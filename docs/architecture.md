@@ -1687,7 +1687,7 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The time to read the daily bars of all US instruments from PostgreSQL (about 10000 × 260 rows) (#136). Synthetic tables give 14 to 16 seconds (section 21.1). Not measured on the real bar tables (#206): the local database has no real daily bars. | Run `read_last_daily_bars` for all instruments of `daily_bar_summary` with `bar_count` 260 on the server and time it. |
 | A US screen keeps 1000 to 2000 instruments after step 1 (estimate, #136). Not counted (#206): the local database has no real daily bars. | Run a screen with the start `all_with_daily_bars` and the filters of the example of `screen.md` section 24.4.1, and read `after_filters_count`. |
 | The time of the IBKR daily bar update for about 500 instruments (#145). | Download the daily bars of 50 instruments and time it. |
-| The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. Not measured (#208): the local database has no real daily bars. Each period start makes 2 bulk daily bar reads (the summary bars and the indicator bars) for the start instruments. |
+| The run time of a backtest with a `screen` universe against the 15 minute wait of the AI assistant (#150). | Run one with real data and time it. Not measured (#208): the local database has no real daily bars. Each period start makes 2 bulk daily bar reads (the summary bars and the indicator bars) for the start instruments. Not measured (#211) for the same reason. When the run is longer, `run_backtest` returns "still running" and the backtest ID (assistant section 25.4.2), tested with a short wait. |
 | The token count of a 500-row screen result (#150). | Count the tokens of 1 real result. Estimate (#209): 500 rows with 3 indicator values and 1 percentile are about 128,000 characters of JSON, about 32,000 to 43,000 tokens (3 to 4 characters for each token). 50 rows are about 3,200 to 4,300 tokens, so the default page of 50 rows stays. Not counted with a real tokenizer and real data. |
 | Memory and time of a backtest of 500 instruments on 1-hour bars: about 4 to 5 GB and 15 s (estimate, #142). Not measured in #199: there are no saved real hourly bars of 500 instruments locally. | Run one with real data and measure the peak memory and the time. |
 | The PostgreSQL read time and the Arrow conversion time of each backtest child with a universe (#142). Not measured in #199 (no real bars locally). | Time one real `rule` backtest child. |
@@ -1889,6 +1889,12 @@ option and records it in this document.
   are lower or equal, so equal values get the same percentile. A run saves
   the full excluded list, also for all US instruments. The result has no
   instrument name: `market_data` has no name source (section 24.5).
+- Decided (#211): `run_backtest` of the AI assistant takes `universe_kind`
+  `single`, `screen` (default rebalance period `quarter`), or `list` (a
+  screen result, optionally only `symbols`). It does not take `rule` and the
+  watchlist. A `list` result has the field `survivorship_bias_warning`
+  ([`assistant.md`](architecture/assistant.md) section 25.4.2,
+  [`backtest.md`](architecture/backtest.md) sections 10.10.8 and 10.13).
 - Decided (#197): the request field of the backtest source order is
   `source_order`. It holds each `BarSource` exactly 1 time, like the global
   source order (`422` otherwise). `bar_count_by_source` counts only the bars

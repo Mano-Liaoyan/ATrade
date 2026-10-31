@@ -26,6 +26,7 @@
     describeCredentialKind,
     describeCredentialState,
     formatKey,
+    isLoginWaiting,
     listCredentials,
     listLoginProviders,
     listProviders,
@@ -240,6 +241,9 @@
         {/if}
         {#if login.progress !== null}
           <p>{login.progress}</p>
+        {/if}
+        {#if isLoginWaiting(login)}
+          <StatusIndicator kind="in-progress" label="Waiting for the provider" />
         {/if}
         {#if login.prompt !== null}
           <form class="credentials__form" onsubmit={sendAnswer}>

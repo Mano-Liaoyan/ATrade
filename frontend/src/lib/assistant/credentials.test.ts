@@ -1,11 +1,14 @@
 import { describe, expect, test } from 'vite-plus/test';
 import {
   addLoginMessage,
+  answerPrompt,
   describeCredentialKind,
   describeCredentialState,
   formatKey,
+  isLoginWaiting,
   listLoginProviders,
   NO_LOGIN,
+  STARTED_LOGIN,
   type Credential,
   type LoginStepMessage,
   type Provider,
@@ -70,6 +73,16 @@ describe('the providers of a login method', () => {
 });
 
 describe('the login steps', () => {
+  test('the login waits while it has no prompt and no progress: after the start and after an answer', () => {
+    const prompted = addLoginMessage(STARTED_LOGIN, step({ step: 'prompt', prompt_id: 'p1', prompt_type: 'secret' }));
+
+    expect(isLoginWaiting(NO_LOGIN)).toBe(false);
+    expect(isLoginWaiting(STARTED_LOGIN)).toBe(true);
+    expect(isLoginWaiting(prompted)).toBe(false);
+    expect(isLoginWaiting(answerPrompt(prompted))).toBe(true);
+    expect(isLoginWaiting(addLoginMessage(STARTED_LOGIN, step({ step: 'progress', message: 'Waiting.' })))).toBe(false);
+  });
+
   test('the link, the device code, and the progress stay, and a prompt waits for its answer', () => {
     let login = addLoginMessage(NO_LOGIN, step({ step: 'auth_url', url: 'https://login.example.test' }));
     login = addLoginMessage(login, step({ step: 'device_code', user_code: 'ABCD-1234', url: 'https://x.test/device' }));

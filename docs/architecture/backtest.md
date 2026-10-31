@@ -1113,8 +1113,11 @@ with universe data from the new route `GET /api/us-universe/range`
   The trial count of section 10.9.5 counts the finished backtests of the same
   strategy, bar period, `universe_kind`, currency, and `universe_top_n`.
   Single-instrument results do not change.
-- Whether `run_backtest` of the AI assistant also accepts `rule` and the
-  watchlist (section 10.13).
+- Decided (#211): `run_backtest` of the AI assistant does not accept `rule`
+  and the watchlist. It accepts `single`, `screen`, and `list` with
+  `screen_result_id` (section 10.13). Reason: the simplest tool. The decision
+  (#150) names only these kinds, and port 8001 refuses no kind, so a later
+  change is only in the tool.
 
 ## 10.11 Parameter sweep
 
@@ -1386,3 +1389,9 @@ Phase 3 ([#150](https://github.com/Mano-Liaoyan/ATrade/issues/150)):
     its reply.
 - One multi-instrument backtest counts as 1 of the 5 backtests of a user
   message. The 15-minute wait does not change.
+- Done (#211): the tool parameters and the warning are in
+  [`assistant.md`](assistant.md) section 25.4.2. Port 8001 takes the same
+  universe fields as port 8000 (section 10.10.6) and records the
+  conversation ID. The tool does not take `rule` and the watchlist
+  (section 10.10.8). For an HK screen, port 8001 saves the missing HKD
+  daily rates from IBKR like port 8000 (#181).
