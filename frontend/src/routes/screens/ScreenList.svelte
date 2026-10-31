@@ -1,6 +1,6 @@
 <!-- The screen list of the screen workbench (the body of the "Screens" side column): each row has the name and the
      market. The open screen expands to its recent runs (time and instrument count). A click on a run opens its screen
-     result (docs/architecture/screen.md section 24.10). -->
+     result (docs/architecture/screen.md section 24.10). A failed "New screen" shows its reason above the list. -->
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { InlineNotification } from '#lib/foundation/carbon';
@@ -13,15 +13,21 @@
     errorMessage: string;
     openScreen: Screen | null;
     openScreenResultId: number | null;
+    /** The reason of the last failed "New screen". Empty: no failure. */
+    createMessage: string;
+    onCreateMessageClose: () => void;
   }
 
-  const { screens, errorMessage, openScreen, openScreenResultId }: Props = $props();
+  const { screens, errorMessage, openScreen, openScreenResultId, createMessage, onCreateMessageClose }: Props = $props();
 
   function runHref(screenId: number, screenResultId: number): string {
     return `${resolve('/screens/[[screenId]]', { screenId: String(screenId) })}?result=${String(screenResultId)}`;
   }
 </script>
 
+{#if createMessage !== ''}
+  <InlineNotification kind="error" title="Screen not created" subtitle={createMessage} lowContrast onClose={onCreateMessageClose} />
+{/if}
 {#if errorMessage !== ''}
   <InlineNotification kind="error" title="Screens not read" subtitle={errorMessage} lowContrast />
 {:else}

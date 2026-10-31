@@ -405,3 +405,39 @@ test('adds Close, changes Avg trading value (20) and Exchange, removes each othe
   await expectRunDone(page);
   await expect(page.getByText(WARNING_TEXT, { exact: false })).toBeVisible();
 });
+
+// The "New screen" button of the "Screens" side column creates a US screen of the quarter universe and opens its run.
+test('"New screen" shows the reason of a failed create, then creates a screen and opens its run', async ({ page }) => {
+  await page.goto('/screens');
+  const newScreenButton = page.getByRole('button', { name: 'New screen', exact: true });
+
+  await page.route('**/api/screens', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({ status: 422, json: { problems: [{ location: ['name'], message: 'The name is in use.' }] } });
+  });
+  await newScreenButton.click();
+  const failure = page.getByRole('alert').filter({ hasText: 'Screen not created' });
+  await expect(failure).toContainText('The name is in use.');
+  await page.unroute('**/api/screens');
+
+  const created = page.waitForResponse(
+    (response) => response.url().endsWith('/api/screens') && response.request().method() === 'POST',
+  );
+  await newScreenButton.click();
+  const response = await created;
+  expect(response.status()).toBe(201);
+  const screen = (await response.json()) as { id: number; name: string; market: string };
+  expect(screen.name).toMatch(/^New screen( \d+)?$/);
+  expect(screen.market).toBe('US');
+
+  await expect(page).toHaveURL(new RegExp(`/screens/${String(screen.id)}\\?result=\\d+$`));
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(screen.name);
+  await expect(conditionBar(page)).toContainText('Quarter universe');
+  await expectRunDone(page);
+  await expect(failure).toHaveCount(0);
+  const openRow = page.getByRole('region', { name: 'Screen list' }).locator('a[aria-current="page"]');
+  await expect(openRow.locator('.screen-name')).toHaveText(screen.name);
+});
