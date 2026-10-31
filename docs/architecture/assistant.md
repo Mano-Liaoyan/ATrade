@@ -1141,6 +1141,48 @@ Implemented (#210, prototype variant A):
   screen". "Discarded" has the neutral `StatusIndicator`, and the conditions
   fade.
 
+### 25.12.5 Message rendering
+
+The text of an AI assistant message is markdown (GFM). A message of the
+user stays plain text. `foundation/markdown` has the `Markdown` component;
+`AssistantLog` uses it in `ChatMessage`.
+
+- Blocks: headings, paragraphs, bold, italic, strikethrough, lists, links,
+  inline code, block quotes, tables, horizontal rules, and code blocks.
+- Security: the text is untrusted. `marked` (lexer only) reads it into
+  blocks that hold text only. Svelte renders the text as text nodes, so raw
+  HTML of the message shows as text. A link keeps only an `http`, `https`,
+  or `mailto` address; another address (for example `javascript:`) shows
+  only the link text. A link opens in a new tab with
+  `rel="noreferrer noopener"`. An image is a link with its alternative
+  text; no image loads.
+- Table: the Carbon data table structure (`cds--data-table--xs`). A column
+  where each body cell is a number is right aligned with tabular numbers. A
+  wide table scrolls in its own styled track.
+- Code block: the language name and a "Copy" button. A closed block gets
+  syntax colors from `shiki` (JavaScript regex engine, loaded on demand)
+  for Python, shell, JSON, YAML, SQL, TypeScript, JavaScript, and TOML. The
+  colors are the colors of the code editor (CSS variables, so a theme
+  change needs no new highlight).
+- Shell block (`bash`, `sh`, `zsh`, `shell`, `console`, `shellsession`):
+  each command shows after a `$` prompt. In a block with prompts, a line
+  without a prompt is output. "Copy" copies the commands without the prompt
+  and without the output.
+- Diff block (`diff` or `patch`, or a code block without a language that
+  holds a unified diff): a closed block with file headers and a hunk shows
+  in the diff view of `@pierre/diffs` (vanilla `FileDiff`, unified, "+" and
+  "-" markers, Carbon token colors). Else the block shows each line with
+  its "+" or "-" marker and a line color.
+- Mermaid block: a closed block shows the diagram of `pele` (loaded on
+  demand). Links and images in the diagram are off, and the SVG is cleaned
+  (no scripts, event attributes, or external references) before it enters
+  the page. The pele colors are Carbon tokens, so the diagram follows the
+  theme. While the text streams in, and when pele cannot read the text, the
+  block shows the Mermaid code.
+- Streaming: the component reads the full text again at each part. An open
+  code fence shows as plain code until it closes, so the lines do not
+  flicker. A half table shows as text until its delimiter row arrives.
+
 ## 25.13 Side column width splitter (all pages)
 
 Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q7).

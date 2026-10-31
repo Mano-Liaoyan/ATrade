@@ -1,10 +1,12 @@
-<!-- The conversation log of the assistant side column (docs/architecture/assistant.md 25.12.1): the messages, the
+<!-- The conversation log of the assistant side column (docs/architecture/assistant.md 25.12.1): the messages (an AI assistant
+     message renders its markdown, 25.12.5), the
      tool steps (one StatusIndicator line each), the diff cards, the metric cards, and the condition cards, in a ChatLog. Each AI assistant
      message shows its model and its credential name. A click on a diff card opens CodeDiff in the editor panel of the
      strategy page. Keep opens the new version in the editor, and Discard adds the discarded mark (25.5.2). -->
 <script lang="ts">
   import { describeToolStep, type DiffItem, type LogItem } from '#lib/assistant';
   import { arrangeChatLog, Button, ChatDivider, ChatLog, ChatMessage, StatusIndicator } from '#lib/foundation/carbon';
+  import { Markdown } from '#lib/foundation/markdown';
   import AssistantMetricCard from './AssistantMetricCard.svelte';
   import AssistantScreenCard from './AssistantScreenCard.svelte';
   import type { DiffChoice } from './assistant_session.svelte';
@@ -51,7 +53,8 @@
           author={item.role === 'user' ? 'You' : 'AI assistant'}
           continued={entry.continued}
           streaming={item.streaming}
-        >{item.text}{#if item.model !== null}<span class="message-model"
+        >{#if item.role === 'user'}{item.text}{:else}<Markdown text={item.text} />{/if}{#if item.model !== null}<span
+              class="message-model"
               >{item.model} · {item.credentialName}</span
             >{/if}</ChatMessage
         >

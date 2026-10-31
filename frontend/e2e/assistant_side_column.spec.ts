@@ -1,6 +1,6 @@
 // The "AI assistant" side column of each workbench page (#185, docs/architecture/assistant.md 25.12). The e2e server
 // uses the fake assistant service backend/tests/fakes/e2e_assistant.py: the prompt text selects the answer ("wait",
-// "screen", "change", "backtest", "notitle", or a streamed answer). No real model provider.
+// "screen", "change", "backtest", "notitle", "markdown", or a streamed answer). No real model provider.
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 // The e2e database is not cleared between tests and browser projects, so each strategy name is unique.
@@ -71,6 +71,45 @@ test('a prompt streams the answer, which shows its model and credential, and a c
   // A reload shows the saved messages.
   await page.reload();
   await expect(conversationLog(page).getByText('gpt-b · Home key')).toBeVisible();
+});
+
+test('an answer shows its markdown: heading, bold, table, shell command, diff, and Mermaid diagram', async ({
+  page,
+  context,
+  browserName,
+}, currentTest) => {
+  await openStrategyWithConversation(page, createUniqueName(currentTest, 'Markdown'));
+  await sendMessage(page, 'Show markdown.');
+  const log = conversationLog(page);
+
+  await expect(log.getByRole('heading', { name: 'Backtest summary', level: 3 })).toBeVisible();
+  await expect(log.locator('strong', { hasText: 'higher Sharpe ratio' })).toBeVisible();
+  await expect(log.getByText('**')).toHaveCount(0);
+
+  const table = log.getByRole('table');
+  await expect(table.getByRole('columnheader', { name: 'Return' })).toBeVisible();
+  await expect(table.getByRole('cell', { name: '12.5%' })).toHaveAttribute('align', 'right');
+  await expect(table.getByRole('cell', { name: 'MSFT' })).toBeVisible();
+
+  const shell = log.getByRole('figure', { name: 'bash' });
+  await expect(shell).toContainText('pnpm install');
+  if (browserName === 'chromium') {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await shell.getByRole('button', { name: 'Copy' }).click();
+    await expect(shell.getByRole('button', { name: 'Copied' })).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('pnpm install');
+  } else {
+    await expect(shell.getByRole('button', { name: 'Copy' })).toBeVisible();
+  }
+
+  const diff = log.getByRole('figure', { name: 'diff' });
+  await expect(diff).toContainText('threshold = 25');
+  await expect(diff).toContainText('threshold = 30');
+
+  const diagram = log.getByRole('figure', { name: 'Mermaid diagram' });
+  await expect(diagram.locator('svg')).toBeVisible();
+  await expect(diagram.locator('svg')).toContainText('Backtest');
+  await expect(log.getByText('flowchart LR')).toHaveCount(0);
 });
 
 test('Send becomes Stop while the AI assistant runs, and Stop ends the run', async ({ page }, currentTest) => {
