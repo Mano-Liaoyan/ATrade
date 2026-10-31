@@ -84,3 +84,9 @@
 .atrade-auto-grid--wide {
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
 }
+
+// A Carbon tab panel takes the focus (tabindex 0) and draws its focus outline on `:focus`, so a mouse click in a
+// panel body draws a frame around the whole panel. Only the keyboard focus (`:focus-visible`) keeps the outline.
+.cds--tab-content:focus:not(:focus-visible) {
+  outline: none;
+}
