@@ -2,7 +2,8 @@
      the action name, for example "Maximize panel". Toolbars and panel header lines use it (spec #99, toolbar rule).
      A toolbar button can show its state: `tone` gives the icon a Carbon token color, `marked` adds a dot (for example
      for unsaved changes), and `busy` turns the icon. The icon shape always changes with the state too, so the color is
-     never the only sign. -->
+     never the only sign. `kind` "primary" or "danger" gives the main action of a line, for example Send and Stop of
+     the AI assistant composer. -->
 <script module lang="ts">
   /** The icon color: icon-secondary (neutral, grey), icon-interactive (blue), or a support color. */
   export type IconTone = 'neutral' | 'interactive' | 'success' | 'warning' | 'error';
@@ -29,6 +30,9 @@
     marked?: boolean;
     /** The icon turns. Use it with `disabled` and a label that says what runs. */
     busy?: boolean;
+    kind?: 'ghost' | 'primary' | 'danger';
+    /** The ID of a visible text that says more, for example why the button is disabled. */
+    describedBy?: string;
     onclick: () => void;
   }
 
@@ -41,6 +45,8 @@
     tone,
     marked = false,
     busy = false,
+    kind = 'ghost',
+    describedBy,
     onclick,
   }: Props = $props();
 
@@ -53,12 +59,13 @@
       {...props}
       type="button"
       class={[
-        'cds--btn cds--btn--ghost cds--btn--sm cds--layout--size-sm cds--btn--icon-only atrade-icon-button',
+        `cds--btn cds--btn--${kind} cds--btn--sm cds--layout--size-sm cds--btn--icon-only atrade-icon-button`,
         disabled && !busy && 'cds--btn--disabled',
         busy && 'atrade-icon-button--busy',
         tone !== undefined && `atrade-icon-button--${tone}`,
       ]}
       aria-label={label}
+      aria-describedby={describedBy}
       aria-disabled={disabled ? 'true' : undefined}
       aria-keyshortcuts={shortcut?.replaceAll('Ctrl', 'Control').replaceAll('Cmd', 'Meta')}
       onclick={() => {

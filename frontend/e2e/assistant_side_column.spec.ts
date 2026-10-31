@@ -147,6 +147,40 @@ test('an answer shows its markdown: heading, bold, table, shell command, diff, a
   await expect(log.getByText('flowchart LR')).toHaveCount(0);
 });
 
+test('the composer is one box with the message, Model, Thinking, and Send; Provider and Credential are under it', async ({
+  page,
+}, currentTest) => {
+  await openStrategyWithConversation(page, createUniqueName(currentTest, 'Composer'));
+  const column = assistantColumn(page);
+  const box = column.getByRole('group', { name: 'New message' });
+  await expect(box.getByRole('textbox', { name: 'Message' })).toBeVisible();
+  await expect(box.getByRole('combobox', { name: 'Model' })).toBeVisible();
+  await expect(box.getByRole('combobox', { name: 'Thinking' })).toBeVisible();
+  await expect(box.getByRole('button', { name: 'Send' })).toBeVisible();
+  await expect(box.getByRole('combobox', { name: 'Provider' })).toHaveCount(0);
+
+  const boxBounds = await box.boundingBox();
+  for (const name of ['Provider', 'Credential']) {
+    const bounds = await column.getByRole('combobox', { name }).boundingBox();
+    expect(bounds?.y).toBeGreaterThanOrEqual((boxBounds?.y ?? 0) + (boxBounds?.height ?? 0));
+  }
+
+  // A long model name stays readable: the field shows it, and when the field cuts it, its tooltip gives all of it.
+  const fullName = 'GPT Long Context Reasoning Preview Edition';
+  await selectOption(page, 'Model', fullName);
+  const model = box.getByRole('combobox', { name: 'Model' });
+  await expect(model).toHaveText(fullName);
+  await model.hover();
+  const field = await model.evaluate((element) => {
+    const label = element.querySelector('.cds--list-box__label');
+    return {
+      isCut: label !== null && label.scrollWidth > label.clientWidth,
+      title: element.closest('.cds--list-box__wrapper')?.getAttribute('title') ?? null,
+    };
+  });
+  expect(field.title).toBe(field.isCut ? fullName : null);
+});
+
 test('Send becomes Stop while the AI assistant runs, and Stop ends the run', async ({ page }, currentTest) => {
   await openStrategyWithConversation(page, createUniqueName(currentTest, 'Stop'));
   const column = assistantColumn(page);

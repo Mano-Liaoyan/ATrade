@@ -8,7 +8,7 @@ The text of a prompt selects the answer:
 - "backtest": a run_backtest tool step with a finished backtest, and a metric card.
 - "notitle": a normal answer, but the title generation fails.
 - "markdown": a streamed markdown answer with a heading, bold text, a table, a bash block, a diff block, and a
-  Mermaid block (docs/architecture/assistant.md 25.12.5).
+  Mermaid block (docs/architecture/assistant.md 25.12.6).
 - other text: a streamed answer.
 The answer ends with the model of the prompt, the name of its credential, and its thinking level. A model without the
 requested thinking level runs with "off". The messages are kept, so a reload shows them.

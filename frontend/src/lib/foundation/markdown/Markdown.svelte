@@ -1,7 +1,7 @@
 <!-- A markdown text (GFM) in Carbon styles: headings, paragraphs, lists, links, block quotes, tables, rules, and code
      blocks (shell commands, diffs, and Mermaid diagrams). The text is untrusted: no HTML of the text renders.
      The text can stream in: an open code fence shows as plain code, and a half table shows as text until it is a table
-     (docs/architecture/assistant.md 25.12.5). -->
+     (docs/architecture/assistant.md 25.12.6). -->
 <script lang="ts">
   import MarkdownBlocks from './MarkdownBlocks.svelte';
   import { parseMarkdown } from './markdown_blocks';

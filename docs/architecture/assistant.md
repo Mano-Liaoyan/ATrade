@@ -989,10 +989,11 @@ log, the message input, and Minimize.
 |---|---|
 | Top | Conversation `Select`, "New conversation" button, "Credentials" icon button, "Prompt" icon button. The prompt version of the open conversation, for example "Prompt v3". |
 | Middle | The conversation messages (`role="log"`) in a `ScrollRegion`. Tool steps, diff cards, metric cards, and (phase 3) condition cards. |
-| Bottom | Line 1: the model `Select` (2 parts of the width, for the full model name) and the thinking `Select`. Line 2: the provider and credential `Select`s. Below them, the message input and the "Send" button. While the AI assistant runs, "Send" becomes "Stop". |
+| Bottom | The composer: one box with the message input, and under the input the inline model `Select` (the full model name), the inline thinking `Select`, and the "Send" icon button. While the AI assistant runs, "Send" becomes "Stop". Under the box: the inline provider and credential `Select`s. |
 
 - A tool step is one `StatusIndicator` line, for example
-  "Backtest #42 running".
+  "Backtest #42 running". 2 or more consecutive tool steps are one group
+  (25.12.5).
 - A diff card shows a code change (25.5.2).
 - A metric card shows the `KeyMetricRow` of a finished backtest. It links to
   the backtest.
@@ -1034,12 +1035,11 @@ Implemented (#185):
   "Model", and "Credential". A conversation starts with its last
   model and credential, else with the first credential and the first model
   of its provider. Enter sends; Shift Enter adds a line.
-- Decided (side column feedback): the bottom has 2 lines of Selects in the
-  28rem column. Line 1: "Model" (2 parts of the width) and "Thinking" (1
-  part). Line 2: "Provider" and "Credential". The open list of each `Select`
-  is at least as wide as its field and as wide as its longest label, not
-  wider than the viewport. A field that cuts its label shows the full label
-  in a native `title` tooltip.
+- Decided (side column feedback, then the conversation design of 25.12.5):
+  the composer replaces the 2 lines of Selects. The open list of each
+  `Select` is at least as wide as its field and as wide as its longest
+  label, not wider than the viewport. A field that cuts its label shows the
+  full label in a native `title` tooltip.
 - Decided (side column feedback): "Thinking" lists only the
   `thinking_levels` of the selected model ("Off", "Minimal", "Low",
   "Medium", "High", "Extra high", "Max"). The browser keeps the last chosen
@@ -1177,7 +1177,41 @@ Implemented (#210, prototype variant A):
   screen". "Discarded" has the neutral `StatusIndicator`, and the conditions
   fade.
 
-### 25.12.5 Message rendering
+### 25.12.5 Conversation design (option A)
+
+Source: the side column design choice of the user (#159, option A of the
+mockups). It takes the patterns of the Codex and Claude Code desktop apps
+and of the open-source apps t3code and orca (stablyai/orca). ATrade copies
+no code or asset of them.
+
+- A message of the user is a bubble at the end of the line (Carbon
+  `chat-bubble-user` token), at most 85% of the width.
+- A message of the AI assistant has no bubble. It is text over the full
+  width of the log, so tables and code have room. Its model line stays
+  under it.
+- 2 or more consecutive tool steps are one group. The group line is a
+  button with a chevron and a `StatusIndicator` "<n> tool steps": in
+  progress while a step runs, error when a step failed, else success. The
+  group is open while a step runs and closes when all steps end. A click
+  opens or closes it, and the choice stays while the page is open. A single
+  tool step stays its own line. Code: `groupToolSteps` and
+  `describeToolStepGroup` (`frontend/src/lib/assistant/tool_step_groups.ts`).
+- The composer is one box with the Carbon field look (`field-01`, the
+  bottom border `border-strong-01`, the focus outline around the whole box),
+  with the accessible name "New message". In it: the message input, and a
+  line with the inline `Select`s "Model" and "Thinking" and the "Send" icon
+  button (Carbon primary, `send--filled` icon). While the AI assistant runs,
+  the button is "Stop" (Carbon danger, `stop--filled--alt` icon).
+  "Thinking" keeps its width; "Model" gets the rest and cuts a long name
+  with an ellipsis and the `title` tooltip.
+- Under the box: the inline `Select`s "Provider" and "Credential". Under
+  them, the reason when "Send" is disabled.
+- `Select` has the property `inline` (the Carbon inline dropdown classes),
+  and `IconButton` has `kind` (`ghost`, `primary`, `danger`) and
+  `describedBy`.
+- The answers render their markdown (25.12.6).
+
+### 25.12.6 Message rendering
 
 The text of an AI assistant message is markdown (GFM). A message of the
 user stays plain text. `foundation/markdown` has the `Markdown` component;

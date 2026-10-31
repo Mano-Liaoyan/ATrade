@@ -56,3 +56,4 @@ export {
   type ThinkingLevel,
 } from './model_selection';
 export { listCredentials, listProviders } from './credentials';
+export { describeToolStepGroup, groupToolSteps, type GroupedLogEntry, type ToolStepGroup } from './tool_step_groups';

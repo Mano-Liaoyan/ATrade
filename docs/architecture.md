@@ -93,7 +93,7 @@ and its revision comments.
 | Frontend API types | `openapi-typescript` generates types from the OpenAPI document. Pydantic exports JSON Schema for WebSocket messages, and types come from that schema. The frontend does no runtime validation. | Data types have one definition, in the backend. |
 | Bar chart | `lightweight-charts`. | It does not depend on the framework. |
 | Code editor | CodeMirror 6, `@codemirror/lang-python`, `@codemirror/merge`, in our own Svelte component. | Small size, low Safari risk, official diff and LSP extensions. |
-| Markdown of AI assistant messages | `marked` (MIT) reads the text. `shiki` (MIT) colors the code, `@pierre/diffs` (Apache-2.0, vanilla JavaScript API) shows a diff, and `pele` (MIT) draws a Mermaid diagram. Exact versions. The page loads `shiki`, `@pierre/diffs`, and `pele` only when a block needs them. | Small, maintained, framework-free libraries. The blocks hold text only, so no HTML of a message renders (`docs/architecture/assistant.md` 25.12.5). |
+| Markdown of AI assistant messages | `marked` (MIT) reads the text. `shiki` (MIT) colors the code, `@pierre/diffs` (Apache-2.0, vanilla JavaScript API) shows a diff, and `pele` (MIT) draws a Mermaid diagram. Exact versions. The page loads `shiki`, `@pierre/diffs`, and `pele` only when a block needs them. | Small, maintained, framework-free libraries. The blocks hold text only, so no HTML of a message renders (`docs/architecture/assistant.md` 25.12.6). |
 | Code completion | basedpyright language server in the backend, `@codemirror/lsp-client` in the frontend. | NautilusTrader 2.0 ships `.pyi` stubs, so basedpyright can resolve `Strategy`. |
 | Real-time communication | WebSocket. | One technology for live data and for the language server. |
 | IBKR connection | TWS API through IB Gateway. Image `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest. | IB Gateway is the official IBKR program. The Client Portal Web API has a lower rate limit. |
@@ -457,7 +457,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - `foundation/carbon` `StatusIndicator` shows a status as an icon and a word
   with a color: `kind` (`success`, `in-progress`, `warning`, `error`,
   `neutral`; each kind has its own icon shape) and `label`. `Select` takes
-  `placeholder` (the trigger text while no item is selected). `TextInput`
+  `placeholder` (the trigger text while no item is selected) and `inline`
+  (the Carbon inline dropdown: no field background, for a control line). `TextInput`
   takes `type` `datetime-local` for a native date and time input.
 - The forward test page (`/forward-tests/<id>`, spec #99, ticket
   [#105](https://github.com/Mano-Liaoyan/ATrade/issues/105)) is a workbench
@@ -705,7 +706,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   - The browser keeps each layout in `localStorage` (`readStoredLayout`,
     `writeStoredLayout`). Blocked storage gives the default layout.
 - `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `disabled`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
-  tooltip that gives the action name. A disabled `IconButton` has
+  tooltip that gives the action name. `kind` `primary` or `danger` makes it
+  the main action of a line (Send and Stop of the AI assistant composer), and
+  `describedBy` names a visible text that says more, for example why the
+  button is disabled. A disabled `IconButton` has
   `aria-disabled` and stays focusable, so its tooltip and its `label` say why
   it is disabled. A toolbar button can also take `shortcut` (shown in the
   tooltip after the label, and `aria-keyshortcuts`), `tone` (`neutral`,
@@ -1009,7 +1013,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     The components ([#187](https://github.com/Mano-Liaoyan/ATrade/issues/187)):
     - `ChatLog` (`label`): a `ScrollRegion` with `role="log"` and `fill`
       around an `<ol>` of messages and dividers.
-    - `ChatMessage` (`from`: `me` aligns to the end, `them` to the start;
+    - `ChatMessage` (`from`: `me` is a bubble at the end, `them` is text
+      over the full width without a bubble (assistant.md 25.12.5);
       `author`, which only screen readers announce; `continued`;
       `streaming`, a caret while the text arrives; `typing`, the typing
       indicator in place of the text; `typingText`, its screen reader text).
@@ -1047,7 +1052,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   color literal. `foundation/markdown/markdown.scss` puts the same colors
   (`@carbon/colors` SCSS) in the `--diffs-token-*` CSS variables that the
   code blocks and the diff view of AI assistant messages read
-  (`docs/architecture/assistant.md` 25.12.5).
+  (`docs/architecture/assistant.md` 25.12.6).
 
 ## 14. Deployment and external access
 

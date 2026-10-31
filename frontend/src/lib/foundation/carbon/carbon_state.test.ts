@@ -31,6 +31,15 @@ describe('dropdownClasses', () => {
       'cds--list-box--disabled',
     ]);
   });
+
+  it('gives the Carbon inline dropdown: no field background, the width of its text', () => {
+    expect(dropdownClasses({ open: false, disabled: false, inline: true })).toEqual([
+      'cds--dropdown',
+      'cds--list-box',
+      'cds--dropdown--inline',
+      'cds--list-box--inline',
+    ]);
+  });
 });
 
 describe('dropdownMenuIconClasses', () => {
