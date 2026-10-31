@@ -19,6 +19,8 @@ from atrade.assistant import (
     BacktestFinished,
     MessageEnd,
     ModelSelection,
+    ScreenRunFinished,
+    ScreenSaved,
     StrategyVersionSaved,
     TextDelta,
     ToolStep,
@@ -157,6 +159,21 @@ async def test_the_tool_events_reach_the_browser_as_tool_steps_and_cards(
             backtest_step("running", "running"),
             backtest_step("succeeded", "finished"),
             BacktestFinished(backtest_id=11),
+            ScreenSaved(
+                screen_id=5,
+                name="Momentum (AI)",
+                market="US",
+                definition={"start": "watchlist"},
+                previous_definition={"start": "quarter_universe"},
+            ),
+            ScreenRunFinished(
+                screen_id=5,
+                screen_result_id=9,
+                start_count=500,
+                after_filters_count=300,
+                after_indicator_conditions_count=40,
+                result_count=20,
+            ),
         ]
     ]
 
@@ -179,6 +196,23 @@ async def test_the_tool_events_reach_the_browser_as_tool_steps_and_cards(
         {**step, "status": "running", "backtest_id": 11, "backtest_status": "running"},
         {**step, "status": "succeeded", "backtest_id": 11, "backtest_status": "finished"},
         {"type": "backtest_finished", "backtest_id": 11},
+        {
+            "type": "screen_saved",
+            "screen_id": 5,
+            "name": "Momentum (AI)",
+            "market": "US",
+            "definition": {"start": "watchlist"},
+            "previous_definition": {"start": "quarter_universe"},
+        },
+        {
+            "type": "screen_run_finished",
+            "screen_id": 5,
+            "screen_result_id": 9,
+            "start_count": 500,
+            "after_filters_count": 300,
+            "after_indicator_conditions_count": 40,
+            "result_count": 20,
+        },
     ]
 
 

@@ -1,6 +1,6 @@
 // The "AI assistant" side column of each workbench page (#185, docs/architecture/assistant.md 25.12). The e2e server
 // uses the fake assistant service backend/tests/fakes/e2e_assistant.py: the prompt text selects the answer ("wait",
-// "change", "backtest", "notitle", or a streamed answer). No real model provider.
+// "screen", "change", "backtest", "notitle", or a streamed answer). No real model provider.
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 // The e2e database is not cleared between tests and browser projects, so each strategy name is unique.
@@ -108,6 +108,47 @@ test('a saved version shows a diff card: the card opens CodeDiff, Keep opens the
   await expect(versionSelect).toHaveText('v2');
   await page.getByRole('button', { name: 'Output', exact: true }).click();
   await expectOutputLine(page, 'Discarded');
+});
+
+test('a saved screen shows a condition card with each change mark; Keep and Discard become states; Open screen opens it', async ({
+  page,
+  request,
+}, currentTest) => {
+  await openStrategyWithConversation(page, createUniqueName(currentTest, 'Screen'));
+  const log = conversationLog(page);
+  await sendMessage(page, 'Make a screen.');
+  await expect(log.getByText('I saved a new screen.')).toBeVisible();
+  const kept = log.getByRole('article', { name: /^Screen E2E momentum/ }).first();
+  await expect(kept.getByText('US', { exact: true })).toBeVisible();
+  const conditions = kept.getByRole('list', { name: 'Conditions' });
+  await expect(conditions.getByRole('img', { name: 'Changed' })).toHaveCount(1);
+  await expect(conditions.getByRole('img', { name: 'Removed' })).toHaveCount(1);
+  await expect(conditions.getByRole('img', { name: 'Added' })).toHaveCount(1);
+  // The changed value: the old value with a line through it, then the new value.
+  const changed = conditions.locator('.condition-tag', { has: page.getByRole('img', { name: 'Changed' }) });
+  await expect(changed).toHaveText(/^\s*Close\s*>\s*5\s*20\s*$/);
+  await expect(changed.locator('s')).toHaveText('5');
+  await expect(conditions.getByLabel('Order count')).toHaveText('20');
+
+  await kept.getByRole('button', { name: 'Keep' }).click();
+  await expect(kept.getByText('Kept')).toBeVisible();
+  await expect(kept.getByRole('button', { name: 'Keep' })).toHaveCount(0);
+  await expect(kept.getByRole('button', { name: 'Discard' })).toHaveCount(0);
+  const keptHref = await kept.getByRole('link', { name: 'Open screen' }).getAttribute('href');
+  const keptRead = await request.get(`/api${keptHref ?? ''}`);
+  expect(((await keptRead.json()) as { kept: boolean }).kept).toBe(true);
+
+  await sendMessage(page, 'Make another screen.');
+  await expect(log.getByRole('article', { name: /^Screen E2E momentum/ })).toHaveCount(2);
+  const discarded = log.getByRole('article', { name: /^Screen E2E momentum/ }).last();
+  const discardedHref = await discarded.getByRole('link', { name: 'Open screen' }).getAttribute('href');
+  await discarded.getByRole('button', { name: 'Discard' }).click();
+  await expect(discarded.getByText('Discarded')).toBeVisible();
+  await expect(discarded.getByRole('button')).toHaveCount(0);
+  expect((await request.get(`/api${discardedHref ?? ''}`)).status()).toBe(404);
+
+  await kept.getByRole('link', { name: 'Open screen' }).click();
+  await expect(page).toHaveURL(new RegExp(`${keptHref ?? ''}$`));
 });
 
 test('a finished backtest shows a tool step and a metric card with a link', async ({ page }, currentTest) => {

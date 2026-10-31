@@ -890,6 +890,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   the conversation (section 25). Each workbench page has the same column.
   Implemented (#185): `AssistantColumn`,
   `AssistantLog`, and `AssistantMetricCard` in `src/routes/assistant/`
+  (#210 adds `AssistantScreenCard`, the condition card)
   (assistant section 25.12). While the column is maximized, the center area
   is a 32px rail and its content stays in the page. A click on a diff card
   adds the tab "v<n-1> → v<n>" with `CodeDiff` to the editor panel. The
@@ -960,7 +961,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     backtest page), `?result=<id>` opens one run, and the "Screens"
     `SideColumn` is `routes/screens/ScreenList.svelte`. `ConditionBar` is
     read-only and has no page state, so the condition card of the AI
-    assistant can use it. The condition bar, the result table, the excluded
+    assistant can use it. Decided (#210): its property `compareWith` (the
+    definition before) shows the change marks of the condition card
+    (`markConditionChanges`). The condition bar, the result table, the excluded
     table, and the screen list each scroll in their own `ScrollRegion`.
   - The backtest page gets a robustness row under `KeyMetricRow`, a Metrics
     tab, and one vertical line at the split time on the equity chart (phase
@@ -1833,6 +1836,13 @@ option and records it in this document.
   the header `X-ATrade-Conversation-Id`, and `read_screen_result` reads
   pages of 50 rows with the parameter `offset` (screen section 24.8,
   assistant sections 25.3.3 and 25.4.3).
+- Decided (#210): the condition card. `/ws/assistant` sends `screen_saved`
+  and `screen_run_finished`. The card compares the screen with the screen
+  before `update_screen`, or with the source screen that `create_screen`
+  names (`source_screen_id`). The funnel counts come from the next
+  `run_screen` of the screen. Keep is `POST /api/screens/{id}/keep` on port
+  8000 and sets `kept`. Discard is `DELETE /api/screens/{id}`. A reload
+  shows no condition card (screen section 24.13, assistant section 25.14).
 - Decided (#185): the conversation controls of the assistant side column,
   the copy of its disabled controls, the diff cards after a reload, and the
   fake assistant service of the e2e server (assistant section 25.14).

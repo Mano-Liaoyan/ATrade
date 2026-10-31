@@ -407,6 +407,16 @@ class ScreenRoutes:
             await connection.commit()
         return to_screen_response(changed, results)
 
+    async def keep_screen(self, screen_id: int) -> ScreenResponse:
+        """Keep of the condition card (section 24.8): `kept` becomes true, so port 8001 cannot change the screen."""
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            screen = await screen_store.keep_screen(connection, screen_id)
+            if screen is None:
+                raise screen_not_found(screen_id)
+            results = await screen_store.select_recent_screen_results(connection, screen_id)
+            await connection.commit()
+        return to_screen_response(screen, results)
+
     async def delete_screen(self, screen_id: int) -> None:
         """Also deletes the screen results of the screen. A backtest keeps its own copy of the screen."""
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
@@ -547,6 +557,9 @@ def create_screen_router(*, database_url: str, clock: Clock) -> APIRouter:
         methods=["DELETE"],
         status_code=status.HTTP_204_NO_CONTENT,
         responses=not_found,
+    )
+    router.add_api_route(
+        "/api/screens/{screen_id}/keep", routes.keep_screen, methods=["POST"], responses=not_found
     )
     router.add_api_route(
         "/api/screens/{screen_id}/runs",

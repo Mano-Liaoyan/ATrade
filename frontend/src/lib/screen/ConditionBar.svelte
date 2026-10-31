@@ -3,13 +3,20 @@
      with its funnel count; the count of the last group is bold. Without `onEdit` the bar is read-only (the condition
      card of the AI assistant). With it, a click on a tag opens its edit popover, the × button of a filter or an
      indicator condition removes it, and the indicator conditions end with the "Add condition" menu. A tag with a
-     problem of a 422 answer shows the error icon and the problem next to it. -->
+     problem of a 422 answer shows the error icon and the problem next to it. With `compareWith`, each tag shows its
+     change against that definition (the condition card, assistant.md 25.12.4): an added tag has the Add icon and a
+     dark border, a removed tag the Subtract icon, a dashed border, and a line through its text, and a changed value
+     the old value with a line through it before the new value. -->
 <script lang="ts">
+  import Add16 from '@carbon/icons/es/add/16.js';
   import ChevronRight16 from '@carbon/icons/es/chevron--right/16.js';
   import Close16 from '@carbon/icons/es/close/16.js';
+  import Edit16 from '@carbon/icons/es/edit/16.js';
+  import Subtract16 from '@carbon/icons/es/subtract/16.js';
   import WarningFilled16 from '@carbon/icons/es/warning--filled/16.js';
   import { Icon, MenuButton, type MenuButtonItem } from '#lib/foundation/carbon';
   import { buildConditionGroups, type FunnelCounts, type IndicatorNames, type ScreenDefinition } from './condition_bar';
+  import { markConditionChanges, type ConditionChange } from './condition_changes';
   import { targetKey, type ConditionKind, type ConditionTarget } from './screen_draft';
 
   type ListTarget = ConditionTarget & { part: 'filters' | 'indicator_conditions' };
@@ -18,6 +25,8 @@
     definition: ScreenDefinition;
     indicatorNames: IndicatorNames;
     counts: FunnelCounts | null;
+    // The definition before the change, for the change marks. Null or left out: no marks.
+    compareWith?: { definition: ScreenDefinition; indicatorNames: IndicatorNames } | null;
     // The problems of a 422 answer by targetKey.
     problems?: Map<string, string[]>;
     onEdit?: (target: ConditionTarget, anchor: HTMLElement) => void;
@@ -25,9 +34,23 @@
     onAdd?: (kind: ConditionKind, anchor: HTMLElement | null) => void;
   }
 
-  const { definition, indicatorNames, counts, problems = new Map(), onEdit, onRemove, onAdd }: Props = $props();
+  const { definition, indicatorNames, counts, compareWith = null, problems = new Map(), onEdit, onRemove, onAdd }: Props =
+    $props();
 
-  const groups = $derived(buildConditionGroups(definition, indicatorNames, counts));
+  const groups = $derived(
+    markConditionChanges(
+      compareWith === null ? null : buildConditionGroups(compareWith.definition, compareWith.indicatorNames, null),
+      buildConditionGroups(definition, indicatorNames, counts),
+    ),
+  );
+  const CHANGE_ICONS = {
+    added: { icon: Add16, label: 'Added' },
+    removed: { icon: Subtract16, label: 'Removed' },
+    changed: { icon: Edit16, label: 'Changed' },
+  } as const;
+  function findChangeIcon(change: ConditionChange) {
+    return change === 'same' ? null : CHANGE_ICONS[change];
+  }
   const COUNT_FORMAT = new Intl.NumberFormat('en-US');
 
   // The definition part of each group, in the order of the groups.
@@ -71,7 +94,14 @@
         {@const tagProblems = problems.get(targetKey(target)) ?? []}
         {@const listTarget = onRemove === undefined ? null : listTargetOf(target)}
         {@const tagText = `${tag.subject} ${tag.operation} ${tag.value}`.replace(/\s+/g, ' ').trim()}
-        <span class={['cds--tag cds--tag--gray condition-tag', listTarget !== null && 'cds--tag--filter', tagProblems.length > 0 && 'tag-invalid']}>
+        <span
+          class={[
+            'cds--tag cds--tag--gray condition-tag',
+            listTarget !== null && 'cds--tag--filter',
+            tagProblems.length > 0 && 'tag-invalid',
+            tag.change !== 'same' && `tag-${tag.change}`,
+          ]}
+        >
           {#if tagProblems.length > 0}
             <Icon icon={WarningFilled16} class="problem-icon" />
           {/if}
@@ -89,9 +119,20 @@
               {#if tag.value !== ''}<span class="value">{tag.value}</span>{/if}
             </button>
           {:else}
+            {@const changeIcon = findChangeIcon(tag.change)}
+            {#if changeIcon !== null}
+              <Icon icon={changeIcon.icon} label={changeIcon.label} class={`change-icon change-icon--${tag.change}`} />
+            {/if}
             <span class="cds--tag__label">
+              {#if tag.previous !== null && tag.previous.subject !== tag.subject}<s class="old">{tag.previous.subject}</s>{/if}
               <span class="subject">{tag.subject}</span>
+              {#if tag.previous !== null && tag.previous.operation !== tag.operation && tag.previous.operation !== ''}<s
+                  class="old">{tag.previous.operation}</s
+                >{/if}
               {#if tag.operation !== ''}<span class="operation">{tag.operation}</span>{/if}
+              {#if tag.previous !== null && tag.previous.value !== tag.value && tag.previous.value !== ''}<s class="old"
+                  >{tag.previous.value}</s
+                >{/if}
               {#if tag.value !== ''}<span class="value">{tag.value}</span>{/if}
             </span>
           {/if}
@@ -197,6 +238,34 @@
   /* The value color: $link-primary (blue 60 in g10, blue 40 in g100), section 24.13. */
   .value {
     color: var(--cds-link-primary);
+  }
+
+  /* The change marks of the condition card (assistant.md 25.12.4). The icon says the change, not only the border. */
+  .tag-added,
+  .tag-changed {
+    border: 1px solid var(--cds-border-inverse);
+  }
+
+  .tag-removed {
+    border: 1px dashed var(--cds-border-strong-01);
+  }
+
+  .tag-removed .cds--tag__label span {
+    color: var(--cds-text-helper);
+    text-decoration: line-through;
+  }
+
+  .condition-tag :global(.change-icon) {
+    margin-inline-end: var(--cds-spacing-02);
+    fill: var(--cds-support-info);
+  }
+
+  .condition-tag :global(.change-icon--removed) {
+    fill: var(--cds-support-error);
+  }
+
+  .old {
+    color: var(--cds-text-helper);
   }
 
   .count {

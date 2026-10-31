@@ -22,6 +22,8 @@ from atrade.assistant import (
     ProviderModel,
     ProviderSummary,
     RunError,
+    ScreenRunFinished,
+    ScreenSaved,
     StrategyVersionSaved,
     TextDelta,
     ToolStep,
@@ -76,6 +78,23 @@ async def test_run_reads_the_tool_events() -> None:
         {**step, "backtest_id": 11, "backtest_status": "queued"},
         {"type": "strategy_version_saved", "strategy_id": 3, "strategy_version_id": 103, "version_number": 3},
         {"type": "backtest_finished", "backtest_id": 11},
+        {
+            "type": "screen_saved",
+            "screen_id": 5,
+            "name": "Momentum (AI)",
+            "market": "US",
+            "definition": {"start": "watchlist"},
+            "previous_definition": None,
+        },
+        {
+            "type": "screen_run_finished",
+            "screen_id": 5,
+            "screen_result_id": 9,
+            "start_count": 500,
+            "after_filters_count": 300,
+            "after_indicator_conditions_count": 40,
+            "result_count": 20,
+        },
     ]
     body = "".join(json.dumps(line) + "\n" for line in lines)
     client = client_for(httpx.Response(200, text=body), [])
@@ -91,6 +110,17 @@ async def test_run_reads_the_tool_events() -> None:
         ),
         StrategyVersionSaved(strategy_id=3, strategy_version_id=103, version_number=3),
         BacktestFinished(backtest_id=11),
+        ScreenSaved(
+            screen_id=5, name="Momentum (AI)", market="US", definition={"start": "watchlist"}, previous_definition=None
+        ),
+        ScreenRunFinished(
+            screen_id=5,
+            screen_result_id=9,
+            start_count=500,
+            after_filters_count=300,
+            after_indicator_conditions_count=40,
+            result_count=20,
+        ),
     ]
 
 

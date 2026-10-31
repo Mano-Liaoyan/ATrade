@@ -93,6 +93,26 @@ export function createScreen(
   });
 }
 
+async function sendScreenAction(fetchFunction: typeof fetch, path: string, method: string): Promise<string | null> {
+  const response = await sendRequest(fetchFunction, path, { method });
+  if (response === null) {
+    return BACKEND_NOT_REACHABLE;
+  }
+  return response.ok ? null : readErrorMessage(response, FAILED_ACTION);
+}
+
+/** Keep of the condition card: the AI assistant cannot change the screen after it (section 24.8). Null when kept,
+ * else the error message. */
+export function keepScreen(fetchFunction: typeof fetch, screenId: number): Promise<string | null> {
+  return sendScreenAction(fetchFunction, `/api/screens/${String(screenId)}/keep`, 'POST');
+}
+
+/** Discard of the condition card: deletes the screen and its screen results. Null when deleted, else the error
+ * message. */
+export function deleteScreen(fetchFunction: typeof fetch, screenId: number): Promise<string | null> {
+  return sendScreenAction(fetchFunction, `/api/screens/${String(screenId)}`, 'DELETE');
+}
+
 export function readScreenResult(
   fetchFunction: typeof fetch,
   screenResultId: number,

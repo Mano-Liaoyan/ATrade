@@ -663,6 +663,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screens/{screen_id}/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep Screen
+         * @description Keep of the condition card (section 24.8): `kept` becomes true, so port 8001 cannot change the screen.
+         */
+        post: operations["keep_screen_api_screens__screen_id__keep_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/screens/{screen_id}/runs": {
         parameters: {
             query?: never;
@@ -3230,6 +3250,52 @@ export interface components {
             state: "running" | "settled";
         };
         /**
+         * ScreenRunFinishedMessage
+         * @description `run_screen` saved a screen result. The last condition card of the screen shows its funnel counts.
+         */
+        ScreenRunFinishedMessage: {
+            /**
+             * Type
+             * @default screen_run_finished
+             * @constant
+             */
+            type: "screen_run_finished";
+            /** Screen Id */
+            screen_id: number;
+            /** Screen Result Id */
+            screen_result_id: number;
+            /** Start Count */
+            start_count: number;
+            /** After Filters Count */
+            after_filters_count: number;
+            /** After Indicator Conditions Count */
+            after_indicator_conditions_count: number;
+            /** Result Count */
+            result_count: number;
+        };
+        /**
+         * ScreenSavedMessage
+         * @description The AI assistant made or changed a screen, for the condition card (25.12.4). The card compares `definition`
+         *     with `previous_definition`: the screen before `update_screen`, or the source screen of `create_screen`. Null when
+         *     `create_screen` has no source screen.
+         */
+        ScreenSavedMessage: {
+            /**
+             * Type
+             * @default screen_saved
+             * @constant
+             */
+            type: "screen_saved";
+            /** Screen Id */
+            screen_id: number;
+            /** Name */
+            name: string;
+            /** Market */
+            market: string;
+            definition: components["schemas"]["JsonValue"];
+            previous_definition: components["schemas"]["JsonValue"];
+        };
+        /**
          * SteerMessage
          * @description Browser to server: a user message while the AI assistant runs.
          */
@@ -4918,6 +4984,46 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    keep_screen_api_screens__screen_id__keep_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
             };
             /** @description Not Found */
             404: {

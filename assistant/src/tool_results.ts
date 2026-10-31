@@ -13,6 +13,28 @@ export interface ToolDetails {
   savedVersion?: { strategy_id: number; strategy_version_id: number; version_number: number };
   /** The backtest that run_backtest waited for to its end, for the metric card. */
   finishedBacktestId?: number;
+  /** The screen that create_screen or update_screen saved, for the condition card (25.12.4). */
+  savedScreen?: SavedScreen;
+  /** The funnel counts of the screen result of run_screen, for the condition card. */
+  screenRun?: ScreenRun;
+}
+
+export interface SavedScreen {
+  screen_id: number;
+  name: string;
+  market: string;
+  definition: unknown;
+  /** The screen before update_screen, or the source screen of create_screen. Null without a source screen. */
+  previous_definition: unknown;
+}
+
+export interface ScreenRun {
+  screen_id: number;
+  screen_result_id: number;
+  start_count: number;
+  after_filters_count: number;
+  after_indicator_conditions_count: number;
+  result_count: number;
 }
 
 export type ToolResult = AgentToolResult<ToolDetails>;
