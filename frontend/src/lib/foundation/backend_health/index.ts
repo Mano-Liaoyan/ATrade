@@ -1,9 +1,8 @@
-// Public entry of foundation/backend_health: reads GET /api/health for the backend status icon and the server clock
+// Public entry of foundation/backend_health: reads GET /api/health for the Connections button and the server clock
 // of the app shell. The server time ticks in the browser: the server time of the answer plus the browser time since
 // the answer.
 
 import type { components } from '#lib/api';
-import type { StatusKind } from '#lib/foundation/carbon';
 
 type HealthResponse = components['schemas']['HealthResponse'];
 
@@ -47,12 +46,6 @@ export async function fetchBackendHealth(
   return { kind: 'ok', serverTimeUtc: health.time_utc, receivedAtMilliseconds: readNowMilliseconds() };
 }
 
-/** The status icon kind and the tooltip text of the backend status in the header. */
-export interface BackendHealthDescription {
-  kind: StatusKind;
-  text: string;
-}
-
 /** `nowMilliseconds` is the browser time (Date.now()). Only the time since the answer comes from the browser clock. */
 export function readServerClock(health: BackendHealth, nowMilliseconds: number): string | null {
   if (health.kind !== 'ok') {
@@ -62,17 +55,4 @@ export function readServerClock(health: BackendHealth, nowMilliseconds: number):
   const serverTimeMilliseconds = answerTimeMilliseconds + nowMilliseconds - health.receivedAtMilliseconds;
   const timeOfDay = new Date(serverTimeMilliseconds).toISOString().slice(ISO_TIME_OF_DAY_START, ISO_TIME_OF_DAY_END);
   return `${timeOfDay} UTC`;
-}
-
-export function describeBackendHealth(health: BackendHealth): BackendHealthDescription {
-  switch (health.kind) {
-    case 'ok':
-      return { kind: 'success', text: 'Backend connected.' };
-    case 'database_unreachable':
-      return { kind: 'error', text: 'Backend connected. Database not reachable.' };
-    case 'backend_unreachable':
-      return { kind: 'error', text: 'Backend not reachable.' };
-    case 'checking':
-      return { kind: 'in-progress', text: 'Checking the backend.' };
-  }
 }
