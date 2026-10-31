@@ -19,19 +19,20 @@ function createJsonRequest(method: string, body: unknown): RequestInit {
   return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
 }
 
-export async function listConversations(fetchFunction: typeof fetch, strategyId: number): Promise<RequestResult<Conversation[]>> {
-  const path = `${CONVERSATIONS_PATH}?strategy_id=${String(strategyId)}`;
-  const result = await requestJson<{ conversations: Conversation[] }>(fetchFunction, FAILED_ACTION, path);
+/** All conversations, the newest first. Each workbench page lists the same conversations (25.12). */
+export async function listConversations(fetchFunction: typeof fetch): Promise<RequestResult<Conversation[]>> {
+  const result = await requestJson<{ conversations: Conversation[] }>(fetchFunction, FAILED_ACTION, CONVERSATIONS_PATH);
   return result.kind === 'ok' ? { kind: 'ok', value: result.value.conversations } : result;
 }
 
-/** The conversation records the open version number in the fixed part of its system prompt (25.9). */
+/** The open strategy and version of the page go in the fixed part of the system prompt (25.9). A page without an open
+ * strategy sends none. */
 export function createConversation(
   fetchFunction: typeof fetch,
-  strategyId: number,
-  versionNumber: number | null,
+  openStrategy: { strategyId: number; versionNumber: number | null } | null,
 ): Promise<RequestResult<Conversation>> {
-  const body = { strategy_id: strategyId, version_number: versionNumber };
+  const body =
+    openStrategy === null ? {} : { strategy_id: openStrategy.strategyId, version_number: openStrategy.versionNumber };
   return requestJson(fetchFunction, FAILED_ACTION, CONVERSATIONS_PATH, createJsonRequest('POST', body));
 }
 

@@ -12,8 +12,8 @@ ADRs: [0004 The AI assistant saves strategy versions directly](../adr/0004-ai-as
 [0005 AI assistant credentials stay in the assistant service](../adr/0005-assistant-credentials-outside-postgresql.md).
 Planning map: [Wayfinder: indicators, screens, and strategy help](https://github.com/Mano-Liaoyan/ATrade/issues/129).
 
-The AI assistant is a language model that works with the user on the
-strategy page. It reads and writes strategy versions, runs and compares
+The AI assistant is a language model that works with the user in the
+"AI assistant" side column of each workbench page (25.12). It reads and writes strategy versions, runs and compares
 backtests, and (in phase 3) reads, runs, and creates screens. It uses pi
 (the pi coding agent) as its agent runtime. It can call only the ATrade
 routes of an allow-list.
@@ -36,7 +36,7 @@ that nobody ran. Section 25.15 lists them.
 | Credentials and provider login (25.7) | 2 |
 | Conversations, titles, and prompt versions (25.8, 25.9) | 2 |
 | `/ws/assistant` and the browser routes (25.10, 25.11) | 2 |
-| Assistant side column on the strategy page (25.12) | 2 |
+| Assistant side column on each workbench page (25.12) | 2 |
 | Width splitter and Maximize for each `SideColumn` (25.13) | 2 |
 | Screen tools, screens made by the AI assistant, condition card (25.4, 25.6, 25.12.4) | 3 |
 | `run_backtest` with a universe (`universe_kind` `screen` or `list`) (25.4.2) | 3 |
@@ -411,9 +411,9 @@ Screen results:
 
 Place:
 
-- The user discusses screens with the AI assistant only in the assistant
-  side column of the strategy page. The screen page `/screens/<id>` has no
-  assistant.
+- The user discusses screens with the AI assistant in the assistant side
+  column. Each workbench page has it, also the screen page `/screens/<id>`
+  (25.12).
 - The condition card has "Open screen". It opens `/screens/<id>`.
 
 ## 25.7 Credentials and provider login
@@ -546,7 +546,7 @@ Implemented (#179, #184):
 | Column | Type | Meaning |
 |---|---|---|
 | `id` | `bigint` identity | The conversation ID. |
-| `strategy_id` | `bigint`, foreign key to `strategy` with `ON DELETE CASCADE` | The strategy of the conversation. |
+| `strategy_id` | `bigint`, nullable, foreign key to `strategy` with `ON DELETE CASCADE` | The strategy of the conversation. Null for a conversation that started on a page without an open strategy (25.12). |
 | `title` | `text`, 1 to 200 characters | The title. |
 | `title_state` | `text` | `new`, `generating`, `generated`, `not_generated` (the generation failed), or `renamed`. |
 | `created_at_utc` | `timestamptz` | The creation time. |
@@ -564,7 +564,8 @@ Implemented (#179, #184):
 - `assistant_prompt_version`: see 25.9.1.
 
 - A conversation belongs to at most one strategy.
-- The strategy page lists only the conversations of the open strategy.
+- Each workbench page lists the same conversations: all conversations, the
+  newest first (25.12). A conversation is not bound to a page.
 - These records keep the conversation ID:
   - the strategy versions that the AI assistant saved
   - the backtests that it started
@@ -655,10 +656,14 @@ Implemented (#184):
   ```
 
   A missing version or no backtest gives `none`. The backtest IDs are the
-  newest first, from all versions of the strategy.
+  newest first, from all versions of the strategy. A conversation that
+  starts on a page without an open strategy gives `none` for each of the 3
+  values. The page itself is not in the context.
 - The browser sends the open version number in the body of
   `POST /api/assistant/conversations`: `{"strategy_id", "version_number"}`.
-  `version_number` is optional. `web` reads the strategy name and the last 3
+  Both are optional. A page without an open strategy sends `{}`. A
+  `version_number` without `strategy_id` gets `422`. Only the strategy page
+  sends a strategy. `web` reads the strategy name and the last 3
   backtests when the conversation starts, and saves the fixed part in
   `assistant_conversation.fixed_prompt`. So all runs of one conversation get
   the same system prompt, also after a rename of the strategy or a new
@@ -831,7 +836,7 @@ below are choices of this document. The implementation can change them.
 
 | Operation | Proposed route | Phase |
 |---|---|---|
-| List the conversations of a strategy | `GET /api/assistant/conversations?strategy_id=...` | 2 |
+| List the conversations (all, or of a strategy) | `GET /api/assistant/conversations[?strategy_id=...]` | 2 |
 | Create a conversation | `POST /api/assistant/conversations` | 2 |
 | Read the messages of a conversation | `GET /api/assistant/conversations/{conversation_id}` | 2 |
 | Rename a conversation | `PATCH /api/assistant/conversations/{conversation_id}` | 2 |
@@ -847,9 +852,12 @@ below are choices of this document. The implementation can change them.
 
 - #179 implements the first 5 rows:
   - `GET ?strategy_id=` answers `{"conversations": [...]}`, the newest
-    first. Each conversation has the columns of 25.8.1.
+    first. Each conversation has the columns of 25.8.1. Without
+    `strategy_id`, the answer has all conversations. The side column uses
+    this form (25.12).
   - `POST` takes `{"strategy_id"}` and answers `201` with the conversation.
-    A strategy that does not exist gets `404`.
+    A strategy that does not exist gets `404`. `strategy_id` is optional:
+    without it, the conversation has no strategy (`strategy_id` null).
   - `GET {conversation_id}` answers the conversation and `messages`: the
     user messages and the AI assistant messages with text, each with
     `role`, `text`, `provider`, `model`, and `credential_name` (the last 3
@@ -896,13 +904,16 @@ below are choices of this document. The implementation can change them.
 - The routes declare their error bodies with `responses=`
   (`ErrorResponse`), like the other routes (section 13).
 
-## 25.12 Assistant side column on the strategy page
+## 25.12 Assistant side column on each workbench page
 
 Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/issues/140) (Q6, Q7),
 [UI reference: screens, rule builder, and AI assistant](https://github.com/Mano-Liaoyan/ATrade/issues/135).
 
-The strategy page has a right `SideColumn` with the name "AI assistant".
-The default width is 28rem.
+Each workbench page has a right `SideColumn` with the name "AI assistant":
+Screens, Strategies, Backtests, Parameter sweeps, and Forward tests. The
+default width is 28rem. All pages show the same column with the same
+conversations. A page change keeps the open conversation, its socket, its
+log, the message input, and Minimize.
 
 ### 25.12.1 Layout
 
@@ -927,8 +938,11 @@ The default width is 28rem.
 
 Implemented (#185):
 
-- `AssistantColumn` (`frontend/src/routes/strategies/`) puts the side column
-  together. The header line of the column has the icon buttons
+- `AssistantColumn` (`frontend/src/routes/assistant/`) puts the side column
+  together. It is a route component, not a part of `src/lib/assistant/`,
+  because its metric card imports `#lib/backtest` (a capability imports only
+  `foundation`). Each workbench page mounts it as the last child of its
+  `Workbench`. The header line of the column has the icon buttons
   "Credentials", "Prompt", "Maximize AI assistant", and "Minimize AI
   assistant". The rail has the `ai-agent` icon.
 - Top line: the conversation `Select` (the titles, the newest first), the
@@ -955,6 +969,38 @@ Implemented (#185):
   close. Each `error` message goes to the Output tab of the "Problems and
   output" panel with the UTC time. After `run_state` `settled`, the page
   reads the conversation list again after 1 second for the generated title.
+
+Decided (each workbench page has the column):
+
+- The state of the column is one module object
+  (`routes/assistant/assistant_session.svelte.ts`): the conversation list,
+  the open conversation and its `/ws/assistant` socket, the log, the model
+  selection, the message input, and the Keep and Discard choices. Each page
+  mounts its own `AssistantColumn`, so the page layout does not change. A
+  page change does not close the socket, so it does not stop a run (25.10).
+- All pages use the storage key `atrade.assistant-column`, so the width and
+  Minimize stay across pages. The browser keeps the open conversation under
+  `atrade.assistant-column.conversation`, so a reload opens it again.
+  Without an open or a stored conversation, the column opens no
+  conversation: the newest one can be the conversation of another browser
+  tab, and a socket that closes stops its run (25.10). After a delete, the
+  column opens the newest conversation.
+- Each page reads the conversation list again when it opens. When the
+  socket of the open conversation is closed, the page opens a new socket.
+- "Send" stays disabled ("connecting") until the socket is open and the
+  saved messages are read, so a sent message is not lost when the saved
+  messages replace the log.
+- "New conversation" on the strategy page sends the open strategy and
+  version (25.9). On the other pages, and on `/strategies` without a
+  strategy, it sends none.
+- The strategy page sends the errors of the conversation to the Output tab
+  of the "Problems and output" panel. The other pages have no Output tab:
+  the column shows the last error in a low-contrast error
+  `InlineNotification` above the log. Its close button removes it.
+- A diff card of the open strategy on the strategy page works as before. A
+  diff card on another page, or of another strategy: a click opens
+  `/strategies/<id>` and then the diff tab; Keep opens
+  `/strategies/<id>/versions/<n>`; Discard adds the discarded mark.
 
 ### 25.12.2 Message components
 
@@ -995,6 +1041,10 @@ Implemented (#185):
   shows only a 32px rail.
 - A second click on Maximize, or Escape, restores the earlier width. This
   is the same as Maximize of a `Panel`.
+- The `Workbench` makes the rail: while a side column is maximized, each
+  other child of the workbench that is not a side column is a 32px rail,
+  and its content stays in the page. So each page gets the rail without its
+  own code. The other side columns keep their width.
 
 ### 25.12.4 Condition card (phase 3)
 

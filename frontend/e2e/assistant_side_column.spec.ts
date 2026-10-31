@@ -1,4 +1,4 @@
-// The "AI assistant" side column of the strategy page (#185, docs/architecture/assistant.md 25.12). The e2e server
+// The "AI assistant" side column of each workbench page (#185, docs/architecture/assistant.md 25.12). The e2e server
 // uses the fake assistant service backend/tests/fakes/e2e_assistant.py: the prompt text selects the answer ("wait",
 // "change", "backtest", "notitle", or a streamed answer). No real model provider.
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
@@ -136,19 +136,26 @@ test('new, rename, and delete conversation; the Credentials and Prompt dialogs o
   const column = assistantColumn(page);
   const conversationSelect = column.getByRole('combobox', { name: 'Conversation' });
 
+  // All pages list all conversations, and the other tests add conversations too, so the title is unique.
+  const title = createUniqueName(currentTest, 'My conversation');
   await column.getByRole('button', { name: 'Rename conversation' }).click();
-  await page.getByRole('textbox', { name: 'Title' }).fill('My conversation');
+  await page.getByRole('textbox', { name: 'Title' }).fill(title);
   await page.getByRole('button', { name: 'Rename conversation' }).last().click();
-  await expect(conversationSelect).toHaveText('My conversation');
+  await expect(conversationSelect).toHaveText(title);
   // After a rename, the title does not change.
   await sendMessage(page, 'Hi.');
   await expect(conversationLog(page).getByText('Hello from the fake AI assistant.')).toBeVisible();
   await page.waitForTimeout(1500);
-  await expect(conversationSelect).toHaveText('My conversation');
+  await expect(conversationSelect).toHaveText(title);
 
+  const created = page.waitForResponse(
+    (response) => response.url().endsWith('/api/assistant/conversations') && response.request().method() === 'POST',
+  );
   await column.getByRole('button', { name: 'New conversation' }).click();
+  const { id: newId } = (await (await created).json()) as { id: number };
+  await expect(conversationSelect).toContainText('New conversation');
   await conversationSelect.click();
-  await expect(page.getByRole('option')).toHaveCount(2);
+  await expect(page.getByRole('option', { name: title, exact: true })).toHaveCount(1);
   await page.keyboard.press('Escape');
 
   await column.getByRole('button', { name: 'Delete conversation' }).click();
@@ -156,8 +163,9 @@ test('new, rename, and delete conversation; the Credentials and Prompt dialogs o
   await expect(dialog.getByRole('heading')).toContainText('Delete');
   await dialog.getByRole('button', { name: 'Delete conversation' }).click();
   await expect(dialog).toBeHidden();
+  expect((await page.request.get(`/api/assistant/conversations/${String(newId)}`)).status()).toBe(404);
   await conversationSelect.click();
-  await expect(page.getByRole('option')).toHaveCount(1);
+  await expect(page.getByRole('option', { name: title, exact: true })).toHaveCount(1);
   await page.keyboard.press('Escape');
 
   await column.getByRole('button', { name: 'Credentials' }).click();
@@ -234,4 +242,64 @@ test('the log has a visible scroll track and does not scroll while the user read
   await assistantColumn(page).getByRole('button', { name: 'Stop' }).click();
   await expect(assistantColumn(page).getByRole('button', { name: 'Send' })).toBeVisible();
   expect(await log.evaluate((element) => element.scrollTop)).toBe(0);
+});
+
+async function openPage(page: Page, name: string, url: RegExp): Promise<void> {
+  await page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name }).click();
+  await expect(page).toHaveURL(url);
+}
+
+test('each workbench page has the column with the same conversations, and the open conversation stays across pages', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/screens');
+  const column = assistantColumn(page);
+  const conversationSelect = column.getByRole('combobox', { name: 'Conversation' });
+  // A page without an open strategy starts a conversation without a strategy.
+  await column.getByRole('button', { name: 'New conversation' }).click();
+  await expect(conversationSelect).toContainText('New conversation');
+  await sendMessage(page, 'Hi.');
+  await expect(conversationLog(page).getByText('Hello from the fake AI assistant.')).toBeVisible();
+  await expect(conversationSelect).toHaveText('Title of Hi.');
+
+  await openPage(page, 'Backtests', /\/backtests/);
+  await expect(conversationSelect).toHaveText('Title of Hi.');
+  await expect(conversationLog(page).getByText('Hi.', { exact: true })).toBeVisible();
+  await sendMessage(page, 'Again.');
+  await expect(conversationLog(page).getByText('Hello from the fake AI assistant.')).toHaveCount(2);
+
+  // Minimize stays across pages.
+  await column.getByRole('button', { name: 'Minimize AI assistant' }).click();
+  await openPage(page, 'Parameter sweeps', /\/sweeps/);
+  await column.getByRole('button', { name: 'Open AI assistant' }).click();
+  await expect(conversationSelect).toHaveText('Title of Hi.');
+  await openPage(page, 'Forward tests', /\/forward-tests/);
+  await expect(conversationSelect).toHaveText('Title of Hi.');
+  await expect(conversationLog(page).getByText('Again.', { exact: true })).toBeVisible();
+  await openPage(page, 'Strategies', /\/strategies/);
+  await expect(conversationSelect).toHaveText('Title of Hi.');
+});
+
+test('a page without an Output tab shows the errors of the conversation in the column', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/backtests');
+  const column = assistantColumn(page);
+  await column.getByRole('button', { name: 'New conversation' }).click();
+  await expect(column.getByRole('combobox', { name: 'Conversation' })).toContainText('New conversation');
+  await sendMessage(page, 'notitle please');
+  await expect(column.getByText('The title was not generated. The model did not answer.')).toBeVisible();
+});
+
+test('Maximize of the column makes the center area of the screen page a rail', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/screens');
+  const column = assistantColumn(page);
+  const readWidth = async (): Promise<number> => Math.round((await column.boundingBox())?.width ?? 0);
+  await expect.poll(readWidth).toBe(448);
+  await column.getByRole('button', { name: 'Maximize AI assistant' }).click();
+  // The screen list is 20rem (320px). The center area is a 32px rail.
+  await expect.poll(readWidth).toBe(1440 - 320 - 32);
+  await page.keyboard.press('Escape');
+  await expect.poll(readWidth).toBe(448);
 });

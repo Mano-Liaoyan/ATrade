@@ -1,18 +1,17 @@
 <!-- The conversation log of the assistant side column (docs/architecture/assistant.md 25.12.1): the messages, the
      tool steps (one StatusIndicator line each), the diff cards, and the metric cards, in a ChatLog. Each AI assistant
-     message shows its model and its credential name. A click on a diff card opens CodeDiff in the editor panel. Keep
-     opens the new version in the editor, and Discard adds the discarded mark (25.5.2). -->
+     message shows its model and its credential name. A click on a diff card opens CodeDiff in the editor panel of the
+     strategy page. Keep opens the new version in the editor, and Discard adds the discarded mark (25.5.2). -->
 <script lang="ts">
   import { describeToolStep, type DiffItem, type LogItem } from '#lib/assistant';
   import { arrangeChatLog, Button, ChatDivider, ChatLog, ChatMessage, StatusIndicator } from '#lib/foundation/carbon';
   import AssistantMetricCard from './AssistantMetricCard.svelte';
-
-  export type DiffChoice = 'kept' | 'discarded';
+  import type { DiffChoice } from './assistant_session.svelte';
 
   interface Props {
     items: readonly LogItem[];
     isRunning: boolean;
-    /** The choice of each diff card in this page, by its item ID. */
+    /** The choice of each diff card of the open conversation, by its item ID. */
     diffChoices: ReadonlyMap<number, DiffChoice>;
     onOpenDiff: (item: DiffItem) => void;
     onKeep: (item: DiffItem) => void;

@@ -5,11 +5,11 @@ reading the messages and deleting a conversation call the assistant service. The
 """
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 import psycopg
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from atrade.assistant import conversation_store, prompt_store
 from atrade.assistant.assistant_service import AssistantService, AssistantServiceError
@@ -24,9 +24,17 @@ Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, ma
 
 
 class CreateConversationRequest(BaseModel):
-    strategy_id: int
+    # The open strategy. None on a page without an open strategy (25.12): the start context is then none.
+    strategy_id: int | None = None
     # The version that the browser shows when the conversation starts. The fixed part of the system prompt names it.
     version_number: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def check_version_has_strategy(self) -> Self:
+        if self.strategy_id is None and self.version_number is not None:
+            message = "A version number needs a strategy_id."
+            raise ValueError(message)
+        return self
 
 
 class RenameConversationRequest(BaseModel):
@@ -35,7 +43,8 @@ class RenameConversationRequest(BaseModel):
 
 class ConversationResponse(BaseModel):
     id: int
-    strategy_id: int
+    # None for a conversation that started without an open strategy.
+    strategy_id: int | None
     title: str
     title_state: conversation_store.TitleState
     created_at_utc: datetime
@@ -111,7 +120,8 @@ class ConversationRoutes:
         self.read_start_context = read_start_context
         self.default_prompt_text = default_prompt_text
 
-    async def list_conversations(self, strategy_id: int) -> ConversationListResponse:
+    async def list_conversations(self, strategy_id: int | None = None) -> ConversationListResponse:
+        """Without strategy_id: all conversations. Each workbench page lists the same conversations (25.12)."""
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             records = await conversation_store.select_conversations(connection, strategy_id)
         return ConversationListResponse(conversations=[to_response(record) for record in records])
@@ -121,9 +131,11 @@ class ConversationRoutes:
         strategy_missing = HTTPException(
             status.HTTP_404_NOT_FOUND, detail=f"The strategy {request.strategy_id} does not exist."
         )
-        start_context = await self.read_start_context(request.strategy_id, request.version_number)
-        if start_context is None:
-            raise strategy_missing
+        start_context = None
+        if request.strategy_id is not None:
+            start_context = await self.read_start_context(request.strategy_id, request.version_number)
+            if start_context is None:
+                raise strategy_missing
         created_at_utc = self.clock.read_now_utc()
         async with (
             await psycopg.AsyncConnection.connect(self.database_url) as connection,

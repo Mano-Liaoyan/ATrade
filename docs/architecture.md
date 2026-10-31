@@ -651,10 +651,14 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)).
     Implemented (#185): `railIcon` (the icon of the Open button of the rail),
     `buttonName` (the name in the button names, default the lower-case
-    `label`), `maximizable`, and `onMaximizedChange`. Maximize ("Maximize
+    `label`), and `maximizable`. Maximize ("Maximize
     <name>", then "Restore <name>") gives the column the workbench width less
     the other side columns and 32px. A second click or Escape restores the
-    width from before. Minimize ends Maximize. Maximize is not stored.
+    width from before. Minimize ends Maximize. Maximize is not stored. The
+    `Workbench` gives its side columns a rail state (Svelte context,
+    `workbench_rail.svelte.ts`): while a column is maximized, each other
+    child of the workbench that is not a side column is a 32px rail and its
+    content stays in the page. The other side columns keep their width.
   - `PanelSplit` (`storageKey`, `panels`, and the snippet `panel(id,
     state)`): 2 or more stacked panels. Each `PanelSpec` has `id`,
     `minPixels`, `defaultPixels` (not for the first panel), and
@@ -883,8 +887,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   name, and "Create strategy"; strategy section 9.7.1). The editor panel has
   the tabs "Rules" (the rule builder, strategy section 9.8) and
   `strategy.py`. The right `SideColumn` "AI assistant" (default 28rem) holds
-  the conversation (section 25). Implemented (#185): `AssistantColumn`,
-  `AssistantLog`, and `AssistantMetricCard` in `src/routes/strategies/`
+  the conversation (section 25). Each workbench page has the same column.
+  Implemented (#185): `AssistantColumn`,
+  `AssistantLog`, and `AssistantMetricCard` in `src/routes/assistant/`
   (assistant section 25.12). While the column is maximized, the center area
   is a 32px rail and its content stays in the page. A click on a diff card
   adds the tab "v<n-1> → v<n>" with `CodeDiff` to the editor panel. The
@@ -2112,4 +2117,4 @@ Section 25 is in [`docs/architecture/assistant.md`](architecture/assistant.md).
 It holds the AI assistant decisions, the `assistant` service with the pi SDK,
 port 8001 and its allow-list, credentials and provider login, conversations
 and prompt versions, the tools for strategies, backtests, and screens, Keep
-and Discard, and the AI assistant column of the strategy page.
+and Discard, and the AI assistant column of each workbench page.

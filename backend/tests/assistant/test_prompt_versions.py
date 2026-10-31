@@ -212,3 +212,19 @@ async def test_a_conversation_without_an_open_version_or_backtests_says_none(
     [system_prompt] = assistant_service.system_prompts
     assert "The open version: none." in system_prompt
     assert "The last 3 backtests of the strategy: none." in system_prompt
+
+
+@pytest.mark.anyio
+async def test_a_conversation_without_an_open_strategy_says_none(
+    client: httpx.AsyncClient, assistant_service: FakeAssistantService
+) -> None:
+    response = await client.post("/api/assistant/conversations", json={})
+    assert response.status_code == httpx.codes.CREATED, response.text
+    assistant_service.run_scripts = [[ANSWER]]
+
+    await run_one_prompt(client, response.json()["id"])
+
+    [system_prompt] = assistant_service.system_prompts
+    assert "The open strategy: none." in system_prompt
+    assert "The open version: none." in system_prompt
+    assert "The last 3 backtests of the strategy: none." in system_prompt

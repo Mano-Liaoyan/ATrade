@@ -8,7 +8,7 @@
      and "Open watchlist". `actions` adds icon buttons before the Minimize button. `railIcon` is the icon of the Open
      button of the rail. With `maximizable`, the column has a Maximize button: the column gets all the width of the
      workbench except the other side columns and a 32px rail of the center area. A second click or Escape restores
-     the width from before. `onMaximizedChange` tells the page, so the center area can show only its rail. -->
+     the width from before. The Workbench makes its center area the rail (workbench_rail.svelte.ts). -->
 <script lang="ts">
   import Maximize16 from '@carbon/icons/es/maximize/16.js';
   import Minimize16 from '@carbon/icons/es/minimize/16.js';
@@ -29,6 +29,7 @@
     readSideColumnLayout,
   } from './side_column';
   import { readStoredLayout, writeStoredLayout } from './stored_layout';
+  import { readWorkbenchRail } from './workbench_rail.svelte';
 
   interface Props {
     /** The name of the column: its heading and its accessible name. */
@@ -44,7 +45,6 @@
     /** The name in the button names. Default: the lower-case label. */
     buttonName?: string;
     maximizable?: boolean;
-    onMaximizedChange?: (isMaximized: boolean) => void;
     children: Snippet;
   }
 
@@ -57,7 +57,6 @@
     railIcon,
     buttonName,
     maximizable = false,
-    onMaximizedChange,
     children,
   }: Props = $props();
 
@@ -74,12 +73,21 @@
 
   // Maximize is not stored: a reload shows the width from before.
   let isMaximized = $state(false);
+  const workbenchRail = readWorkbenchRail();
   function setMaximized(value: boolean): void {
     if (value !== isMaximized) {
       isMaximized = value;
-      onMaximizedChange?.(value);
+      if (workbenchRail !== undefined) {
+        workbenchRail.isRail = value;
+      }
     }
   }
+  // A maximized column that leaves the page gives the center area back.
+  $effect(() => () => {
+    if (isMaximized && workbenchRail !== undefined) {
+      workbenchRail.isRail = false;
+    }
+  });
 
   function restoreOnEscape(event: KeyboardEvent): void {
     if (isMaximized && event.key === 'Escape' && !event.defaultPrevented) {
@@ -102,7 +110,10 @@
     const measure = (): void => {
       remPixels = readRemPixels();
       workbenchPixels = workbench.clientWidth;
-      const others = [...workbench.children].filter((child) => child !== self && child.matches('.side-column'));
+      // A maximized column does not limit the other columns: they keep their width while it is maximized.
+      const others = [...workbench.children].filter(
+        (child) => child !== self && child.matches('.side-column') && !child.matches('.side-column--maximized'),
+      );
       otherColumnsPixels = others.reduce((sum, other) => sum + other.getBoundingClientRect().width, 0);
     };
     const observer = new ResizeObserver(measure);
@@ -142,7 +153,7 @@
 <aside
   {id}
   bind:this={column}
-  class={['side-column', `side-column--${side}`, isMinimized && 'side-column--rail']}
+  class={['side-column', `side-column--${side}`, isMinimized && 'side-column--rail', isMaximized && 'side-column--maximized']}
   aria-label={label}
   style:inline-size={shownWidth}
 >

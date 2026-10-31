@@ -20,7 +20,7 @@ CONVERSATION_COLUMNS: Final = """
 @dataclass(frozen=True)
 class ConversationRecord:
     id: int
-    strategy_id: int
+    strategy_id: int | None
     title: str
     title_state: TitleState
     created_at_utc: datetime
@@ -42,7 +42,7 @@ class SystemPromptParts:
 async def insert_conversation(  # noqa: PLR0913 readability-exception: the columns of a new conversation.
     connection: psycopg.AsyncConnection,
     *,
-    strategy_id: int,
+    strategy_id: int | None,
     title: str,
     created_at_utc: datetime,
     prompt_version_id: int,
@@ -71,11 +71,14 @@ async def insert_conversation(  # noqa: PLR0913 readability-exception: the colum
         return None
 
 
-async def select_conversations(connection: psycopg.AsyncConnection, strategy_id: int) -> list[ConversationRecord]:
-    """The conversations of one strategy, the newest first."""
+async def select_conversations(
+    connection: psycopg.AsyncConnection, strategy_id: int | None
+) -> list[ConversationRecord]:
+    """The conversations of one strategy, or all conversations (strategy_id None), the newest first."""
     async with connection.cursor(row_factory=class_row(ConversationRecord)) as cursor:
         await cursor.execute(
-            f"SELECT {CONVERSATION_COLUMNS} FROM assistant_conversation WHERE strategy_id = %(strategy_id)s "
+            f"SELECT {CONVERSATION_COLUMNS} FROM assistant_conversation "
+            "WHERE %(strategy_id)s::bigint IS NULL OR strategy_id = %(strategy_id)s "
             "ORDER BY created_at_utc DESC, id DESC",
             {"strategy_id": strategy_id},
         )

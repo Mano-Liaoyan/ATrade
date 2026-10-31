@@ -5,7 +5,8 @@
      select of the third parameter value), and the chart: points for 1 parameter, a heatmap for 2 or 3. Each heatmap
      cell shows its value on a Carbon sequential color. Bottom panel "Runs": the parameter values, the status, and the
      key metrics of each run. Each column sorts the rows, and a click on a row opens its backtest. The page reads the
-     sweep and the list again while a run is queued or running. -->
+     sweep and the list again while a run is queued or running.
+     Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import { goto } from '$app/navigation';
@@ -47,6 +48,7 @@
   } from '#lib/sweep';
   import StartSweepDialog from '../StartSweepDialog.svelte';
   import SweepPointChart from '../SweepPointChart.svelte';
+  import AssistantColumn from '../../assistant/AssistantColumn.svelte';
 
   const CHECK_INTERVAL_MILLISECONDS = 2000;
   const PANELS: PanelSpec[] = [
@@ -387,6 +389,8 @@
       {/snippet}
     </PanelSplit>
   {/if}
+
+  <AssistantColumn />
 </Workbench>
 
 <StartSweepDialog
