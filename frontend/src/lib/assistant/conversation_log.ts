@@ -29,8 +29,8 @@ export interface MessageItem extends ItemBase {
   kind: 'message';
   role: 'user' | 'assistant';
   text: string;
-  model: string | null;
-  credentialName: string | null;
+  /** "model · thinking level · credential name" under an AI assistant message. Null for a user message. */
+  modelLine: string | null;
   streaming: boolean;
 }
 
@@ -97,6 +97,21 @@ function replaceLast(log: ConversationLog, item: LogItem): ConversationLog {
 }
 
 /** The saved messages of a conversation. They have no time, so they get the creation time of the conversation. */
+interface MessageModel {
+  model: string | null;
+  credential_name: string | null;
+  thinking_level?: string | null;
+}
+
+/** The level "off" (a model without reasoning, or no thinking) adds nothing to the line. */
+function formatModelLine(message: MessageModel): string | null {
+  if (message.model === null) {
+    return null;
+  }
+  const thinking = message.thinking_level === 'off' ? null : (message.thinking_level ?? null);
+  return [message.model, thinking, message.credential_name].filter((part) => part !== null).join(' · ');
+}
+
 export function readConversationLog(messages: readonly SavedMessage[], createdAtUtc: string): ConversationLog {
   return messages.reduce<ConversationLog>(
     (log, message) =>
@@ -106,8 +121,7 @@ export function readConversationLog(messages: readonly SavedMessage[], createdAt
           kind: 'message',
           role: message.role,
           text: message.text,
-          model: message.model,
-          credentialName: message.credential_name,
+          modelLine: formatModelLine(message),
           streaming: false,
         },
         createdAtUtc,
@@ -117,7 +131,7 @@ export function readConversationLog(messages: readonly SavedMessage[], createdAt
 }
 
 export function addUserMessage(log: ConversationLog, text: string, sentAtUtc: string): ConversationLog {
-  return append(log, { kind: 'message', role: 'user', text, model: null, credentialName: null, streaming: false }, sentAtUtc);
+  return append(log, { kind: 'message', role: 'user', text, modelLine: null, streaming: false }, sentAtUtc);
 }
 
 function findStreamingMessage(log: ConversationLog): MessageItem | null {
@@ -128,13 +142,13 @@ function findStreamingMessage(log: ConversationLog): MessageItem | null {
 function addDelta(log: ConversationLog, text: string, sentAtUtc: string): ConversationLog {
   const streaming = findStreamingMessage(log);
   if (streaming === null) {
-    return append(log, { kind: 'message', role: 'assistant', text, model: null, credentialName: null, streaming: true }, sentAtUtc);
+    return append(log, { kind: 'message', role: 'assistant', text, modelLine: null, streaming: true }, sentAtUtc);
   }
   return replaceLast(log, { ...streaming, text: streaming.text + text });
 }
 
 function endMessage(log: ConversationLog, message: Schemas['MessageEndMessage'], sentAtUtc: string): ConversationLog {
-  const ended = { text: message.text, model: message.model, credentialName: message.credential_name, streaming: false };
+  const ended = { text: message.text, modelLine: formatModelLine(message), streaming: false };
   const streaming = findStreamingMessage(log);
   if (streaming === null) {
     return append(log, { kind: 'message', role: 'assistant', ...ended }, sentAtUtc);

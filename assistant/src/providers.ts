@@ -9,14 +9,15 @@ import {
   type CredentialFile,
 } from './credential_file.ts';
 import type { LoginMethod } from './logins.ts';
-import type { OpenModel } from './model_selection.ts';
+import { listThinkingLevels, type OpenModel, type ThinkingLevel } from './model_selection.ts';
 
 export interface ProviderSummary {
   id: string;
   name: string;
   /** The login methods of pi for this provider: "oauth" (a subscription login) and "api_key". */
   login_methods: LoginMethod[];
-  models: { id: string; name: string }[];
+  /** `thinking_levels`: the thinking levels of the model (only "off" for a model without reasoning). */
+  models: { id: string; name: string; thinking_levels: ThinkingLevel[] }[];
 }
 
 async function readModels(
@@ -24,14 +25,14 @@ async function readModels(
   createRuntime: CreateModelRuntime,
   providerId: string,
 ): Promise<ProviderSummary['models']> {
-  const models = new Map<string, string>();
+  const models = new Map<string, ProviderSummary['models'][number]>();
   for (const credential of file.list().filter((stored) => stored.provider === providerId)) {
     const runtime = await createRuntime(new SelectedCredentialStore(file, credential.id));
     for (const model of await runtime.getAvailable(providerId)) {
-      models.set(model.id, model.name);
+      models.set(model.id, { id: model.id, name: model.name, thinking_levels: listThinkingLevels(model) });
     }
   }
-  return [...models].map(([id, name]) => ({ id, name }));
+  return [...models.values()];
 }
 
 /** The providers with at least one login method, in the order of pi. */

@@ -14,6 +14,7 @@ import { startFakeModelServer, type FakeModelServer, type ModelStep } from './fa
 import { createFakeRuntimeFactory, FAKE_KEY_PROVIDER } from './fake_providers.ts';
 
 const SELECTION = { provider: 'fake', model: 'fake-model', credential_id: 'fake-key-1' };
+const RUN_BODY = { text: 'Hi.', ...SELECTION, thinking_level: 'medium', system_prompt: 'Be short.' };
 
 let workDir: string;
 let model: FakeModelServer | undefined;
@@ -93,7 +94,7 @@ describe('the conversation routes', () => {
   test('POST runs streams the run events as JSON lines', async () => {
     const baseUrl = await startOnFreePort([{ text: 'Hello.' }]);
 
-    const response = await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION, system_prompt: 'Be short.' });
+    const response = await postJson(`${baseUrl}/conversations/3/runs`, RUN_BODY);
 
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toBe('application/x-ndjson');
@@ -103,6 +104,18 @@ describe('the conversation routes', () => {
       provider: 'fake',
       model: 'fake-model',
       credential_name: 'Fake API key · first',
+      thinking_level: 'off',
+    });
+  });
+
+  test('POST runs refuses an unknown thinking level with 400', async () => {
+    const baseUrl = await startOnFreePort();
+
+    const response = await postJson(`${baseUrl}/conversations/3/runs`, { ...RUN_BODY, thinking_level: 'extreme' });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      detail: 'The field thinking_level must be one of off, minimal, low, medium, high, xhigh, max.',
     });
   });
 
@@ -116,19 +129,20 @@ describe('the conversation routes', () => {
 
   test('GET messages reads the messages of the JSONL file', async () => {
     const baseUrl = await startOnFreePort([{ text: 'Hello.' }]);
-    await (await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION, system_prompt: 'Be short.' })).text();
+    await (await postJson(`${baseUrl}/conversations/3/runs`, RUN_BODY)).text();
 
     const response = await fetch(`${baseUrl}/conversations/3/messages`);
 
     expect(await response.json()).toEqual({
       messages: [
-        { role: 'user', text: 'Hi.', provider: null, model: null, credential_name: null },
+        { role: 'user', text: 'Hi.', provider: null, model: null, credential_name: null, thinking_level: null },
         {
           role: 'assistant',
           text: 'Hello.',
           provider: 'fake',
           model: 'fake-model',
           credential_name: 'Fake API key · first',
+          thinking_level: 'off',
         },
       ],
     });
@@ -152,7 +166,7 @@ describe('the conversation routes', () => {
 
   test('POST title answers the title', async () => {
     const baseUrl = await startOnFreePort([{ text: 'Hello.' }, { text: 'Greeting' }]);
-    await (await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION, system_prompt: 'Be short.' })).text();
+    await (await postJson(`${baseUrl}/conversations/3/runs`, RUN_BODY)).text();
 
     const response = await postJson(`${baseUrl}/conversations/3/title`, SELECTION);
 
@@ -170,7 +184,7 @@ describe('the conversation routes', () => {
 
   test('DELETE removes the messages', async () => {
     const baseUrl = await startOnFreePort([{ text: 'Hello.' }]);
-    await (await postJson(`${baseUrl}/conversations/3/runs`, { text: 'Hi.', ...SELECTION, system_prompt: 'Be short.' })).text();
+    await (await postJson(`${baseUrl}/conversations/3/runs`, RUN_BODY)).text();
 
     const response = await fetch(`${baseUrl}/conversations/3`, { method: 'DELETE' });
 
@@ -213,17 +227,17 @@ describe('the credential routes', () => {
     expect(listed).not.toContain('secret');
   });
 
-  test('GET providers lists the models of a provider with a credential', async () => {
+  test('GET providers lists the models of a provider with a credential, with the thinking levels of each model', async () => {
     const baseUrl = await startOnFreePort();
     await addApiKey(baseUrl, 'sk-test-1');
 
     const { providers } = (await (await fetch(`${baseUrl}/providers`)).json()) as {
-      providers: { id: string; models: { id: string }[] }[];
+      providers: { id: string; models: { id: string; thinking_levels: string[] }[] }[];
     };
 
-    expect(providers.find((provider) => provider.id === FAKE_KEY_PROVIDER)?.models.map((item) => item.id)).toEqual([
-      'fake-model',
-      'fake-model-2',
+    expect(providers.find((provider) => provider.id === FAKE_KEY_PROVIDER)?.models).toEqual([
+      { id: 'fake-model', name: 'Fake model', thinking_levels: ['off'] },
+      { id: 'fake-model-2', name: 'Fake model 2', thinking_levels: ['off', 'low', 'medium', 'high', 'xhigh'] },
     ]);
   });
 

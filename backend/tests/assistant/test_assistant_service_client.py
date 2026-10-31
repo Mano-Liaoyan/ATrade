@@ -29,7 +29,8 @@ from atrade.assistant import (
     ToolStep,
 )
 
-SELECTION = ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1")
+SELECTION = ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1", thinking_level="high")
+# The title call has no thinking level.
 SELECTION_BODY = {"provider": "fake", "model": "fake-model", "credential_id": "fake-key-1"}
 
 
@@ -52,6 +53,7 @@ async def test_run_reads_the_json_lines_and_skips_unknown_events() -> None:
             "provider": "fake",
             "model": "fake-model",
             "credential_name": "Fake key",
+            "thinking_level": "high",
         },
         {"type": "error", "message": "Bad key"},
     ]
@@ -63,11 +65,18 @@ async def test_run_reads_the_json_lines_and_skips_unknown_events() -> None:
 
     assert events == [
         TextDelta(text="Hel"),
-        MessageEnd(text="Hello.", provider="fake", model="fake-model", credential_name="Fake key"),
+        MessageEnd(
+            text="Hello.", provider="fake", model="fake-model", credential_name="Fake key", thinking_level="high"
+        ),
         RunError(message="Bad key"),
     ]
     assert str(requests[0].url) == "http://assistant:8002/conversations/7/runs"
-    assert json.loads(requests[0].content) == {"text": "Hi.", **SELECTION_BODY, "system_prompt": "Be short."}
+    assert json.loads(requests[0].content) == {
+        "text": "Hi.",
+        **SELECTION_BODY,
+        "thinking_level": "high",
+        "system_prompt": "Be short.",
+    }
 
 
 @pytest.mark.anyio
@@ -157,13 +166,18 @@ async def test_title_returns_the_title_or_raises_the_reason() -> None:
 @pytest.mark.anyio
 async def test_read_messages_and_steer_and_delete_use_the_conversation_paths() -> None:
     requests: list[httpx.Request] = []
-    message = {"role": "user", "text": "Hi.", "provider": None, "model": None, "credential_name": None}
+    message = {"role": "assistant", "text": "Hi.", "provider": "fake", "model": "m", "credential_name": "Key"}
+    message["thinking_level"] = "low"
 
     messages = await client_for(httpx.Response(200, json={"messages": [message]}), requests).read_messages(7)
     is_steered = await client_for(httpx.Response(409, json={"detail": "No run."}), requests).steer(7, "Use SMA 50.")
     await client_for(httpx.Response(204), requests).delete_conversation(7)
 
-    assert messages == [ConversationMessage(role="user", text="Hi.", provider=None, model=None, credential_name=None)]
+    assert messages == [
+        ConversationMessage(
+            role="assistant", text="Hi.", provider="fake", model="m", credential_name="Key", thinking_level="low"
+        )
+    ]
     assert is_steered is False
     assert [(request.method, request.url.path) for request in requests] == [
         ("GET", "/conversations/7/messages"),
@@ -225,7 +239,7 @@ async def test_credentials_and_providers_are_read_and_a_missing_credential_is_fa
         "id": "google",
         "name": "Google",
         "login_methods": ["api_key"],
-        "models": [{"id": "gemini", "name": "Gemini"}],
+        "models": [{"id": "gemini", "name": "Gemini", "thinking_levels": ["off", "low", "high"]}],
     }
     providers = client_for(httpx.Response(200, json={"providers": [provider_body]}), requests)
     missing = client_for(httpx.Response(404, json={"detail": "The credential c1 does not exist."}), requests)
@@ -233,7 +247,10 @@ async def test_credentials_and_providers_are_read_and_a_missing_credential_is_fa
     assert await credentials.list_credentials() == [CREDENTIAL]
     assert await providers.list_providers() == [
         ProviderSummary(
-            id="google", name="Google", login_methods=["api_key"], models=[ProviderModel(id="gemini", name="Gemini")]
+            id="google",
+            name="Google",
+            login_methods=["api_key"],
+            models=[ProviderModel(id="gemini", name="Gemini", thinking_levels=["off", "low", "high"])],
         )
     ]
     assert await missing.delete_credential("c1") is False

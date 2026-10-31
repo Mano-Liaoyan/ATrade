@@ -1,10 +1,29 @@
 import { describe, expect, it } from 'vite-plus/test';
 import type { Credential, Provider } from './credentials';
-import { changeProvider, describeSendButton, findDefaultSelection, listSelectItems } from './model_selection';
+import {
+  changeProvider,
+  describeSendButton,
+  describeThinkingSelect,
+  findDefaultSelection,
+  listSelectItems,
+} from './model_selection';
 
 const PROVIDERS: Provider[] = [
-  { id: 'openai', name: 'OpenAI', login_methods: ['api_key'], models: [{ id: 'gpt-a', name: 'GPT A' }, { id: 'gpt-b', name: 'GPT B' }] },
-  { id: 'anthropic', name: 'Anthropic', login_methods: ['oauth'], models: [{ id: 'claude-x', name: 'Claude X' }] },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    login_methods: ['api_key'],
+    models: [
+      { id: 'gpt-a', name: 'GPT A', thinking_levels: ['off'] },
+      { id: 'gpt-b', name: 'GPT B', thinking_levels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] },
+    ],
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    login_methods: ['oauth'],
+    models: [{ id: 'claude-x', name: 'Claude X', thinking_levels: ['off', 'low', 'medium', 'high'] }],
+  },
   { id: 'google', name: 'Google', login_methods: ['api_key'], models: [] },
 ];
 
@@ -53,6 +72,49 @@ describe('the model selection of the assistant side column', () => {
       provider: 'anthropic',
       model: 'claude-x',
       credentialId: 'c3',
+    });
+  });
+});
+
+describe('the Thinking select', () => {
+  const GPT_B = { provider: 'openai', model: 'gpt-b', credentialId: 'c1' };
+  const CLAUDE_X = { provider: 'anthropic', model: 'claude-x', credentialId: 'c3' };
+
+  it('lists only the thinking levels of the selected model and keeps the chosen level', () => {
+    expect(describeThinkingSelect(PROVIDERS, CLAUDE_X, 'low')).toEqual({
+      items: [
+        { value: 'off', label: 'Off' },
+        { value: 'low', label: 'Low' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'high', label: 'High' },
+      ],
+      value: 'low',
+      disabledReason: null,
+    });
+    expect(describeThinkingSelect(PROVIDERS, GPT_B, 'xhigh')).toMatchObject({
+      items: [
+        { value: 'off', label: 'Off' },
+        { value: 'minimal', label: 'Minimal' },
+        { value: 'low', label: 'Low' },
+        { value: 'medium', label: 'Medium' },
+        { value: 'high', label: 'High' },
+        { value: 'xhigh', label: 'Extra high' },
+        { value: 'max', label: 'Max' },
+      ],
+      value: 'xhigh',
+    });
+  });
+
+  it('lowers a chosen level that the model does not have to the next level of the model, as pi does', () => {
+    expect(describeThinkingSelect(PROVIDERS, CLAUDE_X, 'minimal').value).toBe('low');
+    expect(describeThinkingSelect(PROVIDERS, CLAUDE_X, 'max').value).toBe('high');
+  });
+
+  it('is disabled with the reason for a model without thinking levels', () => {
+    expect(describeThinkingSelect(PROVIDERS, { provider: 'openai', model: 'gpt-a', credentialId: 'c1' }, 'high')).toEqual({
+      items: [],
+      value: 'off',
+      disabledReason: 'The model has no thinking levels.',
     });
   });
 });

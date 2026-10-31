@@ -38,6 +38,7 @@ from atrade.assistant.assistant_service import (
     ScreenSaved,
     StrategyVersionSaved,
     TextDelta,
+    ThinkingLevel,
     ToolStep,
 )
 from atrade.assistant.credential_routes import CredentialResponse, to_credential_response
@@ -51,13 +52,15 @@ NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_lengt
 
 
 class PromptMessage(BaseModel):
-    """Browser to server: a new user message, with the provider, the model, and the credential of this message."""
+    """Browser to server: a new user message, with the provider, the model, the credential, and the thinking level of
+    this message."""
 
     type: Literal["prompt"] = "prompt"
     text: NonEmptyText
     provider: NonEmptyText
     model: NonEmptyText
     credential_id: NonEmptyText
+    thinking_level: ThinkingLevel
 
 
 class SteerMessage(BaseModel):
@@ -81,13 +84,15 @@ class MessageDeltaMessage(BaseModel):
 
 
 class MessageEndMessage(BaseModel):
-    """The end of one AI assistant message: its full text, its model, and its credential name."""
+    """The end of one AI assistant message: its full text, its model, its credential name, and the thinking level of
+    its run."""
 
     type: Literal["message_end"] = "message_end"
     text: str
     provider: str
     model: str
     credential_name: str
+    thinking_level: str | None
 
 
 class RunStateMessage(BaseModel):
@@ -243,7 +248,11 @@ def to_socket_message(event: RunEvent) -> BaseModel:
             return MessageDeltaMessage(text=event.text)
         case MessageEnd():
             return MessageEndMessage(
-                text=event.text, provider=event.provider, model=event.model, credential_name=event.credential_name
+                text=event.text,
+                provider=event.provider,
+                model=event.model,
+                credential_name=event.credential_name,
+                thinking_level=event.thinking_level,
             )
         case RunError():
             return AssistantErrorMessage(message=event.message)
@@ -374,7 +383,10 @@ class ConversationSocket:
                     await self.send_error("The AI assistant runs. Send a steer message, or stop the run.")
                     return
                 selection = ModelSelection(
-                    provider=message.provider, model=message.model, credential_id=message.credential_id
+                    provider=message.provider,
+                    model=message.model,
+                    credential_id=message.credential_id,
+                    thinking_level=message.thinking_level,
                 )
                 task_group.start_soon(self.run, self.conversation_id, message.text, selection)
                 self.is_running = True

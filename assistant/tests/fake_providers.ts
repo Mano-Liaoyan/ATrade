@@ -50,7 +50,17 @@ function registerFakeProviders(runtime: ModelRuntime, baseUrl: string): void {
     name: 'Fake API key provider',
     baseUrl,
     api: 'openai-completions',
-    models: [FAKE_MODEL, { ...FAKE_MODEL, id: 'fake-model-2', name: 'Fake model 2' }],
+    // Fake model 2 has thinking levels: no "minimal", and "xhigh" but no "max".
+    models: [
+      FAKE_MODEL,
+      {
+        ...FAKE_MODEL,
+        id: 'fake-model-2',
+        name: 'Fake model 2',
+        reasoning: true,
+        thinkingLevelMap: { minimal: null, xhigh: 'xhigh' },
+      },
+    ],
   });
 }
 

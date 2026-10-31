@@ -1,8 +1,30 @@
-// The provider, model, and credential Selects of the assistant side column, and the Send button
+// The model, thinking, provider, and credential Selects of the assistant side column, and the Send button
 // (docs/architecture/assistant.md 25.8.2, 25.12.1). The browser sends the selection with each prompt, so a change
 // applies to the next message.
+import type { components } from '#lib/api';
 import type { SelectItem } from '#lib/foundation/carbon';
 import type { Credential, Provider } from './credentials';
+
+/** The thinking levels of pi, in its order. */
+export type ThinkingLevel = components['schemas']['ThinkingLevel'];
+
+const THINKING_LEVEL_LABELS: Record<ThinkingLevel, string> = {
+  off: 'Off',
+  minimal: 'Minimal',
+  low: 'Low',
+  medium: 'Medium',
+  high: 'High',
+  xhigh: 'Extra high',
+  max: 'Max',
+};
+const THINKING_LEVELS = Object.keys(THINKING_LEVEL_LABELS) as ThinkingLevel[];
+
+/** The default of pi (DEFAULT_THINKING_LEVEL), before the browser has a choice. */
+export const DEFAULT_THINKING_LEVEL: ThinkingLevel = 'medium';
+
+export function isThinkingLevel(value: unknown): value is ThinkingLevel {
+  return THINKING_LEVELS.includes(value as ThinkingLevel);
+}
 
 export interface ModelSelection {
   provider: string;
@@ -17,6 +39,44 @@ export interface LastModel {
 }
 
 const NO_SELECTION: ModelSelection = { provider: '', model: '', credentialId: '' };
+
+export interface ThinkingSelect {
+  items: SelectItem<ThinkingLevel>[];
+  /** The level that the next message sends. */
+  value: ThinkingLevel;
+  /** Null for an enabled Select. */
+  disabledReason: string | null;
+}
+
+/** The chosen level when the model has it. Else the next higher level of the model, else its highest level: the
+ * clampThinkingLevel rule of pi, so the Select shows the level that pi uses. */
+function chooseThinkingLevel(levels: readonly ThinkingLevel[], chosen: ThinkingLevel): ThinkingLevel {
+  if (levels.includes(chosen)) {
+    return chosen;
+  }
+  const higher = THINKING_LEVELS.slice(THINKING_LEVELS.indexOf(chosen)).find((level) => levels.includes(level));
+  return higher ?? levels.at(-1) ?? 'off';
+}
+
+/** Only the thinking levels of the selected model. A model without reasoning has only "off", so the Select is disabled. */
+export function describeThinkingSelect(
+  providers: readonly Provider[],
+  selection: ModelSelection,
+  chosen: ThinkingLevel,
+): ThinkingSelect {
+  const model = providers
+    .find((item) => item.id === selection.provider)
+    ?.models.find((item) => item.id === selection.model);
+  const levels = model?.thinking_levels ?? [];
+  if (levels.every((level) => level === 'off')) {
+    return { items: [], value: 'off', disabledReason: 'The model has no thinking levels.' };
+  }
+  return {
+    items: levels.map((level) => ({ value: level, label: THINKING_LEVEL_LABELS[level] })),
+    value: chooseThinkingLevel(levels, chosen),
+    disabledReason: null,
+  };
+}
 
 /** The first model and the first credential of a provider. */
 export function changeProvider(providers: readonly Provider[], credentials: readonly Credential[], provider: string): ModelSelection {

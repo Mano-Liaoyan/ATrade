@@ -2,8 +2,8 @@
 // 25.14). Only web calls it. The browser never connects to it.
 //
 //   GET    /health                          The Compose health check.
-//   POST   /conversations/{id}/runs         {text, provider, model, credential_id, system_prompt} → the run events as
-//                                           JSON lines.
+//   POST   /conversations/{id}/runs         {text, provider, model, credential_id, thinking_level, system_prompt} → the
+//                                           run events as JSON lines.
 //   POST   /conversations/{id}/steer        {text} → 204, or 409 without an active run.
 //   POST   /conversations/{id}/abort        → 204.
 //   POST   /conversations/{id}/title        {provider, model, credential_id} → {title}, or 502 {detail}.
@@ -19,7 +19,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { Conversations } from './conversations.ts';
 import type { CreateModelRuntime, CredentialFile } from './credential_file.ts';
 import type { LoginMethod, Logins } from './logins.ts';
-import type { ModelSelection } from './model_selection.ts';
+import { isThinkingLevel, THINKING_LEVELS, type ModelSelection, type ThinkingLevel } from './model_selection.ts';
 import { listProviders } from './providers.ts';
 
 const HTTP_OK = 200;
@@ -92,6 +92,14 @@ function readSelection(body: Record<string, unknown>): ModelSelection {
   };
 }
 
+function readThinkingLevel(body: Record<string, unknown>): ThinkingLevel {
+  const value = body['thinking_level'];
+  if (!isThinkingLevel(value)) {
+    throw new BadRequestError(`The field thinking_level must be one of ${THINKING_LEVELS.join(', ')}.`);
+  }
+  return value;
+}
+
 function createRoutes(conversations: Conversations): Record<string, RouteAction> {
   return {
     'POST runs': async (conversationId, request, response) => {
@@ -99,6 +107,7 @@ function createRoutes(conversations: Conversations): Record<string, RouteAction>
       const runRequest = {
         text: readText(body, 'text'),
         selection: readSelection(body),
+        thinkingLevel: readThinkingLevel(body),
         systemPrompt: readText(body, 'system_prompt'),
       };
       response.writeHead(HTTP_OK, { 'content-type': 'application/x-ndjson' });

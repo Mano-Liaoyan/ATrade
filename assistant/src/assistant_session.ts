@@ -13,11 +13,14 @@ import {
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 import { ASSISTANT_TOOL_NAMES } from './assistant_tools.ts';
+import type { ThinkingLevel } from './model_selection.ts';
 import { createToolGuard } from './tool_guard.ts';
 
 export interface AssistantSessionOptions {
   modelRuntime: ModelRuntime;
   model: NonNullable<Parameters<typeof createAgentSession>[0]>['model'];
+  /** The thinking level of the run. pi lowers it to a level of the model (only "off" without reasoning). */
+  thinkingLevel: ThinkingLevel;
   /** The directory of the pi files (the volume atrade-assistant-pi in the container). */
   piDir: string;
   customTools: ToolDefinition[];
@@ -55,7 +58,7 @@ export async function createAssistantSession(options: AssistantSessionOptions): 
     agentDir: options.piDir,
     modelRuntime: options.modelRuntime,
     model: options.model,
-    thinkingLevel: 'off',
+    thinkingLevel: options.thinkingLevel,
     noTools: 'builtin',
     customTools: options.customTools,
     resourceLoader: await createResourceLoader(options.piDir, settings, options.systemPrompt),

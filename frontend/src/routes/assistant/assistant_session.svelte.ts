@@ -1,5 +1,6 @@
 // The state of the AI assistant column that all workbench pages share (docs/architecture/assistant.md 25.12): the
-// conversation list, the open conversation and its /ws/assistant socket, the log, the model selection, the message
+// conversation list, the open conversation and its /ws/assistant socket, the log, the model selection and the thinking
+// level, the message
 // draft, and the Keep and Discard choices of the diff cards and the condition cards. Each page mounts its own AssistantColumn, but the state
 // is one module object, so a page change keeps the open conversation and does not close its socket (a closed socket
 // stops the run, 25.10).
@@ -8,10 +9,13 @@ import {
   addServerMessage,
   addUserMessage,
   createConversation,
+  DEFAULT_THINKING_LEVEL,
   deleteConversation,
+  describeThinkingSelect,
   discardStrategyVersion,
   EMPTY_LOG,
   findDefaultSelection,
+  isThinkingLevel,
   listConversations,
   listCredentials,
   listProviders,
@@ -28,6 +32,7 @@ import {
   type LastModel,
   type ModelSelection,
   type Provider,
+  type ThinkingLevel,
 } from '#lib/assistant';
 import { readStoredLayout, writeStoredLayout } from '#lib/foundation/workbench';
 import { deleteScreen, keepScreen } from '#lib/screen';
@@ -49,6 +54,14 @@ export interface VersionAddress {
 const TITLE_READ_DELAY_MILLISECONDS = 1000;
 // The browser keeps the open conversation, so a reload opens it again.
 const OPEN_CONVERSATION_STORAGE_KEY = 'atrade.assistant-column.conversation';
+
+// The browser keeps the last chosen thinking level for all conversations.
+const THINKING_LEVEL_STORAGE_KEY = 'atrade.assistant-column.thinking-level';
+
+function readStoredThinkingLevel(): ThinkingLevel {
+  const stored = readStoredLayout(THINKING_LEVEL_STORAGE_KEY);
+  return isThinkingLevel(stored) ? stored : DEFAULT_THINKING_LEVEL;
+}
 
 function readStoredConversationId(): number | null {
   const stored = readStoredLayout(OPEN_CONVERSATION_STORAGE_KEY);
@@ -92,6 +105,10 @@ export class AssistantSession {
   providers = $state<Provider[]>([]);
   credentials = $state<Credential[]>([]);
   selection = $state<ModelSelection>({ provider: '', model: '', credentialId: '' });
+  /** The last chosen thinking level. A model without it uses the level of `thinking`. */
+  thinkingLevel = $state<ThinkingLevel>(readStoredThinkingLevel());
+  /** The Thinking select: only the levels of the selected model. */
+  readonly thinking = $derived(describeThinkingSelect(this.providers, this.selection, this.thinkingLevel));
   /** The message input. It stays across pages. */
   text = $state('');
   /** The choice of each diff card of the open conversation, by its item ID. */
@@ -230,6 +247,11 @@ export class AssistantSession {
     socket?.close();
   }
 
+  chooseThinkingLevel(level: ThinkingLevel): void {
+    this.thinkingLevel = level;
+    writeStoredLayout(THINKING_LEVEL_STORAGE_KEY, level);
+  }
+
   /** Sends the message input. False when nothing was sent. */
   send(): boolean {
     const message = this.text.trim();
@@ -242,6 +264,7 @@ export class AssistantSession {
       provider: this.selection.provider,
       model: this.selection.model,
       credential_id: this.selection.credentialId,
+      thinking_level: this.thinking.value,
     });
     this.log = addUserMessage(this.log, message, readNowUtc());
     this.text = '';
