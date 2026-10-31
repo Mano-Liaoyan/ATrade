@@ -69,6 +69,11 @@ test('many backtest tabs scroll in their own strip and Trades, Orders, and Logs 
   await track.focus();
   await page.keyboard.press('End');
   await expect(oldestTab).toBeInViewport({ ratio: 1 });
+  // Backtest #22 runs, so the page checks the backtest list again. The strip stays where the user scrolled it.
+  await page.waitForResponse('**/api/backtests');
+  // Two animation frames, so the page shows the new list before the check.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await expect(oldestTab).toBeInViewport({ ratio: 1 });
 
   // The status icon is in front of the name. The tab text has no status word.
   await expect(results.getByRole('tab', { name: 'Running Backtest #22' })).toHaveText('Backtest #22');

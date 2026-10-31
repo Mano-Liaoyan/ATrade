@@ -71,12 +71,19 @@
 
   // The selected tab of the strip scrolls into view, for example a new backtest tab or a tab chosen with the keys.
   // Only the strip scrolls, not the panels around it. The close button of a dismissable tab shows with its tab.
+  // The effect also runs when the parent gives new props with the same `value`, for example at each check of a
+  // running backtest. Then the strip stays where the user scrolled it.
+  let scrolledToValue: string | undefined;
   $effect(() => {
     const selected = value;
     const selectedTrigger = stripContent?.querySelector<HTMLElement>(`[data-tab-value="${CSS.escape(selected)}"]`);
     if (strip === undefined || stripContent === undefined || selectedTrigger === null || selectedTrigger === undefined) {
       return;
     }
+    if (selected === scrolledToValue) {
+      return;
+    }
+    scrolledToValue = selected;
     const contentLeftPixels = stripContent.getBoundingClientRect().left;
     const triggerRect = selectedTrigger.getBoundingClientRect();
     const closeButton = selectedTrigger.nextElementSibling;
