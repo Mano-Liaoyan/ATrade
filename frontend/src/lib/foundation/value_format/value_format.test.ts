@@ -1,6 +1,14 @@
 // Bar periods and amounts as the tables show them.
 import { describe, expect, it } from 'vite-plus/test';
-import { findChangeDirection, formatAmount, formatBarPeriod, formatPrice, formatSignedNumber, formatSignedPercent } from './index';
+import {
+  findChangeDirection,
+  formatAmount,
+  formatBarPeriod,
+  formatPrice,
+  formatSignedNumber,
+  formatSignedPercent,
+  formatSplitRatio,
+} from './index';
 
 describe('formatBarPeriod', () => {
   it.each([
@@ -67,5 +75,14 @@ describe('findChangeDirection', () => {
     expect(findChangeDirection(-0.5)).toBe('down');
     expect(findChangeDirection(0)).toBe('flat');
     expect(findChangeDirection(null)).toBe('flat');
+  });
+});
+
+describe('formatSplitRatio', () => {
+  it('writes new shares to old shares', () => {
+    expect(formatSplitRatio('4')).toBe('4:1');
+    expect(formatSplitRatio('1.5')).toBe('3:2');
+    expect(formatSplitRatio('0.1')).toBe('1:10');
+    expect(formatSplitRatio('1.1')).toBe('11:10');
   });
 });

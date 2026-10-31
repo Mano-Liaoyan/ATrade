@@ -297,7 +297,7 @@ app           -> all modules
 |---|---|---|
 | `app/web.py` | Compose service `web` | HTTP API, WebSocket, language server processes. 1 uvicorn worker on port 8000. A second uvicorn server on port 8001 runs in the same event loop (`serve_both`) and has only the allow-list routes for the `assistant` service (`app/assistant_port.py`, section 25). When one server stops, the other stops too. Only port 8000 has a lifespan (IB Gateway connection, paper account check, backtest runner). Runs the daily bar update after the close of each trading day (section 8). |
 | `app/backtest_process.py` | Child process of `web` | Runs one backtest. Gets only a backtest ID. Reads the request and the strategy version from PostgreSQL. Writes the result to PostgreSQL. A run of a parameter sweep is a backtest row with its own `parameters`. For `universe_kind=screen`, it runs the saved copy of the screen at each rebalance (section 24.9). |
-| `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT). |
+| `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT, with the bar fetcher client ID, one connection at a time). |
 | `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. It reads the IBKR daily closes of the instruments that still trade (IB Gateway, client ID `--ibkr-client-id`, default `30`), links symbol changes, adjusts the bars for stock splits, and writes `stock_split` and `databento_symbol_link` rows (section 8.8.3, 8.8.4). It imports the daily bars and the XNAS.ITCH `ohlcv-1h` hourly bars of the universe quarters (section 8.8.2), and then calculates the quarters of `us_universe_member` without members (section 8.9). `--hourly-cost` imports nothing: it prints the hourly bar purchase list and its cost from `metadata.get_cost` before the purchase (section 8.8.1). |
 | `app/databento_check.py` | Run by the user after the Databento import, in the `web` image with `docker compose run` (README.md) | Lists the detected stock splits that wait for the user check and the symbol links that are not checked. `--accept` confirms them, `--reject-split <ID>` rejects one stock split (section 8.8.3). |
 | `assistant` service (TypeScript) | Compose service `assistant` | Runs the pi SDK for all conversations. Calls only port 8001 of `web`. Keeps the credentials in the volume `atrade-assistant-pi` (section 25). |
@@ -1702,8 +1702,10 @@ Facts of the map #129 (section 20.1) that the implementation must check:
 | The time of day at which the EQUS.SUMMARY bar of the previous trading day is available (#146). | `metadata.get_dataset_range` at 06:00, 07:00, and 08:00 ET on one trading day. |
 | How Databento links symbol changes, for example FB to META (#141). | Free `symbology.resolve` for FB and META. |
 | The number of stock splits of instruments that stopped trading, and the false positives of the detection rule and the symbol link rule (#191, only tested with fake data). | Run the import on the bought daily bars and check the listed detections by hand. |
-| IBKR scales `TRADES` volume by the split ratio (#149). | At the first stock split, read 1 year of daily bars again and compare. |
-| The paper account handles stock splits (#149). | Watch the first stock split of a held instrument. |
+| IBKR scales `TRADES` volume by the split ratio (#149). The check of #220 uses the guess. 未确认（本地没有IBKR）. | At the first stock split, read 1 year of daily bars again and compare. |
+| The paper account handles stock splits (#149): when it changes the position (before or after the open of the ex-date), whether and when it pays the cash in lieu and in which account value, how `reqPositions` reports the change, and that `reqExecutions` has no fill for it (#219). The stock split check of #220 uses the guesses of `paper_trading.md` section 11.11 and `forward_test.md` section 12.22. 未确认（本地没有IBKR）. | The checks of #219 at the first stock split of a held instrument. |
+| IBKR divides the `TRADES` daily prices before the ex-date by the split ratio, so evidence A finds the ratio (#219). Only the fake. 未确认（本地没有IBKR）. | The checks of #219. |
+| The time of the change of the stored bars at a stock split ("a few seconds") and the restart time of each forward test ("1 minute or less") (#220). Not measured: the local database has no real bars and no IB Gateway. | Read the `atrade.stock_split_check` log times at the first stock split. |
 | The IB data client and the `ib_async` connection of the ATrade execution client share 1 client ID in 1 LiveNode (`forward_test.md` section 12.24) (#213). | `uv run pytest -m ibkr_paper -k share_the_client_id tests/forward_test`. |
 | A running LiveNode that gets a position report with a new quantity (`forward_test.md` section 12.22). The restart avoids it, so #213 did not check it. | A LiveNode test that changes the fake ledger position while the node runs. |
 | IBKR does or does not refuse opposite orders of 2 owners on one instrument (self-trade prevention) (#146). | 2 client IDs on the paper account place an AAPL buy and a sell, first with prices that do not cross, then with prices that cross. |
@@ -1960,6 +1962,15 @@ option and records it in this document.
   the confirmation, because `market_data` cannot read positions (section
   6.2). The stored day, the tolerance, and the ex-date are in
   `docs/architecture/market_data.md` section 8.14.
+- Decided (#220): the stock split check runs in the `forward-test` worker
+  with the bar fetcher client ID; a lock keeps one connection at a time. The
+  `{id}` of the stock split routes is the `split_check` ID. A stock split
+  restart opens no interruption and adds nothing to `crash_count`. The check
+  cancels no order itself, and without IB Gateway until the last try it runs
+  again on the next trading day. The cash in lieu, the tolerance, and
+  "Apply split" and "Keep ledger": `docs/architecture/paper_trading.md`
+  section 11.13. The calendar and the restart:
+  `docs/architecture/forward_test.md` sections 12.22 and 12.24.
 - Decided (#189): the "Source order" section comes after "HK instrument
   list" on the settings page, so the HK table with its own scroll track
   stays in the first screen. `SourceOrderList` is in `#lib/market_data`.

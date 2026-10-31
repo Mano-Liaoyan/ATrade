@@ -251,8 +251,11 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   owner holds no shares. Without a ledger start (section 11.10), `owners` is
   empty, `unattributed_quantity` is the IBKR quantity, and
   `unattributed_cash_usd` is `null`. `unattributed_cash_usd` is
-  `balance.cash_usd` minus the sum of the cash of all owners. `split_check`
-  comes with #149.
+  `balance.cash_usd` minus the sum of the cash of all owners.
+- Implemented (#220): `split_check` is `null`, or `id` (the ID of the
+  stock split routes of section 11.8), `stock_split_id` (`null` when only
+  the position shows the stock split), `split_ratio`,
+  `account_quantity_before`, and `account_quantity_after`.
 - Each order has the fields of `OpenOrderResponse` (section 11.8). When IB
   Gateway does not answer, the server keeps the last list and tries again.
 - Amounts and quantities are decimal text, for example `"101234.50"`.
@@ -321,12 +324,22 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   IBKR share count before and after. The row has 2 buttons:
   "Apply split 4:1" (the ratio of the row) and "Keep ledger". Each button
   says what it does. The row has no other help text.
+  Implemented (#220): the row is one more row of the instrument in
+  `PositionTable.svelte`: the warning status "Split check needed: 4:1" in
+  the Owner column, "10 → 40" in the Quantity column, and the 2 buttons in
+  the other cells. The compact table of the instrument page shows the row
+  without the buttons. A failed button shows the error notification "Split
+  check not changed". `frontend/e2e/stock_split.spec.ts` checks the row,
+  the order panel, the forward test header, "Apply split 4:1", and the
+  "Fills" row.
 - Phase 3 (#146): when the ledger refuses an order by hand, the review button
   stays enabled, and the `409` reason shows as an inline error notification.
   Implemented (#214): the notification "Order not sent" with the `detail`.
   When the instrument is in the "Split check needed" state, the review button
   is disabled and the panel says why, for example "AAPL needs a split check.
   Apply the split or keep the ledger on the paper trading page.".
+  Implemented (#220): `findInstrumentOrderBlock(account, instrument)` reads
+  the `split_check` of the position of the instrument.
 - Phase 3: the review button no longer depends on `/ws/forward-tests`, because
   the forward test block of section 11.3 goes away. Implemented (#215).
 - The result of the order and cancel routes shows in the form or the order
@@ -349,6 +362,19 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 
 - The Phase 3 route names, the response names, and the `rule` values are
   choices of this document.
+- Implemented (#220): the `{id}` of the 2 stock split routes is the
+  `split_check` ID, because a `position_only` check has no stock split row.
+  `apply` returns `StockSplitAppliedResponse` (`split_check`, and `owners`:
+  the owner positions of the instrument after the change). `keep-ledger`
+  returns `SplitCheckResolvedResponse` (`id`, `symbol`, `exchange`,
+  `currency`, `status`). Both give `404` for an unknown ID and `409` when
+  the split check is not `needed`. `apply` also gives `409` when
+  `market_data` confirmed the stock split already, and `502` when IBKR does
+  not answer for the last close or the forex rate. An order by hand on an
+  instrument in the state gets `409` with the `rule` `split_check_needed`
+  and the `detail` "AAPL needs a split check. Apply the split or keep the
+  ledger on the paper trading page.". A cancel is not blocked. The tests are
+  in `backend/tests/paper_trading/test_stock_split_routes.py`.
 - Implemented (#214): `OrderRefusedByLedgerResponse` with `rule`
   `sell_more_than_position`, `buy_more_than_cash`, or `ledger_not_started`
   (the ledger has no start yet, section 11.10). Buy example `detail`: "By
@@ -489,7 +515,7 @@ Sources: [How the owner ledger changes at a stock split](https://github.com/Mano
 
 [`forward_test.md`](forward_test.md) section 12.22 has the daily check and
 the restart of the forward tests. [`market_data.md`](market_data.md)
-section 8.4 has the stock split table and the change of the stored bars.
+section 8.13 has the stock split table and the change of the stored bars.
 
 The ledger change. For each owner that holds the instrument:
 
@@ -545,6 +571,39 @@ Table (the names are choices of this document):
 |---|---|
 | `split_check` | `id`, `stock_split_id` (the stock split event of `market_data`), `symbol`, `exchange`, `currency`, `detected_ratio`, `evidence` (`bar_ratio_only`, `position_only`, `ratios_differ`, `share_count_differs`, `unusual_ratio`), `account_quantity_before`, `account_quantity_after`, `status` (`needed`, `applied`, `kept`), `created_at_utc`, `resolved_at_utc`. |
 
+Implemented (#220, migration `f66ac656f66b`):
+
+- `split_check` also has `account`, `ex_date_utc`, and `restarted_at_utc`.
+  `stock_split_id` is `null` for a `position_only` check: no stock split row
+  exists until "Apply split" writes one with the ex-date of the check (the
+  check day). A partial unique index allows 1 `needed` row for each
+  instrument of an account.
+- The rules are in `paper_trading/stock_split_rules.py`
+  (`calculate_split_adjustments()`, `find_split_evidence()`), the check of
+  one instrument and the 2 buttons in `paper_trading/stock_split_ledger.py`
+  (`StockSplitLedger`). The tests with the 2 examples above are in
+  `backend/tests/paper_trading/test_stock_split_ledger.py` and
+  `test_stock_split_check.py`.
+- `account_quantity_before` is the sum of the owner positions (the ledger),
+  `account_quantity_after` is the IBKR position of the check.
+- The order of the rules: no evidence A and a changed position gives
+  `position_only`. Evidence A and an unchanged position gives
+  `bar_ratio_only`. An unusual ratio gives `unusual_ratio`. The IBKR position
+  equal to the old shares times the ratio, rounded down, confirms the stock
+  split. Else evidence B within 3% of evidence A gives
+  `share_count_differs`, and any other value gives `ratios_differ`.
+- A usual ratio, as a fraction with a denominator of at most 1000: the
+  numerator is 1, or the denominator is 1, or the numerator is at most 20
+  and the denominator at most 10 (for example 3/2 and 11/10).
+- An instrument that no owner holds has no evidence B. Evidence A alone
+  confirms its stock split (`bar_evidence`). The ledger does not change.
+- The difference row of "By hand" (step 4) is a second `split_adjustment`
+  row of "By hand", with the cash-in-lieu share price as `price`, so its
+  average cost includes the shares it gets. The other split adjustment rows
+  have no price and keep the total cost. A position of 0 shares has no cost.
+- "Apply split" on a `ratios_differ` row with a smaller IBKR position can
+  give "By hand" a negative position: the formula of step 4.
+
 ## 11.12 Limits of the owner ledger (Phase 3)
 
 - Version 1 does not handle cash dividends. A cash dividend changes the
@@ -595,6 +654,32 @@ Decided (#214):
 - Rule 3 (no short sale) is part of rule 1: the position of "By hand" is
   never below 0, so a sell larger than the position fails rule 1 with
   `sell_more_than_position`.
+
+Decided (#220):
+
+- ATrade does not read the IBKR cash in lieu. The IBKR cash in lieu of step 4
+  is the part below 1 share of the old account position (the sum of the
+  owner positions) times the split ratio, at the same share price as the
+  owners. The share price is the last stored daily close before the ex-date
+  divided by the split ratio. Without a stored daily bar, it is the last
+  IBKR daily close, which IBKR adjusted already. The cash in lieu is
+  converted to USD with the IBKR forex rate.
+- The tolerance of the 2 ratios: the IBKR position must be the old position
+  times the ratio, rounded down (the share count of the ledger change). A
+  ratio of evidence B within 3% of evidence A (the step tolerance of
+  evidence A, [`market_data.md`](market_data.md) section 8.14) that does not
+  give this count is `share_count_differs`.
+- "Apply split" writes the stock split with the confirmation `user_apply`
+  and changes the stored bars in the same transaction as the ledger rows
+  (`apply_stock_split_in_transaction()` of `market_data`). The worker sees
+  the applied split check without `restarted_at_utc` at its next check
+  (each minute), restarts the forward tests that got a split adjustment,
+  and writes `restarted_at_utc`.
+- "Keep ledger" changes neither the ledger nor the stored bars, and does not
+  restart a forward test. A candidate of evidence A stays without a
+  confirmation. The check does not check a stock split again that has a
+  split check, and does not check an instrument again whose last kept split
+  check has the same 2 quantities.
 
 Decided (#215):
 

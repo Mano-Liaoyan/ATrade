@@ -116,6 +116,15 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   curves and fills, and a link to the comparison with each backtest of the
   same period. See
   [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md).
+- Stock splits: before each US (08:00 ET) and HK (08:30 HKT) trading day,
+  the `forward-test` worker compares the stored daily closes and the paper
+  account positions with the owner ledger. A confirmed stock split changes
+  the owner ledger and the stored bars and restarts the forward tests that
+  hold the instrument. Else the instrument is "Split check needed": no order
+  on it until the user clicks "Apply split" or "Keep ledger" in the
+  Positions table. See
+  [`docs/architecture/paper_trading.md`](docs/architecture/paper_trading.md)
+  section 11.11.
 - Forward test records and comparison: at the end of each bar, the
   forward test records its new fills and one equity point in PostgreSQL. The
   button "Backtest the same period" starts a normal backtest of the same

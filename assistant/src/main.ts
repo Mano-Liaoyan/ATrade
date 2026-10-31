@@ -16,8 +16,11 @@ const PI_DIR = '/data';
 // The credential file (docs/architecture/assistant.md 25.7.2). Mode 0600.
 const CREDENTIAL_FILE = path.join(PI_DIR, 'credentials.json');
 
+// The device ID of this installation for "Sign in with ChatGPT" (25.7.3). Mode 0600.
+const DEVICE_ID_FILE = path.join(PI_DIR, 'device-id');
+
 const file = new CredentialFile(CREDENTIAL_FILE);
-const logins = new Logins({ file, createRuntime: createModelRuntime });
+const logins = new Logins({ file, createRuntime: createModelRuntime, deviceIdFile: DEVICE_ID_FILE });
 // The tools call port 8001 of web with the conversation ID of the run.
 const conversations = new Conversations({
   piDir: PI_DIR,

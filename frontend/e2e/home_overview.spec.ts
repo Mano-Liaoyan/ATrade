@@ -1,7 +1,8 @@
 // The home page is the account overview workbench (#108): the watchlist column, the key numbers of the paper account,
 // the Positions panel, and the Orders panel. With the IBKR fake of backend/tests/e2e_server.py: account DU1234567,
-// a balance, 40 positions, and 30 open orders of forward test 42. The owner ledger of "By hand" has 10 shares of each
-// position, but only 5 of TEST05.
+// a balance, 40 TEST positions, 4 positions in the "Split check needed" state (one for each browser project), and 30
+// open orders of forward test 42. The owner ledger of "By hand" has 10 shares of each TEST position, but only 5 of
+// TEST05.
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 function positionsPanel(page: Page): Locator {
@@ -20,7 +21,7 @@ test('the home page fills the window and shows the key numbers of the paper acco
   await expect(balance.getByRole('term')).toHaveText(['Net liquidation (USD)', 'Cash (USD)']);
   await expect(balance.getByRole('definition')).toHaveText(['101,234.50', '25,000.00']);
   await expect(page.getByRole('complementary', { name: 'Watchlist' })).toBeVisible();
-  await expect(positionsPanel(page).getByRole('heading', { name: 'Positions (40)' })).toBeVisible();
+  await expect(positionsPanel(page).getByRole('heading', { name: 'Positions (44)' })).toBeVisible();
   await expect(ordersPanel(page).getByRole('tab', { name: /^Open orders/ })).toHaveAttribute('aria-selected', 'true');
   const hasPageScroll = await page.evaluate(() => {
     const root = document.documentElement;

@@ -226,6 +226,7 @@ describe('listPositionRows', () => {
       { owner: { kind: 'forward_test', forward_test_id: 3 }, quantity: '10', average_cost: '105' },
     ],
     unattributed_quantity: '50',
+    split_check: null,
   };
 
   it('gives one row for each owner and one Unattributed row for the difference', () => {
@@ -242,6 +243,22 @@ describe('listPositionRows', () => {
       { owner: 'By hand', unattributed: null, quantity: '20', averageCost: '100', marketValue: 2200, unrealizedPnl: 200 },
       { owner: 'Forward test 3', unattributed: null, quantity: '10', averageCost: '105', marketValue: 1100, unrealizedPnl: 50 },
       { owner: null, unattributed: 'Unattributed: 50', quantity: null, averageCost: null, marketValue: null, unrealizedPnl: null },
+    ]);
+  });
+
+  it('gives one Split check needed row for a position in that state', () => {
+    const splitCheck = {
+      id: 7,
+      stock_split_id: 3,
+      split_ratio: '4',
+      account_quantity_before: '10',
+      account_quantity_after: '40',
+    };
+    const rows = listPositionRows([{ ...position, unattributed_quantity: '0', split_check: splitCheck }]);
+    expect(rows.map((row) => [row.owner, row.splitCheck])).toEqual([
+      ['By hand', null],
+      ['Forward test 3', null],
+      [null, splitCheck],
     ]);
   });
 

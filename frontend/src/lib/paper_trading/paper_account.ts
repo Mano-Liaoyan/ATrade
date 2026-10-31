@@ -133,6 +133,8 @@ export interface PositionRow {
   averageCost: string | null;
   marketValue: number | null;
   unrealizedPnl: number | null;
+  /** The "Split check needed" state of the position on its own row, else null (section 11.11). */
+  splitCheck: PaperPosition['split_check'];
 }
 
 export function describeOwner(owner: OwnerPosition['owner']): string {
@@ -152,6 +154,7 @@ function toOwnerRow(position: PaperPosition, ownerPosition: OwnerPosition, key: 
     averageCost: ownerPosition.average_cost,
     marketValue: quantity * marketPrice,
     unrealizedPnl: averageCost === null ? null : (marketPrice - averageCost) * quantity,
+    splitCheck: null,
   };
 }
 
@@ -165,6 +168,7 @@ function toIbkrRow(position: PaperPosition, key: string): PositionRow {
     averageCost: position.average_cost,
     marketValue: Number(position.market_value),
     unrealizedPnl: Number(position.unrealized_pnl),
+    splitCheck: null,
   };
 }
 
@@ -189,6 +193,20 @@ export function listPositionRows(positions: readonly PaperPosition[]): PositionR
         averageCost: null,
         marketValue: null,
         unrealizedPnl: null,
+        splitCheck: null,
+      });
+    }
+    if (position.split_check !== null) {
+      rows.push({
+        key: `${positionKey}-split-check`,
+        position,
+        owner: null,
+        unattributed: null,
+        quantity: null,
+        averageCost: null,
+        marketValue: null,
+        unrealizedPnl: null,
+        splitCheck: position.split_check,
       });
     }
     return rows.length === 0 ? [toIbkrRow(position, positionKey)] : rows;

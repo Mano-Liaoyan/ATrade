@@ -276,6 +276,144 @@
         }
       }
     },
+    "/api/paper-trading/stock-splits/{split_check_id}/apply": {
+      "post": {
+        "summary": "Apply Split",
+        "operationId": "apply_split_api_paper_trading_stock_splits__split_check_id__apply_post",
+        "parameters": [
+          {
+            "name": "split_check_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Split Check Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockSplitAppliedResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/paper-trading/stock-splits/{split_check_id}/keep-ledger": {
+      "post": {
+        "summary": "Keep Ledger",
+        "operationId": "keep_ledger_api_paper_trading_stock_splits__split_check_id__keep_ledger_post",
+        "parameters": [
+          {
+            "name": "split_check_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Split Check Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SplitCheckResolvedResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Gateway"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/paper-trading/paper-capital": {
       "get": {
         "summary": "Read Paper Capital",
@@ -5285,6 +5423,14 @@
             "format": "date-time",
             "title": "Time Utc"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "fill",
+              "split_adjustment"
+            ],
+            "title": "Kind"
+          },
           "side": {
             "type": "string",
             "enum": [
@@ -5298,12 +5444,34 @@
             "title": "Quantity Shares"
           },
           "price_usd": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Price Usd"
           },
           "commission_usd": {
             "type": "string",
             "title": "Commission Usd"
+          },
+          "amount_usd": {
+            "type": "string",
+            "title": "Amount Usd"
+          },
+          "split_ratio": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Ratio"
           }
         },
         "type": "object",
@@ -5311,12 +5479,16 @@
           "symbol",
           "exchange",
           "time_utc",
+          "kind",
           "side",
           "quantity_shares",
           "price_usd",
-          "commission_usd"
+          "commission_usd",
+          "amount_usd",
+          "split_ratio"
         ],
-        "title": "ForwardTestFillResponse"
+        "title": "ForwardTestFillResponse",
+        "description": "A fill, or a stock split adjustment (section 12.16). A split adjustment has no price, the split ratio, and the\ncash in lieu as `amount_usd`. `side` gives the direction of the share change."
       },
       "ForwardTestInstrumentResponse": {
         "properties": {
@@ -5513,6 +5685,13 @@
               }
             ],
             "title": "Allocated Capital Usd"
+          },
+          "split_checks_needed": {
+            "items": {
+              "$ref": "#/components/schemas/SplitCheckNeededResponse"
+            },
+            "title": "Split Checks Needed",
+            "type": "array"
           }
         },
         "required": [
@@ -5537,7 +5716,8 @@
           "end_time_utc",
           "crash_count",
           "interruptions",
-          "allocated_capital_usd"
+          "allocated_capital_usd",
+          "split_checks_needed"
         ],
         "title": "ForwardTestResponse",
         "type": "object"
@@ -5933,7 +6113,8 @@
         "enum": [
           "sell_more_than_position",
           "buy_more_than_cash",
-          "ledger_not_started"
+          "ledger_not_started",
+          "split_check_needed"
         ]
       },
       "LeftOperand": {
@@ -6389,6 +6570,67 @@
           "MKT",
           "LMT"
         ]
+      },
+      "OwnerKind": {
+        "enum": [
+          "by_hand",
+          "forward_test"
+        ],
+        "type": "string"
+      },
+      "OwnerMessage": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/OwnerKind"
+          },
+          "forward_test_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Test Id"
+          }
+        },
+        "required": [
+          "kind",
+          "forward_test_id"
+        ],
+        "title": "OwnerMessage",
+        "type": "object"
+      },
+      "OwnerPositionMessage": {
+        "description": "The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).",
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/OwnerMessage"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "string"
+          },
+          "average_cost": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Cost"
+          }
+        },
+        "required": [
+          "owner",
+          "quantity",
+          "average_cost"
+        ],
+        "title": "OwnerPositionMessage",
+        "type": "object"
       },
       "PaperCapitalResponse": {
         "properties": {
@@ -7610,6 +7852,66 @@
         "title": "SourceOrderBody",
         "description": "The global source order: the first bar source that saved a time range gives all bars of the range."
       },
+      "SplitCheckNeededResponse": {
+        "description": "An instrument of the forward test in the \"Split check needed\" state (paper_trading.md section 11.11).",
+        "properties": {
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol",
+          "exchange"
+        ],
+        "title": "SplitCheckNeededResponse",
+        "type": "object"
+      },
+      "SplitCheckResolvedResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SplitCheckStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "symbol",
+          "exchange",
+          "currency",
+          "status"
+        ],
+        "title": "SplitCheckResolvedResponse",
+        "description": "The split check after \"Apply split\" or \"Keep ledger\" (section 11.11)."
+      },
+      "SplitCheckStatus": {
+        "type": "string",
+        "enum": [
+          "needed",
+          "applied",
+          "kept"
+        ]
+      },
       "SplitMetricsResponse": {
         "properties": {
           "in_sample": {
@@ -8143,6 +8445,26 @@
         ],
         "title": "StartSweepRequest",
         "description": "The fields of a backtest start and the grid of 1 to 3 parameters."
+      },
+      "StockSplitAppliedResponse": {
+        "properties": {
+          "split_check": {
+            "$ref": "#/components/schemas/SplitCheckResolvedResponse"
+          },
+          "owners": {
+            "items": {
+              "$ref": "#/components/schemas/OwnerPositionMessage"
+            },
+            "type": "array",
+            "title": "Owners"
+          }
+        },
+        "type": "object",
+        "required": [
+          "split_check",
+          "owners"
+        ],
+        "title": "StockSplitAppliedResponse"
       },
       "StrategyListItem": {
         "properties": {
@@ -9440,67 +9762,6 @@
         "title": "OpenOrdersMessage",
         "type": "object"
       },
-      "OwnerKind": {
-        "enum": [
-          "by_hand",
-          "forward_test"
-        ],
-        "type": "string"
-      },
-      "OwnerMessage": {
-        "properties": {
-          "kind": {
-            "$ref": "#/components/schemas/OwnerKind"
-          },
-          "forward_test_id": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Forward Test Id"
-          }
-        },
-        "required": [
-          "kind",
-          "forward_test_id"
-        ],
-        "title": "OwnerMessage",
-        "type": "object"
-      },
-      "OwnerPositionMessage": {
-        "description": "The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).",
-        "properties": {
-          "owner": {
-            "$ref": "#/components/schemas/OwnerMessage"
-          },
-          "quantity": {
-            "title": "Quantity",
-            "type": "string"
-          },
-          "average_cost": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Average Cost"
-          }
-        },
-        "required": [
-          "owner",
-          "quantity",
-          "average_cost"
-        ],
-        "title": "OwnerPositionMessage",
-        "type": "object"
-      },
       "PaperAccountBalanceMessage": {
         "description": "The balance in USD. The base currency values and the rate show what ATrade converted (section 11.9).",
         "properties": {
@@ -9758,6 +10019,16 @@
           "unattributed_quantity": {
             "title": "Unattributed Quantity",
             "type": "string"
+          },
+          "split_check": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SplitCheckMessage"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -9771,7 +10042,8 @@
           "market_value",
           "unrealized_pnl",
           "owners",
-          "unattributed_quantity"
+          "unattributed_quantity",
+          "split_check"
         ],
         "title": "PositionMessage",
         "type": "object"
@@ -9924,6 +10196,47 @@
           "previous_definition"
         ],
         "title": "ScreenSavedMessage",
+        "type": "object"
+      },
+      "SplitCheckMessage": {
+        "description": "The \"Split check needed\" state of the instrument (section 11.11). `id` is the ID of the stock split routes.\n`stock_split_id` is None when only the position shows the stock split.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "stock_split_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stock Split Id"
+          },
+          "split_ratio": {
+            "title": "Split Ratio",
+            "type": "string"
+          },
+          "account_quantity_before": {
+            "title": "Account Quantity Before",
+            "type": "string"
+          },
+          "account_quantity_after": {
+            "title": "Account Quantity After",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "stock_split_id",
+          "split_ratio",
+          "account_quantity_before",
+          "account_quantity_after"
+        ],
+        "title": "SplitCheckMessage",
         "type": "object"
       },
       "SteerMessage": {
