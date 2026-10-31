@@ -425,6 +425,8 @@ Page addresses:
 Layout:
 
 - Side column "Screens" at the start side:
+  - Its header has the "New screen" icon button (Carbon Add icon). The
+    button is always available, also when no screen exists.
   - Each row has the name and the market.
   - The current screen expands to its recent runs (time, instrument count).
   - The user can drag its width and minimize it
@@ -563,9 +565,17 @@ Behavior:
 - Decided (#206): the rank method for ties in a percentile (section 24.5).
 - Decided (#205): the operators of a comparison are `<`, `<=`, `>`, and
   `>=` (section 24.4.1).
-- Decided (#212): a new screen has no default order. The definition
-  requires the order (section 24.4.1), and "Save as new screen" copies the
-  order of the open screen.
+- Decided (#212): "Save as new screen" copies the order of the open
+  screen. The definition requires the order (section 24.4.1).
+- Decided: "New screen" in the header of the "Screens" side column sends
+  `POST /api/screens` with the market `US`, the start `quarter_universe`, no
+  filters, no indicator conditions, and the order Avg trading value (20),
+  high first: `{"indicator": {"indicator": "average_trading_value",
+  "parameters": {"period": 20}, "output": "value"}, "direction":
+  "descending"}`. The name is "New screen", or "New screen N" when that
+  name is in use. Then the page runs the new screen and opens its screen
+  result. A failed create shows the error notification "Screen not
+  created" with the reason above the screen list.
 - Decided (#207): `/screens` stores the id of the last opened screen in the
   browser storage (key `atrade.screen-page.last-screen`). The choice belongs
   to the browser. Without a stored id, or when that screen does not exist,
