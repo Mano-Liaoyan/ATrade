@@ -653,10 +653,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   if it waits for a reconnection. After stop, a message of the closing
   socket is not passed on.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
-  TradingView attribution. Each chart uses `ChartFrame` of
-  `foundation/chart_frame`: the canvas container (`role="img"`, `label`,
-  bindable `canvas`) and the one attribution line under it ("Chart by
-  TradingView Lightweight Charts™"), so all charts show the same attribution.
+  TradingView attribution: the TradingView logo in each chart
+  (`layout.attributionLogo`, true by default), which links to
+  tradingview.com. There is no attribution text line under a chart. Each
+  chart uses `ChartFrame` of `foundation/chart_frame`: the canvas container
+  (`role="img"`, `label`, bindable `canvas`).
   With `fill`, the frame fills the height of its parent, and the chart
   (`autoSize`) follows each size change of its container, for example after a
   side column is minimized or resized. Without `fill`, `height` and `minHeight` set the

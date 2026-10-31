@@ -154,7 +154,7 @@ test('runs a backtest from the toolbar and opens its result in a new tab', async
   await expect(page.getByRole('button', { name: 'Run backtest' })).toBeVisible();
   await expect(results.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   await expect(results.getByRole('img', { name: 'Equity and drawdown' }).locator('canvas').first()).toBeVisible();
-  await expect(results.getByRole('link', { name: 'TradingView', exact: true })).toBeVisible();
+  await expect(results.getByRole('link', { name: 'Charting by TradingView' })).toBeVisible();
 
   await results.getByRole('tab', { name: 'Trades' }).click();
   await expect(results.getByRole('scrollbar', { name: 'Trades scroll bar' })).toBeVisible();
