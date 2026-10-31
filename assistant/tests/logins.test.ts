@@ -1,6 +1,6 @@
 // Provider login from the web page (docs/architecture/assistant.md 25.7.3) and the provider list (25.7.1).
 // The login flows are fakes. The first real login is #186.
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vite-plus/test';
@@ -16,7 +16,7 @@ let logins: Logins;
 beforeEach(() => {
   workDir = mkdtempSync(path.join(tmpdir(), 'atrade-logins-'));
   file = new CredentialFile(path.join(workDir, 'credentials.json'));
-  logins = new Logins({ file, createRuntime: createFakeRuntimeFactory() });
+  logins = new Logins({ file, createRuntime: createFakeRuntimeFactory(), deviceIdFile: path.join(workDir, 'device-id') });
 });
 
 afterEach(() => {
@@ -134,5 +134,38 @@ describe('the model of a conversation', () => {
     await expect(openModel({ provider: FAKE_OAUTH_PROVIDER, model: 'fake-model', credentialId: id })).rejects.toThrow(
       'is for fake-key',
     );
+  });
+});
+
+describe('the device ID of the installation', () => {
+  // "Sign in with ChatGPT" refuses a login without a device ID (UUID). pi's own CLI passes getDeviceId to login().
+  test('each login gets the same UUID, also after a restart, and the file has mode 0600', async () => {
+    const deviceIdFile = path.join(workDir, 'device-id');
+    const seenIds: (string | undefined)[] = [];
+    const createRuntime = createFakeRuntimeFactory();
+    const recordingRuntime: typeof createRuntime = async (credentials) => {
+      const runtime = await createRuntime(credentials);
+      const login = runtime.login.bind(runtime);
+      runtime.login = (provider, method, interaction, options) => {
+        seenIds.push(options?.getDeviceId?.());
+        return login(provider, method, interaction, options);
+      };
+      return runtime;
+    };
+    const request = { provider: FAKE_KEY_PROVIDER, method: 'api_key' as const, name: 'Key' };
+    const answer = (target: Logins) => (event: LoginEvent) => {
+      if (event.type === 'login_step' && event.prompt_id !== null) {
+        target.answer(event.prompt_id, 'k-1');
+      }
+    };
+
+    const first = new Logins({ file, createRuntime: recordingRuntime, deviceIdFile });
+    await first.login(request, answer(first));
+    const restarted = new Logins({ file, createRuntime: recordingRuntime, deviceIdFile });
+    await restarted.login(request, answer(restarted));
+
+    expect(seenIds[0]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(seenIds[1]).toBe(seenIds[0]);
+    expect(statSync(deviceIdFile).mode & 0o777).toBe(0o600);
   });
 });

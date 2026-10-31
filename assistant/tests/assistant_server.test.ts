@@ -36,7 +36,7 @@ async function startOnFreePort(script: ModelStep[] = []): Promise<string> {
   const conversations = new Conversations({ piDir: workDir, openModel, createTools: () => [] });
   const file = new CredentialFile(path.join(workDir, 'credentials.json'));
   const createRuntime = createFakeRuntimeFactory(model.baseUrl);
-  const logins = new Logins({ file, createRuntime });
+  const logins = new Logins({ file, createRuntime, deviceIdFile: path.join(workDir, 'device-id') });
   const server = await startAssistantServer({ host: '127.0.0.1', port: 0 }, conversations, {
     file,
     logins,

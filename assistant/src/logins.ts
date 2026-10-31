@@ -5,6 +5,7 @@
 // (login_answer). After the login, the new credential goes into the credential file with the name of the user.
 // A login event never holds a secret: only the browser sends the API key, as an answer.
 import { randomUUID } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import type { ModelRuntime } from '@earendil-works/pi-coding-agent';
 import {
   LoginCredentialStore,
@@ -78,6 +79,25 @@ function readErrorText(error: unknown): string {
 export interface LoginsOptions {
   file: CredentialFile;
   createRuntime: CreateModelRuntime;
+  /** The file of the device ID (a UUID) of this installation. "Sign in with ChatGPT" requires it. */
+  deviceIdFile: string;
+}
+
+const DEVICE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The device ID of the file, or a new one that the file keeps (mode 0600), as pi's own settings do. */
+export function readOrCreateDeviceId(deviceIdFile: string): string {
+  try {
+    const stored = readFileSync(deviceIdFile, 'utf8').trim();
+    if (DEVICE_ID_PATTERN.test(stored)) {
+      return stored;
+    }
+  } catch {
+    // No file yet.
+  }
+  const deviceId = randomUUID();
+  writeFileSync(deviceIdFile, `${deviceId}\n`, { mode: 0o600 });
+  return deviceId;
 }
 
 interface PendingPrompt {
@@ -103,7 +123,10 @@ export class Logins {
         },
         prompt: (prompt) => this.ask(prompt, emit, signal),
       };
-      const credential = await runtime.login(request.provider, request.method, interaction, { agentName: 'ATrade' });
+      const credential = await runtime.login(request.provider, request.method, interaction, {
+        agentName: 'ATrade',
+        getDeviceId: () => readOrCreateDeviceId(this.options.deviceIdFile),
+      });
       const id = this.options.file.add({ name: request.name, provider: request.provider, credential });
       const summary = this.options.file.find(id);
       if (summary !== undefined) {

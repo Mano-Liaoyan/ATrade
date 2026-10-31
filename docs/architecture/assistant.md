@@ -520,6 +520,14 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
   new credential, and `assistant` adds it to the file with the name that
   the user entered. pi asks for an API key with a `secret` prompt
   ("Enter API key"), so the API key also comes as a `login_answer`.
+- Decided (#186): `login()` also gets `getDeviceId`, as in pi's own CLI.
+  "Sign in with ChatGPT" refuses a login without a device ID (a UUID). The
+  ID is in `/data/device-id` (mode `0600`) and stays the same for each
+  login.
+- A browser callback login (for example OpenAI with
+  `http://127.0.0.1:1455/auth/callback`) cannot reach the callback server
+  of pi in `assistant`: the browser shows a connection error. The user
+  pastes the full address of that page into the `manual_code` field.
 - The Credentials dialog opens its own `/ws/assistant` socket without
   `conversation_id`. Closing the dialog closes the socket and stops the
   login. A cancelled login adds no credential.
