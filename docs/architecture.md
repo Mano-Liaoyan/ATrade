@@ -93,7 +93,7 @@ and its revision comments.
 | Frontend API types | `openapi-typescript` generates types from the OpenAPI document. Pydantic exports JSON Schema for WebSocket messages, and types come from that schema. The frontend does no runtime validation. | Data types have one definition, in the backend. |
 | Bar chart | `lightweight-charts`. | It does not depend on the framework. |
 | Code editor | CodeMirror 6, `@codemirror/lang-python`, `@codemirror/merge`, in our own Svelte component. | Small size, low Safari risk, official diff and LSP extensions. |
-| Markdown of AI assistant messages | `marked` (MIT) reads the text. `shiki` (MIT) colors the code, `@pierre/diffs` (Apache-2.0, vanilla JavaScript API) shows a diff, and `pele` (MIT) draws a Mermaid diagram. Exact versions. The page loads `shiki`, `@pierre/diffs`, and `pele` only when a block needs them. | Small, maintained, framework-free libraries. The blocks hold text only, so no HTML of a message renders (`docs/architecture/assistant.md` 25.12.6). |
+| Markdown of AI assistant messages | `marked` (MIT) reads the text. `@pierre/diffs` (Apache-2.0, vanilla JavaScript API) colors the code (its `File` view for a code block, the tokens of its shared highlighter for a shell block) and shows a diff (`FileDiff`): one highlighter for all code. `pele` (MIT) draws a Mermaid diagram. Exact versions. The page loads `@pierre/diffs` and `pele` only when a block needs them. | Small, maintained, framework-free libraries. The blocks hold text only, so no HTML of a message renders (`docs/architecture/assistant.md` 25.12.6). |
 | Code completion | basedpyright language server in the backend, `@codemirror/lsp-client` in the frontend. | NautilusTrader 2.0 ships `.pyi` stubs, so basedpyright can resolve `Strategy`. |
 | Real-time communication | WebSocket. | One technology for live data and for the language server. |
 | IBKR connection | TWS API through IB Gateway. Image `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest. | IB Gateway is the official IBKR program. The Client Portal Web API has a lower rate limit. |
@@ -456,15 +456,22 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `atrade-auto-grid--wide`), with a `--cds-spacing-05` gap.
 - While a button action runs, the button is disabled and its text says why,
   for example "Saving…", "Creating…", or "Starting…".
-- `foundation/carbon` `StatusIndicator` shows a status as an icon and a word
-  with a color: `kind` (`success`, `in-progress`, `warning`, `error`,
-  `neutral`; each kind has its own icon shape) and `label`. With `iconOnly`,
-  only the icon shows, in front of a name inside a control (for example a
-  backtest tab): the icon has `label` as its accessible name (`role="img"`)
-  and as its tooltip (`title`). No status word stands next to it. `StatusIcon`
-  (`kind`, `label`, `align`) shows the same icon alone, for a line with no
-  space for a word (the app header). It takes the keyboard focus, and `label`
-  is its accessible name and its tooltip text. `Select` takes
+- UI rule: a status icon stands alone, with no word next to it, before the
+  item title (for example before "#42" in a list row or a header line).
+  Success has the green check. `foundation/carbon` `StatusIndicator` is this
+  status icon: `kind` (`success`, `in-progress`, `warning`, `error`,
+  `neutral`; each kind has its own icon shape), `label`, and `align`. It takes
+  the keyboard focus; `label` is its accessible name (`role="img"`) and its
+  Carbon tooltip (Bits UI Tooltip). With `iconOnly`, the icon sits inside a
+  control (for example a backtest tab): it does not take the focus, and
+  `label` is its accessible name and its `title`. `StatusIcon` is the same
+  focusable icon; `inline` gives the size for a line of text, and without it
+  the icon has a 32px box. A text that the user needs to act, for example an
+  error or the reason that a control is disabled, is a `StatusMessage`
+  (`kind`, `text`: the icon and the text) or an `InlineNotification`, not a
+  status icon. `InlineNotification` takes `tooltip`: the notification then
+  takes the focus and shows the explanation in a tooltip, so the title stays
+  short (for example "Survivorship bias"). `Select` takes
   `placeholder` (the trigger text while no item is selected) and `inline`
   (the Carbon inline dropdown: no field background, for a control line). `TextInput`
   takes `type` `datetime-local` for a native date and time input.
@@ -474,14 +481,17 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   with the live list (`routes/forward-tests/ForwardTestList.svelte`, 32px
   rows, from `ForwardTestsOnInstrumentsFeed.forwardTests`) and the
   "New forward test" dialog (form id `start-forward-test`); the forward test
-  panel (header line with the status, the red "Stop forward test" icon button
+  panel (header line with the status icon before "#<id>", the red "Stop forward test" icon button
   while the forward test can stop, and the "Backtest the same period" icon
   button; `KeyMetricRow`; `EquityDrawdownChart`, which lists the
   interruptions under the chart and marks grey the recorded bar ends inside
   one) over
   the Fills / Comparison / Logs panel. `/forward-tests` opens the newest
   forward test. The status of a forward test is a `StatusIndicator`
-  (`findForwardTestStatusKind` of `forward_test`).
+  (`findForwardTestStatusKind` of `forward_test`) before "#<id>" in the list
+  row and in the header line. The list has no Status column. Warning icons for
+  "Crashes in a row: <n> of 3" and "Split check needed: <symbols>" stand
+  after the status icon; the text is their tooltip.
 - Only `src/lib/foundation/` can import `bits-ui`. ESLint fails on an import
   of `bits-ui` in a capability or in `src/routes/`. Capabilities and routes
   use the components of `#lib/foundation/carbon`.
@@ -788,10 +798,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   order value, position, average cost, unrealized P&L, cash (USD), and net
   liquidation (USD) as `MetricTile`s in a `MetricRow` with `columns` 2; and
   the full-width button "Review buy order" (primary) or "Review sell order"
-  (danger). The button opens the confirmation dialog with the PAPER tag and
+  (danger). The button opens the confirmation dialog with the account ID and
   "Send paper order". A paper account check that did not pass, or a running
   forward test on the instrument, disables the button, and the status above it
-  says why with a `StatusIndicator` (`findInstrumentOrderBlock`). A sent order
+  says why with a `StatusMessage` (`findInstrumentOrderBlock`). A form error
+  is an `InlineNotification`. A sent order
   shows in the Open orders tab from `/ws/paper-trading`. The fields and the
   button stay in view; only the numbers scroll, in their own `ScrollRegion`.
   The side column is the landmark; its content has no landmark with the same
@@ -834,7 +845,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   backtest panel (header line, `KeyMetricRow`, `EquityDrawdownChart`) over
   the Trades / Orders / Logs panel. `/backtests` opens the newest backtest
   (docs/architecture/backtest.md section 10.6). A backtest status is a
-  `StatusIndicator` (`findBacktestStatusKind` of `backtest`). The equity and
+  `StatusIndicator` (`findBacktestStatusKind` of `backtest`) before "#<id>"
+  in the list row and in the header line; the list has no Status column. The
+  same comparison of a backtest shows "No code difference" (`EmptyText`) for
+  the same strategy version. The equity and
   drawdown chart reads only Carbon tokens: `--cds-layer-01` (background),
   `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid, and the line
   between its 2 panes), `--cds-text-primary` (first equity curve, solid),
@@ -1056,9 +1070,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     trading value, watchlist), "Capital (USD)", and "Unallocated: <amount>
     USD". The forward test page has an "Instruments" tab, a "Symbol" column
     in "Fills", and the split adjustment rows. The paper trading Positions
-    table has an "Owner" column, "Unattributed: <n>" with a warning icon, and
-    the "Split check needed" row with "Apply split <ratio>" and "Keep
-    ledger" (phase 3, sections 11 and 12).
+    table has an "Owner" column, the "Unattributed" row (a warning icon
+    before the symbol with the tooltip "Unattributed: <n>", and the
+    difference as the quantity), and the "Split check needed" row (a warning
+    icon before the symbol with the tooltip "Split check needed: <ratio>")
+    with "Apply split <ratio>" and "Keep ledger" (phase 3, sections 11 and
+    12). The open orders have no Status column: the status icon before the
+    symbol has the IBKR order status as its tooltip.
   - A settings page has the "Source order" list of the bar sources
     (`docs/architecture/market_data.md`). The settings page is `/settings`
     with the header link "Settings" after "Forward tests". It is a document

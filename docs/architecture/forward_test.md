@@ -836,9 +836,9 @@ than the worker clock.
   test. The side column "Forward tests" has the list from `/ws/forward-tests`
   and the "New forward test" button. The dialog has the start form (strategy,
   strategy version, symbol, exchange, currency, a bar period from the IB live
-  bar periods, an optional end time in the local time zone) and the metrics of
-  the latest finished backtest of the selected strategy version or "no
-  backtest result". A refused start shows the `detail` text. A started
+  bar periods, an optional end time in the local time zone). The dialog
+  shows no backtest result (UI rule: no text that the user does not need to
+  act). A refused start shows the `detail` text. A started
   forward test opens at once.
 - The page reads `GET /api/forward-tests/{id}` every 2 seconds. The header
   line shows the number, the strategy version (link to that version on the strategy page),
@@ -932,16 +932,16 @@ than the worker clock.
     change of the share count. The price column is empty. The amount column
     shows the cash in lieu.
 - Phase 3 (#149): when an instrument of the forward test is in the
-  "Split check needed" state, the header line shows a warning icon, the
-  words "Split check needed", and the instrument, for example
-  "Split check needed: AAPL". The paper trading page has the actions
+  "Split check needed" state, the header line shows a warning icon before
+  "#<id>" with the tooltip "Split check needed: AAPL". The paper trading page has the actions
   ([`paper_trading.md`](paper_trading.md) section 11.7).
 - Implemented (#220): the "Fills" table has one more column, "Amount (USD)":
   the quantity times the price of a fill, or the cash in lieu of a split
   adjustment. A split adjustment row has "Split 4:1" in "Side", the signed
   change of the share count (for example "+30") in "Quantity", and an empty
-  price and commission. The header line shows the instruments of
-  `split_checks_needed`, for example "Split check needed: AAPL".
+  price and commission. The tooltip of the warning icon of the header line
+  names the instruments of `split_checks_needed`, for example "Split check
+  needed: AAPL".
 - `test_forward_test_paper_contract.py` (`ibkr_paper`, by hand): a real
   LiveNode sends a buy limit order for 1 AAPL at 1.00 USD. The Web side
   (`reqAllOpenOrders`, client ID 98) sees it with the forward test ID from

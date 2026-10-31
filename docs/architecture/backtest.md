@@ -511,7 +511,7 @@ section 9.5.
   with wrapped lines, unchanged lines collapsed to the changed parts and 3
   lines around them, in a `ScrollRegion` named "Code difference").
 - When both backtests have the same code (the same strategy version), the
-  tab shows the status "Same strategy version: no code difference." in place
+  tab shows the empty state "No code difference" (`EmptyText`) in place
   of the diff. A closed "Show the code" disclosure shows the full code
   without collapsed lines.
 - Phase 1 ([#137](https://github.com/Mano-Liaoyan/ATrade/issues/137)):
@@ -1220,11 +1220,13 @@ and a parameter chart. ATrade uses a heat map, not a 3D chart, because a 3D
 chart is hard to read on flat Carbon surfaces.
 
 - The "Parameter sweeps" `SideColumn` has the "New parameter sweep" icon
-  button and the sweep list. Each row has the number, the strategy version,
-  the status, and the finished runs / all runs.
+  button and the sweep list. Each row has the status icon before the number
+  (the status in its tooltip), the strategy version, and the finished runs /
+  all runs.
 - Top panel:
   - A status line with the number of finished, failed, running, and queued
-    runs.
+    runs: each count follows its status icon, and the status word is the
+    tooltip of the icon.
   - With 1 parameter: a point chart. With 2 or 3 parameters: a heat map.
   - A "Metric" select. The default is Total return. With 3 parameters, a
     second select chooses the value of the third parameter.
@@ -1252,7 +1254,7 @@ chart is hard to read on flat Carbon surfaces.
   cancelled. The status line counts finished, failed, running, and queued
   runs. The "Metric" select has Total return, Max drawdown, Sharpe ratio,
   Win rate, and Trades. The Runs table has the parameter values, the run
-  status, and these 5 metrics, sorted by Total return, highest first. The
+  status icon (Status column, sortable), and these 5 metrics, sorted by Total return, highest first. The
   heat map has the first grid parameter on the columns and the second on
   the rows. The third parameter select starts at its lowest value. A
   `bool` parameter row of the dialog has no range inputs. The backtest
@@ -1311,8 +1313,9 @@ Phase 3. Sources: [#141](https://github.com/Mano-Liaoyan/ATrade/issues/141),
   - an HK backtest,
   - a US backtest that starts before 2018-05-01 (the start of the Databento
     history).
-- The warning text is "The universe has survivorship bias: instruments that
-  stopped trading are missing." It is a Carbon warning with an icon.
+- The warning title is "Survivorship bias". It is a Carbon warning with an
+  icon. Its tooltip says "Instruments that stopped trading are missing from
+  the universe." (UI rule: a short title, the explanation in the tooltip).
 - Decided (#197): the "Bar sources" tab of the "Backtest tables" panel
   shows the source order and the bar counts: a data table with one row for
   each bar source in the source order, and the columns "Bar source" and
