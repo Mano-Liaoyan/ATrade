@@ -284,7 +284,8 @@ Decided (#205): the paths and the field names of this table are final.
 | `GET /api/screens/{screen_id}` | `200` with the screen (`id`, `name`, `market`, `definition`, `kept`, `assistant_conversation_id`, `created_at_utc`, `updated_at_utc`) and `recent_screen_results`: the last 10 screen results (`id`, `run_at_utc`, `result_count`), the last run first. `404` when the screen does not exist. |
 | `POST /api/screens` | Body `{"name", "market", "definition"}`. `201` with the screen, as `GET /api/screens/{screen_id}` gives it. A screen of the user has `kept` true and `assistant_conversation_id` null. `422` with the problem list (section 24.6). |
 | `PUT /api/screens/{screen_id}` | Body `{"name", "definition"}`. `200` with the screen. `422` with the problem list. `404` when the screen does not exist. On the AI assistant port, `403` for each screen that section 24.8 does not allow. |
-| `DELETE /api/screens/{screen_id}` | `204`. Also deletes the screen results of the screen. `404` when the screen does not exist. Not on the AI assistant port. |
+| `DELETE /api/screens/{screen_id}` | `204`. Also deletes the screen results of the screen. `404` when the screen does not exist. Not on the AI assistant port. Discard of the condition card uses it (#210). |
+| `POST /api/screens/{screen_id}/keep` | Keep of the condition card (#210). `200` with the screen, as `GET /api/screens/{screen_id}` gives it, with `kept` true. A screen that is kept already also gets `200`. `updated_at_utc` does not change. `404` when the screen does not exist. Not on the AI assistant port. |
 | `POST /api/screens/{screen_id}/runs` | Runs the saved screen. With the optional body `{market, definition}`, runs that market and definition in place of the saved ones and does not change the saved screen (#212). `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
 | `GET /api/screen-indicators` | `200` with the indicator catalog of section 23.3, in its order: `[{"key", "name", "parameters": [{"name", "value_type" ("int" or "float"), "default", "minimum", "maximum", "is_in_name"}], "outputs"}]`. The edit popover of the screen page reads it (#212). Not on the AI assistant port. |
 | `GET /api/screen-results/{screen_result_id}?offset=&limit=` | `200` with the summary and one page of rows. Default `limit` 50. `404` when the screen result does not exist. |
@@ -357,9 +358,10 @@ exist, and `403` when the screen has `kept` true or another
 - The name of a new screen of the AI assistant is the old name with
   " (AI)". When that name is in use, it adds a number, for example
   "Momentum leaders (AI 2)". The user can rename it.
-- Keep: the screen stays, and `kept` becomes true.
+- Keep: the screen stays, and `kept` becomes true
+  (`POST /api/screens/{id}/keep`, #210).
 - Discard: deletes the screen that the AI assistant made. Old backtests keep
-  their copy of the screen.
+  their copy of the screen (`DELETE /api/screens/{id}`, #210).
 - When the user selects neither Keep nor Discard, the screen stays.
 - Not on the AI assistant port: `DELETE /api/screens/{id}`, watchlist
   changes (also "Add to watchlist"), HK instrument list changes, the daily
@@ -537,8 +539,10 @@ Behavior:
   24.7).
 - Decided (#205): the form of the problem location in the `422` list
   (section 24.6).
-- The route for Keep. Discard can use `DELETE /api/screens/{id}` on the Web
-  port.
+- Decided (#210): the route for Keep is `POST /api/screens/{id}/keep` on the
+  Web port (section 24.7). It sets the column `kept`, so `update_screen`
+  gets `403` after it. Discard uses `DELETE /api/screens/{id}` on the Web
+  port. Neither route is on the AI assistant port.
 - Decided (#209): how the API tells the screen routes the AI assistant
   caller and the conversation: port 8001 has its own router
   (`create_screen_assistant_router`), and the conversation comes from the

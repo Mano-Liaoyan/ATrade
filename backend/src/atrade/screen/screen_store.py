@@ -129,6 +129,20 @@ async def update_screen(
         raise NameInUseError from error
 
 
+async def keep_screen(connection: psycopg.AsyncConnection, screen_id: int) -> ScreenRecord | None:
+    """Sets `kept` (Keep of the condition card). The change time stays: the screen itself does not change. Returns
+    None when the screen does not exist."""
+    async with connection.cursor(row_factory=class_row(ScreenRecord)) as cursor:
+        await cursor.execute(
+            """
+            UPDATE screen SET kept = true WHERE id = %(id)s
+            RETURNING id, name, market, definition, kept, assistant_conversation_id, created_at_utc, updated_at_utc
+            """,
+            {"id": screen_id},
+        )
+        return await cursor.fetchone()
+
+
 async def select_screen(connection: psycopg.AsyncConnection, screen_id: int) -> ScreenRecord | None:
     async with connection.cursor(row_factory=class_row(ScreenRecord)) as cursor:
         await cursor.execute(

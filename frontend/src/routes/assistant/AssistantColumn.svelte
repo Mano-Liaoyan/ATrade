@@ -232,6 +232,9 @@
     onOpenDiff={openDiff}
     onKeep={keep}
     onDiscard={(item: DiffItem) => void discard(item)}
+    screenChoices={session.screenChoices}
+    onKeepScreen={(screenId: number) => void session.keepScreen(screenId)}
+    onDiscardScreen={(screenId: number) => void session.discardScreen(screenId)}
   />
 
   <div class="assistant-bottom">

@@ -1,6 +1,6 @@
 // The state of the AI assistant column that all workbench pages share (docs/architecture/assistant.md 25.12): the
 // conversation list, the open conversation and its /ws/assistant socket, the log, the model selection, the message
-// draft, and the Keep and Discard choices of the diff cards. Each page mounts its own AssistantColumn, but the state
+// draft, and the Keep and Discard choices of the diff cards and the condition cards. Each page mounts its own AssistantColumn, but the state
 // is one module object, so a page change keeps the open conversation and does not close its socket (a closed socket
 // stops the run, 25.10).
 import { SvelteMap } from 'svelte/reactivity';
@@ -30,6 +30,7 @@ import {
   type Provider,
 } from '#lib/assistant';
 import { readStoredLayout, writeStoredLayout } from '#lib/foundation/workbench';
+import { deleteScreen, keepScreen } from '#lib/screen';
 
 export type DiffChoice = 'kept' | 'discarded';
 
@@ -95,6 +96,8 @@ export class AssistantSession {
   text = $state('');
   /** The choice of each diff card of the open conversation, by its item ID. */
   readonly diffChoices = new SvelteMap<number, DiffChoice>();
+  /** The choice of each screen of the condition cards, by its screen ID. All cards of one screen share it. */
+  readonly screenChoices = new SvelteMap<number, DiffChoice>();
   /** The last error, for a page that has no Output tab. Empty when there is none. */
   errorText = $state('');
 
@@ -175,6 +178,7 @@ export class AssistantSession {
     this.#closeSocket();
     this.log = EMPTY_LOG;
     this.diffChoices.clear();
+    this.screenChoices.clear();
     if (id === null) {
       return;
     }
@@ -287,6 +291,26 @@ export class AssistantSession {
     }
     this.diffChoices.set(item.id, 'discarded');
     return true;
+  }
+
+  /** Keep of a condition card: the AI assistant cannot change the screen after it (25.6). */
+  async keepScreen(screenId: number): Promise<void> {
+    const error = await keepScreen(fetch, screenId);
+    if (error !== null) {
+      this.reportError(`Screen not kept: ${error}`);
+      return;
+    }
+    this.screenChoices.set(screenId, 'kept');
+  }
+
+  /** Discard of a condition card: deletes the screen (25.6). Old backtests keep their copy of it. */
+  async discardScreen(screenId: number): Promise<void> {
+    const error = await deleteScreen(fetch, screenId);
+    if (error !== null) {
+      this.reportError(`Screen not discarded: ${error}`);
+      return;
+    }
+    this.screenChoices.set(screenId, 'discarded');
   }
 
   /** A diff card on another page asks the strategy page to open the diff after it opens the strategy. */

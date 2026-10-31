@@ -11,6 +11,7 @@ export {
   type IndicatorNames,
   type ScreenDefinition,
 } from './condition_bar';
+export { markConditionChanges, type ConditionChange, type MarkedConditionGroup, type MarkedConditionTag } from './condition_changes';
 export { describeExclusionReason, listResultColumns, sortResultRows, type ScreenResultRow } from './result_table';
 export { default as ConditionEditor } from './ConditionEditor.svelte';
 export { newScreen } from './new_screen';
@@ -30,6 +31,8 @@ export {
 } from './screen_draft';
 export {
   createScreen,
+  deleteScreen,
+  keepScreen,
   listScreenIndicators,
   listScreens,
   readScreen,
