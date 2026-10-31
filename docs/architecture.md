@@ -93,6 +93,7 @@ and its revision comments.
 | Frontend API types | `openapi-typescript` generates types from the OpenAPI document. Pydantic exports JSON Schema for WebSocket messages, and types come from that schema. The frontend does no runtime validation. | Data types have one definition, in the backend. |
 | Bar chart | `lightweight-charts`. | It does not depend on the framework. |
 | Code editor | CodeMirror 6, `@codemirror/lang-python`, `@codemirror/merge`, in our own Svelte component. | Small size, low Safari risk, official diff and LSP extensions. |
+| Markdown of AI assistant messages | `marked` (MIT) reads the text. `shiki` (MIT) colors the code, `@pierre/diffs` (Apache-2.0, vanilla JavaScript API) shows a diff, and `pele` (MIT) draws a Mermaid diagram. Exact versions. The page loads `shiki`, `@pierre/diffs`, and `pele` only when a block needs them. | Small, maintained, framework-free libraries. The blocks hold text only, so no HTML of a message renders (`docs/architecture/assistant.md` 25.12.6). |
 | Code completion | basedpyright language server in the backend, `@codemirror/lsp-client` in the frontend. | NautilusTrader 2.0 ships `.pyi` stubs, so basedpyright can resolve `Strategy`. |
 | Real-time communication | WebSocket. | One technology for live data and for the language server. |
 | IBKR connection | TWS API through IB Gateway. Image `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest. | IB Gateway is the official IBKR program. The Client Portal Web API has a lower rate limit. |
@@ -458,9 +459,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - `foundation/carbon` `StatusIndicator` shows a status as an icon and a word
   with a color: `kind` (`success`, `in-progress`, `warning`, `error`,
   `neutral`; each kind has its own icon shape) and `label`. With `iconOnly`,
-  only the icon shows, in front of a name (for example a backtest tab): the
-  icon has `label` as its accessible name (`role="img"`) and as its tooltip
-  (`title`). No status word stands next to it. `Select` takes
+  only the icon shows, in front of a name inside a control (for example a
+  backtest tab): the icon has `label` as its accessible name (`role="img"`)
+  and as its tooltip (`title`). No status word stands next to it. `StatusIcon`
+  (`kind`, `label`, `align`) shows the same icon alone, for a line with no
+  space for a word (the app header). It takes the keyboard focus, and `label`
+  is its accessible name and its tooltip text. `Select` takes
   `placeholder` (the trigger text while no item is selected) and `inline`
   (the Carbon inline dropdown: no field background, for a control line). `TextInput`
   takes `type` `datetime-local` for a native date and time input.
@@ -523,8 +527,16 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   header in a `cds--g100` zone in all themes. It shows the product name, the
   page links (Home, Screens, Strategies, Backtests, Parameter sweeps,
   Forward tests) with
-  `aria-current="page"` on the current page, the backend status, the IB
-  Gateway status, the server time, and the Paper tag. The Paper tag is a
+  `aria-current="page"` on the current page, the server clock, the backend
+  status icon, the IB Gateway status icon, and the Paper tag. The server
+  clock is a short time text, for example "03:04:05 UTC" (`role="timer"`,
+  name "Server time"). Each status icon (`StatusIcon` of
+  `foundation/carbon`) is a Carbon status icon alone, with no word next to
+  it: green check (connected), red error (not reachable), info in-progress
+  (checking), or warning (not known). Each icon is in a `role="status"`
+  region ("Backend status", "IB Gateway status"). The icon takes the keyboard
+  focus. Its accessible name and its tooltip give the full status, for
+  example the IB Gateway host and port and what to check. The Paper tag is a
   Carbon operational tag with a tooltip. The tooltip shows the checked paper
   account number with its middle hidden, for example `DU****567`. The header
   reads the account check from `/ws/paper-trading`. Carbon hides the header
@@ -743,8 +755,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   daily bars). A row opens its instrument page with the same bar period. The
   center `PanelSplit` has the chart panel and the "Paper account" panel. The
   chart panel header line has the instrument name, the last price, the change
-  from the previous close, and the bar periods as a Carbon `sm` content
-  switcher with short names (1m, 5m, 15m, 30m, 1h, 1D). The arrow keys, Home,
+  from the previous close, and the bar periods as a compact Carbon `sm`
+  content switcher with short names (1m, 5m, 15m, 30m, 1h, 1D). The switcher
+  is 24px high and centered in the 32px header line, with space to the line
+  edges and to the panel buttons. The arrow keys, Home,
   and End select a bar period at once. The page address keeps the bar period,
   and the switcher keeps the focus. The bar chart fills the rest of the panel.
   The bar count and the live bar are status text for screen readers. The bars
@@ -986,7 +1000,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   on all pages: the text with an arrow icon and `--cds-support-success` (up)
   or `--cds-support-error` (down), so the color is never the only sign.
   `foundation/time_format` shows a UTC time as "2026-01-02 03:04:05 UTC".
-- The app shell header shows the server time and updates it every second:
+- The app shell header shows the server time of day ("03:04:05 UTC") and
+  updates it every second:
   the `time_utc` of `GET /api/health` plus the browser time since the answer
   (`foundation/backend_health`).
 - Chart times are UNIX timestamps, not date strings. This keeps the browsers
@@ -1082,7 +1097,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   style needs one color value for each syntax role, so
   `foundation/code_editor/code_colors.ts` imports the colors from the
   official Carbon packages `@carbon/colors` and `@carbon/themes`. It has no
-  color literal.
+  color literal. `foundation/markdown/markdown.scss` puts the same colors
+  (`@carbon/colors` SCSS) in the `--diffs-token-*` CSS variables that the
+  code blocks and the diff view of AI assistant messages read
+  (`docs/architecture/assistant.md` 25.12.6).
 
 ## 14. Deployment and external access
 

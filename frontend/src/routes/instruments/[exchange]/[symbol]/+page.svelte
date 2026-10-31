@@ -288,19 +288,27 @@
     white-space: nowrap;
   }
 
+  /* A compact switcher in the 32px header line: 24px high, centered, with space to the line edges and to the panel
+     buttons, so it does not touch the borders of the line. */
   .bar-periods {
+    display: flex;
     flex: none;
-    margin-inline-start: auto;
+    align-items: center;
+    margin-inline: auto var(--cds-spacing-03);
   }
 
   /* 6 short bar period names, each wide enough for its name. */
   .bar-periods :global(.cds--content-switcher) {
-    inline-size: calc(var(--cds-spacing-10) * 5);
+    block-size: var(--cds-spacing-06);
+    inline-size: calc(var(--cds-spacing-09) * 6);
   }
 
   .bar-periods :global(.cds--content-switcher-btn) {
     justify-content: center;
     padding-inline: var(--cds-spacing-03);
+    font-size: var(--cds-label-01-font-size);
+    line-height: var(--cds-label-01-line-height);
+    letter-spacing: var(--cds-label-01-letter-spacing);
   }
 
   /* The chart fills the panel body and follows its size (BarChart fill). */
