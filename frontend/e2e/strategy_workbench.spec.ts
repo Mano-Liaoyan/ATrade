@@ -143,12 +143,13 @@ test('runs a backtest from the toolbar and opens its result in a new tab', async
   // A child process runs the backtest for some seconds. Meanwhile the user looks at another tab. The finished backtest
   // then opens in its own tab, with its number and total return.
   const results = page.getByRole('region', { name: 'Results' });
-  const backtestTab = results.getByRole('tab', { name: /^Backtest #\d+/ });
+  // The status icon in front of the name gives the status in the accessible name of the tab, not in its text.
+  const backtestTab = results.getByRole('tab', { name: /Backtest #\d+/ });
   await expect(backtestTab).toBeVisible();
   // The list reads again every 2 seconds, so the running state shows at least until the next read.
   await expect(page.getByRole('button', { name: 'Backtest is running' })).toHaveAttribute('aria-disabled', 'true');
   await results.getByRole('tab', { name: 'Logs' }).click();
-  await expect(backtestTab).toHaveText(/^Backtest #\d+\s+[+-]?[\d,]+\.\d{2} %$/, { timeout: BACKTEST_TIMEOUT_MILLISECONDS });
+  await expect(backtestTab).toHaveText(/^\s*Backtest #\d+\s+[+-]?[\d,]+\.\d{2} %$/, { timeout: BACKTEST_TIMEOUT_MILLISECONDS });
   await expect(backtestTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('button', { name: 'Run backtest' })).toBeVisible();
   await expect(results.getByRole('term')).toHaveText(KEY_METRIC_NAMES);

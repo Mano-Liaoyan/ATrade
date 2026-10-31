@@ -362,6 +362,33 @@ async def select_backtest(connection: psycopg.AsyncConnection, backtest_id: int)
         return await cursor.fetchone()
 
 
+async def delete_backtest(connection: psycopg.AsyncConnection, backtest_id: int) -> str | None:
+    """Deletes a backtest with a final status and its result rows (ON DELETE CASCADE). Returns the reason of a
+    refusal, or None after the delete. The caller has checked that the backtest exists. Section 10.5."""
+    async with connection.transaction():
+        cursor = await connection.execute(
+            "SELECT status, sweep_id FROM backtest WHERE id = %(backtest_id)s FOR UPDATE",
+            {"backtest_id": backtest_id},
+        )
+        found = await cursor.fetchone()
+        if found is None:
+            return None
+        status, sweep_id = found
+        if status in ("queued", "running"):
+            return f"Backtest #{backtest_id} is {status}. Wait for its end."
+        if sweep_id is not None:
+            return f"Backtest #{backtest_id} is a run of sweep #{sweep_id}. Delete the sweep."
+        try:
+            async with connection.transaction():
+                await connection.execute(
+                    "DELETE FROM backtest WHERE id = %(backtest_id)s", {"backtest_id": backtest_id}
+                )
+        except psycopg.errors.RestrictViolation:
+            # Only forward_test_same_period_backtest refuses the delete (ON DELETE RESTRICT); the result tables cascade.
+            return f"Backtest #{backtest_id} is the same-period backtest of a forward test."
+    return None
+
+
 async def select_overlapping_out_of_sample_parts(
     connection: psycopg.AsyncConnection, row: BacktestRow
 ) -> list[OverlappingBacktest]:

@@ -156,10 +156,11 @@ test('compares two versions of the same strategy and refuses different strategie
   await expect(track).toBeVisible();
   await expect(track.locator('.scroll-thumb')).toBeVisible();
 
-  // The Carbon batch action bar shows when 2 rows are checked.
+  // The Carbon batch action bar shows when a row is checked. Compare shows when 2 rows are checked.
   const selection = list.getByRole('status', { name: 'Comparison selection' });
   await list.getByRole('checkbox', { name: `Select backtest #${String(firstBacktestId)}`, exact: true }).check();
-  await expect(selection).toHaveCount(0);
+  await expect(selection).toHaveText('1 backtest selected');
+  await expect(list.getByRole('button', { name: 'Compare', exact: true })).toHaveCount(0);
   await list.getByRole('checkbox', { name: `Select backtest #${String(otherBacktestId)}`, exact: true }).check();
   await expect(selection).toHaveText('Only backtests of the same strategy can be compared');
   await expect(list.getByRole('button', { name: 'Compare', exact: true })).toBeDisabled();
