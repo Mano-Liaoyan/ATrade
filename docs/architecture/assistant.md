@@ -1454,7 +1454,6 @@ columns behave the same (section 13).
 |---|---|---|
 | #140, #133 | OpenAI may count a self-hosted single-user server as "remotely hosted" for the ChatGPT subscription login. The OpenAI pages read on 2026-10-30 do not settle it (`docs/architecture.md` section 21.1). | Ask OpenAI. |
 | #140 | Community Antigravity extensions may not work in pi 1.4.0. Not needed in this stage. | Only for the later extension ticket: install the extension in a temporary container, and let the user log in one time. |
-| #140 | An OAuth refresh of a real provider writes back through ATrade's `CredentialStore`. Checked with a fake refresh and 2 credentials of one provider (#183). | Wait for a real OAuth token refresh and read `/data/credentials.json` (#186, step 7). The real logins and model calls are checked (`docs/architecture.md` section 21.1). |
 | #150 | The run time of a point-in-time backtest from a screen (34 quarters, a screen of 500 instruments, and a multi-instrument backtest). It can be longer than the 15 minute wait. | After the implementation, run one with real data and measure the time. |
 | #150 | The token count of a screen result with 500 rows. | After the implementation, count the tokens of one real result. |
 | #140 | The VS Code secondary side bar resize and Maximize behavior, which the side column follows. | Read `src/vs/workbench/browser/layout.ts` of VS Code. |
