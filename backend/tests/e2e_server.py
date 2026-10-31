@@ -31,6 +31,7 @@ from tests.fakes.ibkr import (
     make_forward_test_order,
     make_stock_position,
 )
+from tests.e2e_split_checks import add_split_checks
 from tests.saved_ranges import save_ibkr_saved_range
 
 FAKE_ACCOUNT_ID = "DU1234567"
@@ -422,6 +423,7 @@ def main() -> None:
     add_compared_forward_test(database_url)
     add_discarded_version(database_url)
     add_owner_ledger_start(database_url)
+    split_positions = add_split_checks(database_url, account=FAKE_ACCOUNT_ID, project_names=PLAYWRIGHT_PROJECT_NAMES)
     add_survivorship_bias_backtests(database_url)
     add_us_universe(database_url)
     settings = Settings(
@@ -440,6 +442,7 @@ def main() -> None:
         make_stock_position(FAKE_ACCOUNT_ID, symbol=f"TEST{number:02d}", quantity="10", market_price="100")
         for number in range(1, E2E_POSITION_COUNT + 1)
     ]
+    gateway_connection.portfolio.extend(split_positions)
     # Enough forward test orders to overflow the order list, so that the e2e tests can check its scroll track.
     gateway_connection.open_orders = [
         make_forward_test_order(

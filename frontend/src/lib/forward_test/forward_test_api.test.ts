@@ -26,7 +26,6 @@ const request: ForwardTestRequest = {
   currency: 'USD',
   bar_period: '1-MINUTE',
   allocated_capital_usd: '10000',
-  split_checks_needed: [],
 };
 
 const runningForwardTest: ForwardTest = {

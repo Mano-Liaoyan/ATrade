@@ -585,7 +585,7 @@ Phase 3 table changes (#146). The column names are choices of this document.
 - The owner ledger tables and the split check state belong to
   `paper_trading` ([`paper_trading.md`](paper_trading.md) sections 11.10 and
   11.11). The table of stock split events and the change of the stored bars
-  are in [`market_data.md`](market_data.md) section 8.4.
+  are in [`market_data.md`](market_data.md) section 8.13.
 
 | Status | Meaning |
 |---|---|
@@ -646,6 +646,16 @@ and the status codes of the new refusals are choices of this document.
   `ForwardTestResponse.allocated_capital_usd` (null for an old row), and the
   `symbol` and `exchange` of the fill rows. `universe`, `split_checks_needed`,
   `instruments`, and the fill `kind` come with #217 and the split check.
+- Implemented (#220): `split_checks_needed` lists the instrument of a
+  single-instrument forward test, or each instrument that the forward test
+  holds in the owner ledger, while it is in the "Split check needed" state.
+  The fill rows get `kind`, `amount_usd` (the quantity times the price of a
+  fill, or the cash in lieu), and `split_ratio` (null for a fill). The
+  `price_usd` of a split adjustment is null and its `commission_usd` is 0.
+  The metrics, the Instruments tab, and the comparison count only the
+  `fill` rows. The equity includes the split adjustments: the recorder and
+  the universe equity read them as a trade with the price 0 and the cash in
+  lieu as a negative commission (`test_forward_test_recorder.py`).
 - Implemented (#217, first part): `universe` in `StartForwardTestRequest`
   (the flat `symbol`, `exchange`, and `currency` stay as a single
   instrument; a request with both gets `422`), the `422` refusals for the
@@ -892,6 +902,12 @@ than the worker clock.
   words "Split check needed", and the instrument, for example
   "Split check needed: AAPL". The paper trading page has the actions
   ([`paper_trading.md`](paper_trading.md) section 11.7).
+- Implemented (#220): the "Fills" table has one more column, "Amount (USD)":
+  the quantity times the price of a fill, or the cash in lieu of a split
+  adjustment. A split adjustment row has "Split 4:1" in "Side", the signed
+  change of the share count (for example "+30") in "Quantity", and an empty
+  price and commission. The header line shows the instruments of
+  `split_checks_needed`, for example "Split check needed: AAPL".
 - `test_forward_test_paper_contract.py` (`ibkr_paper`, by hand): a real
   LiveNode sends a buy limit order for 1 AAPL at 1.00 USD. The Web side
   (`reqAllOpenOrders`, client ID 98) sees it with the forward test ID from
@@ -1112,7 +1128,7 @@ Source: [Forward tests of multi-instrument strategies](https://github.com/Mano-L
 - Before a multi-instrument forward test starts, it reads the missing ranges
   of the 1-year warm-up (section 12.17).
 - Each bar read from IBKR also reads 1 stored daily bar, for the stock split
-  evidence A ([`market_data.md`](market_data.md) section 8.4,
+  evidence A ([`market_data.md`](market_data.md) section 8.13,
   [ADR 0008](../adr/0008-stock-splits-from-ibkr-evidence.md)). So each
   instrument can need 1 more request each day.
 - The reason for the fetcher: the IB adapter subscribes to 1-hour and 1-day
@@ -1190,7 +1206,7 @@ Sources: [How the owner ledger changes at a stock split](https://github.com/Mano
 This section has the check and the restart of the forward tests.
 [`paper_trading.md`](paper_trading.md) section 11.11 has the ledger change
 and the "Split check needed" state. [`market_data.md`](market_data.md)
-section 8.4 has the stock split table and the change of the stored bars.
+section 8.13 has the stock split table and the change of the stored bars.
 
 - Scope: forward splits, reverse splits, and bonus issues, for US and HK
   instruments. A bonus issue uses its ratio, for example 1.1 for 1 new share
@@ -1206,7 +1222,7 @@ section 8.4 has the stock split table and the change of the stored bars.
   the owner positions.
 - When both ratios agree, the stock split is confirmed. An instrument
   without a position has only evidence A. `market_data` finds it when it
-  reads bars ([`market_data.md`](market_data.md) section 8.4).
+  reads bars ([`market_data.md`](market_data.md) section 8.13).
 - When the evidence is not complete, the check tries again every 15 minutes
   until 5 minutes before the market opens.
 - After a confirmed stock split:
@@ -1227,6 +1243,42 @@ section 8.4 has the stock split table and the change of the stored bars.
 - The `forward-test` worker runs the check, because the check restarts
   forward test children. This is a choice of this document.
 - The cost is 0 USD.
+
+Implemented (#220) with the IBKR fake only:
+
+- `StockSplitCheck` (`forward_test/stock_split_check.py`) runs in the worker
+  next to the bar fetcher and checks each minute if a try is due. The tries
+  of a trading day are at 08:00 ET (US, the USD instruments) or 08:30 HKT
+  (HK, the HKD instruments), then every 15 minutes while a try is not later
+  than 5 minutes before the 09:30 open. The last try is the try after which
+  15 more minutes pass this limit.
+- Each try connects with the bar fetcher client ID (one connection of the 2
+  jobs at a time), runs the paper account check, reads the IBKR positions of
+  the market, and reads evidence A again for each instrument with an IBKR
+  position or an owner position (`record_stock_split_evidence()` of
+  `market_data`). So a retry can find evidence A that the daily bar update
+  of the evening before did not have. Then it gives each instrument, and
+  each candidate of the market, to `StockSplitLedger.check_instrument()` of
+  `paper_trading`.
+- Evidence that is not complete (`position_only` or `bar_ratio_only`) waits
+  for the next try. At the last try it gives the "Split check needed"
+  state. The other 3 cases give the state at once.
+- After a confirmed stock split, the check asks the worker to restart the
+  forward tests that held the instrument (`ForwardTestWorker.request_restart`).
+  The worker asks the child to stop. When it ends with exit code 0, the
+  worker writes `starting` and the next comparison starts a new child. The
+  restart adds nothing to `crash_count`. The new child cancels the open
+  orders of its client ID (section 12.7) and gets the new owner positions
+  from the ledger.
+- The tests are `backend/tests/forward_test/test_stock_split_check.py` (the
+  try times and the retries with a fixed clock),
+  `test_stock_split_restart.py` (no crash count), and
+  `test_atrade_clients_live_node.py` (the strategy position after a stock
+  split and a restart, with the fake ledger, #213).
+- Not measured: the restart time of each forward test and the time of the
+  change of the stored bars. 未确认（本地没有IBKR）: each fact of
+  [ADR 0008](../adr/0008-stock-splits-from-ibkr-evidence.md) "Not checked
+  before implementation" (section 21).
 
 ## 12.23 Limits and later work
 
@@ -1325,11 +1377,26 @@ simplest option and records it in this document.
   changes them. A forward test that runs during the upgrade has no
   allocated capital in the owner ledger: stop it before the upgrade.
 - Whether a stock split restart opens an interruption.
+  Decided (#220): no. The restart is before the open and misses no bar.
 - What the stock split check does when IB Gateway is not reachable until
   5 minutes before the open.
+  Decided (#220): the check logs the reason, writes nothing, and runs again
+  on the next trading day. The orders of the forward tests need IB Gateway
+  too, so none goes out with the old ledger. The paper account check of a
+  try that fails counts the same.
 - How the stock split check cancels the orders of other client IDs. IBKR lets
   a client cancel only its own orders. The forward test restart cancels the
   forward test orders. The Web client can cancel the orders by hand.
+  Decided (#220): the check cancels no order itself. The restart of each
+  forward test that held the instrument cancels the open orders of its
+  client ID (section 12.7). The check does not cancel the orders by hand:
+  IBKR cancels GTC orders at a stock split (best effort), and a DAY order by
+  hand of the day before is not open at 08:00 ET. An order by hand that
+  stays open shows in the open order list, and the user cancels it.
+- Decided (#220): the trading day calendar of the stock split check. US:
+  the trading days of `market_data` (weekdays without New Year's Day and
+  Good Friday, `is_us_trading_day()`). HK: the weekdays. On a holiday that
+  the calendars do not know, the check finds no new evidence.
 - Market orders and limit orders that a strategy sends after the daily close.
   Decided (#217): the platform does not change them. The ATrade execution
   client sends them at once, as during the trading hours. How IBKR handles
