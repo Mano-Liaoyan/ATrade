@@ -8,15 +8,26 @@ import type { Backtest } from '#lib/backtest';
 import type { ForwardTest } from '#lib/forward_test';
 import {
   EDITOR_SHORTCUT_KEYS,
+  closeBacktestTab,
+  describeNoBacktestText,
+  listClosedBacktestTabs,
+  openBacktestTab,
+  reopenAllBacktestTabs,
+  reopenBacktestTab,
   createOutputLine,
   describeBacktestEvent,
+  describeFixRequest,
   describeProblemCounts,
   describeShortcut,
   describeSwapButton,
+  findClosedBacktestIds,
   findFinishedBacktest,
+  findDefaultVersionNumber,
   findRunningForwardTest,
   listResultTabs,
+  listVersionItems,
   listWorkbenchPanels,
+  readClosedBacktestTabs,
   readPaneOrder,
   readWorkbenchShortcut,
   resolveResultTab,
@@ -107,20 +118,100 @@ describe('describeSwapButton', () => {
 });
 
 describe('listResultTabs', () => {
-  it('has one tab for each backtest of the strategy, the newest first, then Trades, Orders, and Logs', () => {
+  it('has one tab for each backtest of the strategy, the newest first, and the fixed Trades, Orders, and Logs', () => {
     const backtests = [
       createBacktest(13, 3, 'finished', '-2.5'),
       createBacktest(9, 4, 'finished', '1'),
       createBacktest(14, 3, 'running'),
     ];
 
-    expect(listResultTabs(backtests, 3)).toEqual([
-      { value: 'backtest-14', label: 'Backtest #14', name: 'Backtest #14', backtestId: 14, change: null, changeText: '' },
-      { value: 'backtest-13', label: 'Backtest #13 -2.50 %', name: 'Backtest #13', backtestId: 13, change: -2.5, changeText: '-2.50 %' },
-      { value: 'trades', label: 'Trades', name: 'Trades', backtestId: null, change: null, changeText: '' },
-      { value: 'orders', label: 'Orders', name: 'Orders', backtestId: null, change: null, changeText: '' },
-      { value: 'logs', label: 'Logs', name: 'Logs', backtestId: null, change: null, changeText: '' },
+    expect(listResultTabs(backtests, 3)).toEqual({
+      backtestTabs: [
+        { value: 'backtest-14', label: 'Backtest #14', name: 'Backtest #14', backtestId: 14, status: 'running', change: null, changeText: '' },
+        {
+          value: 'backtest-13',
+          label: 'Backtest #13 -2.50 %',
+          name: 'Backtest #13',
+          backtestId: 13,
+          status: 'finished',
+          change: -2.5,
+          changeText: '-2.50 %',
+        },
+      ],
+      tableTabs: [
+        { value: 'trades', label: 'Trades', name: 'Trades', backtestId: null, status: null, change: null, changeText: '' },
+        { value: 'orders', label: 'Orders', name: 'Orders', backtestId: null, status: null, change: null, changeText: '' },
+        { value: 'logs', label: 'Logs', name: 'Logs', backtestId: null, status: null, change: null, changeText: '' },
+      ],
+    });
+  });
+
+  it('leaves out the closed backtest tabs', () => {
+    const backtests = [createBacktest(14, 3, 'failed'), createBacktest(13, 3, 'finished', '1')];
+
+    expect(listResultTabs(backtests, 3, new Set([14])).backtestTabs.map((tab) => tab.value)).toEqual(['backtest-13']);
+  });
+});
+
+describe('closed backtest tabs', () => {
+  it('keeps the closed backtests of each strategy', () => {
+    const closed = closeBacktestTab(closeBacktestTab(readClosedBacktestTabs(null), 3, 14), 4, 9);
+
+    expect(closed).toEqual({ '3': [14], '4': [9] });
+    expect(findClosedBacktestIds(closed, 3)).toEqual(new Set([14]));
+    expect(findClosedBacktestIds(closed, 5)).toEqual(new Set());
+  });
+
+  it('reopens one closed backtest of the strategy and keeps the others closed', () => {
+    const closed = { '3': [14, 12], '4': [9] };
+
+    expect(reopenBacktestTab(closed, 3, 14)).toEqual({ '3': [12], '4': [9] });
+    expect(reopenBacktestTab(closed, 3, 99)).toEqual(closed);
+  });
+
+  it('reopens all closed backtests of the strategy only', () => {
+    expect(reopenAllBacktestTabs({ '3': [14, 12], '4': [9] }, 3)).toEqual({ '3': [], '4': [9] });
+  });
+
+  it('a backtest that opens from elsewhere leaves the closed list and is selected', () => {
+    expect(openBacktestTab({ '3': [14, 12] }, 3, 14)).toEqual({
+      closed: { '3': [12] },
+      selection: { tab: 'backtest-14', backtestId: 14 },
+    });
+  });
+
+  it('lists the closed backtests of the strategy like their tabs, the newest first', () => {
+    const backtests = [
+      createBacktest(12, 3, 'failed'),
+      createBacktest(14, 3, 'finished', '1'),
+      createBacktest(13, 3, 'finished', '2'),
+      createBacktest(9, 4, 'finished', '1'),
+    ];
+
+    expect(listClosedBacktestTabs(backtests, 3, new Set([12, 14, 9, 77]))).toEqual([
+      {
+        value: 'backtest-14',
+        label: 'Backtest #14 +1.00 %',
+        name: 'Backtest #14',
+        backtestId: 14,
+        status: 'finished',
+        change: 1,
+        changeText: '+1.00 %',
+      },
+      { value: 'backtest-12', label: 'Backtest #12', name: 'Backtest #12', backtestId: 12, status: 'failed', change: null, changeText: '' },
     ]);
+  });
+
+  it('says "No open backtests" when the strategy has backtests and all are closed', () => {
+    const backtests = [createBacktest(14, 3, 'finished', '1')];
+
+    expect(describeNoBacktestText(backtests, 3)).toBe('No open backtests');
+    expect(describeNoBacktestText(backtests, 4)).toBe('No backtests');
+  });
+
+  it('reads a damaged stored value as no closed tabs', () => {
+    expect(readClosedBacktestTabs('x')).toEqual({});
+    expect(readClosedBacktestTabs({ '3': ['a', 2] })).toEqual({ '3': [2] });
   });
 });
 
@@ -139,8 +230,21 @@ describe('resolveResultTab', () => {
     expect(resolveResultTab({ tab: 'backtest-99', backtestId: 99 }, backtests, 3)).toEqual({ tab: 'backtest-14', backtestId: 14 });
   });
 
+  it('opens the newest open tab when the selected tab is closed', () => {
+    expect(resolveResultTab({ tab: 'backtest-14', backtestId: 14 }, backtests, 3, new Set([14]))).toEqual({
+      tab: 'backtest-13',
+      backtestId: 13,
+    });
+  });
+
   it('opens Trades with no backtest when the strategy has no backtest', () => {
     expect(resolveResultTab({ tab: null, backtestId: null }, [], 3)).toEqual({ tab: 'trades', backtestId: null });
+  });
+});
+
+describe('describeFixRequest', () => {
+  it('asks the AI assistant to read the failed backtest and fix the code', () => {
+    expect(describeFixRequest(21)).toBe('Backtest #21 failed. Read it with read_backtest and fix the strategy code.');
   });
 });
 
@@ -237,5 +341,52 @@ describe('readWorkbenchShortcut', () => {
   it('names the shortcut keys of the platform in the tooltip', () => {
     expect(describeShortcut('forward-test', false)).toBe('Ctrl+Shift+F');
     expect(describeShortcut('save', true)).toBe('Cmd+S');
+  });
+});
+
+describe('listVersionItems', () => {
+  const versions = [
+    { version_number: 1, discarded: false },
+    { version_number: 2, discarded: true },
+    { version_number: 3, discarded: false },
+  ];
+
+  it('hides the discarded versions by default', () => {
+    expect(listVersionItems(versions, { showDiscarded: false, openVersionNumber: 3 })).toEqual([
+      { value: '1', label: 'v1' },
+      { value: '3', label: 'v3' },
+    ]);
+  });
+
+  it('shows the discarded versions with the tag Discarded when the toggle is on', () => {
+    expect(listVersionItems(versions, { showDiscarded: true, openVersionNumber: 3 })).toEqual([
+      { value: '1', label: 'v1' },
+      { value: '2', label: 'v2', tag: 'Discarded' },
+      { value: '3', label: 'v3' },
+    ]);
+  });
+
+  it('keeps the open version in the list when it is discarded', () => {
+    expect(listVersionItems(versions, { showDiscarded: false, openVersionNumber: 2 })).toEqual([
+      { value: '1', label: 'v1' },
+      { value: '2', label: 'v2', tag: 'Discarded' },
+      { value: '3', label: 'v3' },
+    ]);
+  });
+});
+
+describe('findDefaultVersionNumber', () => {
+  it('opens the latest version that is not discarded', () => {
+    expect(
+      findDefaultVersionNumber([
+        { version_number: 1, discarded: false },
+        { version_number: 2, discarded: true },
+      ]),
+    ).toBe(1);
+  });
+
+  it('opens the latest version when all versions are discarded', () => {
+    expect(findDefaultVersionNumber([{ version_number: 4, discarded: true }])).toBe(4);
+    expect(findDefaultVersionNumber([])).toBeUndefined();
   });
 });

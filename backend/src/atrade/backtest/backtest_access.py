@@ -2,15 +2,17 @@
 comparison with a backtest of the same period (docs/architecture/forward_test.md section 12.10).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from typing import Final
 
 import psycopg
 
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
-from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus
-from atrade.market_data import BarRequest, has_saved_bars
+from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus, UniversePeriod
+from atrade.backtest.backtest_universe import check_universe
+from atrade.market_data import BarRequest, check_source_order, has_saved_bars, read_source_order
 
 
 @dataclass(frozen=True)
@@ -26,11 +28,41 @@ class BacktestOutcome:
     trades: list[BacktestTrade]
 
 
+# The start of the Databento history: no bar source has US instruments that stopped trading before it.
+DATABENTO_HISTORY_START_UTC: Final = datetime(2018, 5, 1, tzinfo=UTC)
+
+
 def check_backtest_request(request: BacktestRequest) -> str | None:
     """Returns why a backtest cannot run with this request, or None."""
     if request.time_range.end_utc <= request.time_range.start_utc:
         return "The time range must end after it starts."
+    universe_refusal = check_universe(request)
+    if universe_refusal is not None:
+        return universe_refusal
+    if request.source_order is not None:
+        return check_source_order(request.source_order)
     return None
+
+
+def has_survivorship_bias(request: BacktestRequest) -> bool:
+    """True for an HK backtest and a US backtest that starts before the Databento history: their universe has no
+    instruments that stopped trading (docs/architecture/backtest.md section 10.12). Also true for a fixed `list`
+    universe: its members are chosen at the end of the range (docs/architecture/screen.md section 24.9). Also true for
+    a `screen` universe whose screen does not start from the US universe of each quarter: its start list is the list
+    of today (screen.md section 24.13)."""
+    universe = request.universe
+    if universe is not None and universe.kind == "list":
+        return True
+    if (
+        universe is not None
+        and universe.screen is not None
+        and universe.screen.definition["start"] != "quarter_universe"
+    ):
+        return True
+    currency = request.currency
+    if currency == "HKD":
+        return True
+    return currency == "USD" and request.time_range.start_utc < DATABENTO_HISTORY_START_UTC
 
 
 def format_message_time(time_utc: datetime) -> str:
@@ -42,7 +74,7 @@ def describe_missing_bars(request: BacktestRequest) -> str:
 
     It names the bars, says how bars get saved, and says why a closed market gives no bars (section 10.1).
     """
-    instrument = request.instrument
+    instrument = request.single_instrument
     return (
         f"There are no saved {request.bar_period.label} bars of {instrument.symbol} / {instrument.exchange}"
         f" / {instrument.currency} from {format_message_time(request.time_range.start_utc)}"
@@ -59,17 +91,40 @@ async def check_saved_bars(*, database_url: str, request: BacktestRequest) -> st
     a backtest can start before the first saved bar or end after the last one (docs/architecture/backtest.md 10.1).
     """
     bar_request = BarRequest(
-        instrument=request.instrument, bar_period=request.bar_period, time_range=request.time_range
+        instrument=request.single_instrument, bar_period=request.bar_period, time_range=request.time_range
     )
-    if await has_saved_bars(database_url=database_url, bar_request=bar_request):
+    source_order = request.source_order or await read_source_order(database_url=database_url)
+    if await has_saved_bars(database_url=database_url, bar_request=bar_request, source_order=source_order):
         return None
     return describe_missing_bars(request)
 
 
-async def queue_backtest(*, database_url: str, request: BacktestRequest, created_at_utc: datetime) -> int:
-    """Adds a queued backtest and returns its ID. The backtest runner of the Web process starts it."""
+async def add_global_source_order(*, database_url: str, request: BacktestRequest) -> BacktestRequest:
+    """The request with the global source order when it has no source order (docs/architecture/backtest.md 10.12)."""
+    if request.source_order is not None:
+        return request
+    return replace(request, source_order=await read_source_order(database_url=database_url))
+
+
+async def queue_backtest(
+    *,
+    database_url: str,
+    request: BacktestRequest,
+    created_at_utc: datetime,
+    universe_periods: list[UniversePeriod] | None = None,
+    conversation_id: int | None = None,
+) -> int:
+    """Adds a queued backtest and returns its ID. The backtest runner of the Web process starts it. Without a source
+    order in the request, the backtest saves and uses the global source order."""
+    request = await add_global_source_order(database_url=database_url, request=request)
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
-        row = await backtest_store.insert_backtest(connection, request=request, created_at_utc=created_at_utc)
+        row = await backtest_store.insert_backtest(
+            connection,
+            request=request,
+            created_at_utc=created_at_utc,
+            universe_periods=universe_periods,
+            conversation_id=conversation_id,
+        )
     return row.id
 
 
@@ -89,3 +144,13 @@ async def read_backtest_outcome(*, database_url: str, backtest_id: int) -> Backt
         equity_curve=equity_curve,
         trades=trades,
     )
+
+
+async def read_last_backtest_ids(*, database_url: str, strategy_version_ids: list[int], count: int) -> list[int]:
+    """The IDs of the last backtests of these strategy versions, the newest first. At most `count`."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        cursor = await connection.execute(
+            "SELECT id FROM backtest WHERE strategy_version_id = ANY(%(ids)s) ORDER BY id DESC LIMIT %(count)s",
+            {"ids": strategy_version_ids, "count": count},
+        )
+        return [backtest_id for (backtest_id,) in await cursor.fetchall()]

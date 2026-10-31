@@ -8,7 +8,15 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 // A real child process runs each backtest. The browser projects share one queue.
 const BACKTEST_TIMEOUT_MILLISECONDS = 90_000;
 const COMPARED_STRATEGY_LABEL = 'E2E compared forward test v1';
-const KEY_METRIC_NAMES = ['Total return', 'Net profit (USD)', 'Max drawdown', 'Win rate', 'Trades', 'Final equity (USD)'];
+const KEY_METRIC_NAMES = [
+  'Total return',
+  'Net profit (USD)',
+  'Max drawdown',
+  'Sharpe ratio',
+  'Win rate',
+  'Trades',
+  'Final equity (USD)',
+];
 
 /** Opens the forward test of the list row. Returns its ID. /forward-tests first opens the newest forward test. */
 async function openForwardTest(page: Page, row: Locator): Promise<string> {
@@ -47,11 +55,11 @@ async function expectComparedMetrics(metrics: Locator, forwardTestId: string): P
   await expect(forwardTestMetrics.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   await expect(backtestMetrics.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   // The forward test records 40 fills. The bar count strategy of the backtest buys and sells 3 times.
-  await expect(forwardTestMetrics.getByRole('definition').nth(4)).toHaveText('40');
-  await expect(backtestMetrics.getByRole('definition').nth(4)).toHaveText('3');
+  await expect(forwardTestMetrics.getByRole('definition').nth(5)).toHaveText('40');
+  await expect(backtestMetrics.getByRole('definition').nth(5)).toHaveText('3');
   await expect(backtestMetrics.getByRole('definition').nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
-  // The win rates come from the fills and the trades: a percent, not a dash.
-  await expect(backtestMetrics.getByRole('definition').nth(3)).toHaveText(/^\s*\d+\.\d{2} %$/);
+  // The API gives the win rate of the backtest: a percent, not a dash.
+  await expect(backtestMetrics.getByRole('definition').nth(4)).toHaveText(/^\s*\d+\.\d{2} %$/);
 }
 
 test('backtests the same period and compares the metrics, the equity curves, and the fills', async ({ page }) => {
@@ -66,7 +74,7 @@ test('backtests the same period and compares the metrics, the equity curves, and
   await chartPanel.getByRole('button', { name: 'Backtest the same period', exact: true }).click();
 
   await expect(page).toHaveURL(/\/forward-tests\/\d+\/comparison\/\d+$/);
-  await expect(page.getByRole('status', { name: 'Backtest status' })).toContainText('Finished', {
+  await expect(page.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,
   });
 
@@ -114,6 +122,48 @@ test('backtests the same period and compares the metrics, the equity curves, and
   await expect(page).toHaveURL(comparisonUrl);
 });
 
+// backend/tests/e2e_server.py adds the stopped watchlist forward test "E2E universe compared forward test" with an
+// allocated capital of 10,000 USD, the recorded members FTUA and FTUB, then FTUA and FTUC from 2026-04-01, 40 fills of
+// FTUA and FTUB, and the saved daily bars of the 3 members.
+test('compares a multi-instrument forward test with a backtest of its recorded members', async ({ page }) => {
+  test.setTimeout(BACKTEST_TIMEOUT_MILLISECONDS * 2);
+  await page.setViewportSize({ width: 1280, height: 640 });
+  await page.goto('/forward-tests');
+
+  const row = page
+    .getByRole('region', { name: 'Forward test list' })
+    .getByRole('row', { name: /E2E universe compared forward test/ });
+  const forwardTestId = await openForwardTest(page, row);
+  const chartPanel = page.getByRole('region', { name: `Forward test #${forwardTestId}` });
+  await chartPanel.getByRole('button', { name: 'Backtest the same period', exact: true }).click();
+
+  await expect(page).toHaveURL(/\/forward-tests\/\d+\/comparison\/\d+$/);
+  await expect(page.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
+    timeout: BACKTEST_TIMEOUT_MILLISECONDS,
+  });
+
+  // The start capital of the forward test is its allocated capital: 10,000 -> 10,045.
+  const forwardTestMetrics = page.getByRole('region', { name: 'Compared metrics' }).locator('dl').first();
+  await expect(forwardTestMetrics.getByRole('definition').nth(1)).toContainText('45.00');
+  await expect(forwardTestMetrics.getByRole('definition').nth(5)).toHaveText('40');
+
+  // One row for each bar end, side, and member. FTUC is a member only from the second recorded quarter, so only the
+  // backtest buys it.
+  const fills = page.getByRole('region', { name: 'Comparison tables' }).getByRole('region', { name: 'Compared fills' });
+  await expect(fills.getByRole('columnheader', { name: 'Symbol', exact: true })).toBeVisible();
+  await expect(fills.getByRole('row', { name: /FTUA/ }).first()).toBeVisible();
+  await expect(fills.getByRole('row', { name: /FTUB/ }).first()).toBeVisible();
+  await expect(fills.getByRole('row', { name: /FTUC\s*BUY/ })).toBeVisible();
+
+  const track = page.getByRole('scrollbar', { name: 'Compared fills scroll bar' });
+  const lastRow = fills.getByRole('row').last();
+  await expect(track).toBeVisible();
+  await expect(lastRow).not.toBeInViewport();
+  await track.focus();
+  await page.keyboard.press('End');
+  await expect(lastRow).toBeInViewport();
+});
+
 test('a stopped forward test shows the key metrics, the equity and drawdown chart, the fills, and the logs', async ({ page }) => {
   await page.goto('/forward-tests');
   const row = page.getByRole('region', { name: 'Forward test list' }).getByRole('row', { name: /FTCMP/ });
@@ -124,15 +174,15 @@ test('a stopped forward test shows the key metrics, the equity and drawdown char
   await expect(heading.getByRole('link', { name: COMPARED_STRATEGY_LABEL })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: 'FTCMP', exact: true })).toHaveAttribute('href', '/instruments/ARCA/FTCMP?currency=USD');
   await expect(heading).toContainText('1 day');
-  await expect(chartPanel.getByRole('status', { name: 'Forward test status' })).toHaveText('Stopped');
+  await expect(chartPanel.getByRole('status', { name: 'Forward test status' }).getByRole('img', { name: 'Stopped' })).toBeVisible();
   // A stopped forward test has no Stop button.
   await expect(chartPanel.getByRole('button', { name: 'Stop forward test' })).toHaveCount(0);
   // The same key metrics as the backtest page, in the same order. The max drawdown is a negative percent (or 0.00 %).
   await expect(chartPanel.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   await expect(chartPanel.getByRole('definition').nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
-  await expect(chartPanel.getByRole('definition').nth(4)).toHaveText('40');
+  await expect(chartPanel.getByRole('definition').nth(5)).toHaveText('40');
   await expect(chartPanel.getByRole('img', { name: 'Equity and drawdown' }).locator('canvas').first()).toBeVisible();
-  await expect(chartPanel.getByRole('link', { name: 'TradingView', exact: true })).toBeVisible();
+  await expect(chartPanel.getByRole('link', { name: 'Charting by TradingView' })).toBeVisible();
   await expect(chartPanel.getByRole('list', { name: 'Equity and drawdown interruptions' }).getByRole('listitem')).toHaveText([
     'Interrupted from 2026-03-21 01:00:00 UTC to 2026-03-24 01:00:00 UTC',
   ]);
@@ -142,6 +192,9 @@ test('a stopped forward test shows the key metrics, the equity and drawdown char
   const fills = tables.getByRole('region', { name: 'Fills' });
   const track = tables.getByRole('scrollbar', { name: 'Fills scroll bar' });
   const lastFill = fills.getByRole('row').last();
+  // The Symbol column names the instrument of each fill (docs/architecture/forward_test.md 12.16).
+  await expect(fills.getByRole('columnheader', { name: 'Symbol', exact: true })).toBeVisible();
+  await expect(fills.getByRole('row').nth(1)).toContainText('FTCMP');
   await expect(track).toBeVisible();
   await expect(lastFill).not.toBeInViewport();
   await track.focus();

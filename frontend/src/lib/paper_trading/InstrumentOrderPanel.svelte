@@ -1,7 +1,7 @@
 <!-- The paper order panel of the instrument page (#103), IBKR Desktop layout: the Buy / Sell switch, the order fields
      in two columns, the order and account numbers as metric tiles in two columns (MetricRow, like the key metrics of the other pages), and the full-width button at the bottom. The order
      is for the instrument of the page, so the panel has no instrument fields. The limit price starts with the last
-     price. A confirmation dialog with the PAPER mark comes before each order. A failed paper account check or a forward
+     price. A confirmation dialog with the account ID comes before each order. A failed paper account check or a forward
      test on the instrument disables the button, and the panel says why. ATrade sends paper orders only. -->
 <script lang="ts">
   import {
@@ -10,8 +10,7 @@
     Dialog,
     InlineNotification,
     Select,
-    StatusIndicator,
-    Tag,
+    StatusMessage,
     TextInput,
     type NotificationMessage,
   } from '#lib/foundation/carbon';
@@ -32,7 +31,6 @@
     describeOrderTitle,
     readOrderForm,
     sendPaperOrder,
-    type BlockingForwardTest,
     type OrderForm,
     type SendOrderRequest,
   } from './paper_orders';
@@ -42,12 +40,11 @@
     /** The last price of the instrument. The limit price starts with it. */
     lastPrice: number | null;
     account: PaperAccountMessage | null;
-    blockingForwardTests?: readonly BlockingForwardTest[];
-    /** False while a live socket of the account or of the forward tests is not connected. */
+    /** False while the live socket of the account is not connected. */
     isConnected: boolean;
   }
 
-  const { instrument, lastPrice, account, blockingForwardTests = [], isConnected }: Props = $props();
+  const { instrument, lastPrice, account, isConnected }: Props = $props();
 
   const SIDES = [
     { value: 'BUY' as const, label: 'Buy' },
@@ -98,7 +95,7 @@
     }
   });
 
-  const blockReason = $derived(findInstrumentOrderBlock(account, instrument, blockingForwardTests));
+  const blockReason = $derived(findInstrumentOrderBlock(account, instrument));
   // The paper account that passed the check. The backend checks it again before it sends the order.
   const accountId = $derived(account?.check.status === 'passed' ? (account.check.actual_accounts[0] ?? null) : null);
   const position = $derived(findInstrumentPosition(account, instrument));
@@ -190,10 +187,10 @@
 
     <div class="submit">
       {#if blockReason !== null}
-        <p id={blockReasonId} class="message"><StatusIndicator kind={blockReason.kind} label={blockReason.text} /></p>
+        <p id={blockReasonId} class="message"><StatusMessage kind={blockReason.kind} text={blockReason.text} /></p>
       {/if}
       {#if formMessage !== null}
-        <p class="message" role="alert"><StatusIndicator kind="error" label={formMessage} /></p>
+        <InlineNotification kind="error" title={formMessage} lowContrast />
       {/if}
       {#if resultMessage !== null}
         <InlineNotification {...resultMessage} lowContrast onClose={() => (resultMessage = null)} />
@@ -227,7 +224,6 @@
       void sendReviewedOrder();
     }}
   >
-    <Tag label="PAPER" kind="blue" />
     <dl class="confirmation">
       {#each describeOrderForConfirmation(reviewedRequest) as line (line.label)}
         <div>

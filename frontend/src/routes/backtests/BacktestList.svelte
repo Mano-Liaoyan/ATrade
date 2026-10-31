@@ -1,19 +1,32 @@
-<!-- The backtest list of the backtest workbench (the body of the "Backtests" side column): 32px rows with the number,
-     the strategy version, the instrument symbol, the status (icon and word), and the total return (ChangeText). The open
+<!-- The backtest list of the backtest workbench (the body of the "Backtests" side column): 32px rows with the status
+     icon before the number (the tooltip names the status), the strategy version, the instrument symbol, and the total
+     return (ChangeText). The open
      backtest (or both compared backtests) has the Carbon selected row color. A click on a row opens its backtest.
-     When 2 or more rows are checked, the Carbon batch action bar shows Compare: it opens the comparison of 2 backtests of the same strategy, and its
-     text says why Compare is not available (docs/architecture section 9.5). -->
+     When 1 or more rows are checked, the Carbon batch action bar shows. With 2 or more, it has Compare: it opens the
+     comparison of 2 backtests of the same strategy, and its text says why Compare is not available (docs/architecture
+     section 9.5). Delete opens a danger dialog and then deletes each checked backtest (a true delete); the backend
+     refuses some backtests, and the list shows each reason. -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import {
     checkComparisonSelection,
+    deleteBacktest,
     describeBacktestStatus,
     findBacktestStatusKind,
     formatPercent,
     type Backtest,
   } from '#lib/backtest';
-  import { Checkbox, DataTable, InlineNotification, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
+  import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
+  import {
+    Checkbox,
+    DataTable,
+    Dialog,
+    Icon,
+    InlineNotification,
+    StatusIndicator,
+    type TableColumn,
+  } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText } from '#lib/foundation/value_format';
   import { formatVersionLabel } from '#lib/strategy';
@@ -25,9 +38,11 @@
     openBacktestId: number | null;
     /** The compared backtests of a comparison page: their rows have the open row color too. */
     comparedBacktestIds?: readonly number[];
+    /** The backtests that the delete removed. The page reads the list again. */
+    onDeleted?: (backtestIds: number[]) => void;
   }
 
-  const { backtests, errorMessage, openBacktestId, comparedBacktestIds = [] }: Props = $props();
+  const { backtests, errorMessage, openBacktestId, comparedBacktestIds = [], onDeleted }: Props = $props();
 
   const COMPARED_BACKTEST_COUNT = 2;
   const COLUMNS: TableColumn[] = [
@@ -35,14 +50,24 @@
     { header: '#', align: 'right' },
     { header: 'Strategy' },
     { header: 'Instrument' },
-    { header: 'Status' },
     { header: 'Return', align: 'right' },
   ];
 
   let checkedIds: number[] = $state([]);
+  let isDeleteDialogOpen = $state(false);
+  let isDeleting = $state(false);
+  // The reasons of the backtests that the backend did not delete, one line each.
+  let deleteMessages: string[] = $state([]);
   const comparison = $derived(checkComparisonSelection(backtests, checkedIds));
-  const showsBatchActions = $derived(checkedIds.length >= COMPARED_BACKTEST_COUNT);
+  const showsBatchActions = $derived(checkedIds.length > 0);
+  const canCompare = $derived(checkedIds.length >= COMPARED_BACKTEST_COUNT);
+  const deleteTitle = $derived(
+    checkedIds.length === 1 ? `Delete backtest #${String(checkedIds[0])}?` : `Delete ${String(checkedIds.length)} backtests?`,
+  );
   const selectionText = $derived.by(() => {
+    if (!canCompare) {
+      return '1 backtest selected';
+    }
     if (comparison.kind === 'ready') {
       return '2 backtests selected';
     }
@@ -53,6 +78,27 @@
 
   function toggleChecked(id: number, isChecked: boolean): void {
     checkedIds = isChecked ? [...checkedIds, id] : checkedIds.filter((checkedId) => checkedId !== id);
+  }
+
+  async function deleteChecked(): Promise<void> {
+    isDeleting = true;
+    const deletedIds: number[] = [];
+    const messages: string[] = [];
+    for (const id of [...checkedIds].sort((first, second) => first - second)) {
+      const result = await deleteBacktest(fetch, id);
+      if (result.kind === 'deleted') {
+        deletedIds.push(id);
+      } else {
+        messages.push(result.message);
+      }
+    }
+    isDeleting = false;
+    isDeleteDialogOpen = false;
+    deleteMessages = messages;
+    checkedIds = checkedIds.filter((id) => !deletedIds.includes(id));
+    if (deletedIds.length > 0) {
+      onDeleted?.(deletedIds);
+    }
   }
 
   function backtestHref(id: number): string {
@@ -76,7 +122,9 @@
         <p class="cds--batch-summary__para" role="status" aria-label="Comparison selection">{selectionText}</p>
       </div>
       <div class="cds--action-list">
-        {#if comparison.kind === 'ready'}
+        {#if !canCompare}
+          <!-- One backtest: no comparison. -->
+        {:else if comparison.kind === 'ready'}
           <a
             class="cds--btn cds--btn--primary cds--btn--sm cds--layout--size-sm"
             href={resolve('/backtests/[backtestId]/comparison/[otherBacktestId]', {
@@ -89,6 +137,15 @@
         {/if}
         <button
           type="button"
+          class="cds--btn cds--btn--primary cds--btn--sm cds--layout--size-sm"
+          onclick={() => {
+            isDeleteDialogOpen = true;
+          }}
+          >Delete
+          <Icon icon={TrashCan16} class="cds--btn__icon" />
+        </button>
+        <button
+          type="button"
           class="cds--btn cds--btn--primary cds--btn--sm cds--layout--size-sm cds--batch-summary__cancel"
           onclick={() => {
             checkedIds = [];
@@ -98,6 +155,32 @@
     </div>
   </section>
 {/if}
+
+{#if deleteMessages.length > 0}
+  <InlineNotification
+    kind="error"
+    title={deleteMessages.length === 1 ? 'Backtest not deleted' : 'Backtests not deleted'}
+    subtitle={deleteMessages.join(' ')}
+    lowContrast
+    onClose={() => {
+      deleteMessages = [];
+    }}
+  />
+{/if}
+
+<Dialog
+  open={isDeleteDialogOpen}
+  onOpenChange={(open: boolean) => {
+    isDeleteDialogOpen = open;
+  }}
+  title={deleteTitle}
+  primaryText={checkedIds.length === 1 ? 'Delete backtest' : 'Delete backtests'}
+  primaryKind="danger"
+  busy={isDeleting}
+  onPrimary={() => {
+    void deleteChecked();
+  }}
+/>
 
 {#if errorMessage !== ''}
   <InlineNotification kind="error" title="Backtests not read" subtitle={errorMessage} lowContrast />
@@ -127,11 +210,18 @@
                 />
               </td>
               <th scope="row" align="right">
-                <a
-                  class="row-link"
-                  href={resolve('/backtests/[[backtestId]]', { backtestId: String(item.id) })}
-                  aria-current={item.id === openBacktestId ? 'page' : undefined}>#{item.id}</a
-                >
+                <span class="status-id">
+                  <StatusIndicator
+                    label={describeBacktestStatus(item.status)}
+                    kind={findBacktestStatusKind(item.status)}
+                    align="right"
+                  />
+                  <a
+                    class="row-link"
+                    href={resolve('/backtests/[[backtestId]]', { backtestId: String(item.id) })}
+                    aria-current={item.id === openBacktestId ? 'page' : undefined}>#{item.id}</a
+                  >
+                </span>
               </th>
               <td>
                 <span class="strategy-name" title={formatVersionLabel(item.strategy_name, item.version_number)}
@@ -139,9 +229,6 @@
                 >
               </td>
               <td>{item.symbol}</td>
-              <td>
-                <StatusIndicator label={describeBacktestStatus(item.status)} kind={findBacktestStatusKind(item.status)} />
-              </td>
               <td align="right">
                 {#if item.metrics !== null}
                   <ChangeText
@@ -190,16 +277,16 @@
     inline-size: var(--cds-spacing-09);
   }
 
+  /* The status icon and the number. */
   .list :global(th:nth-child(2)) {
-    inline-size: calc(var(--cds-spacing-09) + var(--cds-spacing-05));
+    inline-size: var(--cds-spacing-12);
   }
 
   .list :global(th:nth-child(4)) {
     inline-size: var(--cds-spacing-12);
   }
 
-  .list :global(th:nth-child(5)),
-  .list :global(th:nth-child(6)) {
+  .list :global(th:nth-child(5)) {
     inline-size: calc(var(--cds-spacing-12) + var(--cds-spacing-06));
   }
 
@@ -230,5 +317,18 @@
   .row-link:focus-visible {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
+  }
+
+  /* The status icon keeps the start of the cell and the number keeps the end, so the icons are in one line for
+     each number length. */
+  .status-id {
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-03);
+  }
+
+  .status-id > a {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
   }
 </style>

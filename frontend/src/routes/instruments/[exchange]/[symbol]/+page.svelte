@@ -7,11 +7,11 @@
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
-  import { ContentSwitcher, StatusIndicator } from '#lib/foundation/carbon';
+  import { ContentSwitcher, InlineNotification } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { buildSocketUrl, LiveUpdatesNotification, openLiveSocket } from '#lib/foundation/live_socket';
   import { ChangeText, formatPrice } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
-  import { ForwardTestsOnInstrumentsFeed } from '#lib/forward_test';
   import {
     BAR_PERIODS,
     BarChart,
@@ -128,11 +128,9 @@
   const shownDayQuote = $derived(dayQuote?.instrumentKey === instrumentKey ? dayQuote.quote : null);
   const lastPrice = $derived(liveBar?.close ?? shownDayQuote?.last ?? chartBars.at(-1)?.close ?? null);
 
-  // The paper account and the running forward tests (they block paper orders by hand on their instruments).
+  // The paper account. Forward tests and orders by hand share the instruments (forward_test.md section 12.2).
   const accountFeed = new PaperAccountFeed();
   $effect(() => accountFeed.start(fetch, window.location));
-  const forwardTestsFeed = new ForwardTestsOnInstrumentsFeed();
-  $effect(() => forwardTestsFeed.start(window.location));
   const account = $derived(accountFeed.account);
 
   const PANELS: PanelSpec[] = [
@@ -234,9 +232,9 @@
               {#if isLoading}
                 <p class="chart-message" role="status">Loading bars.</p>
               {:else if barsResult?.kind === 'failed'}
-                <p class="chart-message" role="alert"><StatusIndicator kind="error" label={barsResult.message} /></p>
+                <div class="chart-message"><InlineNotification kind="error" title={barsResult.message} lowContrast /></div>
               {:else if liveBarErrorText !== null}
-                <p class="chart-message" role="alert"><StatusIndicator kind="error" label={liveBarErrorText} /></p>
+                <div class="chart-message"><InlineNotification kind="error" title={liveBarErrorText} lowContrast /></div>
               {/if}
             </div>
           </Panel>
@@ -257,7 +255,7 @@
               <LiveUpdatesNotification isConnected={accountFeed.isConnected} />
               {#if accountTable === 'positions'}
                 {#if account === null}
-                  <p role="status">Reading the paper account.</p>
+                  <EmptyText text="Loading" role="status" />
                 {:else}
                   <PositionTable positions={account.positions} fill compact />
                 {/if}
@@ -274,11 +272,10 @@
 
     <SideColumn label="Paper order" side="end" width="20rem" storageKey="atrade.instrument-page.order-column">
       <InstrumentOrderPanel
-        isConnected={accountFeed.isConnected && forwardTestsFeed.isConnected}
+        isConnected={accountFeed.isConnected}
         instrument={chartRequest.instrument}
         {lastPrice}
         {account}
-        blockingForwardTests={forwardTestsFeed.onInstruments}
       />
     </SideColumn>
   </Workbench>
@@ -292,19 +289,27 @@
     white-space: nowrap;
   }
 
+  /* A compact switcher in the 32px header line: 24px high, centered, with space to the line edges and to the panel
+     buttons, so it does not touch the borders of the line. */
   .bar-periods {
+    display: flex;
     flex: none;
-    margin-inline-start: auto;
+    align-items: center;
+    margin-inline: auto var(--cds-spacing-03);
   }
 
   /* 6 short bar period names, each wide enough for its name. */
   .bar-periods :global(.cds--content-switcher) {
-    inline-size: calc(var(--cds-spacing-10) * 5);
+    block-size: var(--cds-spacing-06);
+    inline-size: calc(var(--cds-spacing-09) * 6);
   }
 
   .bar-periods :global(.cds--content-switcher-btn) {
     justify-content: center;
     padding-inline: var(--cds-spacing-03);
+    font-size: var(--cds-label-01-font-size);
+    line-height: var(--cds-label-01-line-height);
+    letter-spacing: var(--cds-label-01-letter-spacing);
   }
 
   /* The chart fills the panel body and follows its size (BarChart fill). */
@@ -325,6 +330,12 @@
     font-size: var(--cds-body-compact-01-font-size);
     line-height: var(--cds-body-compact-01-line-height);
     color: var(--cds-text-secondary);
+  }
+
+  /* An error notification over the chart: the notification has its own background and padding. */
+  div.chart-message {
+    padding: 0;
+    background: none;
   }
 
   .account-table {

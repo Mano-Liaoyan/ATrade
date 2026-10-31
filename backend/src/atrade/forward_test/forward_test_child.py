@@ -14,9 +14,10 @@ from typing import Literal
 
 import psycopg
 
-from atrade.backtest import find_look_back_length
+from atrade.backtest import find_look_back
 from atrade.forward_test import forward_test_store
 from atrade.forward_test.forward_test_store import ForwardTestRow
+from atrade.forward_test.forward_test_universe import UniverseNodeInput, read_universe_node_input
 from atrade.forward_test.forward_test_worker import (
     GATEWAY_UNREACHABLE_EXIT_CODE,
     PAPER_CHECK_FAILED_EXIT_CODE,
@@ -48,7 +49,8 @@ class LiveNodeInput:
     account_id: str
     # NautilusTrader writes it into each ClientOrderId, and the IB execution client into orderRef (section 12.9).
     order_id_tag: str
-    instrument: Instrument
+    # None for a multi-instrument forward test: then `universe` names the instruments.
+    instrument: Instrument | None
     bar_period: BarPeriod
     strategy_code: str
     gateway_host: str
@@ -57,8 +59,10 @@ class LiveNodeInput:
     database_url: str
     # The balance at the first start. The equity of the records starts at this value.
     start_balance_usd: Decimal
-    # The bars before the start that answer `request_bars` of the strategy, oldest first (section 12.15).
+    # The bars before the start that answer `request_bars` of the strategy, oldest first (section 12.15). Empty for a
+    # multi-instrument forward test: its data client reads the bar store (section 12.17).
     warm_up_bars: tuple[Bar, ...]
+    universe: UniverseNodeInput | None = None
 
 
 # "ended": the stop request came, or the LiveNode ended by itself. "gateway_lost": the IB connection was lost for
@@ -99,7 +103,7 @@ async def write_error_message(job: ChildJob, error_message: str) -> None:
 @dataclass(frozen=True)
 class CheckedAccount:
     account_id: str
-    # The first start balance of the forward test. A restart keeps it (section 12.1).
+    # The start of the equity: the allocated capital, or the first start balance of an old forward test.
     start_balance_usd: Decimal
     warm_up_bars: tuple[Bar, ...]
 
@@ -116,15 +120,20 @@ async def save_start_balance(job: ChildJob, net_liquidation_usd: Decimal | None)
 
 
 async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection) -> tuple[Bar, ...]:
-    """The complete bars of the look-back length before now, the same length as a backtest look-back. The child also
-    saves them in the bar store of `market_data`, so a same-period backtest finds them (section 12.15).
+    """The complete bars of the look-back before now, the same look-back as a backtest of the strategy version
+    (`find_look_back`): with rules, the last bars that the longest indicator needs. The child saves all read bars in the bar store
+    of `market_data`, so a same-period backtest finds them (section 12.15).
 
     `read_historical_bars` splits the range into requests of the IBKR step size of the bar period. A failed read
     gives no warm-up bars: the forward test starts, and the strategy gets an empty `request_bars` answer.
     """
     bar_period = BarPeriod(job.row.bar_period)
+    strategy_version = await read_strategy_version(
+        database_url=job.settings.database_url, strategy_version_id=job.row.strategy_version_id
+    )
+    look_back = find_look_back(bar_period, None if strategy_version is None else strategy_version.warm_up_bar_count)
     end_utc = floor_to_bar_start(job.ibkr_access.clock.read_now_utc(), bar_period)
-    time_range = TimeRange(start_utc=end_utc - find_look_back_length(bar_period), end_utc=end_utc)
+    time_range = TimeRange(start_utc=end_utc - look_back.length, end_utc=end_utc)
     bar_request = BarRequest(
         instrument=forward_test_store.read_instrument(job.row), bar_period=bar_period, time_range=time_range
     )
@@ -136,7 +145,7 @@ async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection
         logger.warning("Forward test %s: the warm-up bars were not read: %s", job.row.id, error)
         return ()
     await save_warm_up_bars(job, bar_request, bars)
-    return tuple(bars)
+    return tuple(look_back.keep_bars(bars))
 
 
 async def save_warm_up_bars(job: ChildJob, bar_request: BarRequest, bars: list[Bar]) -> None:
@@ -174,9 +183,16 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         except GatewayRequestError as error:
             await write_error_message(job, f"The open orders were not cancelled before the start: {error}")
             return FAILURE_EXIT_CODE
-        warm_up_bars = await read_warm_up_bars(job, gateway_connection)
+        # A multi-instrument forward test reads its warm-up from the bar store, not from IBKR (section 12.17).
+        warm_up_bars = await read_warm_up_bars(job, gateway_connection) if job.row.universe_kind == "single" else ()
     finally:
         gateway_connection.disconnect()
+    if job.row.allocated_capital_usd is not None:
+        # The equity starts at the allocated capital (section 12.8). The child does not need NetLiquidation.
+        return CheckedAccount(
+            account_id=account_id, start_balance_usd=job.row.allocated_capital_usd, warm_up_bars=warm_up_bars
+        )
+    # A forward test from the time before the allocated capital keeps its first start balance (section 12.24).
     start_balance_usd = await save_start_balance(job, None if balance is None else balance.net_liquidation_usd)
     if start_balance_usd is None:
         # The equity of the records starts at the balance (section 12.8). This child sent no order.
@@ -233,12 +249,20 @@ async def read_live_node_input(job: ChildJob, checked_account: CheckedAccount) -
     if strategy_version is None:
         message = f"Strategy version {job.row.strategy_version_id} does not exist."
         raise LookupError(message)
+    instrument = forward_test_store.read_single_instrument(job.row)
+    universe = (
+        None
+        if instrument is not None
+        else await read_universe_node_input(
+            database_url=job.settings.database_url, row=job.row, now_utc=job.ibkr_access.clock.read_now_utc()
+        )
+    )
     return LiveNodeInput(
         forward_test_id=job.row.id,
         client_id=job.client_id,
         account_id=checked_account.account_id,
         order_id_tag=format_forward_test_order_tag(job.row.id),
-        instrument=forward_test_store.read_instrument(job.row),
+        instrument=instrument,
         bar_period=BarPeriod(job.row.bar_period),
         strategy_code=strategy_version.code,
         gateway_host=job.settings.ibkr_host,
@@ -246,6 +270,7 @@ async def read_live_node_input(job: ChildJob, checked_account: CheckedAccount) -
         database_url=job.settings.database_url,
         start_balance_usd=checked_account.start_balance_usd,
         warm_up_bars=checked_account.warm_up_bars,
+        universe=universe,
     )
 
 

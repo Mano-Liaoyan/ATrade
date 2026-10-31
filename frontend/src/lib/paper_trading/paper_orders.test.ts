@@ -6,7 +6,7 @@ import {
   describeOrderSource,
   describeOrderForConfirmation,
   describeOrderTitle,
-  findOrderBlock,
+  findOpenOrderStatusKind,
   readFilledManualOrders,
   readOpenOrdersMessage,
   readOrderForm,
@@ -106,25 +106,27 @@ describe('describeOrderTitle', () => {
   });
 });
 
-describe('findOrderBlock', () => {
-  const runningForwardTest = { label: 'Forward test 7 (Bar count v1)', symbol: 'SPY', exchange: 'ARCA' };
-
-  it('names the forward test that trades the instrument of the form', () => {
-    expect(findOrderBlock({ ...limitForm, symbol: ' spy ', exchange: 'arca' }, [runningForwardTest])).toBe(
-      'Forward test 7 (Bar count v1) trades SPY / ARCA. Stop the forward test to send an order by hand.',
-    );
-  });
-
-  it('blocks no order on another instrument', () => {
-    expect(findOrderBlock({ ...limitForm, symbol: 'SPY', exchange: 'NASDAQ' }, [runningForwardTest])).toBeNull();
-    expect(findOrderBlock(limitForm, [])).toBeNull();
-  });
-});
-
 describe('describeOrderSource', () => {
   it('names orders by hand and forward test orders', () => {
     expect(describeOrderSource({ kind: 'by_hand', forward_test_id: null })).toBe('by hand');
     expect(describeOrderSource({ kind: 'forward_test', forward_test_id: 42 })).toBe('forward test 42');
+  });
+});
+
+describe('findOpenOrderStatusKind', () => {
+  it.each([
+    ['Submitted', 'in-progress'],
+    ['PreSubmitted', 'in-progress'],
+    ['PendingSubmit', 'in-progress'],
+    ['PendingCancel', 'in-progress'],
+    ['ApiPending', 'in-progress'],
+    ['Filled', 'success'],
+    ['Cancelled', 'neutral'],
+    ['ApiCancelled', 'neutral'],
+    ['Inactive', 'warning'],
+    ['SomethingNew', 'neutral'],
+  ])('gives the status icon kind of the IBKR order status %s', (status, kind) => {
+    expect(findOpenOrderStatusKind(status)).toBe(kind);
   });
 });
 

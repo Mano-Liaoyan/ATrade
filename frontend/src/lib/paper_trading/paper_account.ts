@@ -119,3 +119,96 @@ export function listBalanceMetrics(balance: PaperAccountBalance): BalanceMetric[
   }
   return metrics;
 }
+
+export type OwnerPosition = PaperPosition['owners'][number];
+
+/** One row of the Positions table: the part of one owner, or the "Unattributed" difference (section 11.7). */
+export interface PositionRow {
+  key: string;
+  position: PaperPosition;
+  owner: string | null;
+  /** "Unattributed: 50" when the IBKR position is not the sum of the owner positions, else null. */
+  unattributed: string | null;
+  quantity: string | null;
+  averageCost: string | null;
+  marketValue: number | null;
+  unrealizedPnl: number | null;
+  /** The "Split check needed" state of the position on its own row, else null (section 11.11). */
+  splitCheck: PaperPosition['split_check'];
+}
+
+export function describeOwner(owner: OwnerPosition['owner']): string {
+  return owner.kind === 'by_hand' ? 'By hand' : `Forward test ${String(owner.forward_test_id)}`;
+}
+
+function toOwnerRow(position: PaperPosition, ownerPosition: OwnerPosition, key: string): PositionRow {
+  const quantity = Number(ownerPosition.quantity);
+  const marketPrice = Number(position.market_price);
+  const averageCost = ownerPosition.average_cost === null ? null : Number(ownerPosition.average_cost);
+  return {
+    key,
+    position,
+    owner: describeOwner(ownerPosition.owner),
+    unattributed: null,
+    quantity: ownerPosition.quantity,
+    averageCost: ownerPosition.average_cost,
+    marketValue: quantity * marketPrice,
+    unrealizedPnl: averageCost === null ? null : (marketPrice - averageCost) * quantity,
+    splitCheck: null,
+  };
+}
+
+function toIbkrRow(position: PaperPosition, key: string): PositionRow {
+  return {
+    key,
+    position,
+    owner: null,
+    unattributed: null,
+    quantity: position.quantity,
+    averageCost: position.average_cost,
+    marketValue: Number(position.market_value),
+    unrealizedPnl: Number(position.unrealized_pnl),
+    splitCheck: null,
+  };
+}
+
+/**
+ * The rows of the Positions table: one row for each owner of each position, then one "Unattributed" row for a
+ * position that is not the sum of its owner positions. A position without owners and without a difference keeps one
+ * row with the IBKR values.
+ */
+export function listPositionRows(positions: readonly PaperPosition[]): PositionRow[] {
+  return positions.flatMap((position) => {
+    const positionKey = `${position.symbol}-${position.exchange}-${position.security_type}`;
+    const rows = position.owners.map((ownerPosition) =>
+      toOwnerRow(position, ownerPosition, `${positionKey}-${describeOwner(ownerPosition.owner)}`),
+    );
+    if (Number(position.unattributed_quantity) !== 0) {
+      rows.push({
+        key: `${positionKey}-unattributed`,
+        position,
+        owner: null,
+        unattributed: `Unattributed: ${position.unattributed_quantity}`,
+        quantity: position.unattributed_quantity,
+        averageCost: null,
+        marketValue: null,
+        unrealizedPnl: null,
+        splitCheck: null,
+      });
+    }
+    if (position.split_check !== null) {
+      rows.push({
+        key: `${positionKey}-split-check`,
+        position,
+        owner: null,
+        unattributed: null,
+        quantity: null,
+        averageCost: null,
+        marketValue: null,
+        unrealizedPnl: null,
+        splitCheck: position.split_check,
+      });
+    }
+    return rows.length === 0 ? [toIbkrRow(position, positionKey)] : rows;
+  });
+}

@@ -7,23 +7,44 @@ async function stopBrowserClock(page: Page): Promise<void> {
   await page.clock.pauseAt(new Date('2026-06-01T00:00:01Z'));
 }
 
-test('app shell shows the product name and a connected backend', async ({ page }) => {
+// The Connections button of the header: one plug icon for the backend and IB Gateway. Its popover lists both.
+async function openConnections(page: Page, buttonName: string | RegExp): Promise<Locator> {
+  await page.getByRole('banner').getByRole('button', { name: buttonName }).click();
+  const popover = page.getByRole('dialog', { name: 'Connections' });
+  await expect(popover).toBeVisible();
+  return popover;
+}
+
+test('app shell shows the product name and a quiet Connections button when all is connected', async ({ page }) => {
   await stopBrowserClock(page);
   await page.goto('/');
 
-  await expect(page.getByRole('banner')).toContainText('ATrade');
-  await expect(page.getByRole('status', { name: 'Backend status' })).toHaveText('Backend connected. Server time 2026-01-02 03:04:05 UTC.');
+  const header = page.getByRole('banner');
+  await expect(header).toContainText('ATrade');
+  // No problem: the button name has no status, and the header shows no status word and no clock.
+  await expect(header.getByRole('button', { name: 'Connections', exact: true })).toBeVisible();
+  await expect(header).not.toContainText('Backend');
+  await expect(header).not.toContainText('UTC');
+
+  const popover = await openConnections(page, 'Connections');
+  const backendRow = popover.getByRole('listitem').filter({ hasText: 'Backend' });
+  await expect(backendRow.getByRole('img')).toHaveAccessibleName('Connected');
+  await expect(backendRow.getByRole('timer', { name: 'Server time' })).toHaveText('Server time 03:04:05 UTC');
+  const gatewayRow = popover.getByRole('listitem').filter({ hasText: 'IB Gateway' });
+  await expect(gatewayRow.getByRole('img')).toHaveAccessibleName('Connected');
+  await expect(gatewayRow).toHaveText('IB Gateway');
 });
 
-test('the server time in the header ticks after the page load', async ({ page }) => {
+test('the server time in the Connections popover ticks after the page load', async ({ page }) => {
   await stopBrowserClock(page);
   await page.goto('/');
-  const backendStatus = page.getByRole('status', { name: 'Backend status' });
-  await expect(backendStatus).toHaveText('Backend connected. Server time 2026-01-02 03:04:05 UTC.');
+  const popover = await openConnections(page, 'Connections');
+  const serverTime = popover.getByRole('timer', { name: 'Server time' });
+  await expect(serverTime).toHaveText('Server time 03:04:05 UTC');
 
   await page.clock.runFor(62_000);
 
-  await expect(backendStatus).toHaveText('Backend connected. Server time 2026-01-02 03:05:07 UTC.');
+  await expect(serverTime).toHaveText('Server time 03:05:07 UTC');
 });
 
 test('app shell loads for a page path that the backend does not know', async ({ page }) => {
@@ -32,10 +53,84 @@ test('app shell loads for a page path that the backend does not know', async ({ 
   await expect(page.getByRole('banner')).toContainText('ATrade');
 });
 
-test('app shell shows that IB Gateway is connected', async ({ page }) => {
+test('the Connections button names a not reachable IB Gateway and opens its details with the keyboard', async ({
+  page,
+}) => {
+  await page.route('**/api/ibkr/gateway', (route) => route.fulfill({ json: { status: 'disconnected', host: 'ib-gateway', port: 4004 } }));
+  await page.goto('/');
+  const header = page.getByRole('banner');
+  const connectionsButton = header.getByRole('button', { name: 'Connections: IB Gateway not reachable.' });
+  await expect(connectionsButton).toBeVisible();
+  await expect(header).not.toContainText('IB Gateway');
+
+  await connectionsButton.hover();
+  await expect(page.getByRole('tooltip')).toHaveText('Connections: IB Gateway not reachable.');
+
+  await connectionsButton.focus();
+  await page.keyboard.press('Enter');
+  const popover = page.getByRole('dialog', { name: 'Connections' });
+  const gatewayRow = popover.getByRole('listitem').filter({ hasText: 'IB Gateway' });
+  await expect(gatewayRow.getByRole('img')).toHaveAccessibleName('Not reachable');
+  await expect(gatewayRow).toContainText(
+    'Not reachable at ib-gateway:4004. ATrade keeps trying to connect. Make sure that the ib-gateway service runs and is logged in.',
+  );
+
+  await page.keyboard.press('Escape');
+  await expect(popover).toBeHidden();
+  await expect(connectionsButton).toBeFocused();
+});
+
+test('the Connections button names a not reachable backend, and the popover has no server time', async ({ page }) => {
+  await page.route('**/api/health', (route) => route.fulfill({ status: 502, body: 'Bad Gateway' }));
+  await page.route('**/api/ibkr/gateway', (route) => route.fulfill({ status: 502, body: 'Bad Gateway' }));
   await page.goto('/');
 
-  await expect(page.getByRole('status', { name: 'IB Gateway status' })).toHaveText('IB Gateway connected.');
+  const popover = await openConnections(page, 'Connections: Backend not reachable. IB Gateway status not known.');
+
+  await expect(popover.getByRole('listitem').filter({ hasText: 'Backend' }).getByRole('img')).toHaveAccessibleName(
+    'Not reachable',
+  );
+  await expect(popover.getByRole('listitem').filter({ hasText: 'IB Gateway' }).getByRole('img')).toHaveAccessibleName(
+    'Status not known',
+  );
+  await expect(popover.getByRole('listitem')).toHaveText(['Backend Not reachable.', 'IB Gateway Status not known.']);
+  await expect(popover.getByRole('timer')).toHaveCount(0);
+});
+
+// After the divider, the header actions are equal 40px cells side by side: Connections, command palette, theme.
+async function readBox(button: Locator): Promise<{ x: number; width: number; height: number }> {
+  const box = await button.boundingBox();
+  expect(box).not.toBeNull();
+  return box ?? { x: 0, width: 0, height: 0 };
+}
+
+test('the header actions after the divider are equal cells without gaps', async ({ page }) => {
+  await page.goto('/');
+  const header = page.getByRole('banner');
+  const paper = await readBox(header.getByRole('button', { name: 'Paper' }));
+  const connections = await readBox(header.getByRole('button', { name: /^Connections/ }));
+  const palette = await readBox(header.getByRole('button', { name: 'Open command palette' }));
+  const theme = await readBox(header.getByRole('button', { name: 'Theme: System' }));
+
+  expect([connections, palette, theme].map((box) => [box.width, box.height])).toEqual([
+    [40, 48],
+    [40, 48],
+    [40, 48],
+  ]);
+  expect(palette.x - connections.x).toBe(40);
+  expect(theme.x - palette.x).toBe(40);
+  expect(paper.x + paper.width).toBeLessThan(connections.x);
+});
+
+// A header tooltip is the light Carbon high-contrast bubble. On the light page it has the Carbon drop shadow.
+test('a header tooltip has a drop shadow on the light page', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+
+  await page.getByRole('banner').getByRole('button', { name: 'Theme: System' }).hover();
+
+  const bubble = page.getByRole('tooltip').locator('xpath=..');
+  await expect(bubble).toHaveCSS('filter', /drop-shadow/);
 });
 
 test('the header navigation marks the current page', async ({ page }) => {

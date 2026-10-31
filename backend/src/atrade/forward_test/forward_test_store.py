@@ -13,6 +13,7 @@ from psycopg.rows import class_row
 
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.instrument import Instrument
+from atrade.paper_trading import write_capital_allocation
 
 type DesiredState = Literal["running", "stopped"]
 type ForwardTestStatus = Literal[
@@ -20,6 +21,8 @@ type ForwardTestStatus = Literal[
 ]
 # Why the forward test did not run for a time (section 12.7).
 type InterruptionReason = Literal["crash", "gateway", "worker_restart"]
+# The universe of a forward test (section 12.17): one instrument, the top N by trading value, or the watchlist.
+type UniverseKind = Literal["single", "rule", "list"]
 
 NO_FREE_CLIENT_ID_MESSAGE = "limit of running forward tests reached"
 
@@ -27,18 +30,27 @@ NO_FREE_CLIENT_ID_MESSAGE = "limit of running forward tests reached"
 @dataclass(frozen=True)
 class ForwardTestRequest:
     strategy_version_id: int
-    instrument: Instrument
+    # None for a multi-instrument forward test: then `universe_kind` and `members` name the instruments.
+    instrument: Instrument | None
     bar_period: BarPeriod
+    # The capital of the forward test in USD (section 12.18).
+    allocated_capital_usd: Decimal
     end_time_utc: datetime | None = None
+    universe_kind: UniverseKind = "single"
+    universe_top_n: int | None = None
+    # The members of the first quarter of a multi-instrument forward test (section 12.17).
+    quarter_start_utc: datetime | None = None
+    members: tuple[Instrument, ...] = ()
 
 
 @dataclass(frozen=True)
 class ForwardTestRow:
     id: int
     strategy_version_id: int
-    symbol: str
-    exchange: str
-    currency: str
+    # Null unless the universe kind is "single".
+    symbol: str | None
+    exchange: str | None
+    currency: str | None
     bar_period: str
     desired_state: DesiredState
     status: ForwardTestStatus
@@ -49,6 +61,15 @@ class ForwardTestRow:
     stopped_at_utc: datetime | None
     end_time_utc: datetime | None
     crash_count: int
+    # None for a forward test of the time before the allocated capital. It then uses start_balance_usd.
+    allocated_capital_usd: Decimal | None
+    universe_kind: UniverseKind
+    universe_top_n: int | None
+
+    @property
+    def start_capital_usd(self) -> Decimal | None:
+        """The start of the equity curve and of the Net profit: the allocated capital, or the old start balance."""
+        return self.allocated_capital_usd if self.allocated_capital_usd is not None else self.start_balance_usd
 
     def is_stop_wanted(self, now_utc: datetime) -> bool:
         """The user stopped the forward test, or its end time came (section 12.1)."""
@@ -65,35 +86,42 @@ class ForwardTestInterruption:
 
 @dataclass(frozen=True)
 class StartRefusal:
-    """Why the start was refused. `forward_test_id` is the forward test that already runs on the instrument."""
+    """Why the start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18)."""
 
-    reason: Literal["no_free_client_id", "instrument_taken"]
-    forward_test_id: int | None
+    reason: Literal["no_free_client_id", "capital_too_large"]
+    unallocated_usd: Decimal | None = None
 
 
 FORWARD_TEST_COLUMNS: Final = """
     id, strategy_version_id, symbol, exchange, currency, bar_period, desired_state, status, client_id,
-    start_balance_usd, error_message, created_at_utc, stopped_at_utc, end_time_utc, crash_count
+    start_balance_usd, error_message, created_at_utc, stopped_at_utc, end_time_utc, crash_count, allocated_capital_usd,
+    universe_kind, universe_top_n
 """
 
 
-def read_instrument(row: ForwardTestRow) -> Instrument:
+def read_single_instrument(row: ForwardTestRow) -> Instrument | None:
+    """The instrument of a single-instrument forward test, or None for a multi-instrument forward test."""
+    if row.symbol is None or row.exchange is None or row.currency is None:
+        return None
     return Instrument(symbol=row.symbol, exchange=row.exchange, currency=row.currency)
 
 
-async def select_forward_test_on_instrument(
-    connection: psycopg.AsyncConnection, instrument: Instrument
-) -> ForwardTestRow | None:
-    """The forward test that holds a client ID on the instrument. It can have open orders and a position there."""
-    async with connection.cursor(row_factory=class_row(ForwardTestRow)) as cursor:
-        await cursor.execute(
-            f"""
-            SELECT {FORWARD_TEST_COLUMNS} FROM forward_test
-            WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND client_id IS NOT NULL
-            """,
-            {"symbol": instrument.symbol, "exchange": instrument.exchange},
-        )
-        return await cursor.fetchone()
+def read_instrument(row: ForwardTestRow) -> Instrument:
+    """The instrument of a single-instrument forward test. Raises ValueError for a multi-instrument forward test."""
+    instrument = read_single_instrument(row)
+    if instrument is None:
+        message = f"Forward test {row.id} has the universe kind {row.universe_kind} and no single instrument."
+        raise ValueError(message)
+    return instrument
+
+
+async def select_allocated_usd(connection: psycopg.AsyncConnection) -> Decimal:
+    """The sum of the allocated capital of the running forward tests: the forward tests that hold a client ID."""
+    cursor = await connection.execute(
+        "SELECT COALESCE(sum(allocated_capital_usd), 0) FROM forward_test WHERE client_id IS NOT NULL"
+    )
+    row = await cursor.fetchone()
+    return Decimal(0) if row is None else Decimal(row[0])
 
 
 async def select_taken_client_ids(connection: psycopg.AsyncConnection) -> set[int]:
@@ -116,22 +144,26 @@ async def insert_forward_test(
             f"""
             INSERT INTO forward_test (
                 strategy_version_id, symbol, exchange, currency, bar_period, desired_state, status, client_id,
-                created_at_utc, end_time_utc
+                created_at_utc, end_time_utc, allocated_capital_usd, universe_kind, universe_top_n
             ) VALUES (
                 %(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, 'running',
-                'starting', %(client_id)s, %(created_at_utc)s, %(end_time_utc)s
+                'starting', %(client_id)s, %(created_at_utc)s, %(end_time_utc)s, %(allocated_capital_usd)s,
+                %(universe_kind)s, %(universe_top_n)s
             )
             RETURNING {FORWARD_TEST_COLUMNS}
             """,
             {
                 "strategy_version_id": request.strategy_version_id,
-                "symbol": request.instrument.symbol,
-                "exchange": request.instrument.exchange,
-                "currency": request.instrument.currency,
+                "symbol": None if request.instrument is None else request.instrument.symbol,
+                "exchange": None if request.instrument is None else request.instrument.exchange,
+                "currency": None if request.instrument is None else request.instrument.currency,
                 "bar_period": request.bar_period.value,
                 "client_id": client_id,
                 "created_at_utc": created_at_utc,
                 "end_time_utc": request.end_time_utc,
+                "allocated_capital_usd": request.allocated_capital_usd,
+                "universe_kind": request.universe_kind,
+                "universe_top_n": request.universe_top_n,
             },
         )
         row = await cursor.fetchone()
@@ -141,24 +173,112 @@ async def insert_forward_test(
     return row
 
 
-async def start_forward_test(
-    connection: psycopg.AsyncConnection, *, request: ForwardTestRequest, client_ids: range, created_at_utc: datetime
+async def start_forward_test(  # noqa: PLR0913 readability-exception: one keyword argument per input of the start.
+    connection: psycopg.AsyncConnection,
+    *,
+    request: ForwardTestRequest,
+    client_ids: range,
+    created_at_utc: datetime,
+    net_liquidation_usd: Decimal,
+    account: str,
 ) -> ForwardTestRow | StartRefusal:
-    """Takes the lowest free client ID in one transaction (section 12.4). The connection must not be in autocommit.
+    """Checks the allocated capital and takes the lowest free client ID in one transaction (sections 12.4, 12.18).
 
-    The table lock makes parallel starts wait for each other. The unique constraints are a second guard.
+    The connection must not be in autocommit. The table lock makes parallel starts wait for each other. The unique
+    constraints are a second guard. The same transaction moves the allocated capital from "By hand" to the forward
+    test in the owner ledger.
     """
     async with connection.transaction():
         await connection.execute("LOCK TABLE forward_test IN SHARE ROW EXCLUSIVE MODE")
-        running_forward_test = await select_forward_test_on_instrument(connection, request.instrument)
-        if running_forward_test is not None:
-            return StartRefusal(reason="instrument_taken", forward_test_id=running_forward_test.id)
+        unallocated_usd = net_liquidation_usd - await select_allocated_usd(connection)
+        if request.allocated_capital_usd > unallocated_usd:
+            return StartRefusal(reason="capital_too_large", unallocated_usd=unallocated_usd)
         client_id = find_lowest_free_client_id(client_ids, await select_taken_client_ids(connection))
         if client_id is None:
-            return StartRefusal(reason="no_free_client_id", forward_test_id=None)
-        return await insert_forward_test(
-            connection, request=request, client_id=client_id, created_at_utc=created_at_utc
+            return StartRefusal(reason="no_free_client_id")
+        row = await insert_forward_test(connection, request=request, client_id=client_id, created_at_utc=created_at_utc)
+        if request.quarter_start_utc is not None:
+            await insert_universe_members(
+                connection, forward_test_id=row.id, quarter_start_utc=request.quarter_start_utc, members=request.members
+            )
+        await write_capital_allocation(
+            connection,
+            account=account,
+            forward_test_id=row.id,
+            allocated_capital_usd=request.allocated_capital_usd,
+            time_utc=created_at_utc,
         )
+        return row
+
+
+async def insert_universe_members(
+    connection: psycopg.AsyncConnection,
+    *,
+    forward_test_id: int,
+    quarter_start_utc: datetime,
+    members: tuple[Instrument, ...] | list[Instrument],
+) -> None:
+    """Records the members that the forward test gives the strategy in the quarter (section 12.12)."""
+    async with connection.cursor() as cursor:
+        await cursor.executemany(
+            """
+            INSERT INTO forward_test_universe_member (forward_test_id, quarter_start_utc, symbol, exchange, currency)
+            VALUES (%(forward_test_id)s, %(quarter_start_utc)s, %(symbol)s, %(exchange)s, %(currency)s)
+            ON CONFLICT DO NOTHING
+            """,
+            [
+                {
+                    "forward_test_id": forward_test_id,
+                    "quarter_start_utc": quarter_start_utc,
+                    "symbol": member.symbol,
+                    "exchange": member.exchange,
+                    "currency": member.currency,
+                }
+                for member in members
+            ],
+        )
+
+
+async def select_universe_members(
+    connection: psycopg.AsyncConnection, forward_test_id: int
+) -> dict[datetime, list[Instrument]]:
+    """The recorded members of each quarter of a forward test, oldest quarter first."""
+    cursor = await connection.execute(
+        """
+        SELECT quarter_start_utc, symbol, exchange, currency FROM forward_test_universe_member
+        WHERE forward_test_id = %(id)s ORDER BY quarter_start_utc, symbol, exchange
+        """,
+        {"id": forward_test_id},
+    )
+    members: dict[datetime, list[Instrument]] = {}
+    for quarter_start_utc, symbol, exchange, currency in await cursor.fetchall():
+        members.setdefault(quarter_start_utc, []).append(
+            Instrument(symbol=symbol, exchange=exchange, currency=currency)
+        )
+    return members
+
+
+async def select_running_member_lists(connection: psycopg.AsyncConnection) -> dict[int, list[Instrument]]:
+    """The members of the last recorded quarter of each multi-instrument forward test that holds a client ID."""
+    cursor = await connection.execute(
+        """
+        SELECT member.forward_test_id, member.symbol, member.exchange, member.currency
+        FROM forward_test_universe_member AS member
+        JOIN forward_test ON forward_test.id = member.forward_test_id
+        WHERE forward_test.client_id IS NOT NULL
+          AND member.quarter_start_utc = (
+              SELECT max(quarter_start_utc) FROM forward_test_universe_member
+              WHERE forward_test_id = member.forward_test_id
+          )
+        ORDER BY member.forward_test_id, member.symbol, member.exchange
+        """
+    )
+    member_lists: dict[int, list[Instrument]] = {}
+    for forward_test_id, symbol, exchange, currency in await cursor.fetchall():
+        member_lists.setdefault(forward_test_id, []).append(
+            Instrument(symbol=symbol, exchange=exchange, currency=currency)
+        )
+    return member_lists
 
 
 async def select_forward_tests(connection: psycopg.AsyncConnection) -> list[ForwardTestRow]:

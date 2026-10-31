@@ -2,11 +2,12 @@
      /forward-tests/<id>; /forward-tests opens the newest forward test.
      Left: the "Forward tests" side column (ForwardTestList, live from /ws/forward-tests) with the "New forward test"
      button. Center: the panel of the open forward test (header line: number, strategy version, instrument, bar
-     period, status, the red "Stop forward test" button while it can stop, and "Backtest the same period"; then the
+     period, status, the allocated capital, "Split check needed: AAPL" while an instrument needs a split check, the red "Stop forward test" button while it can stop, and "Backtest the same period"; then the
      key metric row and the equity and drawdown curves with the interruptions in grey) over the
      Fills / Comparison / Logs panel. Comparison links to the comparison with each backtest of the same period. Logs
      shows the current error and the events (start, interruptions, stop). The open forward test reads again every
-     2 seconds. The address #start-forward-test (command palette) opens the New forward test dialog. -->
+     2 seconds. The address #start-forward-test (command palette) opens the New forward test dialog.
+     Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import Compare16 from '@carbon/icons/es/compare/16.js';
@@ -20,6 +21,7 @@
     findBacktestStatusKind,
     formatPercent,
     KeyMetricRow,
+    UniverseInstrumentTable,
     type TimeInterval,
   } from '#lib/backtest';
   import {
@@ -34,12 +36,15 @@
   import { startPolling } from '#lib/foundation/polling';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
-  import { ChangeText, formatBarPeriod } from '#lib/foundation/value_format';
+  import { ChangeText, formatAmount, formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import {
     canBacktestSamePeriod,
     canStop,
     describeForwardTestStatus,
+    describeForwardTestUniverse,
+    readForwardTestInstrument,
+    readStartCapital,
     findForwardTestStatusKind,
     ForwardTestFillTable,
     ForwardTestsOnInstrumentsFeed,
@@ -56,6 +61,7 @@
   import { START_FORWARD_TEST_FORM_ID } from '../../palette_commands';
   import ForwardTestList from '../ForwardTestList.svelte';
   import StartForwardTestDialog from '../StartForwardTestDialog.svelte';
+  import AssistantColumn from '../../assistant/AssistantColumn.svelte';
 
   const READ_INTERVAL_MILLISECONDS = 2000;
   const START_FORWARD_TEST_HASH = `#${START_FORWARD_TEST_FORM_ID}`;
@@ -67,15 +73,15 @@
   ];
   const COMPARISON_COLUMNS: TableColumn[] = [
     { header: '#', align: 'right' },
-    { header: 'Status' },
     { header: 'Start' },
     { header: 'End' },
     { header: 'Return', align: 'right' },
   ];
   const EVENT_COLUMNS: TableColumn[] = [{ header: 'Time' }, { header: 'Event' }];
-  type ForwardTestTable = 'fills' | 'comparison' | 'logs';
+  type ForwardTestTable = 'fills' | 'instruments' | 'comparison' | 'logs';
   const TABLE_TABS: { value: ForwardTestTable; label: string }[] = [
     { value: 'fills', label: 'Fills' },
+    { value: 'instruments', label: 'Instruments' },
     { value: 'comparison', label: 'Comparison' },
     { value: 'logs', label: 'Logs' },
   ];
@@ -222,6 +228,16 @@
   }
 </script>
 
+{#snippet instrumentOrUniverse(forwardTest: ForwardTest, instrumentCount: number)}
+  {@const instrument = readForwardTestInstrument(forwardTest)}
+  {#if instrument === null}
+    <span>{describeForwardTestUniverse(forwardTest, instrumentCount)}</span>
+  {:else}
+    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
+    <a class="cds--link" href={createInstrumentHref(instrument)}>{instrument.symbol}</a>
+  {/if}
+{/snippet}
+
 <Workbench>
   <SideColumn label="Forward tests" side="start" width="30rem" storageKey="atrade.forward-test-page.list-column">
     {#snippet actions()}
@@ -253,6 +269,21 @@
         {#if id === 'chart'}
           <Panel {...state} label={`Forward test #${String(forwardTest.id)}`}>
             {#snippet header()}
+              <span class="run-status" role="status" aria-label="Forward test status">
+                <StatusIndicator
+                  label={describeForwardTestStatus(forwardTest.status)}
+                  kind={findForwardTestStatusKind(forwardTest.status)}
+                />
+                {#if showsCrashCount(forwardTest)}
+                  <StatusIndicator kind="warning" label={`Crashes in a row: ${String(forwardTest.crash_count)} of 3`} />
+                {/if}
+                {#if forwardTest.split_checks_needed.length > 0}
+                  <StatusIndicator
+                    kind="warning"
+                    label={`Split check needed: ${forwardTest.split_checks_needed.map((item) => item.symbol).join(', ')}`}
+                  />
+                {/if}
+              </span>
               <h1 class="run-title">
                 <span class="run-number">#{forwardTest.id}</span>
                 <a
@@ -260,18 +291,11 @@
                   href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(forwardTest.strategy_id), versionNumber: String(forwardTest.version_number) })}
                   >{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</a
                 >
-                <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
-                <a class="cds--link" href={createInstrumentHref(forwardTest)}>{forwardTest.symbol}</a>
+                {@render instrumentOrUniverse(forwardTest, records.instruments.length)}
                 <span class="run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
               </h1>
-              <span class="run-status" role="status" aria-label="Forward test status">
-                <StatusIndicator
-                  label={describeForwardTestStatus(forwardTest.status)}
-                  kind={findForwardTestStatusKind(forwardTest.status)}
-                />
-              </span>
-              {#if showsCrashCount(forwardTest)}
-                <span class="run-note">Crashes in a row: {forwardTest.crash_count} of 3</span>
+              {#if forwardTest.allocated_capital_usd !== null}
+                <span class="run-note run-capital">Capital {formatAmount(forwardTest.allocated_capital_usd)} USD</span>
               {/if}
               <span class="run-actions">
                 {#if canStop(forwardTest)}
@@ -303,18 +327,11 @@
                 }}
               />
             {/if}
-            {#if records.metrics === null}
-              <div class="state-area">
-                <StatusIndicator
-                  label={describeForwardTestStatus(forwardTest.status)}
-                  kind={findForwardTestStatusKind(forwardTest.status)}
-                />
-              </div>
-            {:else}
-              <KeyMetricRow metrics={records.metrics} startCapitalUsd={forwardTest.start_balance_usd} trades={records.fills} />
+            {#if records.metrics !== null}
+              <KeyMetricRow metrics={records.metrics} startCapitalUsd={readStartCapital(forwardTest)} />
               <div class="chart">
                 <EquityDrawdownChart
-                  curves={[{ name: 'Equity', points: records.equity_curve, startCapitalUsd: forwardTest.start_balance_usd }]}
+                  curves={[{ name: 'Equity', points: records.equity_curve, startCapitalUsd: readStartCapital(forwardTest) }]}
                   label="Equity and drawdown"
                   interruptions={chartInterruptions}
                   fill
@@ -337,6 +354,8 @@
           >
             {#if selectedTable === 'fills'}
               <ForwardTestFillTable fills={records.fills} />
+            {:else if selectedTable === 'instruments'}
+              <UniverseInstrumentTable instruments={records.instruments} countHeader="Fills" />
             {:else if selectedTable === 'comparison'}
               {#if records.same_period_backtests.length === 0}
                 <EmptyText text="No backtests of the same period" />
@@ -347,6 +366,11 @@
                       {#each records.same_period_backtests as backtest (backtest.id)}
                         <tr>
                           <th scope="row" align="right">
+                            <StatusIndicator
+                              label={describeBacktestStatus(backtest.status)}
+                              kind={findBacktestStatusKind(backtest.status)}
+                              align="right"
+                            />
                             <a
                               class="cds--link"
                               aria-label={`Compare with backtest #${String(backtest.id)}`}
@@ -356,12 +380,6 @@
                               })}>#{backtest.id}</a
                             >
                           </th>
-                          <td>
-                            <StatusIndicator
-                              label={describeBacktestStatus(backtest.status)}
-                              kind={findBacktestStatusKind(backtest.status)}
-                            />
-                          </td>
                           <td>{formatUtcTime(backtest.start_utc)}</td>
                           <td>{formatUtcTime(backtest.end_utc)}</td>
                           <td align="right">
@@ -400,6 +418,8 @@
       {/snippet}
     </PanelSplit>
   {/if}
+
+  <AssistantColumn />
 </Workbench>
 
 <StartForwardTestDialog open={isStartDialogOpen} onOpenChange={changeStartDialog} onStarted={openStartedForwardTest} />
@@ -431,31 +451,27 @@
     color: var(--cds-text-secondary);
   }
 
-  .run-status,
+  .run-status {
+    display: flex;
+    flex: none;
+  }
+
   .run-note {
     flex: none;
     font-size: var(--cds-body-compact-01-font-size);
     line-height: var(--cds-body-compact-01-line-height);
     white-space: nowrap;
+    color: var(--cds-text-secondary);
   }
 
-  .run-note {
-    color: var(--cds-text-secondary);
+  .run-capital {
+    font-variant-numeric: tabular-nums;
   }
 
   .run-actions {
     display: flex;
     flex: none;
     margin-inline-start: auto;
-  }
-
-  .state-area {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--cds-heading-compact-02-font-size);
-    line-height: var(--cds-heading-compact-02-line-height);
   }
 
   /* The chart fills the rest of the panel body and follows its size (EquityDrawdownChart fill). */

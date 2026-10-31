@@ -7,7 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEFAULT_FRONTEND_BUILD_DIR = Path("/app/frontend-build")
@@ -39,8 +39,14 @@ class Settings(BaseSettings):
     ibkr_web_client_id: int = Field(default=1, ge=0)
     forward_test_client_id_first: int = Field(default=10, ge=0)
     forward_test_client_id_last: int = Field(default=13, ge=0)
+    # The fixed client ID of the bar fetcher in the forward-test worker (section 12.4).
+    ibkr_bar_fetcher_client_id: int = Field(default=20, ge=0)
     # Paper capital when no paper account balance is available.
     local_paper_capital_usd: Decimal = Field(default=Decimal(100000), gt=0)
+    # Secret. Decision #146 names it without the ATRADE_ prefix. None when it is not configured.
+    databento_api_key: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("DATABENTO_API_KEY", "databento_api_key")
+    )
 
     @field_validator("trading_mode")
     @classmethod
@@ -50,15 +56,20 @@ class Settings(BaseSettings):
             raise ValueError(message)
         return trading_mode
 
-    @field_validator("ibkr_account_id")
+    @field_validator("ibkr_account_id", "databento_api_key", mode="before")
     @classmethod
-    def treat_empty_account_id_as_none(cls, account_id: str | None) -> str | None:
+    def treat_empty_value_as_none(cls, value: object) -> object:
         # Compose passes an empty value when .env does not set the variable.
-        if account_id == "":
+        if value == "":
             return None
-        return account_id
+        return value
 
-    @field_validator("ibkr_web_client_id", "forward_test_client_id_first", "forward_test_client_id_last")
+    @field_validator(
+        "ibkr_web_client_id",
+        "forward_test_client_id_first",
+        "forward_test_client_id_last",
+        "ibkr_bar_fetcher_client_id",
+    )
     @classmethod
     def refuse_unusable_client_id(cls, client_id: int) -> int:
         require_usable_client_id(client_id)
@@ -80,4 +91,22 @@ class Settings(BaseSettings):
                 f" {first}-{last}. Each process must use a different client ID."
             )
             raise ValueError(message)
+        self.refuse_shared_bar_fetcher_client_id()
         return self
+
+    def refuse_shared_bar_fetcher_client_id(self) -> None:
+        bar_fetcher_client_id = self.ibkr_bar_fetcher_client_id
+        first = self.forward_test_client_id_first
+        last = self.forward_test_client_id_last
+        if first <= bar_fetcher_client_id <= last:
+            message = (
+                f"The bar fetcher client ID {bar_fetcher_client_id} is inside the forward test client ID range"
+                f" {first}-{last}. Each process must use a different client ID."
+            )
+            raise ValueError(message)
+        if bar_fetcher_client_id == self.ibkr_web_client_id:
+            message = (
+                f"The bar fetcher client ID {bar_fetcher_client_id} is equal to the Web client ID."
+                " Each process must use a different client ID."
+            )
+            raise ValueError(message)

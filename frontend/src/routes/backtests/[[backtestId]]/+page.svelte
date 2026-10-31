@@ -3,9 +3,13 @@
      Left: the "Backtests" side column (BacktestList) with the "New backtest" and "Backtest limits" buttons. Center:
      the panel of the open backtest (header line: number, strategy version, instrument, bar period, status, and the
      "Start forward test" button; then the key metric row and the equity and drawdown curves on one time axis) over the
-     Trades / Orders / Logs panel. The API has no orders, so Orders is an empty state. Logs shows the strategy error.
+     Trades / Orders / Logs / Metrics / Bar sources panel. The API has no orders, so Orders is an empty state. Logs
+     shows the strategy error. Metrics shows the metric table (docs/architecture/backtest.md section 10.9.6). Bar
+     sources shows the source order and the bar counts. An HK backtest and a US backtest before the Databento history
+     show the survivorship bias warning over the key metrics.
      The list reads again while a backtest in it is queued or running; the open backtest reads again until its status
-     is final. The address #start-backtest (command palette) opens the New backtest dialog. -->
+     is final. The address #start-backtest (command palette) opens the New backtest dialog.
+     Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import ConnectionSignal16 from '@carbon/icons/es/connection-signal/16.js';
@@ -15,16 +19,22 @@
   import { navigating, page } from '$app/state';
   import {
     BacktestLimitsForm,
+    BacktestMetricTable,
     BacktestTradeTable,
     describeBacktestStatus,
     EquityDrawdownChart,
     findBacktestStatusKind,
+    formatPeriodCountHeader,
+    formatUniverseLabel,
     isFinalStatus,
     KeyMetricRow,
     listBacktests,
     readBacktest,
+    readBacktestInstrument,
+    UniverseInstrumentTable,
     type Backtest,
     type BacktestDetail,
+    type BacktestInstrument,
   } from '#lib/backtest';
   import { Dialog, IconButton, InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
@@ -33,11 +43,14 @@
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { isLiveBarPeriod, startForwardTest } from '#lib/forward_test';
+  import { SurvivorshipBiasWarning } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_BACKTEST_FORM_ID } from '../../palette_commands';
   import BacktestList from '../BacktestList.svelte';
+  import BarSourceTable from '../BarSourceTable.svelte';
   import StartBacktestDialog from '../StartBacktestDialog.svelte';
+  import AssistantColumn from '../../assistant/AssistantColumn.svelte';
 
   // A backtest of a few years of daily bars ends in seconds. One read each second is enough.
   const STATUS_CHECK_INTERVAL_MILLISECONDS = 1000;
@@ -48,11 +61,14 @@
     { id: 'chart', minPixels: 160 },
     { id: 'tables', minPixels: 96, defaultPixels: 240, splitterLabel: 'Resize the chart and the tables' },
   ];
-  type BacktestTable = 'trades' | 'orders' | 'logs';
+  type BacktestTable = 'trades' | 'instruments' | 'orders' | 'logs' | 'metrics' | 'bar-sources';
   const TABLE_TABS: { value: BacktestTable; label: string }[] = [
     { value: 'trades', label: 'Trades' },
+    { value: 'instruments', label: 'Instruments' },
     { value: 'orders', label: 'Orders' },
     { value: 'logs', label: 'Logs' },
+    { value: 'metrics', label: 'Metrics' },
+    { value: 'bar-sources', label: 'Bar sources' },
   ];
 
   const routeBacktestId = $derived(page.params['backtestId']);
@@ -156,12 +172,21 @@
     }
   }
 
+  // A deleted open backtest: /backtests opens the newest backtest that is left.
+  function removeDeletedBacktests(deletedIds: number[]): void {
+    backtests = backtests.filter((item) => !deletedIds.includes(item.id));
+    listReadCount += 1;
+    if (backtestId !== null && deletedIds.includes(backtestId)) {
+      void goto(resolve('/backtests/[[backtestId]]', { backtestId: undefined }), { replace: true });
+    }
+  }
+
   function openStartedBacktest(started: Backtest): void {
     listReadCount += 1;
     void goto(resolve('/backtests/[[backtestId]]', { backtestId: String(started.id) }));
   }
 
-  async function startForwardTestFromBacktest(detail: BacktestDetail): Promise<void> {
+  async function startForwardTestFromBacktest(detail: BacktestDetail, instrument: BacktestInstrument): Promise<void> {
     if (isStartingForwardTest) {
       return;
     }
@@ -169,10 +194,12 @@
     forwardTestMessage = '';
     const result = await startForwardTest(fetch, {
       strategy_version_id: detail.strategy_version_id,
-      symbol: detail.symbol,
-      exchange: detail.exchange,
-      currency: detail.currency,
+      symbol: instrument.symbol,
+      exchange: instrument.exchange,
+      currency: instrument.currency,
       bar_period: detail.bar_period,
+      // The paper capital of the backtest is the allocated capital of the forward test (forward_test.md 12.18).
+      allocated_capital_usd: detail.paper_capital_usd,
     });
     isStartingForwardTest = false;
     if (result.kind === 'failed') {
@@ -182,7 +209,10 @@
     await goto(resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(result.forwardTest.id) }));
   }
 
-  function describeForwardTestButton(detail: BacktestDetail): string {
+  function describeForwardTestButton(detail: BacktestDetail, instrument: BacktestInstrument | undefined): string {
+    if (instrument === undefined) {
+      return 'Start forward test: not available for a multi-instrument backtest';
+    }
     if (!hasLiveBarPeriod) {
       return `Start forward test: not available for ${formatBarPeriod(detail.bar_period)} bars`;
     }
@@ -208,7 +238,7 @@
         }}
       />
     {/snippet}
-    <BacktestList {backtests} errorMessage={listMessage} openBacktestId={backtestId} />
+    <BacktestList {backtests} errorMessage={listMessage} openBacktestId={backtestId} onDeleted={removeDeletedBacktests} />
   </SideColumn>
 
   {#if shownBacktest === null}
@@ -221,30 +251,45 @@
     </div>
   {:else}
     {@const detail = shownBacktest}
+    {@const instrument = readBacktestInstrument(detail)}
+    {@const universeLabel = formatUniverseLabel(detail, detail.instruments.length)}
     <PanelSplit storageKey="atrade.backtest-page.panel-split" panels={PANELS}>
       {#snippet panel(id, state)}
         {#if id === 'chart'}
           <Panel {...state} label={`Backtest #${String(detail.id)}`}>
             {#snippet header()}
+              <span class="run-status" role="status" aria-label="Backtest status">
+                <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
+              </span>
               <h1 class="run-title">
                 <span class="run-number">#{detail.id}</span>
                 <a class="cds--link" href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(detail.strategy_id), versionNumber: String(detail.version_number) })}
                   >{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
                 >
-                <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
-                <a class="cds--link" href={createInstrumentHref(detail)}>{detail.symbol}</a>
+                {#if instrument !== undefined}
+                  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
+                  <a class="cds--link" href={createInstrumentHref(instrument)}>{instrument.symbol}</a>
+                {:else if universeLabel !== undefined}
+                  <span>{universeLabel}</span>
+                {/if}
                 <span class="run-period">{formatBarPeriod(detail.bar_period)}</span>
+                {#if detail.sweep_id !== null}
+                  <a class="cds--link" href={resolve('/sweeps/[[sweepId]]', { sweepId: String(detail.sweep_id) })}
+                    >Parameter sweep #{detail.sweep_id}</a
+                  >
+                {/if}
               </h1>
-              <span class="run-status" role="status" aria-label="Backtest status">
-                <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
-              </span>
               <span class="run-actions">
                 <IconButton
-                  label={describeForwardTestButton(detail)}
+                  label={describeForwardTestButton(detail, instrument)}
                   icon={ConnectionSignal16}
                   tone="interactive"
-                  disabled={!hasLiveBarPeriod || isStartingForwardTest}
-                  onclick={() => void startForwardTestFromBacktest(detail)}
+                  disabled={instrument === undefined || !hasLiveBarPeriod || isStartingForwardTest}
+                  onclick={() => {
+                    if (instrument !== undefined) {
+                      void startForwardTestFromBacktest(detail, instrument);
+                    }
+                  }}
                 />
               </span>
             {/snippet}
@@ -259,12 +304,11 @@
                 }}
               />
             {/if}
-            {#if detail.metrics === null}
-              <div class="state-area">
-                <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
-              </div>
-            {:else}
-              <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} trades={detail.trades} />
+            {#if detail.survivorship_bias}
+              <SurvivorshipBiasWarning />
+            {/if}
+            {#if detail.metrics !== null}
+              <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} />
               <div class="chart">
                 <EquityDrawdownChart
                   curves={[{ name: 'Equity', points: detail.equity_curve, startCapitalUsd: detail.paper_capital_usd }]}
@@ -289,8 +333,18 @@
           >
             {#if selectedTable === 'trades'}
               <BacktestTradeTable trades={detail.trades} />
+            {:else if selectedTable === 'instruments'}
+              <UniverseInstrumentTable instruments={detail.instruments} periodHeader={formatPeriodCountHeader(detail)} />
             {:else if selectedTable === 'orders'}
               <EmptyText text="No orders" />
+            {:else if selectedTable === 'metrics'}
+              {#if detail.metrics === null}
+                <EmptyText text="No metrics" />
+              {:else}
+                <BacktestMetricTable metrics={detail.metrics} />
+              {/if}
+            {:else if selectedTable === 'bar-sources'}
+              <BarSourceTable sourceOrder={detail.source_order} barCountBySource={detail.bar_count_by_source} />
             {:else if detail.error_message === null}
               <EmptyText text="No logs" />
             {:else}
@@ -303,6 +357,8 @@
       {/snippet}
     </PanelSplit>
   {/if}
+
+  <AssistantColumn />
 </Workbench>
 
 <StartBacktestDialog open={isStartDialogOpen} onOpenChange={changeStartDialog} onStarted={openStartedBacktest} />
@@ -347,25 +403,14 @@
   }
 
   .run-status {
+    display: flex;
     flex: none;
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    white-space: nowrap;
   }
 
   .run-actions {
     display: flex;
     flex: none;
     margin-inline-start: auto;
-  }
-
-  .state-area {
-    display: flex;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    font-size: var(--cds-heading-compact-02-font-size);
-    line-height: var(--cds-heading-compact-02-line-height);
   }
 
   /* The chart fills the rest of the panel body and follows its size (EquityDrawdownChart fill). */

@@ -40,7 +40,9 @@
     <!-- Carbon puts the menu below the trigger with its end edges in line (cds--overflow-menu--flip). -->
     <DropdownMenu.Content side="bottom" align="end" sideOffset={0}>
       {#snippet child({ props, wrapperProps })}
-        <div {...wrapperProps}>
+        <!-- Above a Dialog (Carbon modal 9000), as the Carbon list box menu (9100): the Portal puts the menu outside it,
+             and the fixed wrapper is its own stacking context. -->
+        <div {...wrapperProps} style:z-index="9100">
           <ul
             {...props}
             class={[

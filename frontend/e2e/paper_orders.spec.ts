@@ -40,7 +40,7 @@ test('sends a limit order after the confirmation and cancels it', async ({ page 
 
   const dialog = page.getByRole('dialog', { name: `Buy 3 ${symbol}` });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('PAPER', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('PAPER', { exact: true })).toHaveCount(0);
   await expect(dialog).toContainText(`${symbol} / NASDAQ / USD`);
   await expect(dialog).toContainText('Buy');
   await expect(dialog).toContainText('Limit, GTC');
@@ -58,7 +58,7 @@ test('sends a limit order after the confirmation and cancels it', async ({ page 
   const orderRow = orders.getByRole('row', { name: new RegExp(symbol) });
   await orderRow.scrollIntoViewIfNeeded();
   await expect(orderRow).toContainText('by hand');
-  await expect(orderRow).toContainText('Submitted');
+  await expect(orderRow.getByRole('img', { name: 'Submitted', exact: true })).toBeVisible();
   await orderRow.getByRole('button', { name: /^Actions for order \d+$/ }).click();
   await page.getByRole('menuitem', { name: 'Cancel order' }).click();
   await expect(page.getByRole('menu')).toHaveCount(0);
@@ -76,7 +76,7 @@ test('cancels an open order with the keyboard only', async ({ page }, currentTes
 
   await page.goto('/');
   const orderRow = page.getByRole('region', { name: 'Open orders' }).getByRole('row', { name: new RegExp(symbol) });
-  await expect(orderRow).toContainText('Submitted');
+  await expect(orderRow.getByRole('img', { name: 'Submitted', exact: true })).toBeVisible();
   // The keyboard opens the row overflow menu, moves to the enabled item, and chooses it.
   await orderRow.getByRole('button', { name: /^Actions for order \d+$/ }).focus();
   await page.keyboard.press('Space');

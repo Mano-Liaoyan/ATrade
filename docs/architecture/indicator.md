@@ -72,12 +72,53 @@ of #130 (A is the strongest, D is practitioner use only).
 | Average trading value | mean(close × volume) | n = 20 or 60 | `value` | ATrade | B (screen only) |
 | RSI | 100 − 100 / (1 + average gain / average loss), Wilder average | n = 14, levels 30 and 70 | `value` | wraps `RelativeStrengthIndex` | D |
 | MACD | fast EMA − slow EMA, and its signal line | not given | `value` (MACD line), `signal`, `histogram` | wraps `MovingAverageConvergenceDivergence` | D (entry timing) |
-| Bollinger Bands | middle average ± k standard deviations | not given | `upper`, `middle`, `lower` | wraps `BollingerBands` | D (entry timing) |
+| Bollinger Bands | mean of the last n closes ± k population standard deviations of the same closes | not given | `upper`, `middle`, `lower` | wraps `BollingerBands` | D (entry timing) |
 | Donchian channel | highest high and lowest low of the last n bars | not given | `upper`, `middle`, `lower` | wraps `DonchianChannel` | B (trend filter, range break) |
 
 - The output names of the wrapped indicators are the NautilusTrader names.
   Checked in #138: MACD has `value`, `signal`, and `histogram`. Bollinger
   Bands and the Donchian channel have `upper`, `middle`, and `lower`.
+- The ATrade classes of the wrapped indicators (#161) and their defaults.
+  #130 gives no usual parameters for EMA, MACD, Bollinger Bands, and the
+  Donchian channel. Their defaults are the common textbook values.
+
+  | Indicator | Class | Defaults | First value at bar |
+  |---|---|---|---|
+  | SMA | `SMA` | `period=50` | `period` |
+  | EMA | `EMA` | `period=20` | `period` |
+  | ATR | `ATR` | `period=14` | `period` |
+  | RSI | `RSI` | `period=14` | `period + 1` |
+  | MACD | `MACD` | `fast_period=12`, `slow_period=26`, `signal_period=9` | `slow_period + signal_period - 1` |
+  | Bollinger Bands | `BollingerBands` | `period=20`, `k=2.0` | `period` |
+  | Donchian channel | `DonchianChannel` | `period=20` | `period` |
+
+- The ATrade classes of the indicators that ATrade writes (#162) and their
+  defaults. #130 gives n = 60 or 252 for realized volatility and n = 20 or
+  60 for average trading value. The defaults are the shorter values.
+
+  | Indicator | Class | Defaults | First value at bar |
+  |---|---|---|---|
+  | 12-1 momentum | `Momentum12_1` | `look_back=252`, `skip=21` | `look_back + 1` |
+  | Distance to 52-week high | `DistanceTo52WeekHigh` | `period=252` | `period` |
+  | Realized volatility | `RealizedVolatility` | `period=60`, `bars_per_year=252` | `period + 1` |
+  | Average trading value | `AverageTradingValue` | `period=20` | `period` |
+
+- 12-1 momentum accepts `skip` from 0 to `look_back − 1`. With `skip=0` the
+  value is close(t) / close(t − look-back) − 1 (template S3). The class
+  refuses other values with a `ValueError`.
+- Realized volatility is the sample standard deviation (n − 1) of the last
+  n log returns of the close, times √`bars_per_year`. On daily bars
+  `bars_per_year` is 252. On 1-hour bars the strategy passes 1764 (252 days
+  × 7 regular-session bars, section 23.1). The class does not read the bar
+  period.
+- Distance to 52-week high uses the highs of the last `period` bars, the
+  current bar included, so the value is at most 1.
+- The Donchian `middle` is the mean of `upper` and `lower`. The MACD
+  `histogram` is `value` − `signal`. RSI is on a scale of 0 to 100.
+- The wrapped ATR and RSI use the Wilder average (#130). The NautilusTrader
+  2.0.0rc7 default of both is Wilder, so the classes do not pass
+  `MovingAverageType.Wilder` (#160, section 21.1 of
+  [`docs/architecture.md`](../architecture.md)).
 - Average trading value is in the currency of the instrument (USD for US
   instruments, HKD for Hong Kong instruments).
 - RSI, MACD, and Bollinger Bands are entry timing tools only. #130 found no
@@ -119,9 +160,9 @@ Each class has:
 |---|---|
 | Constructor | The parameters of the indicator, each with a default value. |
 | `handle_bar(bar)` | Takes one NautilusTrader `Bar`. `register_indicator_for_bars` calls it. |
-| A method for one `foundation` `Bar` | The screen path. It gives the same update as `handle_bar` for the same open, high, low, close, and volume. |
+| `update(bar)` | The screen path: takes one `foundation` `Bar`. It gives the same update as `handle_bar` for the same open, high, low, close, and volume. A wrapped class makes a NautilusTrader bar from it and calls `handle_bar`. |
 | `initialized` | `True` when the class has enough bars for a value. NautilusTrader reads it for `indicators_initialized()`. |
-| Outputs (`value`, or the names of section 23.2) | The value, or "no value" while `initialized` is `False`. |
+| Outputs (`value`, or the names of section 23.2) | The value (`float`), or "no value" (`None`) while `initialized` is `False`. |
 | `reset()` | Removes all received bars. |
 
 The public entry also exports a catalog of the first set. For each
@@ -136,6 +177,33 @@ indicator, the catalog has:
 `screen` uses the catalog to check a screen (section 24.6). The rule builder
 uses it for its condition lists.
 
+Decided (#163): the catalog is `INDICATOR_CATALOG`
+(`indicator/indicator_catalog.py`), a mapping from the key to an
+`IndicatorDefinition` (`key`, `name`, `parameters`, `outputs`,
+`display_name(parameters)`, `screen_look_back_bars(parameters)`). Each
+`IndicatorParameter` has `name`, `value_type` (`int` or `float`), `default`,
+`minimum`, and `maximum`. The range includes both ends.
+
+| Key | UI name (defaults) | Parameters: default (allowed range) | Outputs |
+|---|---|---|---|
+| `sma` | `SMA(50)` | `period`: 50 (1 to 1000) | `value` |
+| `ema` | `EMA(20)` | `period`: 20 (1 to 1000) | `value` |
+| `momentum_12_1` | `12-1 momentum(252, 21)` | `look_back`: 252 (1 to 1000), `skip`: 21 (0 to 999, less than `look_back`) | `value` |
+| `distance_to_52_week_high` | `Distance to 52-week high(252)` | `period`: 252 (1 to 1000) | `value` |
+| `realized_volatility` | `Realized volatility(60)` | `period`: 60 (2 to 1000), `bars_per_year`: 252 (1 to 10000) | `value` |
+| `atr` | `ATR(14)` | `period`: 14 (1 to 1000) | `value` |
+| `average_trading_value` | `Average trading value(20)` | `period`: 20 (1 to 1000) | `value` |
+| `rsi` | `RSI(14)` | `period`: 14 (1 to 1000) | `value` |
+| `macd` | `MACD(12, 26, 9)` | `fast_period`: 12 (1 to 1000, less than `slow_period`), `slow_period`: 26 (2 to 1000), `signal_period`: 9 (1 to 1000) | `value`, `signal`, `histogram` |
+| `bollinger_bands` | `Bollinger Bands(20, 2)` | `period`: 20 (1 to 1000), `k`: 2.0 (0.1 to 10.0) | `upper`, `middle`, `lower` |
+| `donchian_channel` | `Donchian channel(20)` | `period`: 20 (1 to 1000) | `upper`, `middle`, `lower` |
+
+- The UI name is the indicator name and its parameter values in the
+  constructor order, for example `RSI(14)`. A `float` shows without a
+  trailing zero (`2`, `2.5`). `bars_per_year` is not in the name.
+- The ranges are the simplest ones that each class accepts. 1000 bars is
+  about 4 years of daily bars.
+
 ## 23.4 Look-back bars of a screen
 
 Source: [Indicator library scope and calculation place](https://github.com/Mano-Liaoyan/ATrade/issues/136).
@@ -147,13 +215,25 @@ needs. Examples from #136: RSI(14) reads about 100 bars. 12-1 momentum reads
 | Indicator | Daily bars that a screen reads |
 |---|---|
 | SMA(n), average trading value(n), Bollinger Bands(n), Donchian channel(n) | n |
-| Distance to 52-week high | 252 |
+| Distance to 52-week high (period n, default 252) | n |
 | 12-1 momentum (look-back L) | L + 1 |
 | Realized volatility(n) | n + 1 (n log returns) |
-| EMA, RSI, ATR, MACD | A fixed count for each indicator, more than its warm-up (RSI(14): about 100) |
+| EMA(n), RSI(n), ATR(n) | 8 × n (RSI(14): 112) |
+| MACD(fast, slow, signal) | 8 × (slow + signal) (MACD(12, 26, 9): 280) |
 
 EMA, RSI, ATR, and MACD use recursive averages. Their value depends a little
-on the first bar that the class receives. Section 23.8 has the open point.
+on the first bar that the class receives. Decided (#163): the fixed count is
+8 × the longest period of the recursive average. Section 21.1 of
+[`docs/architecture.md`](../architecture.md) has the measured differences
+(#160): with 8 × the period, each difference is less than 0.005, half of
+the last place of a value with 2 decimals. #160 did not measure the MACD
+signal line. The signal line is an EMA of the MACD line, so the MACD count
+adds 8 × `signal_period`.
+
+`IndicatorDefinition.screen_look_back_bars(parameters)` gives the count. A
+test gives each class with its default parameters exactly this count of
+bars and checks that each output has a value
+(`tests/indicator/test_indicator_catalog.py`).
 
 ## 23.5 Consistency test
 
@@ -188,6 +268,25 @@ indicator reference in JSON:
   its default.
 - `output` names one output of section 23.2. A multi-line indicator needs it
   (MACD, Bollinger Bands, Donchian channel).
+- Decided (#163): `check_indicator_reference(reference)` returns a list of
+  `IndicatorProblem(location, message)`. An empty list means the reference
+  is correct. `location` is the path in the reference, for example
+  `("parameters", "period")`, `("output",)`, or `()` for the reference.
+  A screen (section 24.6) and the rules of the rule builder put the location
+  of the condition before it. The problems are:
+  - the reference is not an object, or has a field that is not
+    `indicator`, `parameters`, or `output`,
+  - an unknown `indicator` key,
+  - `parameters` is not an object, an unknown parameter, a parameter of the
+    wrong type (an `int` parameter refuses `20.5` and `true`), or a
+    parameter out of its range,
+  - a parameter order rule fails: 12-1 momentum `skip` less than
+    `look_back`, MACD `fast_period` less than `slow_period`,
+  - a multi-line indicator without `output`, or an unknown `output`.
+- A single-line indicator without `output` uses `value`.
+- `create_indicator(reference)` makes the class with the defaults for the
+  missing parameters. It raises `ValueError` when the reference has
+  problems.
 
 ## 23.7 Phase
 
@@ -200,19 +299,4 @@ indicator reference in JSON:
 
 ## 23.8 Left to the implementation
 
-- The Python type of a value and of "no value" (for example `float | None`,
-  as the NautilusTrader indicators use `float`).
-- The name of the screen-path method of section 23.3.
-- The defaults of EMA, MACD, Bollinger Bands, and the Donchian channel.
-  #130 gives no usual parameters for them.
-- The skip parameter of 12-1 momentum must accept 0, or the strategy template
-  S3 "12-month time-series momentum" (look-back 252, skip 0) becomes a code
-  template ([#139](https://github.com/Mano-Liaoyan/ATrade/issues/139)).
-- The fixed look-back count of EMA, RSI, ATR, and MACD in a screen
-  (section 23.4).
-- The smoothing type of the wrapped ATR and RSI. #130 gives the Wilder
-  average. If the NautilusTrader default is different, the class passes
-  `MovingAverageType.Wilder`.
-- The annualization factor of realized volatility on 1-hour bars. The #130
-  formula (√252) is for daily bars.
-- The names that the UI shows for the indicators.
+No open points.

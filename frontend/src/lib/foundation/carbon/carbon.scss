@@ -43,10 +43,15 @@
 @use '@carbon/styles/scss/components/data-table';
 // The table toolbar and its batch action bar (backtest list, #104).
 @use '@carbon/styles/scss/components/data-table/action';
+// The sortable headers of the Runs table of the sweep page (#204).
+@use '@carbon/styles/scss/components/data-table/sort';
 @use '@carbon/styles/scss/components/overflow-menu';
 @use '@carbon/styles/scss/components/notification';
 @use '@carbon/styles/scss/components/tile';
 @use '@carbon/styles/scss/components/search';
+@use '@carbon/styles/scss/components/toggle';
+// The source order list of the settings page (#189).
+@use '@carbon/styles/scss/components/structured-list';
 
 // Themes: g10 is the light theme and g100 is the dark theme.
 // The system theme applies when <html> has no data-theme attribute. data-theme="light" or "dark" overrides it.
@@ -78,4 +83,10 @@
 
 .atrade-auto-grid--wide {
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+}
+
+// A Carbon tab panel takes the focus (tabindex 0) and draws its focus outline on `:focus`, so a mouse click in a
+// panel body draws a frame around the whole panel. Only the keyboard focus (`:focus-visible`) keeps the outline.
+.cds--tab-content:focus:not(:focus-visible) {
+  outline: none;
 }

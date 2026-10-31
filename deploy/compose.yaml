@@ -60,16 +60,22 @@ services:
       ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
       ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
       ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
+      ATRADE_IBKR_BAR_FETCHER_CLIENT_ID: ${ATRADE_IBKR_BAR_FETCHER_CLIENT_ID:-20}
       ATRADE_LOCAL_PAPER_CAPITAL_USD: ${ATRADE_LOCAL_PAPER_CAPITAL_USD:-100000}
+      # The Databento import program runs in this service with "docker compose run" (README.md).
+      DATABENTO_API_KEY: ${DATABENTO_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
     ports:
       - "${ATRADE_WEB_BIND_ADDRESS:-127.0.0.1}:${ATRADE_WEB_PORT:-8000}:8000"
+    networks:
+      - default
+      - assistant-internal
     read_only: true
     tmpfs:
       - /tmp
-    mem_limit: ${ATRADE_WEB_MEMORY_LIMIT:-4g}
+    mem_limit: ${ATRADE_WEB_MEMORY_LIMIT:-8g}
     pids_limit: 2048
     # The forward-test service waits for this check: web runs the database migrations before it serves HTTP.
     healthcheck:
@@ -97,6 +103,9 @@ services:
       ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
       ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
       ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
+      ATRADE_IBKR_BAR_FETCHER_CLIENT_ID: ${ATRADE_IBKR_BAR_FETCHER_CLIENT_ID:-20}
+      # The quarterly US universe update downloads EQUS.SUMMARY bars to /tmp. Empty: the update does not run.
+      DATABENTO_API_KEY: ${DATABENTO_API_KEY:-}
     depends_on:
       web:
         condition: service_healthy
@@ -106,7 +115,53 @@ services:
     pids_limit: 2048
     restart: unless-stopped
 
+  # The AI assistant (docs/architecture/assistant.md section 25). A Node.js process with the pi SDK.
+  # It has no database URL, no IBKR setting, and no other value of .env. It is not on the default network, so it cannot
+  # connect to postgres or ib-gateway. It connects to web through assistant-internal and to the model providers
+  # through assistant-egress. No port is published.
+  assistant:
+    build:
+      context: ..
+      dockerfile: deploy/assistant.Dockerfile
+    image: atrade-assistant:local
+    networks:
+      - assistant-internal
+      - assistant-egress
+    volumes:
+      # The pi files: later the credential file and the conversation files. ATrade never deletes or changes it.
+      - assistant-pi:/data
+    read_only: true
+    # Without raw sockets, assistant cannot send packets with the address of web, which port 8000 lets through
+    # (docs/architecture/assistant.md 25.3.2).
+    cap_drop:
+      - NET_RAW
+    tmpfs:
+      - /tmp
+    mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT:-1g}
+    pids_limit: 2048
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8002/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+networks:
+  # Only web and assistant. internal: true: no route out of the host. The subnet is fixed, so web can know the
+  # requests of assistant by their address (docs/architecture/assistant.md 25.3.2).
+  assistant-internal:
+    name: atrade-assistant-internal
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+  # Only assistant: its connection to the model providers.
+  assistant-egress:
+    name: atrade-assistant-egress
+
 volumes:
   pgdata:
     # backend/src/atrade/app/web.py names this volume when PostgreSQL refuses the password.
     name: atrade-postgres18-data
+  assistant-pi:
+    name: atrade-assistant-pi

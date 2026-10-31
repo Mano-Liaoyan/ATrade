@@ -40,6 +40,7 @@ from tests.forward_test.test_forward_test_routes import (
     make_start_request,
     save_test_strategy_version,
 )
+from tests.strategy.rules_examples import condition, group, indicator, make_rules, price
 
 ACCOUNT_ID = "DU1234567"
 CHILD_NOW_UTC = datetime(2026, 1, 2, 3, 10, 30, tzinfo=UTC)
@@ -96,6 +97,16 @@ def make_forward_test_gateway() -> FakeGatewayConnection:
 async def start_forward_test(web_client: httpx.AsyncClient) -> JsonObject:
     strategy_version_id = await save_test_strategy_version(web_client)
     return (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))).json()
+
+
+async def start_old_forward_test(web_client: httpx.AsyncClient, database_url: str) -> JsonObject:
+    """A forward test from the time before the allocated capital: its equity starts at the start balance."""
+    forward_test = await start_forward_test(web_client)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "UPDATE forward_test SET allocated_capital_usd = NULL WHERE id = %(id)s", {"id": forward_test["id"]}
+        )
+    return forward_test
 
 
 @dataclass(frozen=True)
@@ -161,16 +172,17 @@ async def test_checks_the_paper_account_then_runs_the_live_node_with_the_same_cl
     assert live_node_input.client_id == 10
     assert live_node_input.account_id == ACCOUNT_ID
     assert live_node_input.order_id_tag == f"FT{forward_test['id']}"
+    assert live_node_input.instrument is not None
     assert live_node_input.instrument.symbol == "AAPL"
     assert "class BarCountStrategy" in live_node_input.strategy_code
-    # The recorder DataActor of the LiveNode writes the records with the balance at the start (section 12.8).
+    # The recorder DataActor of the LiveNode starts the equity at the allocated capital (section 12.8).
     assert live_node_input.database_url == database_url
-    assert live_node_input.start_balance_usd == Decimal("98765.40")
+    assert live_node_input.start_balance_usd == Decimal(10000)
     # The check connection closes before the LiveNode connects with the same client ID.
     assert not live_node.was_check_connection_open_at_start
     assert opened_client_ids == [10, 10]
     listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
-    assert listed["start_balance_usd"] == "98765.40"
+    assert listed["start_balance_usd"] is None
 
 
 @pytest.mark.anyio
@@ -204,6 +216,7 @@ async def test_the_live_node_gets_the_warm_up_bars_of_7_days_before_the_start(
     # The range ends at the start of the current 1-minute bar: the current bar is not complete.
     warm_up_end_utc = datetime(2026, 1, 2, 3, 10, tzinfo=UTC)
     [request] = gateway_connection.historical_bar_requests
+    assert live_node.inputs[0].instrument is not None
     assert request == HistoricalBarRequest(
         live_node.inputs[0].instrument,
         BarPeriod.ONE_MINUTE,
@@ -214,10 +227,35 @@ async def test_the_live_node_gets_the_warm_up_bars_of_7_days_before_the_start(
     assert warm_up_bars[-1].start_utc == warm_up_end_utc - timedelta(minutes=1)
     # The child saves the warm-up bars in the bar store, so a same-period backtest can use them.
     with psycopg.connect(database_url) as connection:
-        assert connection.execute("SELECT count(*) FROM bar").fetchall() == [(7 * 24 * 60,)]
-        assert connection.execute("SELECT start_utc, end_utc FROM bar_saved_range").fetchall() == [
+        assert connection.execute("SELECT count(*) FROM ibkr_bar").fetchall() == [(7 * 24 * 60,)]
+        assert connection.execute("SELECT start_utc, end_utc FROM ibkr_bar_saved_range").fetchall() == [
             (warm_up_end_utc - timedelta(days=7), warm_up_end_utc)
         ]
+
+
+@pytest.mark.anyio
+async def test_the_warm_up_of_rules_has_the_bars_of_the_longest_indicator(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    # A rule builder version with SMA(200) on daily bars: the same look-back as a backtest. The child reads 400 days
+    # (2 calendar days for each daily bar), and the LiveNode gets the last 200 bars for its look-back catalog.
+    strategy = (await web_client.post("/api/strategies", json={"name": "Rules"})).json()
+    rules = make_rules(group("all_of", condition(price(), "above", indicator("sma", period=200))))
+    version = (await web_client.post(f"/api/strategies/{strategy['id']}/versions", json={"rules": rules})).json()
+    start_request = make_start_request(version["id"]) | {"bar_period": "1-DAY"}
+    forward_test = (await web_client.post(FORWARD_TESTS_PATH, json=start_request)).json()
+    gateway_connection = make_forward_test_gateway()
+    live_node = FakeLiveNode(gateway_connection)
+
+    await run_child(make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node)
+
+    warm_up_end_utc = datetime(2026, 1, 2, tzinfo=UTC)
+    [request] = gateway_connection.historical_bar_requests
+    assert request.time_range == TimeRange(start_utc=warm_up_end_utc - timedelta(days=400), end_utc=warm_up_end_utc)
+    warm_up_bars = live_node.inputs[0].warm_up_bars
+    assert len(warm_up_bars) == 200
+    assert warm_up_bars[0].start_utc == warm_up_end_utc - timedelta(days=200)
+    assert warm_up_bars[-1].start_utc == warm_up_end_utc - timedelta(days=1)
 
 
 @pytest.mark.anyio
@@ -286,7 +324,7 @@ async def test_a_failed_paper_account_check_starts_no_live_node(
 async def test_a_paper_account_without_a_usd_balance_starts_no_live_node(
     web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
 ) -> None:
-    forward_test = await start_forward_test(web_client)
+    forward_test = await start_old_forward_test(web_client, database_url)
     gateway_connection = make_forward_test_gateway()
     gateway_connection.account_values = []
     live_node = FakeLiveNode(gateway_connection)
@@ -315,7 +353,7 @@ def make_eur_account_values() -> list[AccountValue]:
 async def test_a_eur_paper_account_starts_with_the_balance_converted_to_usd(
     web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
 ) -> None:
-    forward_test = await start_forward_test(web_client)
+    forward_test = await start_old_forward_test(web_client, database_url)
     gateway_connection = make_forward_test_gateway()
     gateway_connection.account_values = make_eur_account_values()
     gateway_connection.exchange_rates = {("EUR", "USD"): Decimal("1.1139")}
@@ -336,7 +374,7 @@ async def test_a_eur_paper_account_starts_with_the_balance_converted_to_usd(
 async def test_a_eur_paper_account_without_an_exchange_rate_starts_no_live_node(
     web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
 ) -> None:
-    forward_test = await start_forward_test(web_client)
+    forward_test = await start_old_forward_test(web_client, database_url)
     gateway_connection = make_forward_test_gateway()
     gateway_connection.account_values = make_eur_account_values()
     gateway_connection.exchange_rate_error_message = "No market data permissions."

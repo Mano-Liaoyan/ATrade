@@ -53,6 +53,20 @@ test('the order panel shows the position of the instrument', async ({ page }) =>
   await expect(keyNumber(panel, 'Unrealized P&L')).toHaveText('0.00');
 });
 
+test('a refusal of the owner ledger shows as an error notification and keeps the button enabled', async ({ page }) => {
+  await page.goto('/instruments/NASDAQ/TEST01?currency=USD');
+  const panel = orderPanel(page, 'TEST01');
+  await panel.getByRole('tab', { name: 'Sell' }).click();
+  await panel.getByLabel('Quantity').fill('1000');
+  await panel.getByRole('button', { name: 'Review sell order' }).click();
+  await page.getByRole('dialog', { name: 'Sell 1000 TEST01' }).getByRole('button', { name: 'Send paper order' }).click();
+
+  const notification = panel.getByRole('alert').filter({ hasText: 'Order not sent' });
+  await expect(notification).toContainText('By hand holds 10 TEST01');
+  await expect(notification).toContainText('ATrade refuses a sell order for 1000.');
+  await expect(panel.getByRole('button', { name: 'Review sell order' })).toBeEnabled();
+});
+
 test('a sent paper order shows in the open orders panel', async ({ page }) => {
   await openWorkbench(page);
   const panel = orderPanel(page);
@@ -61,7 +75,7 @@ test('a sent paper order shows in the open orders panel', async ({ page }) => {
   await panel.getByRole('button', { name: 'Review buy order' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Buy 2 700' });
-  await expect(dialog.getByText('PAPER', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('PAPER', { exact: true })).toHaveCount(0);
   await expect(dialog).toContainText('700 / SEHK / HKD');
   await expect(dialog).toContainText('Limit, DAY');
   await dialog.getByRole('button', { name: 'Send paper order' }).click();
@@ -82,14 +96,14 @@ test('a sent paper order shows in the open orders panel', async ({ page }) => {
   await expect(orderRow).toHaveCount(0);
 });
 
-test('the chart rescales when the order column collapses and opens', async ({ page }) => {
+test('the chart rescales when the order column minimizes and opens', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await openWorkbench(page);
   const chart = page.getByRole('img', { name: CHART_NAME });
   const readWidth = async (): Promise<number> => (await chart.boundingBox())?.width ?? 0;
   const firstWidth = await readWidth();
 
-  await page.getByRole('button', { name: 'Collapse paper order' }).click();
+  await page.getByRole('button', { name: 'Minimize paper order' }).click();
   await expect(orderPanel(page)).toBeHidden();
   await expect.poll(readWidth).toBeGreaterThan(firstWidth + 100);
 

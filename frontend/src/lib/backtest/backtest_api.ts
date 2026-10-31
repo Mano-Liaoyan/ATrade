@@ -1,9 +1,18 @@
 // Calls the backtest HTTP routes (backend/src/atrade/backtest/http_routes.py).
 
 import type { components } from '#lib/api';
-import { requestJson as requestBackendJson, type RequestResult } from '#lib/foundation/http_request';
+import {
+  BACKEND_NOT_REACHABLE,
+  readErrorMessage,
+  requestJson as requestBackendJson,
+  sendRequest,
+  type RequestResult,
+} from '#lib/foundation/http_request';
 
-export type BacktestRequest = components['schemas']['StartBacktestRequest'];
+// The generated type makes the fields with a default required. Without `out_of_sample_share`, the route uses 30.
+export type BacktestRequest = Omit<components['schemas']['StartBacktestRequest'], 'out_of_sample_share'> & {
+  out_of_sample_share?: number;
+};
 export type Backtest = components['schemas']['BacktestResponse'];
 export type BacktestDetail = components['schemas']['BacktestDetailResponse'];
 export type BacktestStatus = components['schemas']['BacktestStatus'];
@@ -12,8 +21,25 @@ export type EquityPoint = components['schemas']['EquityPointResponse'];
 export type BacktestTrade = components['schemas']['TradeResponse'];
 export type BacktestLimits = components['schemas']['BacktestLimitsBody'];
 export type BacktestComparison = components['schemas']['BacktestComparisonResponse'];
+export type UniverseInstrument = components['schemas']['UniverseInstrumentResponse'];
+export type UsUniverseRange = components['schemas']['UsUniverseRangeResponse'];
 
 export type { RequestResult } from '#lib/foundation/http_request';
+
+export interface BacktestInstrument {
+  symbol: string;
+  exchange: string;
+  currency: string;
+}
+
+// The instrument of a single-instrument backtest. A multi-instrument backtest has none.
+export function readBacktestInstrument(backtest: Backtest): BacktestInstrument | undefined {
+  const { symbol, exchange, currency } = backtest;
+  if (symbol === null || exchange === null || currency === null) {
+    return undefined;
+  }
+  return { symbol, exchange, currency };
+}
 
 const BACKTESTS_PATH = '/api/backtests';
 const BACKTEST_LIMITS_PATH = '/api/backtest-limits';
@@ -34,6 +60,21 @@ export function startBacktest(fetchFunction: typeof fetch, request: BacktestRequ
 
 export function listBacktests(fetchFunction: typeof fetch): Promise<RequestResult<Backtest[]>> {
   return requestJson(fetchFunction, BACKTESTS_PATH);
+}
+
+export type DeleteBacktestResult = { kind: 'deleted' } | { kind: 'failed'; message: string };
+
+/** A true delete. The backend refuses a queued or running backtest, a sweep run, and the same-period backtest of a
+ * forward test (409 with the reason). */
+export async function deleteBacktest(fetchFunction: typeof fetch, backtestId: number): Promise<DeleteBacktestResult> {
+  const response = await sendRequest(fetchFunction, `${BACKTESTS_PATH}/${String(backtestId)}`, { method: 'DELETE' });
+  if (response === null) {
+    return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
+  }
+  if (!response.ok) {
+    return { kind: 'failed', message: await readErrorMessage(response, FAILED_ACTION) };
+  }
+  return { kind: 'deleted' };
 }
 
 export function readBacktest(fetchFunction: typeof fetch, backtestId: number): Promise<RequestResult<BacktestDetail>> {
@@ -61,4 +102,9 @@ export function compareBacktests(
   secondBacktestId: number,
 ): Promise<RequestResult<BacktestComparison>> {
   return requestJson(fetchFunction, `${BACKTESTS_PATH}/${String(firstBacktestId)}/comparison/${String(secondBacktestId)}`);
+}
+
+// The first and the last quarter start with US universe data (docs/architecture/backtest.md 10.10.6).
+export function readUsUniverseRange(fetchFunction: typeof fetch): Promise<RequestResult<UsUniverseRange>> {
+  return requestJson(fetchFunction, '/api/us-universe/range');
 }

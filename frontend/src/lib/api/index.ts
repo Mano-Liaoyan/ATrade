@@ -107,6 +107,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/paper-trading/stock-splits/{split_check_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Split */
+        post: operations["apply_split_api_paper_trading_stock_splits__split_check_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/paper-trading/stock-splits/{split_check_id}/keep-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep Ledger */
+        post: operations["keep_ledger_api_paper_trading_stock_splits__split_check_id__keep_ledger_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/paper-trading/paper-capital": {
         parameters: {
             query?: never;
@@ -153,6 +187,102 @@ export interface paths {
          * @description Returns the complete bars that start in the range, oldest first. Only missing ranges go to IBKR.
          */
         get: operations["read_bars_api_market_data_bars_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market-data/source-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Source Order */
+        get: operations["read_source_order_api_market_data_source_order_get"];
+        /** Save Source Order */
+        put: operations["save_source_order_api_market_data_source_order_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market-data/hk-instrument-list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Instruments */
+        get: operations["list_instruments_api_market_data_hk_instrument_list_get"];
+        put?: never;
+        /**
+         * Add Instruments
+         * @description Checks all new symbols through IBKR first. On a 502 or 503, the list does not change.
+         */
+        post: operations["add_instruments_api_market_data_hk_instrument_list_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market-data/hk-instrument-list/{member_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Instrument */
+        delete: operations["delete_instrument_api_market_data_hk_instrument_list__member_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategy-rules/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Make Code
+         * @description Makes the code from the rules and saves nothing (section 9.8.3).
+         */
+        post: operations["make_code_api_strategy_rules_code_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/strategy-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Templates
+         * @description The template list in the order of section 9.9.3.
+         */
+        get: operations["list_templates_api_strategy_templates_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -214,6 +344,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/strategies/{strategy_id}/versions/{version_number}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Discard Version
+         * @description Adds the discarded mark to a version that the AI assistant saved (docs/architecture/assistant.md 25.5).
+         */
+        post: operations["discard_version_api_strategies__strategy_id__versions__version_number__discard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/strategies/{strategy_id}/versions": {
         parameters: {
             query?: never;
@@ -226,6 +376,8 @@ export interface paths {
         /**
          * Save Version
          * @description Checks the code first. Then it appends a version, or returns the latest version when the code is the same.
+         *
+         *     A `rules` body makes the code from the rules, and the latest version is the same only when the rules are too.
          */
         post: operations["save_version_api_strategies__strategy_id__versions_post"];
         delete?: never;
@@ -244,25 +396,11 @@ export interface paths {
         /** List Backtests */
         get: operations["list_backtests_api_backtests_get"];
         put?: never;
-        /** Start Backtest */
+        /**
+         * Start Backtest
+         * @description The start of port 8000: a backtest without a conversation.
+         */
         post: operations["start_backtest_api_backtests_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/backtests/{backtest_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Backtest */
-        get: operations["read_backtest_api_backtests__backtest_id__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -287,6 +425,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/us-universe/range": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Us Universe Range */
+        get: operations["read_us_universe_range_api_us_universe_range_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/backtests/{backtest_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Backtest */
+        get: operations["read_backtest_api_backtests__backtest_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Backtest
+         * @description A true delete (section 10.5). 409 while the backtest is queued or running, for a sweep run, and for the
+         *     same-period backtest of a forward test.
+         */
+        delete: operations["delete_backtest_api_backtests__backtest_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/backtests/{first_backtest_id}/comparison/{second_backtest_id}": {
         parameters: {
             query?: never;
@@ -299,6 +476,92 @@ export interface paths {
          * @description Compare two backtests of the same strategy: two versions, or one version with other request fields.
          */
         get: operations["compare_backtests_api_backtests__first_backtest_id__comparison__second_backtest_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sweeps/parameters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Parameters */
+        get: operations["read_parameters_api_sweeps_parameters_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sweeps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sweeps */
+        get: operations["list_sweeps_api_sweeps_get"];
+        put?: never;
+        /** Start Sweep */
+        post: operations["start_sweep_api_sweeps_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sweeps/{sweep_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Sweep */
+        get: operations["read_sweep_api_sweeps__sweep_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sweeps/{sweep_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel Sweep */
+        post: operations["cancel_sweep_api_sweeps__sweep_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/forward-tests/capital": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Capital */
+        get: operations["read_capital_api_forward_tests_capital_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -396,6 +659,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Screens */
+        get: operations["list_screens_api_screens_get"];
+        put?: never;
+        /** Create Screen */
+        post: operations["create_screen_api_screens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screens/{screen_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Screen */
+        get: operations["read_screen_api_screens__screen_id__get"];
+        /**
+         * Change Screen
+         * @description Overwrites the name and the definition. A screen has no versions (section 24.1).
+         */
+        put: operations["change_screen_api_screens__screen_id__put"];
+        post?: never;
+        /**
+         * Delete Screen
+         * @description Also deletes the screen results of the screen. A backtest keeps its own copy of the screen.
+         */
+        delete: operations["delete_screen_api_screens__screen_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screens/{screen_id}/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep Screen
+         * @description Keep of the condition card (section 24.8): `kept` becomes true, so port 8001 cannot change the screen.
+         */
+        post: operations["keep_screen_api_screens__screen_id__keep_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screens/{screen_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run Screen
+         * @description Runs the saved screen and saves 1 screen result (section 24.5). With a body, runs that market and
+         *     definition in place of the saved ones and keeps the saved screen (section 24.13).
+         */
+        post: operations["run_screen_api_screens__screen_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screen-results/{screen_result_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Screen Result */
+        get: operations["read_screen_result_api_screen_results__screen_result_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/screen-indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Screen Indicators
+         * @description The indicator catalog in its own order (section 24.7).
+         */
+        get: operations["list_screen_indicators_api_screen_indicators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/watchlist": {
         parameters: {
             query?: never;
@@ -434,6 +818,124 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assistant/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Conversations
+         * @description Without strategy_id: all conversations. Each workbench page lists the same conversations (25.12).
+         */
+        get: operations["list_conversations_api_assistant_conversations_get"];
+        put?: never;
+        /**
+         * Create Conversation
+         * @description The conversation records the latest prompt version and the fixed part of the system prompt (25.9).
+         */
+        post: operations["create_conversation_api_assistant_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Conversation */
+        get: operations["read_conversation_api_assistant_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Conversation
+         * @description Deletes the JSONL file first. When the assistant service is not reachable, the row stays for a new try.
+         */
+        delete: operations["delete_conversation_api_assistant_conversations__conversation_id__delete"];
+        options?: never;
+        head?: never;
+        /** Rename Conversation */
+        patch: operations["rename_conversation_api_assistant_conversations__conversation_id__patch"];
+        trace?: never;
+    };
+    "/api/assistant/prompt-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Prompt Versions
+         * @description When no version exists, saves the default text as version 1, so the list is never empty.
+         */
+        get: operations["list_prompt_versions_api_assistant_prompt_versions_get"];
+        put?: never;
+        /** Save Prompt Version */
+        post: operations["save_prompt_version_api_assistant_prompt_versions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Providers */
+        get: operations["list_providers_api_assistant_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Credentials */
+        get: operations["list_credentials_api_assistant_credentials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/assistant/credentials/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Credential */
+        delete: operations["delete_credential_api_assistant_credentials__credential_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -442,6 +944,23 @@ export interface components {
         AccessSessionResponse: {
             /** Logout Url */
             logout_url: string | null;
+        };
+        /** AddHkInstrumentsRequest */
+        AddHkInstrumentsRequest: {
+            /** Symbols */
+            symbols: string[];
+        };
+        /**
+         * AddHkInstrumentsResponse
+         * @description The pasted symbols in their order. A symbol that is pasted 2 times is in already_in_list the second time.
+         */
+        AddHkInstrumentsResponse: {
+            /** Added */
+            added: string[];
+            /** Not Found */
+            not_found: string[];
+            /** Already In List */
+            already_in_list: string[];
         };
         /** AddInstrumentRequest */
         AddInstrumentRequest: {
@@ -473,12 +992,17 @@ export interface components {
             strategy_name: string;
             /** Version Number */
             version_number: number;
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            /** Universe Top N */
+            universe_top_n: number | null;
+            universe_screen: components["schemas"]["UniverseScreenResponse"] | null;
+            universe_rebalance_period: components["schemas"]["UniverseRebalancePeriod"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -504,11 +1028,32 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
+            /** Sweep Id */
+            sweep_id: number | null;
+            parameters: components["schemas"]["ParameterValues"] | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            /** Instruments */
+            instruments: components["schemas"]["UniverseInstrumentResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
+            robustness: components["schemas"]["BacktestRobustnessResponse"];
         };
         /**
          * BacktestLimitsBody
@@ -520,7 +1065,11 @@ export interface components {
             /** Concurrency */
             concurrency: number;
         };
-        /** BacktestMetricsResponse */
+        /**
+         * BacktestMetricsResponse
+         * @description The metrics of docs/architecture/backtest.md section 10.9.2. A metric without a meaning is null, and
+         *     `missing_reasons` gives its reason by its field name (section 10.9.3). The page shows "–" with the reason.
+         */
         BacktestMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
@@ -530,6 +1079,34 @@ export interface components {
             max_drawdown_percent: string;
             /** Trade Count */
             trade_count: number;
+            /** Cagr Percent */
+            cagr_percent: string | null;
+            /** Annual Volatility Percent */
+            annual_volatility_percent: string | null;
+            /** Sharpe Ratio */
+            sharpe_ratio: string | null;
+            /** Sortino Ratio */
+            sortino_ratio: string | null;
+            /** Calmar Ratio */
+            calmar_ratio: string | null;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Average Win Usd */
+            average_win_usd: string | null;
+            /** Average Win Percent */
+            average_win_percent: string | null;
+            /** Average Loss Usd */
+            average_loss_usd: string | null;
+            /** Exposure Percent */
+            exposure_percent: string | null;
+            /** Turnover Per Year */
+            turnover_per_year: string | null;
+            /** Win Rate Percent */
+            win_rate_percent: string | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
         };
         /** BacktestResponse */
         BacktestResponse: {
@@ -543,12 +1120,17 @@ export interface components {
             strategy_name: string;
             /** Version Number */
             version_number: number;
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            /** Universe Top N */
+            universe_top_n: number | null;
+            universe_screen: components["schemas"]["UniverseScreenResponse"] | null;
+            universe_rebalance_period: components["schemas"]["UniverseRebalancePeriod"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -574,10 +1156,50 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
+            /** Sweep Id */
+            sweep_id: number | null;
+            parameters: components["schemas"]["ParameterValues"] | null;
+        };
+        /**
+         * BacktestRobustnessResponse
+         * @description The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A
+         *     value without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`.
+         */
+        BacktestRobustnessResponse: {
+            /** Trial Count */
+            trial_count: number;
+            /** Sharpe Probability Percent */
+            sharpe_probability_percent: string | null;
+            sharpe_probability_kind: components["schemas"]["SharpeProbabilityKind"];
+            sharpe_probability_status: components["schemas"]["SharpeProbabilityStatus"] | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
+            /** Out Of Sample To In Sample Sharpe Percent */
+            out_of_sample_to_in_sample_sharpe_percent: string | null;
+            /** Out Of Sample Use Count */
+            out_of_sample_use_count: number | null;
         };
         /** @enum {string} */
-        BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out";
+        BacktestStatus: "queued" | "running" | "finished" | "failed" | "timed_out" | "cancelled";
+        /** @enum {string} */
+        BacktestUniverseKind: "single" | "rule" | "list" | "screen";
         /**
          * BarPeriod
          * @description The bar periods that the chart offers. The values use the NautilusTrader bar specification format.
@@ -602,10 +1224,22 @@ export interface components {
             /** Volume */
             volume: number;
         };
+        /**
+         * BarSource
+         * @description Each bar source has its own bar table and its own saved-range table (ADR 0002).
+         * @enum {string}
+         */
+        BarSource: "ibkr" | "databento";
         /** BarsResponse */
         BarsResponse: {
             /** Bars */
             bars: components["schemas"]["BarResponse"][];
+        };
+        /** ChangeScreenRequest */
+        ChangeScreenRequest: {
+            /** Name */
+            name: string;
+            definition: components["schemas"]["JsonValue"];
         };
         /** CodeCheckFailedResponse */
         CodeCheckFailedResponse: {
@@ -631,12 +1265,17 @@ export interface components {
             strategy_name: string;
             /** Version Number */
             version_number: number;
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            /** Universe Top N */
+            universe_top_n: number | null;
+            universe_screen: components["schemas"]["UniverseScreenResponse"] | null;
+            universe_rebalance_period: components["schemas"]["UniverseRebalancePeriod"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -662,11 +1301,32 @@ export interface components {
             started_at_utc: string | null;
             /** Ended At Utc */
             ended_at_utc: string | null;
+            /** Out Of Sample Share */
+            out_of_sample_share: number;
+            /** Split Time Utc */
+            split_time_utc: string | null;
             metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][] | null;
+            /** Bar Count By Source */
+            bar_count_by_source: {
+                [key: string]: number;
+            } | null;
+            /** Survivorship Bias */
+            survivorship_bias: boolean;
+            /** Sweep Id */
+            sweep_id: number | null;
+            parameters: components["schemas"]["ParameterValues"] | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Trades */
             trades: components["schemas"]["TradeResponse"][];
+            /** Instruments */
+            instruments: components["schemas"]["UniverseInstrumentResponse"][];
+            split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
+            robustness: components["schemas"]["BacktestRobustnessResponse"];
             /** Code */
             code: string;
         };
@@ -717,21 +1377,177 @@ export interface components {
              */
             end_utc: string;
         };
-        /** ComparedMetricsResponse */
+        /**
+         * ComparedMetricsResponse
+         * @description The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the
+         *     final equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10).
+         */
         ComparedMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
+            /** Net Profit Usd */
+            net_profit_usd: string;
             /** Total Return Percent */
             total_return_percent: string;
             /** Max Drawdown Percent */
             max_drawdown_percent: string;
             /** Trade Count */
             trade_count: number;
+            /** Cagr Percent */
+            cagr_percent: string | null;
+            /** Annual Volatility Percent */
+            annual_volatility_percent: string | null;
+            /** Sharpe Ratio */
+            sharpe_ratio: string | null;
+            /** Sortino Ratio */
+            sortino_ratio: string | null;
+            /** Calmar Ratio */
+            calmar_ratio: string | null;
+            /** Profit Factor */
+            profit_factor: string | null;
+            /** Average Win Usd */
+            average_win_usd: string | null;
+            /** Average Win Percent */
+            average_win_percent: string | null;
+            /** Average Loss Usd */
+            average_loss_usd: string | null;
+            /** Exposure Percent */
+            exposure_percent: string | null;
+            /** Turnover Per Year */
+            turnover_per_year: string | null;
+            /** Win Rate Percent */
+            win_rate_percent: string | null;
+            /** Missing Reasons */
+            missing_reasons: {
+                [key: string]: string;
+            };
+        };
+        /** @enum {string} */
+        Comparison: "above" | "below" | "at_or_above" | "at_or_below" | "crosses_above" | "crosses_below";
+        /** ConversationDetailResponse */
+        ConversationDetailResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: number | null;
+            /** Title */
+            title: string;
+            title_state: components["schemas"]["TitleState"];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Last Provider */
+            last_provider: string | null;
+            /** Last Model */
+            last_model: string | null;
+            /** Last Credential Name */
+            last_credential_name: string | null;
+            /** Prompt Version Id */
+            prompt_version_id: number;
+            /** Prompt Version Number */
+            prompt_version_number: number;
+            /** Messages */
+            messages: components["schemas"]["ConversationMessageResponse"][];
+        };
+        /** ConversationListResponse */
+        ConversationListResponse: {
+            /** Conversations */
+            conversations: components["schemas"]["ConversationResponse"][];
+        };
+        /** ConversationMessageResponse */
+        ConversationMessageResponse: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string | null;
+            /** Model */
+            model: string | null;
+            /** Credential Name */
+            credential_name: string | null;
+            /** Thinking Level */
+            thinking_level: string | null;
+        };
+        /** ConversationResponse */
+        ConversationResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: number | null;
+            /** Title */
+            title: string;
+            title_state: components["schemas"]["TitleState"];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Last Provider */
+            last_provider: string | null;
+            /** Last Model */
+            last_model: string | null;
+            /** Last Credential Name */
+            last_credential_name: string | null;
+            /** Prompt Version Id */
+            prompt_version_id: number;
+            /** Prompt Version Number */
+            prompt_version_number: number;
+        };
+        /** CreateConversationRequest */
+        CreateConversationRequest: {
+            /** Strategy Id */
+            strategy_id?: number | null;
+            /** Version Number */
+            version_number?: number | null;
+        };
+        /** CreateScreenRequest */
+        CreateScreenRequest: {
+            /** Name */
+            name: string;
+            /** Market */
+            market: string;
+            definition: components["schemas"]["JsonValue"];
         };
         /** CreateStrategyRequest */
         CreateStrategyRequest: {
             /** Name */
             name: string;
+            /** @default blank_code */
+            start_from: components["schemas"]["StartPoint"];
+        };
+        /** CredentialListResponse */
+        CredentialListResponse: {
+            /** Credentials */
+            credentials: components["schemas"]["CredentialResponse"][];
+        };
+        /** CredentialResponse */
+        CredentialResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Provider */
+            provider: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "oauth" | "api_key";
+            /** Key Last4 */
+            key_last4: string | null;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "ready" | "failed";
+            /** State Message */
+            state_message: string | null;
         };
         /** @enum {string} */
         DesiredState: "running" | "stopped";
@@ -750,6 +1566,13 @@ export interface components {
             /** Detail */
             detail: string;
         };
+        /** ExclusionCountResponse */
+        ExclusionCountResponse: {
+            /** Reason */
+            reason: string;
+            /** Count */
+            count: number;
+        };
         /** FillComparisonResponse */
         FillComparisonResponse: {
             /**
@@ -762,6 +1585,10 @@ export interface components {
              * @enum {string}
              */
             side: "BUY" | "SELL";
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
             /** Forward Test Quantity Shares */
             forward_test_quantity_shares: string | null;
             /** Forward Test Price Usd */
@@ -772,6 +1599,29 @@ export interface components {
             backtest_price_usd: string | null;
             /** Price Difference Usd */
             price_difference_usd: string | null;
+        };
+        /** FixedShares */
+        FixedShares: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "fixed_shares";
+            /** Shares */
+            shares: number;
+        };
+        /**
+         * ForwardTestCapitalResponse
+         * @description The capital of the paper account in USD (section 12.18). All 3 are None when the paper account check did not
+         *     pass or IBKR has no NetLiquidation value in USD.
+         */
+        ForwardTestCapitalResponse: {
+            /** Net Liquidation Usd */
+            net_liquidation_usd: string | null;
+            /** Allocated Usd */
+            allocated_usd: string | null;
+            /** Unallocated Usd */
+            unallocated_usd: string | null;
         };
         /** ForwardTestComparisonResponse */
         ForwardTestComparisonResponse: {
@@ -799,16 +1649,31 @@ export interface components {
             equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
             /** Fills */
             fills: components["schemas"]["ForwardTestFillResponse"][];
+            /** Instruments */
+            instruments: components["schemas"]["ForwardTestInstrumentResponse"][];
             /** Same Period Backtests */
             same_period_backtests: components["schemas"]["ComparedBacktestSummaryResponse"][];
         };
-        /** ForwardTestFillResponse */
+        /**
+         * ForwardTestFillResponse
+         * @description A fill, or a stock split adjustment (section 12.16). A split adjustment has no price, the split ratio, and the
+         *     cash in lieu as `amount_usd`. `side` gives the direction of the share change.
+         */
         ForwardTestFillResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
             /**
              * Time Utc
              * Format: date-time
              */
             time_utc: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "fill" | "split_adjustment";
             /**
              * Side
              * @enum {string}
@@ -817,9 +1682,29 @@ export interface components {
             /** Quantity Shares */
             quantity_shares: string;
             /** Price Usd */
-            price_usd: string;
+            price_usd: string | null;
             /** Commission Usd */
             commission_usd: string;
+            /** Amount Usd */
+            amount_usd: string;
+            /** Split Ratio */
+            split_ratio: string | null;
+        };
+        /**
+         * ForwardTestInstrumentResponse
+         * @description One member of a multi-instrument forward test: the Instruments tab (section 12.16).
+         */
+        ForwardTestInstrumentResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Trade Count */
+            trade_count: number;
+            /** Net Profit Usd */
+            net_profit_usd: string;
+            /** Quarter Count */
+            quarter_count: number;
         };
         /** ForwardTestResponse */
         ForwardTestResponse: {
@@ -834,11 +1719,14 @@ export interface components {
             /** Version Number */
             version_number: number;
             /** Symbol */
-            symbol: string;
+            symbol: string | null;
             /** Exchange */
-            exchange: string;
+            exchange: string | null;
             /** Currency */
-            currency: string;
+            currency: string | null;
+            universe_kind: components["schemas"]["UniverseKind"];
+            /** Universe Top N */
+            universe_top_n: number | null;
             bar_period: components["schemas"]["BarPeriod"];
             desired_state: components["schemas"]["DesiredState"];
             status: components["schemas"]["ForwardTestStatus"];
@@ -861,6 +1749,10 @@ export interface components {
             crash_count: number;
             /** Interruptions */
             interruptions: components["schemas"]["InterruptionResponse"][];
+            /** Allocated Capital Usd */
+            allocated_capital_usd: string | null;
+            /** Split Checks Needed */
+            split_checks_needed: components["schemas"]["SplitCheckNeededResponse"][];
         };
         /** @enum {string} */
         ForwardTestStatus: "starting" | "running" | "waiting_for_gateway" | "stopping" | "stopped" | "stop_failed" | "failed";
@@ -876,6 +1768,23 @@ export interface components {
             /** Port */
             port: number;
         };
+        /**
+         * GridEntry
+         * @description One parameter of the grid. An `int` or `float` parameter needs `start`, `end`, and `step`. A `bool` parameter
+         *     takes no values: the grid uses false and true.
+         */
+        GridEntry: {
+            /** Name */
+            name: string;
+            /** Start */
+            start?: number | string | null;
+            /** End */
+            end?: number | string | null;
+            /** Step */
+            step?: number | string | null;
+        };
+        /** @enum {string} */
+        GroupMatch: "all_of" | "any_of";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -898,6 +1807,74 @@ export interface components {
              * Format: date-time
              */
             time_utc: string;
+        };
+        /** HkInstrumentListErrorResponse */
+        HkInstrumentListErrorResponse: {
+            /** Detail */
+            detail: string;
+        };
+        /** HkInstrumentListResponse */
+        HkInstrumentListResponse: {
+            /** Instruments */
+            instruments: components["schemas"]["HkInstrumentResponse"][];
+        };
+        /** HkInstrumentResponse */
+        HkInstrumentResponse: {
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /**
+             * Added At Utc
+             * Format: date-time
+             */
+            added_at_utc: string;
+        };
+        /**
+         * IndicatorOperand
+         * @description A stored indicator reference. A single-line indicator without `output` uses `value`.
+         */
+        IndicatorOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "indicator";
+            /** Indicator */
+            indicator: string;
+            /** Parameters */
+            parameters?: {
+                [key: string]: components["schemas"]["Number"];
+            };
+            /** Output */
+            output?: string | null;
+        };
+        /**
+         * InnerRuleGroup
+         * @description A group in a group. It holds conditions only, so the maximum depth is 1 nested group.
+         */
+        InnerRuleGroup: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "group";
+            match: components["schemas"]["GroupMatch"];
+            /** Items */
+            items: components["schemas"]["RuleCondition"][];
+        };
+        /** InstrumentBody */
+        InstrumentBody: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
         };
         /** InstrumentResponse */
         InstrumentResponse: {
@@ -926,6 +1903,10 @@ export interface components {
             /** Ended At Utc */
             ended_at_utc: string | null;
         };
+        JsonValue: unknown;
+        /** @enum {string} */
+        LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started" | "split_check_needed";
+        LeftOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"];
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
             /** Manual Orders */
@@ -998,6 +1979,18 @@ export interface components {
             /** Average Fill Price */
             average_fill_price: string | null;
         };
+        /** @enum {string} */
+        Market: "US" | "HK";
+        Number: number;
+        /** NumberOperand */
+        NumberOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "number";
+            value: components["schemas"]["Number"];
+        };
         /** OpenOrderListResponse */
         OpenOrderListResponse: {
             /** Orders */
@@ -1033,20 +2026,19 @@ export interface components {
             /** Can Cancel */
             can_cancel: boolean;
         };
-        /**
-         * OrderBlockedResponse
-         * @description A forward test runs on the instrument. ATrade did not send the order (section 12.2).
-         */
-        OrderBlockedResponse: {
-            /** Detail */
-            detail: string;
-            /** Forward Test Id */
-            forward_test_id: number;
-        };
         /** OrderErrorResponse */
         OrderErrorResponse: {
             /** Detail */
             detail: string;
+        };
+        /**
+         * OrderRefusedByLedgerResponse
+         * @description An order rule of the owner ledger failed for "By hand". ATrade did not send the order (section 11.10).
+         */
+        OrderRefusedByLedgerResponse: {
+            /** Detail */
+            detail: string;
+            rule: components["schemas"]["LedgerRule"];
         };
         /**
          * OrderRefusedResponse
@@ -1074,6 +2066,25 @@ export interface components {
         };
         /** @enum {string} */
         OrderType: "MKT" | "LMT";
+        /** @enum {string} */
+        OwnerKind: "by_hand" | "forward_test";
+        /** OwnerMessage */
+        OwnerMessage: {
+            kind: components["schemas"]["OwnerKind"];
+            /** Forward Test Id */
+            forward_test_id: number | null;
+        };
+        /**
+         * OwnerPositionMessage
+         * @description The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).
+         */
+        OwnerPositionMessage: {
+            owner: components["schemas"]["OwnerMessage"];
+            /** Quantity */
+            quantity: string;
+            /** Average Cost */
+            average_cost: string | null;
+        };
         /**
          * PaperCapitalResponse
          * @description The default paper capital of the backtest form (docs/architecture.md section 10).
@@ -1082,21 +2093,196 @@ export interface components {
             /** Paper Capital Usd */
             paper_capital_usd: string;
         };
+        /** ParameterResponse */
+        ParameterResponse: {
+            /** Name */
+            name: string;
+            /** Type */
+            type: string;
+            /** Default */
+            default: number | boolean;
+        };
+        ParameterValues: {
+            [key: string]: number | boolean;
+        };
+        /** ParametersResponse */
+        ParametersResponse: {
+            /** Parameters */
+            parameters: components["schemas"]["ParameterResponse"][];
+        };
+        /**
+         * PercentOfEquity
+         * @description The quantity is equity x percent / close price, rounded down to whole shares.
+         */
+        PercentOfEquity: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "percent_of_equity";
+            percent: components["schemas"]["Number"];
+        };
+        /** @enum {string} */
+        PriceName: "close" | "open" | "high" | "low";
+        /** PriceOperand */
+        PriceOperand: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "price";
+            price: components["schemas"]["PriceName"];
+        };
+        /** PromptVersionListResponse */
+        PromptVersionListResponse: {
+            /** Prompt Versions */
+            prompt_versions: components["schemas"]["PromptVersionResponse"][];
+            /** Default Text */
+            default_text: string;
+            /** Fixed Part */
+            fixed_part: string;
+        };
+        /** PromptVersionResponse */
+        PromptVersionResponse: {
+            /** Id */
+            id: number;
+            /** Version Number */
+            version_number: number;
+            /** Text */
+            text: string;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+        };
+        /** ProviderListResponse */
+        ProviderListResponse: {
+            /** Providers */
+            providers: components["schemas"]["ProviderResponse"][];
+        };
+        /** ProviderModelResponse */
+        ProviderModelResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Thinking Levels */
+            thinking_levels: components["schemas"]["ThinkingLevel"][];
+        };
+        /** ProviderResponse */
+        ProviderResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Login Methods */
+            login_methods: ("oauth" | "api_key")[];
+            /** Models */
+            models: components["schemas"]["ProviderModelResponse"][];
+        };
+        /** @enum {string} */
+        RankDirection: "high_to_low" | "low_to_high";
+        /** @enum {string} */
+        RebalancePeriod: "weekly" | "monthly" | "quarterly";
+        /** RenameConversationRequest */
+        RenameConversationRequest: {
+            /** Title */
+            title: string;
+        };
+        RightOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"] | components["schemas"]["NumberOperand"];
+        /** RuleCondition */
+        RuleCondition: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "condition";
+            left: components["schemas"]["LeftOperand"];
+            comparison: components["schemas"]["Comparison"];
+            right: components["schemas"]["RightOperand"];
+        };
+        /**
+         * RuleExits
+         * @description The exit items. Each item that is not null (or `true`) is selected.
+         */
+        RuleExits: {
+            stop_loss_percent?: components["schemas"]["Number"] | null;
+            take_profit_percent?: components["schemas"]["Number"] | null;
+            /** Exit After Bars */
+            exit_after_bars?: number | null;
+            /**
+             * Exit When Entry Is False
+             * @default false
+             */
+            exit_when_entry_is_false: boolean;
+            exit_group?: components["schemas"]["RuleGroup"] | null;
+        };
+        /** RuleGroup */
+        RuleGroup: {
+            /**
+             * Type
+             * @constant
+             */
+            type: "group";
+            match: components["schemas"]["GroupMatch"];
+            /** Items */
+            items: (components["schemas"]["RuleCondition"] | components["schemas"]["InnerRuleGroup"])[];
+        };
+        /**
+         * RuleSettings
+         * @description `position_size` is not used in the universe mode: each member gets equity / `hold_count`.
+         */
+        RuleSettings: {
+            /** Position Size */
+            position_size: components["schemas"]["FixedShares"] | components["schemas"]["PercentOfEquity"];
+            /** Template Id */
+            template_id?: string | null;
+            universe?: components["schemas"]["UniverseSettings"] | null;
+        };
+        /** RulesCodeRequest */
+        RulesCodeRequest: {
+            rules: components["schemas"]["StrategyRules"];
+        };
+        /** RulesCodeResponse */
+        RulesCodeResponse: {
+            /** Code */
+            code: string;
+        };
+        /**
+         * RunScreenRequest
+         * @description A run of a changed screen (section 24.13). The run does not change the saved screen.
+         */
+        RunScreenRequest: {
+            /** Market */
+            market: string;
+            definition: components["schemas"]["JsonValue"];
+        };
         /** SamePeriodBacktestResponse */
         SamePeriodBacktestResponse: {
             /** Backtest Id */
             backtest_id: number;
         };
-        /** SaveVersionRequest */
+        /** SavePromptVersionRequest */
+        SavePromptVersionRequest: {
+            /** Text */
+            text: string;
+        };
+        /**
+         * SaveVersionRequest
+         * @description Exactly one of `code` and `rules` (section 9.6).
+         */
         SaveVersionRequest: {
             /** Code */
-            code: string;
+            code?: string | null;
+            rules?: components["schemas"]["StrategyRules"] | null;
         };
         /**
          * SavedBarsResponse
-         * @description The saved bars of one bar period: the start of the first and of the last saved bar.
+         * @description The saved bars of one bar source and one bar period: the start of the first and of the last saved bar.
          */
         SavedBarsResponse: {
+            bar_source: components["schemas"]["BarSource"];
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * First Start Utc
@@ -1108,6 +2294,193 @@ export interface components {
              * Format: date-time
              */
             last_start_utc: string;
+        };
+        /** ScreenCheckFailedResponse */
+        ScreenCheckFailedResponse: {
+            /** Problems */
+            problems: components["schemas"]["ScreenProblemResponse"][];
+        };
+        /**
+         * ScreenIndicatorNamesResponse
+         * @description The UI names of the indicators of the definition, for example "RSI(14)" (screen.md section 24.7).
+         */
+        ScreenIndicatorNamesResponse: {
+            /** Indicator Conditions */
+            indicator_conditions: string[];
+            /** Order */
+            order: string;
+        };
+        /** ScreenIndicatorParameterResponse */
+        ScreenIndicatorParameterResponse: {
+            /** Name */
+            name: string;
+            /**
+             * Value Type
+             * @enum {string}
+             */
+            value_type: "int" | "float";
+            /** Default */
+            default: number;
+            /** Minimum */
+            minimum: number;
+            /** Maximum */
+            maximum: number;
+            /** Is In Name */
+            is_in_name: boolean;
+        };
+        /**
+         * ScreenIndicatorResponse
+         * @description One indicator of the catalog (indicator.md section 23.3), for the edit popover of the screen page.
+         */
+        ScreenIndicatorResponse: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Parameters */
+            parameters: components["schemas"]["ScreenIndicatorParameterResponse"][];
+            /** Outputs */
+            outputs: string[];
+        };
+        /** ScreenListItemResponse */
+        ScreenListItemResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            market: components["schemas"]["Market"];
+            /** Kept */
+            kept: boolean;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+        };
+        /** ScreenProblemResponse */
+        ScreenProblemResponse: {
+            /** Location */
+            location: (string | number)[];
+            /** Message */
+            message: string;
+        };
+        /** ScreenResponse */
+        ScreenResponse: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            market: components["schemas"]["Market"];
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            /** Kept */
+            kept: boolean;
+            /** Assistant Conversation Id */
+            assistant_conversation_id: number | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /**
+             * Updated At Utc
+             * Format: date-time
+             */
+            updated_at_utc: string;
+            /** Recent Screen Results */
+            recent_screen_results: components["schemas"]["ScreenResultSummaryResponse"][];
+        };
+        /** ScreenResultExclusionResponse */
+        ScreenResultExclusionResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Reason */
+            reason: string;
+        };
+        /** ScreenResultResponse */
+        ScreenResultResponse: {
+            /** Id */
+            id: number;
+            /** Screen Id */
+            screen_id: number;
+            market: components["schemas"]["Market"];
+            /** Assistant Conversation Id */
+            assistant_conversation_id: number | null;
+            summary: components["schemas"]["ScreenRunSummaryResponse"];
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+            indicator_names: components["schemas"]["ScreenIndicatorNamesResponse"];
+            /** Rows */
+            rows: components["schemas"]["ScreenResultRowResponse"][];
+            /** Exclusions */
+            exclusions: components["schemas"]["ScreenResultExclusionResponse"][];
+        };
+        /** ScreenResultRowResponse */
+        ScreenResultRowResponse: {
+            /** Position */
+            position: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            /** Last Price */
+            last_price: string;
+            /** Average Trading Value 20 */
+            average_trading_value_20: number | null;
+            /** Indicator Values */
+            indicator_values: {
+                [key: string]: number;
+            };
+            /** Percentiles */
+            percentiles: {
+                [key: string]: number;
+            };
+        };
+        /** ScreenResultSummaryResponse */
+        ScreenResultSummaryResponse: {
+            /** Id */
+            id: number;
+            /**
+             * Run At Utc
+             * Format: date-time
+             */
+            run_at_utc: string;
+            /** Result Count */
+            result_count: number;
+        };
+        /** ScreenRunSummaryResponse */
+        ScreenRunSummaryResponse: {
+            /** Row Count */
+            row_count: number;
+            /** Start Count */
+            start_count: number;
+            /** After Filters Count */
+            after_filters_count: number;
+            /** After Indicator Conditions Count */
+            after_indicator_conditions_count: number;
+            /** Result Count */
+            result_count: number;
+            /** Exclusion Counts */
+            exclusion_counts: components["schemas"]["ExclusionCountResponse"][];
+            /** Daily Bars Date */
+            daily_bars_date: string | null;
+            /**
+             * Run At Utc
+             * Format: date-time
+             */
+            run_at_utc: string;
+            /** Run Seconds */
+            run_seconds: number;
         };
         /** SendOrderRequest */
         SendOrderRequest: {
@@ -1125,16 +2498,78 @@ export interface components {
             limit_price: number | string | null;
             time_in_force: components["schemas"]["TimeInForce"];
         };
-        /** StartBacktestRequest */
-        StartBacktestRequest: {
-            /** Strategy Version Id */
-            strategy_version_id: number;
+        /** @enum {string} */
+        SharpeProbabilityKind: "probabilistic" | "deflated";
+        /** @enum {string} */
+        SharpeProbabilityStatus: "likely_real" | "uncertain" | "likely_luck";
+        /**
+         * SourceOrderBody
+         * @description The global source order: the first bar source that saved a time range gives all bars of the range.
+         */
+        SourceOrderBody: {
+            /** Source Order */
+            source_order: components["schemas"]["BarSource"][];
+        };
+        /**
+         * SplitCheckNeededResponse
+         * @description An instrument of the forward test in the "Split check needed" state (paper_trading.md section 11.11).
+         */
+        SplitCheckNeededResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+        };
+        /**
+         * SplitCheckResolvedResponse
+         * @description The split check after "Apply split" or "Keep ledger" (section 11.11).
+         */
+        SplitCheckResolvedResponse: {
+            /** Id */
+            id: number;
             /** Symbol */
             symbol: string;
             /** Exchange */
             exchange: string;
             /** Currency */
             currency: string;
+            status: components["schemas"]["SplitCheckStatus"];
+        };
+        /** @enum {string} */
+        SplitCheckStatus: "needed" | "applied" | "kept";
+        /** SplitMetricsResponse */
+        SplitMetricsResponse: {
+            in_sample: components["schemas"]["BacktestMetricsResponse"];
+            out_of_sample: components["schemas"]["BacktestMetricsResponse"];
+        };
+        /**
+         * StartBacktestRequest
+         * @description `universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and
+         *     `list` needs `instruments` or `screen_result_id`, and `screen` needs `screen_id` (docs/architecture/backtest.md
+         *     section 10.10.6).
+         */
+        StartBacktestRequest: {
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** @default single */
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
+            /** Symbol */
+            symbol?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Top N */
+            top_n?: number | null;
+            /** Instruments */
+            instruments?: components["schemas"]["InstrumentBody"][] | null;
+            /** Screen Result Id */
+            screen_result_id?: number | null;
+            /** Symbols */
+            symbols?: string[] | null;
+            /** Screen Id */
+            screen_id?: number | null;
+            rebalance_period?: components["schemas"]["UniverseRebalancePeriod"] | null;
             bar_period: components["schemas"]["BarPeriod"];
             /**
              * Start Utc
@@ -1148,30 +2583,102 @@ export interface components {
             end_utc: string;
             /** Paper Capital Usd */
             paper_capital_usd: number | string;
+            /**
+             * Out Of Sample Share
+             * @default 30
+             */
+            out_of_sample_share: number;
+            /** Source Order */
+            source_order?: components["schemas"]["BarSource"][] | null;
         };
-        /** StartForwardTestRequest */
+        /**
+         * StartForwardTestRequest
+         * @description The universe comes in `universe`, or for a single instrument in `symbol`, `exchange`, and `currency`.
+         */
         StartForwardTestRequest: {
             /** Strategy Version Id */
             strategy_version_id: number;
             /** Symbol */
-            symbol: string;
+            symbol?: string | null;
             /** Exchange */
-            exchange: string;
+            exchange?: string | null;
             /** Currency */
-            currency: string;
+            currency?: string | null;
+            universe?: components["schemas"]["UniverseBody"] | null;
             bar_period: components["schemas"]["BarPeriod"];
+            /** Allocated Capital Usd */
+            allocated_capital_usd: number | string;
             /** End Time Utc */
             end_time_utc?: string | null;
         };
+        /** @enum {string} */
+        StartPoint: "blank_code" | "blank_rules" | "s1" | "s2" | "s3" | "m1" | "m2" | "m3" | "m4";
         /**
          * StartRefusedResponse
-         * @description The start was refused. `forward_test_id` is the forward test that already runs on the instrument.
+         * @description The start was refused. `unallocated_usd` is set when the allocated capital is too large (section 12.18).
          */
         StartRefusedResponse: {
             /** Detail */
             detail: string;
             /** Forward Test Id */
-            forward_test_id: number | null;
+            forward_test_id?: number | null;
+            /** Unallocated Usd */
+            unallocated_usd?: string | null;
+        };
+        /**
+         * StartSweepRequest
+         * @description The fields of a backtest start and the grid of 1 to 3 parameters.
+         */
+        StartSweepRequest: {
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** @default single */
+            universe_kind: components["schemas"]["BacktestUniverseKind"];
+            /** Symbol */
+            symbol?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Top N */
+            top_n?: number | null;
+            /** Instruments */
+            instruments?: components["schemas"]["InstrumentBody"][] | null;
+            /** Screen Result Id */
+            screen_result_id?: number | null;
+            /** Symbols */
+            symbols?: string[] | null;
+            /** Screen Id */
+            screen_id?: number | null;
+            rebalance_period?: components["schemas"]["UniverseRebalancePeriod"] | null;
+            bar_period: components["schemas"]["BarPeriod"];
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
+            /** Paper Capital Usd */
+            paper_capital_usd: number | string;
+            /**
+             * Out Of Sample Share
+             * @default 30
+             */
+            out_of_sample_share: number;
+            /** Source Order */
+            source_order?: components["schemas"]["BarSource"][] | null;
+            /** Grid */
+            grid: components["schemas"]["GridEntry"][];
+        };
+        /** StockSplitAppliedResponse */
+        StockSplitAppliedResponse: {
+            split_check: components["schemas"]["SplitCheckResolvedResponse"];
+            /** Owners */
+            owners: components["schemas"]["OwnerPositionMessage"][];
         };
         /** StrategyListItem */
         StrategyListItem: {
@@ -1196,6 +2703,45 @@ export interface components {
             /** Versions */
             versions: components["schemas"]["StrategyVersionSummary"][];
         };
+        /** StrategyRules */
+        StrategyRules: {
+            /**
+             * Format Version
+             * @constant
+             */
+            format_version: 1;
+            settings: components["schemas"]["RuleSettings"];
+            entry: components["schemas"]["RuleGroup"];
+            exits: components["schemas"]["RuleExits"];
+        };
+        /** StrategyTemplateResponse */
+        StrategyTemplateResponse: {
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "rules" | "code";
+            /** Entry */
+            entry: string;
+            /** Exit */
+            exit: string;
+            /** Defaults */
+            defaults: string;
+            /** Market */
+            market: string;
+            /** Bar Period */
+            bar_period: string;
+            /** Evidence */
+            evidence: string;
+            /** Sources */
+            sources: components["schemas"]["TemplateSourceResponse"][];
+            /** Differs From Source */
+            differs_from_source: string;
+        };
         /** StrategyVersionResponse */
         StrategyVersionResponse: {
             /** Id */
@@ -1213,6 +2759,19 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder" | "ai_assistant";
+            /** Rules */
+            rules: {
+                [key: string]: unknown;
+            } | null;
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
         };
         /** StrategyVersionSummary */
         StrategyVersionSummary: {
@@ -1227,9 +2786,95 @@ export interface components {
              * Format: date-time
              */
             created_at_utc: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "user" | "rule_builder" | "ai_assistant";
+            /** Conversation Id */
+            conversation_id: number | null;
+            /** Discarded */
+            discarded: boolean;
+        };
+        /** SweepDetailResponse */
+        SweepDetailResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
+            /** Grid */
+            grid: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Run Count */
+            run_count: number;
+            /** Status Counts */
+            status_counts: {
+                [key: string]: number;
+            };
+            /** Runs */
+            runs: components["schemas"]["SweepRunResponse"][];
+        };
+        /** SweepResponse */
+        SweepResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
+            /** Grid */
+            grid: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Run Count */
+            run_count: number;
+            /** Status Counts */
+            status_counts: {
+                [key: string]: number;
+            };
+        };
+        /** SweepRunResponse */
+        SweepRunResponse: {
+            /** Backtest Id */
+            backtest_id: number;
+            parameters: components["schemas"]["ParameterValues"];
+            status: components["schemas"]["BacktestStatus"];
+            metrics: components["schemas"]["BacktestMetricsResponse"] | null;
+        };
+        /** TemplateSourceResponse */
+        TemplateSourceResponse: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
         };
         /** @enum {string} */
+        ThinkingLevel: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+        /** @enum {string} */
         TimeInForce: "DAY" | "GTC";
+        /** @enum {string} */
+        TitleState: "new" | "generating" | "generated" | "not_generated" | "renamed";
         /** TradeResponse */
         TradeResponse: {
             /**
@@ -1248,6 +2893,83 @@ export interface components {
             price_usd: string;
             /** Commission Usd */
             commission_usd: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Exchange */
+            exchange: string | null;
+        };
+        /**
+         * UniverseBody
+         * @description `single` needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, `list` needs nothing: the members
+         *     are the watchlist at the start (section 12.17).
+         */
+        UniverseBody: {
+            kind: components["schemas"]["UniverseKind"];
+            /** Symbol */
+            symbol?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /** Top N */
+            top_n?: number | null;
+        };
+        /** UniverseInstrumentResponse */
+        UniverseInstrumentResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Trade Count */
+            trade_count: number;
+            /** Net Profit Usd */
+            net_profit_usd: string;
+            /** Quarter Count */
+            quarter_count: number;
+        };
+        /** @enum {string} */
+        UniverseKind: "single" | "rule" | "list";
+        /** @enum {string} */
+        UniverseRebalancePeriod: "quarter" | "month";
+        /**
+         * UniverseScreenResponse
+         * @description The copy of the screen that a `screen` universe saved at its start (docs/architecture/screen.md 24.9).
+         */
+        UniverseScreenResponse: {
+            /** Screen Id */
+            screen_id: number;
+            /** Name */
+            name: string;
+            /** Market */
+            market: string;
+            /** Definition */
+            definition: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * UniverseSettings
+         * @description The universe mode (section 9.8.6). The entry group is the filter. Only the members that pass it get a rank.
+         *
+         *     The strategy holds the `hold_count` members with the best rank, with equal weight, and ranks again at the start of
+         *     each `rebalance_period`.
+         */
+        UniverseSettings: {
+            rank_indicator: components["schemas"]["IndicatorOperand"];
+            rank_direction: components["schemas"]["RankDirection"];
+            /** Hold Count */
+            hold_count: number;
+            rebalance_period: components["schemas"]["RebalancePeriod"];
+        };
+        /**
+         * UsUniverseRangeResponse
+         * @description The first and the last quarter start with US universe data. Null without universe data.
+         */
+        UsUniverseRangeResponse: {
+            /** First Day Utc */
+            first_day_utc: string | null;
+            /** Last Day Utc */
+            last_day_utc: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -1289,6 +3011,46 @@ export interface components {
         WatchlistResponse: {
             /** Instruments */
             instruments: components["schemas"]["WatchlistInstrumentResponse"][];
+        };
+        /**
+         * AbortMessage
+         * @description Browser to server: stop the active run (the "Stop" button).
+         */
+        AbortMessage: {
+            /**
+             * Type
+             * @default abort
+             * @constant
+             */
+            type: "abort";
+        };
+        /**
+         * AssistantErrorMessage
+         * @description An error of the conversation, for the Output tab of the "Problems and output" panel.
+         */
+        AssistantErrorMessage: {
+            /**
+             * Type
+             * @default error
+             * @constant
+             */
+            type: "error";
+            /** Message */
+            message: string;
+        };
+        /**
+         * BacktestFinishedMessage
+         * @description A backtest of `run_backtest` ended in the wait of the tool, for the metric card.
+         */
+        BacktestFinishedMessage: {
+            /**
+             * Type
+             * @default backtest_finished
+             * @constant
+             */
+            type: "backtest_finished";
+            /** Backtest Id */
+            backtest_id: number;
         };
         /** ForwardTestsMessage */
         ForwardTestsMessage: {
@@ -1333,6 +3095,135 @@ export interface components {
              */
             type: "bar";
             bar: components["schemas"]["BarResponse"];
+        };
+        /**
+         * LoginAnswerMessage
+         * @description Browser to server: the answer to a login step `prompt`. For a `select` prompt, the ID of the option.
+         */
+        LoginAnswerMessage: {
+            /**
+             * Type
+             * @default login_answer
+             * @constant
+             */
+            type: "login_answer";
+            /** Prompt Id */
+            prompt_id: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * LoginEndMessage
+         * @description The login ended. The credential is in the credential file of the assistant service.
+         */
+        LoginEndMessage: {
+            /**
+             * Type
+             * @default login_end
+             * @constant
+             */
+            type: "login_end";
+            credential: components["schemas"]["CredentialResponse"];
+        };
+        /** LoginOptionResponse */
+        LoginOptionResponse: {
+            /** Id */
+            id: string;
+            /** Label */
+            label: string;
+        };
+        /**
+         * LoginStartMessage
+         * @description Browser to server: start a login. `method` "oauth" is a subscription login. `name` names the new credential.
+         */
+        LoginStartMessage: {
+            /**
+             * Type
+             * @default login_start
+             * @constant
+             */
+            type: "login_start";
+            /** Provider */
+            provider: string;
+            /**
+             * Method
+             * @enum {string}
+             */
+            method: "oauth" | "api_key";
+            /** Name */
+            name: string;
+        };
+        /**
+         * LoginStepMessage
+         * @description One login step of pi (25.7.3).
+         *
+         *     - `auth_url`: open `url` (the authorization link). `message` has the instructions of the provider.
+         *     - `device_code`: enter `user_code` at `url`.
+         *     - `progress`, `info`: `message` (and for `info` maybe a `url`).
+         *     - `prompt`: show a field for `prompt_type` (`text`, `secret` as a password field, `select` with `options`, or
+         *       `manual_code` to paste a code) with the label `message`, and answer with `login_answer` and `prompt_id`.
+         */
+        LoginStepMessage: {
+            /**
+             * Type
+             * @default login_step
+             * @constant
+             */
+            type: "login_step";
+            /**
+             * Step
+             * @enum {string}
+             */
+            step: "auth_url" | "device_code" | "progress" | "info" | "prompt";
+            /** Message */
+            message: string | null;
+            /** Url */
+            url: string | null;
+            /** User Code */
+            user_code: string | null;
+            /** Prompt Id */
+            prompt_id: string | null;
+            /** Prompt Type */
+            prompt_type: ("text" | "secret" | "select" | "manual_code") | null;
+            /** Options */
+            options: components["schemas"]["LoginOptionResponse"][] | null;
+        };
+        /**
+         * MessageDeltaMessage
+         * @description A part of the streamed text of an AI assistant message.
+         */
+        MessageDeltaMessage: {
+            /**
+             * Type
+             * @default message_delta
+             * @constant
+             */
+            type: "message_delta";
+            /** Text */
+            text: string;
+        };
+        /**
+         * MessageEndMessage
+         * @description The end of one AI assistant message: its full text, its model, its credential name, and the thinking level of
+         *     its run.
+         */
+        MessageEndMessage: {
+            /**
+             * Type
+             * @default message_end
+             * @constant
+             */
+            type: "message_end";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Credential Name */
+            credential_name: string;
+            /** Thinking Level */
+            thinking_level: string | null;
         };
         /** OpenOrdersMessage */
         OpenOrdersMessage: {
@@ -1393,6 +3284,8 @@ export interface components {
             balance: components["schemas"]["PaperAccountBalanceMessage"] | null;
             /** Positions */
             positions: components["schemas"]["PositionMessage"][];
+            /** Unattributed Cash Usd */
+            unattributed_cash_usd: string | null;
         };
         /** PositionMessage */
         PositionMessage: {
@@ -1414,6 +3307,174 @@ export interface components {
             market_value: string;
             /** Unrealized Pnl */
             unrealized_pnl: string;
+            /** Owners */
+            owners: components["schemas"]["OwnerPositionMessage"][];
+            /** Unattributed Quantity */
+            unattributed_quantity: string;
+            split_check: components["schemas"]["SplitCheckMessage"] | null;
+        };
+        /**
+         * PromptMessage
+         * @description Browser to server: a new user message, with the provider, the model, the credential, and the thinking level of
+         *     this message.
+         */
+        PromptMessage: {
+            /**
+             * Type
+             * @default prompt
+             * @constant
+             */
+            type: "prompt";
+            /** Text */
+            text: string;
+            /** Provider */
+            provider: string;
+            /** Model */
+            model: string;
+            /** Credential Id */
+            credential_id: string;
+            thinking_level: components["schemas"]["ThinkingLevel"];
+        };
+        /**
+         * RunStateMessage
+         * @description The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.
+         */
+        RunStateMessage: {
+            /**
+             * Type
+             * @default run_state
+             * @constant
+             */
+            type: "run_state";
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "running" | "settled";
+        };
+        /**
+         * ScreenRunFinishedMessage
+         * @description `run_screen` saved a screen result. The last condition card of the screen shows its funnel counts.
+         */
+        ScreenRunFinishedMessage: {
+            /**
+             * Type
+             * @default screen_run_finished
+             * @constant
+             */
+            type: "screen_run_finished";
+            /** Screen Id */
+            screen_id: number;
+            /** Screen Result Id */
+            screen_result_id: number;
+            /** Start Count */
+            start_count: number;
+            /** After Filters Count */
+            after_filters_count: number;
+            /** After Indicator Conditions Count */
+            after_indicator_conditions_count: number;
+            /** Result Count */
+            result_count: number;
+        };
+        /**
+         * ScreenSavedMessage
+         * @description The AI assistant made or changed a screen, for the condition card (25.12.4). The card compares `definition`
+         *     with `previous_definition`: the screen before `update_screen`, or the source screen of `create_screen`. Null when
+         *     `create_screen` has no source screen.
+         */
+        ScreenSavedMessage: {
+            /**
+             * Type
+             * @default screen_saved
+             * @constant
+             */
+            type: "screen_saved";
+            /** Screen Id */
+            screen_id: number;
+            /** Name */
+            name: string;
+            /** Market */
+            market: string;
+            definition: components["schemas"]["JsonValue"];
+            previous_definition: components["schemas"]["JsonValue"];
+        };
+        /**
+         * SplitCheckMessage
+         * @description The "Split check needed" state of the instrument (section 11.11). `id` is the ID of the stock split routes.
+         *     `stock_split_id` is None when only the position shows the stock split.
+         */
+        SplitCheckMessage: {
+            /** Id */
+            id: number;
+            /** Stock Split Id */
+            stock_split_id: number | null;
+            /** Split Ratio */
+            split_ratio: string;
+            /** Account Quantity Before */
+            account_quantity_before: string;
+            /** Account Quantity After */
+            account_quantity_after: string;
+        };
+        /**
+         * SteerMessage
+         * @description Browser to server: a user message while the AI assistant runs.
+         */
+        SteerMessage: {
+            /**
+             * Type
+             * @default steer
+             * @constant
+             */
+            type: "steer";
+            /** Text */
+            text: string;
+        };
+        /**
+         * StrategyVersionSavedMessage
+         * @description The AI assistant saved a strategy version, for the diff card (25.5.2).
+         */
+        StrategyVersionSavedMessage: {
+            /**
+             * Type
+             * @default strategy_version_saved
+             * @constant
+             */
+            type: "strategy_version_saved";
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Version Number */
+            version_number: number;
+        };
+        /**
+         * ToolStepMessage
+         * @description The start, an update, or the end of one tool call. One `tool_call_id` is one tool step of the conversation.
+         *
+         *     `status` is `running` at the start and at each update, then `succeeded` or `failed`. For `run_backtest`,
+         *     `backtest_id` and `backtest_status` give the queue state (`queued`) or the run state (`running`, then a final
+         *     status). They are null for the other tools and at the start.
+         */
+        ToolStepMessage: {
+            /**
+             * Type
+             * @default tool_step
+             * @constant
+             */
+            type: "tool_step";
+            /** Tool Call Id */
+            tool_call_id: string;
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "running" | "succeeded" | "failed";
+            /** Backtest Id */
+            backtest_id: number | null;
+            /** Backtest Status */
+            backtest_status: string | null;
         };
     };
     responses: never;
@@ -1561,7 +3622,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OrderBlockedResponse"];
+                    "application/json": components["schemas"]["OrderRefusedByLedgerResponse"];
                 };
             };
             /** @description Validation Error */
@@ -1667,6 +3728,122 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManualOrderListResponse"];
+                };
+            };
+        };
+    };
+    apply_split_api_paper_trading_stock_splits__split_check_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                split_check_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockSplitAppliedResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+        };
+    };
+    keep_ledger_api_paper_trading_stock_splits__split_check_id__keep_ledger_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                split_check_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SplitCheckResolvedResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
                 };
             };
         };
@@ -1790,6 +3967,221 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_source_order_api_market_data_source_order_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOrderBody"];
+                };
+            };
+        };
+    };
+    save_source_order_api_market_data_source_order_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceOrderBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceOrderBody"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_instruments_api_market_data_hk_instrument_list_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListResponse"];
+                };
+            };
+        };
+    };
+    add_instruments_api_market_data_hk_instrument_list_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddHkInstrumentsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddHkInstrumentsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListErrorResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_instrument_api_market_data_hk_instrument_list__member_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                member_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HkInstrumentListErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    make_code_api_strategy_rules_code_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RulesCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulesCodeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_templates_api_strategy_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyTemplateResponse"][];
                 };
             };
         };
@@ -1984,6 +4376,56 @@ export interface operations {
             };
         };
     };
+    discard_version_api_strategies__strategy_id__versions__version_number__discard_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+                version_number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyVersionResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     save_version_api_strategies__strategy_id__versions_post: {
         parameters: {
             query?: never;
@@ -1999,7 +4441,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The code is the same as the latest version. No new version is made. */
+            /** @description The code (and, for a rules body, the rules) is the same as the latest version. No new version is made. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -2090,46 +4532,6 @@ export interface operations {
             };
         };
     };
-    read_backtest_api_backtests__backtest_id__get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                backtest_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["BacktestDetailResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     read_limits_api_backtest_limits_get: {
         parameters: {
             query?: never;
@@ -2183,6 +4585,113 @@ export interface operations {
             };
         };
     };
+    read_us_universe_range_api_us_universe_range_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsUniverseRangeResponse"];
+                };
+            };
+        };
+    };
+    read_backtest_api_backtests__backtest_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_backtest_api_backtests__backtest_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     compare_backtests_api_backtests__first_backtest_id__comparison__second_backtest_id__get: {
         parameters: {
             query?: never;
@@ -2220,6 +4729,199 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_parameters_api_sweeps_parameters_get: {
+        parameters: {
+            query: {
+                strategy_version_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParametersResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sweeps_api_sweeps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepResponse"][];
+                };
+            };
+        };
+    };
+    start_sweep_api_sweeps_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartSweepRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepDetailResponse"];
+                };
+            };
+            /** @description The request is refused (detail is a text), or a field is not valid (detail is a list). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_sweep_api_sweeps__sweep_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sweep_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_sweep_api_sweeps__sweep_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sweep_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is refused (detail is a text), or a field is not valid (detail is a list). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    read_capital_api_forward_tests_capital_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ForwardTestCapitalResponse"];
                 };
             };
         };
@@ -2411,6 +5113,328 @@ export interface operations {
             };
         };
     };
+    list_screens_api_screens_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenListItemResponse"][];
+                };
+            };
+        };
+    };
+    create_screen_api_screens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    read_screen_api_screens__screen_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_screen_api_screens__screen_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeScreenRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    delete_screen_api_screens__screen_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    keep_screen_api_screens__screen_id__keep_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_screen_api_screens__screen_id__runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                screen_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RunScreenRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResultResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    read_screen_result_api_screen_results__screen_result_id__get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                screen_result_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResultResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_screen_indicators_api_screen_indicators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenIndicatorResponse"][];
+                };
+            };
+        };
+    };
     list_instruments_api_watchlist_get: {
         parameters: {
             query?: never;
@@ -2534,6 +5558,377 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_api_assistant_conversations_get: {
+        parameters: {
+            query?: {
+                strategy_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_conversation_api_assistant_conversations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_conversation_api_assistant_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_conversation_api_assistant_conversations__conversation_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rename_conversation_api_assistant_conversations__conversation_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameConversationRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompt_versions_api_assistant_prompt_versions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionListResponse"];
+                };
+            };
+        };
+    };
+    save_prompt_version_api_assistant_prompt_versions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SavePromptVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptVersionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_providers_api_assistant_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProviderListResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_credentials_api_assistant_credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CredentialListResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_credential_api_assistant_credentials__credential_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

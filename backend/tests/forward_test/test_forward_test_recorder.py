@@ -1,8 +1,9 @@
-"""The platform DataActor that saves the bars and records the fills and the equity of a forward test
+"""The platform DataActor that saves the bars and records the equity of a forward test
 (docs/architecture/forward_test.md section 12.8).
 
-The actor runs in the NautilusTrader backtest engine with the bar count test strategy and a small bar file. The test
-asserts the exact rows of the bar and record tables in a real PostgreSQL.
+The actor runs in the NautilusTrader backtest engine with the bar count test strategy and a small bar file. The fills
+come from the owner ledger, where the ATrade execution client writes them. The test asserts the exact rows of the bar
+and record tables in a real PostgreSQL.
 """
 
 import csv
@@ -76,7 +77,7 @@ def insert_forward_test(database_url: str) -> int:
         forward_test_row = connection.execute(
             """
             INSERT INTO forward_test (strategy_version_id, symbol, exchange, currency, bar_period, desired_state,
-                status, client_id, start_balance_usd, created_at_utc)
+                status, client_id, allocated_capital_usd, created_at_utc)
             VALUES (%(version_id)s, 'BTEST', 'ARCA', 'USD', '1-DAY', 'running', 'running', 10, 10000, %(now)s)
             RETURNING id
             """,
@@ -84,6 +85,24 @@ def insert_forward_test(database_url: str) -> int:
         ).fetchone()
         assert forward_test_row is not None
         return int(forward_test_row[0])
+
+
+def insert_ledger_fills(database_url: str, forward_test_id: int) -> None:
+    """The ATrade execution client wrote 2 fills: a buy of 10 at 104 and a sell of 10 at 106, and a fill of another
+    forward test."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.cursor().executemany(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %s, 'fill', %s, 'DU1234567', 'BTEST', 'ARCA', 'USD', %s, %s, %s, %s, 1)
+            """,
+            [
+                (forward_test_id, make_time(5), 10, 104, -1040, "e1"),
+                (forward_test_id, make_time(10), -10, 106, 1060, "e2"),
+                (forward_test_id + 1, make_time(5), 50, 104, -5200, "e3"),
+            ],
+        )
 
 
 def run_engine_with_recorder(
@@ -132,26 +151,17 @@ def test_records_each_new_fill_once_and_one_equity_point_at_the_end_of_each_bar(
     database_url: str, tmp_path: Path
 ) -> None:
     forward_test_id = insert_forward_test(database_url)
+    insert_ledger_fills(database_url, forward_test_id)
 
     run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
 
-    fills = read_table_rows(
-        database_url,
-        """
-        SELECT forward_test_id, time_utc, side, quantity_shares, price_usd, commission_usd FROM forward_test_fill
-        ORDER BY time_utc
-        """,
-    )
-    # The strategy buys 10 shares at the close of bar 3 and sells them at the close of bar 8.
-    assert fills == [
-        (forward_test_id, make_time(5), "BUY", Decimal(10), Decimal("104.00"), Decimal(0)),
-        (forward_test_id, make_time(10), "SELL", Decimal(10), Decimal("106.00"), Decimal(0)),
-    ]
+    # The recorder writes no fill: the owner ledger has them (section 12.8).
+    assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_fill") == [(0,)]
     equity_points = read_table_rows(
         database_url, "SELECT time_utc, equity_usd FROM forward_test_equity_point ORDER BY time_utc"
     )
-    # The actor gets a bar before the strategy, so a fill at a bar close counts from the next bar on.
-    # 10000 - 10 * 104 = 8960 cash, plus 10 shares at the close.
+    # The allocated capital 10000 - 10 * 104 = 8960 cash, plus 10 shares at the close. The fill of the other forward
+    # test does not count.
     assert equity_points == [
         (make_time(3), Decimal(10000)),
         (make_time(4), Decimal(10000)),
@@ -166,16 +176,48 @@ def test_records_each_new_fill_once_and_one_equity_point_at_the_end_of_each_bar(
     ]
 
 
+def test_the_equity_includes_the_cash_in_lieu_of_a_stock_split(database_url: str, tmp_path: Path) -> None:
+    forward_test_id = insert_forward_test(database_url)
+    insert_ledger_fills(database_url, forward_test_id)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        # The split adjustment of day 8 gives no new share and 7.50 USD cash in lieu (section 12.8).
+        connection.execute(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, cash_change, stock_split_id)
+            VALUES ('forward_test', %s, 'split_adjustment', %s, 'DU1234567', 'BTEST', 'ARCA', 'USD', 0, 7.5, 1)
+            """,
+            (forward_test_id, make_time(8)),
+        )
+
+    run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
+
+    equity_points = read_table_rows(
+        database_url, "SELECT time_utc, equity_usd FROM forward_test_equity_point ORDER BY time_utc"
+    )
+    assert [equity for _, equity in equity_points] == [
+        Decimal(10000),
+        Decimal(10000),
+        Decimal(10000),
+        Decimal(10020),
+        Decimal(10040),
+        Decimal("10067.5"),
+        Decimal("10047.5"),
+        Decimal("10027.5"),
+        Decimal("10027.5"),
+        Decimal("10027.5"),
+    ]
+
+
 def test_a_second_run_over_the_same_bars_adds_no_row(database_url: str, tmp_path: Path) -> None:
     forward_test_id = insert_forward_test(database_url)
     run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
 
-    # A restart reads the same fills from the cache again (section 12.7).
+    # A restart gets the same bars again (section 12.7).
     run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
 
-    assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_fill") == [(2,)]
     assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_equity_point") == [(BAR_COUNT,)]
-    assert read_table_rows(database_url, "SELECT count(*) FROM bar") == [(BAR_COUNT,)]
+    assert read_table_rows(database_url, "SELECT count(*) FROM ibkr_bar") == [(BAR_COUNT,)]
 
 
 def test_saves_each_bar_in_the_bar_store_with_its_saved_range(database_url: str, tmp_path: Path) -> None:
@@ -186,7 +228,7 @@ def test_saves_each_bar_in_the_bar_store_with_its_saved_range(database_url: str,
     saved_bars = read_table_rows(
         database_url,
         """
-        SELECT symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume FROM bar
+        SELECT symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume FROM ibkr_bar
         ORDER BY start_utc
         """,
     )
@@ -195,7 +237,7 @@ def test_saves_each_bar_in_the_bar_store_with_its_saved_range(database_url: str,
         for bar in read_test_bars()
     ]
     # The bar ranges touch, so the store joins them into one saved range.
-    assert read_table_rows(database_url, "SELECT symbol, bar_period, start_utc, end_utc FROM bar_saved_range") == [
+    assert read_table_rows(database_url, "SELECT symbol, bar_period, start_utc, end_utc FROM ibkr_bar_saved_range") == [
         ("BTEST", "1-DAY", make_time(2), make_time(12))
     ]
 
@@ -212,8 +254,7 @@ def test_a_failed_bar_save_does_not_stop_the_records(database_url: str, tmp_path
         instrument=instrument_that_cannot_be_saved,
     )
 
-    assert read_table_rows(database_url, "SELECT count(*) FROM bar") == [(0,)]
-    assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_fill") == [(2,)]
+    assert read_table_rows(database_url, "SELECT count(*) FROM ibkr_bar") == [(0,)]
     assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_equity_point") == [(BAR_COUNT,)]
 
 

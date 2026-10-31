@@ -11,12 +11,16 @@ import httpx
 import psycopg
 import pytest
 
+from atrade.backtest import backtest_store
+from atrade.foundation.instrument import Instrument
 from tests.fakes.clock import FixedClock
 from tests.forward_test.test_forward_test_routes import (
     FORWARD_TESTS_PATH,
     make_start_request,
+    make_universe_request,
     save_test_strategy_version,
 )
+from tests.saved_ranges import save_ibkr_saved_range
 
 type JsonObject = dict[str, Any]
 
@@ -35,11 +39,11 @@ async def start_forward_test(web_client: httpx.AsyncClient, *, currency: str = "
 
 
 def write_forward_test_end(database_url: str, forward_test_id: int, *, is_stopped: bool = True) -> None:
-    """The child writes the start balance. The worker writes the stop (test_forward_test_worker.py)."""
+    """The worker writes the stop (test_forward_test_worker.py). The allocated capital of the start is 10000."""
     with psycopg.connect(database_url, autocommit=True) as connection:
         connection.execute(
             """
-            UPDATE forward_test SET start_balance_usd = 10000, status = %(status)s, desired_state = %(desired_state)s,
+            UPDATE forward_test SET status = %(status)s, desired_state = %(desired_state)s,
                 client_id = %(client_id)s, stopped_at_utc = %(stopped_at_utc)s
             WHERE id = %(id)s
             """,
@@ -54,29 +58,33 @@ def write_forward_test_end(database_url: str, forward_test_id: int, *, is_stoppe
 
 
 def write_forward_test_records(database_url: str, forward_test_id: int) -> None:
-    """Rows like the DataActor writes them, and an interruption like the worker writes it (section 12.7). No equity
-    point at 03:07 and 03:08: the LiveNode did not run."""
+    """Fills like the ATrade execution client writes them into the owner ledger, equity points like the DataActor
+    writes them, and an interruption like the worker writes it (section 12.7). No equity point at 03:07 and 03:08:
+    the LiveNode did not run."""
     with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO forward_test_fill (forward_test_id, trade_id, time_utc, side, quantity_shares, price_usd,
-                commission_usd)
-            VALUES (%(id)s, %(trade_id)s, %(time_utc)s, %(side)s, 10, %(price_usd)s, 1)
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %(id)s, 'fill', %(time_utc)s, 'DU1234567', 'AAPL', 'NASDAQ', 'USD',
+                %(quantity_change)s, %(price)s, 1, %(cash_change)s, %(execution_id)s, 1)
             """,
             [
                 {
                     "id": forward_test_id,
-                    "trade_id": "T-1",
+                    "execution_id": f"E-{forward_test_id}-1",
                     "time_utc": make_minute(5, 2),
-                    "side": "BUY",
-                    "price_usd": "100.05",
+                    "quantity_change": 10,
+                    "price": "100.05",
+                    "cash_change": "-1001.5",
                 },
                 {
                     "id": forward_test_id,
-                    "trade_id": "T-2",
+                    "execution_id": f"E-{forward_test_id}-2",
                     "time_utc": make_minute(9, 1),
-                    "side": "SELL",
-                    "price_usd": "101.00",
+                    "quantity_change": -10,
+                    "price": "101.00",
+                    "cash_change": "1009",
                 },
             ],
         )
@@ -171,8 +179,15 @@ async def test_the_same_period_backtest_of_a_running_forward_test_ends_now(
 
 
 @pytest.mark.anyio
-async def test_the_same_period_backtest_is_refused_without_a_start_balance(web_client: httpx.AsyncClient) -> None:
+async def test_the_same_period_backtest_of_an_old_forward_test_is_refused_without_a_start_balance(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
     forward_test = await start_forward_test(web_client)
+    # A forward test from the time before the allocated capital uses its start balance (section 12.24).
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "UPDATE forward_test SET allocated_capital_usd = NULL WHERE id = %(id)s", {"id": forward_test["id"]}
+        )
 
     response = await start_same_period_backtest(web_client, forward_test["id"])
 
@@ -223,13 +238,29 @@ async def test_compares_the_metrics_the_equity_curves_the_fills_and_the_interrup
     assert comparison["backtest"]["id"] == backtest_id
     assert comparison["backtest"]["status"] == "finished"
     # The metric functions of backtest: 10000 -> 10006, the peak 10020 falls to 10006 (0.1397 %).
-    assert comparison["forward_test_metrics"] == {
+    # The other metrics: test_forward_test_metrics.py.
+    forward_test_metrics = comparison["forward_test_metrics"]
+    assert {
+        name: forward_test_metrics[name]
+        for name in (
+            "final_equity_usd",
+            "net_profit_usd",
+            "total_return_percent",
+            "max_drawdown_percent",
+            "trade_count",
+        )
+    } == {
         "final_equity_usd": "10006",
+        "net_profit_usd": "6",
         "total_return_percent": "0.06",
         "max_drawdown_percent": "0.14",
         "trade_count": 2,
     }
-    assert comparison["backtest"]["metrics"]["trade_count"] == 3
+    # The Net profit of the backtest uses its paper capital: 10050 - 10000.
+    assert (comparison["backtest"]["metrics"]["trade_count"], comparison["backtest"]["metrics"]["net_profit_usd"]) == (
+        3,
+        "50",
+    )
     assert [point["time_utc"] for point in comparison["forward_test_equity_curve"]] == [
         "2026-01-02T03:05:00Z",
         "2026-01-02T03:06:00Z",
@@ -242,6 +273,8 @@ async def test_compares_the_metrics_the_equity_curves_the_fills_and_the_interrup
         {
             "bar_end_utc": "2026-01-02T03:05:00Z",
             "side": "BUY",
+            "symbol": "AAPL",
+            "exchange": "NASDAQ",
             "forward_test_quantity_shares": "10",
             "forward_test_price_usd": "100.05",
             "backtest_quantity_shares": "10",
@@ -251,6 +284,8 @@ async def test_compares_the_metrics_the_equity_curves_the_fills_and_the_interrup
         {
             "bar_end_utc": "2026-01-02T03:09:00Z",
             "side": "SELL",
+            "symbol": "AAPL",
+            "exchange": "NASDAQ",
             "forward_test_quantity_shares": "10",
             "forward_test_price_usd": "101.00",
             "backtest_quantity_shares": "10",
@@ -260,6 +295,8 @@ async def test_compares_the_metrics_the_equity_curves_the_fills_and_the_interrup
         {
             "bar_end_utc": "2026-01-02T03:10:00Z",
             "side": "BUY",
+            "symbol": "AAPL",
+            "exchange": "NASDAQ",
             "forward_test_quantity_shares": None,
             "forward_test_price_usd": None,
             "backtest_quantity_shares": "5",
@@ -317,11 +354,12 @@ async def test_a_backtest_of_another_instrument_is_refused(web_client: httpx.Asy
     with psycopg.connect(database_url, autocommit=True) as connection:
         connection.execute(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES ('MSFT', 'NASDAQ', 'USD', '1-MINUTE', %(start_utc)s, 100, 101, 99, 100, 1000)
             """,
             {"start_utc": make_minute(5)},
         )
+        save_ibkr_saved_range(connection, Instrument(symbol="MSFT", exchange="NASDAQ", currency="USD"), "1-MINUTE")
     other_backtest = await web_client.post(
         "/api/backtests",
         json={
@@ -366,11 +404,16 @@ async def test_the_forward_test_page_has_the_records_and_links_each_same_period_
     assert detail["metrics"]["trade_count"] == 2
     assert [point["equity_usd"] for point in detail["equity_curve"]] == ["10000", "10010", "10020", "10006"]
     assert detail["fills"][0] == {
+        "symbol": "AAPL",
+        "exchange": "NASDAQ",
         "time_utc": "2026-01-02T03:05:02Z",
+        "kind": "fill",
         "side": "BUY",
         "quantity_shares": "10",
         "price_usd": "100.05",
         "commission_usd": "1",
+        "amount_usd": "1000.50",
+        "split_ratio": None,
     }
     # Newest first. The page links to the comparison with each one.
     assert [(item["id"], item["status"]) for item in detail["same_period_backtests"]] == [
@@ -385,12 +428,8 @@ async def test_a_new_forward_test_page_has_no_records_and_no_backtests(web_clien
 
     detail = (await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")).json()
 
-    assert (detail["metrics"], detail["equity_curve"], detail["fills"], detail["same_period_backtests"]) == (
-        None,
-        [],
-        [],
-        [],
-    )
+    assert detail["metrics"]["trade_count"] == 0
+    assert (detail["equity_curve"], detail["fills"], detail["same_period_backtests"]) == ([], [], [])
 
 
 @pytest.mark.anyio
@@ -398,3 +437,193 @@ async def test_the_page_of_an_unknown_forward_test_is_not_found(web_client: http
     response = await web_client.get(f"{FORWARD_TESTS_PATH}/999")
 
     assert response.status_code == 404
+
+
+MULTI_STOPPED_UTC = datetime(2026, 5, 4, 20, tzinfo=UTC)
+
+
+async def start_watchlist_forward_test(web_client: httpx.AsyncClient, database_url: str) -> JsonObject:
+    """A `list` forward test of AAPL and MSFT, stopped on 2026-05-04. It recorded a second quarter with AAPL and NVDA,
+    as `update_current_quarter()` writes it (section 12.17)."""
+    strategy_version_id = await save_test_strategy_version(web_client)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        for symbol in ("AAPL", "MSFT"):
+            connection.execute(
+                """
+                INSERT INTO watchlist_instrument (symbol, exchange, currency, added_at_utc)
+                VALUES (%(symbol)s, 'NASDAQ', 'USD', now())
+                """,
+                {"symbol": symbol},
+            )
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+    assert response.status_code == 201
+    forward_test = response.json()
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        for symbol in ("AAPL", "NVDA"):
+            connection.execute(
+                """
+                INSERT INTO forward_test_universe_member (forward_test_id, quarter_start_utc, symbol, exchange,
+                    currency)
+                VALUES (%(id)s, '2026-04-01T00:00:00Z', %(symbol)s, 'NASDAQ', 'USD')
+                """,
+                {"id": forward_test["id"], "symbol": symbol},
+            )
+        connection.execute(
+            """
+            UPDATE forward_test SET status = 'stopped', desired_state = 'stopped', client_id = NULL,
+                stopped_at_utc = %(stopped_at_utc)s
+            WHERE id = %(id)s
+            """,
+            {"id": forward_test["id"], "stopped_at_utc": MULTI_STOPPED_UTC},
+        )
+    return forward_test
+
+
+async def read_backtest_periods(database_url: str, backtest_id: int) -> list[tuple[str, list[str]]]:
+    """The members of each universe period, as the backtest child reads them."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        periods = await backtest_store.select_universe_periods(connection, backtest_id=backtest_id, currency="USD")
+    return [(period.start_utc.isoformat(), [member.symbol for member in period.members]) for period in periods]
+
+
+@pytest.mark.anyio
+async def test_the_same_period_backtest_of_a_multi_instrument_forward_test_uses_the_recorded_members(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url)
+
+    response = await start_same_period_backtest(web_client, forward_test["id"])
+
+    assert response.status_code == 201
+    backtest_id = response.json()["backtest_id"]
+    backtest = (await web_client.get(f"/api/backtests/{backtest_id}")).json()
+    assert backtest["universe_kind"] == "list"
+    assert backtest["paper_capital_usd"] == "10000"
+    assert (backtest["start_utc"], backtest["end_utc"]) == ("2026-01-02T03:04:05Z", "2026-05-04T20:00:00Z")
+    # The first quarter starts at the forward test start, as the first period of a `rule` backtest.
+    assert await read_backtest_periods(database_url, backtest_id) == [
+        ("2026-01-02T03:04:05+00:00", ["AAPL", "MSFT"]),
+        ("2026-04-01T00:00:00+00:00", ["AAPL", "NVDA"]),
+    ]
+
+
+def make_day(month: int, day: int, hour: int = 21) -> datetime:
+    return datetime(2026, month, day, hour, tzinfo=UTC)
+
+
+def write_multi_instrument_records(database_url: str, forward_test_id: int, backtest_id: int) -> None:
+    """Owner ledger fills of 2 members at the next open, daily equity points, and the backtest result."""
+    with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %(id)s, 'fill', %(time_utc)s, 'DU1234567', %(symbol)s, 'NASDAQ', 'USD',
+                %(quantity_change)s, %(price)s, 0, %(cash_change)s, %(execution_id)s, 1)
+            """,
+            [
+                {
+                    "id": forward_test_id,
+                    "execution_id": f"E-{forward_test_id}-{symbol}",
+                    "time_utc": make_day(4, 2, 14),
+                    "symbol": symbol,
+                    "quantity_change": 10,
+                    "price": price,
+                    "cash_change": f"-{price}0",
+                }
+                for symbol, price in (("AAPL", "100"), ("NVDA", "50"))
+            ],
+        )
+        cursor.executemany(
+            "INSERT INTO forward_test_equity_point (forward_test_id, time_utc, equity_usd) VALUES (%s, %s, %s)",
+            [(forward_test_id, make_day(4, 1), "10000"), (forward_test_id, make_day(4, 2), "10100")],
+        )
+        cursor.executemany(
+            "INSERT INTO backtest_equity_point (backtest_id, time_utc, equity_usd) VALUES (%s, %s, %s)",
+            [(backtest_id, make_day(4, 1), "10000"), (backtest_id, make_day(4, 2), "10080")],
+        )
+        cursor.executemany(
+            """
+            INSERT INTO backtest_trade (backtest_id, time_utc, side, quantity_shares, price_usd, commission_usd,
+                symbol, exchange)
+            VALUES (%s, %s, 'BUY', 10, %s, 0, %s, 'NASDAQ')
+            """,
+            [(backtest_id, make_day(4, 2, 14), "99.50", "AAPL"), (backtest_id, make_day(4, 2, 14), "51.00", "NVDA")],
+        )
+        cursor.execute(
+            """
+            UPDATE backtest SET status = 'finished', started_at_utc = %(now)s, ended_at_utc = %(now)s,
+                final_equity_usd = 10080, total_return_percent = 0.80, max_drawdown_percent = 0, trade_count = 2
+            WHERE id = %(id)s
+            """,
+            {"id": backtest_id, "now": MULTI_STOPPED_UTC},
+        )
+
+
+@pytest.mark.anyio
+async def test_compares_a_multi_instrument_forward_test_with_its_same_period_backtest(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url)
+    backtest_id = (await start_same_period_backtest(web_client, forward_test["id"])).json()["backtest_id"]
+    write_multi_instrument_records(database_url, forward_test["id"], backtest_id)
+
+    response = await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/comparison/{backtest_id}")
+
+    assert response.status_code == 200
+    comparison = response.json()
+    # The start capital of both sides is the allocated capital 10000.
+    assert comparison["backtest"]["paper_capital_usd"] == "10000"
+    assert (
+        comparison["forward_test_metrics"]["net_profit_usd"],
+        comparison["forward_test_metrics"]["trade_count"],
+    ) == (
+        "100",
+        2,
+    )
+    assert comparison["backtest"]["metrics"]["net_profit_usd"] == "80"
+    assert [point["equity_usd"] for point in comparison["forward_test_equity_curve"]] == ["10000", "10100"]
+    assert [point["equity_usd"] for point in comparison["backtest_equity_curve"]] == ["10000", "10080"]
+    # One row for each bar end, side, and member.
+    assert comparison["fills"] == [
+        {
+            "bar_end_utc": "2026-04-01T21:00:00Z",
+            "side": "BUY",
+            "symbol": "AAPL",
+            "exchange": "NASDAQ",
+            "forward_test_quantity_shares": "10",
+            "forward_test_price_usd": "100",
+            "backtest_quantity_shares": "10",
+            "backtest_price_usd": "99.50",
+            "price_difference_usd": "0.50",
+        },
+        {
+            "bar_end_utc": "2026-04-01T21:00:00Z",
+            "side": "BUY",
+            "symbol": "NVDA",
+            "exchange": "NASDAQ",
+            "forward_test_quantity_shares": "10",
+            "forward_test_price_usd": "50",
+            "backtest_quantity_shares": "10",
+            "backtest_price_usd": "51.00",
+            "price_difference_usd": "-1.00",
+        },
+    ]
+
+
+@pytest.mark.anyio
+async def test_a_backtest_of_another_universe_is_refused_for_a_multi_instrument_forward_test(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url)
+    single_forward_test = (
+        await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(forward_test["strategy_version_id"]))
+    ).json()
+    write_forward_test_end(database_url, single_forward_test["id"])
+    other_backtest_id = (await start_same_period_backtest(web_client, single_forward_test["id"])).json()["backtest_id"]
+
+    response = await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/comparison/{other_backtest_id}")
+
+    assert response.status_code == 422

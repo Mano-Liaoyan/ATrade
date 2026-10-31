@@ -25,9 +25,11 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   routes under `/api/paper-trading`, the backtest routes under
   `/api/backtests` and `/api/backtest-limits`, the forward test routes under
   `/api/forward-tests`, `/ws/paper-trading`, and `/ws/forward-tests`.
-- The app shell header shows the backend status, the IB Gateway status, the
-  server time, and the Paper tag of the checked paper account. Behind
-  Cloudflare Access, it also has a Log out link.
+- The app shell header shows the Paper tag of the checked paper account and a
+  Connections button (plug icon). The plug icon has a status badge when the
+  backend or IB Gateway has a problem. Its popover shows the backend status
+  with the server time and the IB Gateway status with the details. Behind
+  Cloudflare Access, the header also has a Log out link.
 - The `web` service connects to IB Gateway and connects again after a lost
   connection. It starts also when the Gateway is not reachable.
 - After each connection, the `web` service checks the paper account. The home
@@ -116,6 +118,15 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   curves and fills, and a link to the comparison with each backtest of the
   same period. See
   [`docs/architecture/forward_test.md`](docs/architecture/forward_test.md).
+- Stock splits: before each US (08:00 ET) and HK (08:30 HKT) trading day,
+  the `forward-test` worker compares the stored daily closes and the paper
+  account positions with the owner ledger. A confirmed stock split changes
+  the owner ledger and the stored bars and restarts the forward tests that
+  hold the instrument. Else the instrument is "Split check needed": no order
+  on it until the user clicks "Apply split" or "Keep ledger" in the
+  Positions table. See
+  [`docs/architecture/paper_trading.md`](docs/architecture/paper_trading.md)
+  section 11.11.
 - Forward test records and comparison: at the end of each bar, the
   forward test records its new fills and one equity point in PostgreSQL. The
   button "Backtest the same period" starts a normal backtest of the same
@@ -153,7 +164,7 @@ For development and checks, also:
    `ATRADE_POSTGRES_PASSWORD` to a new password (letters, digits, and `-`
    only). PostgreSQL keeps this password in its volume at the first start.
 4. On rootless Podman without the memory cgroup controller, set
-   `ATRADE_WEB_MEMORY_LIMIT=0`.
+   `ATRADE_WEB_MEMORY_LIMIT=0` and `ATRADE_ASSISTANT_MEMORY_LIMIT=0`.
 5. Start all services:
 
    ```sh
@@ -220,12 +231,97 @@ With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
 | `ib-gateway` | IB Gateway and IBC, logged in to the paper account. Profile `ibkr`. The API port (`ib-gateway:4004`) is not published outside the Compose network. |
 | `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default `127.0.0.1:8000`). Memory limit, read-only root file system, writable `/tmp`. Health check on `/api/health`. |
 | `forward-test` | Forward-test worker (`python -m atrade.app.forward_test_worker`) and 1 child process per running forward test. Same image as `web`. Starts after the health check of `web` passes. No IBKR user name or password. |
+| `assistant` | The AI assistant: a Node.js process with the pi SDK (`assistant/`, image from `deploy/assistant.Dockerfile`). Memory limit `ATRADE_ASSISTANT_MEMORY_LIMIT` (default `1g`), read-only root file system, writable `/tmp`, volume `atrade-assistant-pi` on `/data`. No published port, no database URL, no IBKR setting. Networks `atrade-assistant-internal` (with `web` only) and `atrade-assistant-egress` (to the model providers). Health check on `GET /health` (port 8002, inside the network only). |
 
 At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
 `live`, `web` does not start and writes the reason.
 
 Rootless Podman without the memory cgroup controller cannot set a memory
-limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` in `.env`.
+limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` and
+`ATRADE_ASSISTANT_MEMORY_LIMIT=0` in `.env`. Only Compose reads these 2
+values.
+
+The volume `atrade-assistant-pi` holds the files of the AI assistant: one
+JSONL file of messages for each conversation in `conversations/`, and the
+AI assistant credentials in `credentials.json` (mode `0600`): the
+subscription login tokens and the API keys. The credentials are not in
+PostgreSQL, `.env`, or git. ATrade makes no automatic backup. A manual
+backup:
+
+```sh
+docker run --rm -v atrade-assistant-pi:/data:ro -v "$PWD":/backup busybox tar czf /backup/atrade-assistant-pi.tar.gz -C /data .
+chmod 600 atrade-assistant-pi.tar.gz
+```
+
+The backup holds the credentials. Keep it like `.env`: not in git, not in a
+shared folder, and readable only by you. When the volume is lost, log in and
+enter the API keys again in the "Credentials" dialog.
+
+### Import the Databento history
+
+The user buys the Databento daily bars and `statistics` one time
+(`docs/architecture/market_data.md` section 8.8.1). Then the import program
+saves them in `databento_bar`. It runs in the `web` image. Keep the files in
+`data/databento/` (not in git).
+
+```sh
+mkdir -p data/databento
+# Download the bought batch jobs (needs DATABENTO_API_KEY in .env) and import all DBN files.
+# --user lets the program write to data/databento/:
+docker compose --file deploy/compose.yaml --env-file .env run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/data/databento:/databento" web \
+  python -m atrade.app.databento_import /databento --job-id <batch job ID> --job-id <batch job ID>
+# Or import the DBN files that are already in data/databento/:
+docker compose --file deploy/compose.yaml --env-file .env run --rm \
+  -v "$PWD/data/databento:/databento:ro" web \
+  python -m atrade.app.databento_import /databento
+```
+
+The import writes the symbols without an official close and the
+EQUS.SUMMARY symbols without a listing exchange to its log. A second import
+of the same files adds no row. After the import, the program calculates the
+quarterly US universe of each quarter from 2018-10-01 that has no members.
+
+With `DATABENTO_API_KEY` in `.env`, the `forward-test` service updates the
+universe at 06:00 ET on the first trading day of each quarter (about 1.3 USD
+each quarter). With an empty key, the update does not run.
+
+The import reads the IBKR daily closes of the instruments that still trade
+to find their stock splits, so IB Gateway must run (`ibkr` profile). The
+import connects with client ID 30. Use `--ibkr-client-id <ID>` for another
+free client ID. The import also links symbol changes (for example `SQ` to
+`XYZ`) and writes the stock splits and links that it found to its log
+(`docs/architecture/market_data.md` sections 8.8.3 and 8.8.4).
+
+Check the detections one time after the import:
+
+```sh
+# List the stock splits that wait for the check and the symbol links that are not checked.
+docker compose --file deploy/compose.yaml --env-file .env run --rm web \
+  python -m atrade.app.databento_check
+# Confirm all of them. Reject each wrong stock split by its ID.
+docker compose --file deploy/compose.yaml --env-file .env run --rm web \
+  python -m atrade.app.databento_check --accept --reject-split <ID>
+```
+
+A confirmed stock split changes the stored bars before its ex-date. A
+rejected stock split changes nothing, and the next import keeps it rejected.
+
+Buy the hourly bars after the first import and the check
+(`docs/architecture/market_data.md` section 8.8.1). First print the purchase
+list and its cost. This reads `metadata.get_cost` (free, needs
+`DATABENTO_API_KEY`) and buys nothing:
+
+```sh
+docker compose --file deploy/compose.yaml --env-file .env run --rm web \
+  python -m atrade.app.databento_import --hourly-cost
+```
+
+The log has one line for each quarter: the time range, the symbols, and the
+cost. Buy XNAS.ITCH `ohlcv-1h` with these symbols and time ranges as batch
+jobs in DBN format, then import them with the same commands as above. The
+import keeps the 7 regular-hours bars of each day, and only in the quarters
+in which the instrument is in the universe.
 
 ### Old data
 
@@ -342,6 +438,7 @@ One command runs the same checks as CI:
 ./scripts/check            # all checks
 ./scripts/check backend    # ruff, basedpyright, import-linter, file length, pytest
 ./scripts/check frontend   # API types, ESLint, svelte-check, Vitest, build
+./scripts/check assistant  # assistant service: ESLint, TypeScript, Vitest
 ./scripts/check e2e        # Playwright
 ```
 
@@ -362,6 +459,8 @@ One command runs the same checks as CI:
   Gateway port is not published, so set `ATRADE_IBKR_HOST` and
   `ATRADE_IBKR_PAPER_PORT` to an address that you can reach, for example an
   SSH tunnel. See `docs/architecture/ibkr.md` section 7.5.
+- The `assistant` tests use a local fake OpenAI-compatible model server. They
+  call no real model provider and need no credential.
 
 ## Generate the API types
 
@@ -402,7 +501,10 @@ frontend/
   src/lib/           # one directory per capability, plus foundation/
   src/routes/        # pages
   e2e/               # Playwright tests
-deploy/              # compose.yaml, web.Dockerfile
+assistant/           # the assistant service (TypeScript, pi SDK)
+  src/               # Node.js runs these files directly; no build step
+  tests/             # Vitest, with a fake model server
+deploy/              # compose.yaml, web.Dockerfile, assistant.Dockerfile
 scripts/check        # the quality gate
 scripts/deploy       # deploys one commit of main on the server
 start                # ./start run

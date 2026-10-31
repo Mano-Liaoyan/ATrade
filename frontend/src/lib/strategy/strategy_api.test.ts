@@ -1,14 +1,30 @@
 // Calls the strategy HTTP routes and turns each answer into a result that the editor page can show.
 import { describe, expect, it } from 'vite-plus/test';
-import { createStrategy, deleteStrategy, saveStrategyVersion } from './index';
+import {
+  createStrategy,
+  listStrategyTemplates,
+  deleteStrategy,
+  readStrategy,
+  BLANK_RULES,
+  generateRulesCode,
+  readStrategyVersion,
+  saveStrategyRules,
+  saveStrategyVersion,
+  type StrategyDetail,
+  type StrategyVersion,
+} from './index';
 
-const VERSION = {
+const VERSION: StrategyVersion = {
   id: 7,
   strategy_id: 4,
   version_number: 3,
   code: 'x = 1\n',
   code_sha256: 'abc',
   created_at_utc: '2026-01-02T03:04:05Z',
+  source: 'user',
+  rules: null,
+  conversation_id: null,
+  discarded: false,
 };
 
 function respondWith(status: number, body: unknown): typeof fetch {
@@ -45,11 +61,82 @@ describe('saveStrategyVersion', () => {
   });
 });
 
+describe('readStrategyVersion', () => {
+  it('returns the source and the rules of the version', async () => {
+    const ruleBuilderVersion: StrategyVersion = { ...VERSION, source: 'rule_builder', rules: { entry: [] } };
+
+    const result = await readStrategyVersion(respondWith(200, ruleBuilderVersion), 4, 3);
+
+    expect(result).toEqual({ kind: 'ok', value: ruleBuilderVersion });
+  });
+});
+
+describe('readStrategy', () => {
+  it('returns the source of each version', async () => {
+    const strategy: StrategyDetail = {
+      id: 4,
+      name: 'Moving average',
+      created_at_utc: '2026-01-02T03:04:05Z',
+      versions: [
+        {
+          id: 6,
+          version_number: 1,
+          code_sha256: 'aaa',
+          created_at_utc: '2026-01-02T03:04:05Z',
+          source: 'user',
+          conversation_id: null,
+          discarded: false,
+        },
+        {
+          id: 7,
+          version_number: 2,
+          code_sha256: 'bbb',
+          created_at_utc: '2026-01-02T03:04:05Z',
+          source: 'rule_builder',
+          conversation_id: null,
+          discarded: false,
+        },
+      ],
+    };
+
+    const result = await readStrategy(respondWith(200, strategy), 4);
+
+    expect(result).toEqual({ kind: 'ok', value: strategy });
+  });
+});
+
 describe('createStrategy', () => {
   it('reports that the name is in use when the backend answers 409', async () => {
     const result = await createStrategy(respondWith(409, { detail: 'A strategy with this name exists.' }), 'Moving average');
 
     expect(result).toEqual({ kind: 'failed', message: 'A strategy with this name exists.' });
+  });
+
+  it('sends the name and the start point', async () => {
+    const bodies: unknown[] = [];
+    const recordingFetch: typeof fetch = (_input, init) => {
+      bodies.push(JSON.parse(init?.body as string));
+      return Promise.resolve(new Response(JSON.stringify({ id: 4 }), { status: 201 }));
+    };
+
+    await createStrategy(recordingFetch, 'Trend test', 's1');
+
+    expect(bodies).toEqual([{ name: 'Trend test', start_from: 's1' }]);
+  });
+});
+
+describe('listStrategyTemplates', () => {
+  it('reads the template list', async () => {
+    const paths: string[] = [];
+    const recordingFetch: typeof fetch = (input) => {
+      paths.push(input as string);
+      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+    };
+
+    const result = await listStrategyTemplates(recordingFetch);
+
+    expect(paths).toEqual(['/api/strategy-templates']);
+    expect(result).toEqual({ kind: 'ok', value: [] });
   });
 });
 
@@ -76,5 +163,39 @@ describe('deleteStrategy', () => {
     const result = await deleteStrategy(proxyFetch, 4);
 
     expect(result).toEqual({ kind: 'failed', message: 'The strategy request failed with HTTP status 502.' });
+  });
+});
+
+describe('saveStrategyRules', () => {
+  it('sends the rules and reports the new version', async () => {
+    let sentBody = '';
+    const recordingFetch: typeof fetch = (_input, init) => {
+      sentBody = typeof init?.body === 'string' ? init.body : '';
+      return Promise.resolve(new Response(JSON.stringify(VERSION), { status: 201 }));
+    };
+
+    const result = await saveStrategyRules(recordingFetch, 4, BLANK_RULES);
+
+    expect(JSON.parse(sentBody)).toEqual({ rules: BLANK_RULES });
+    expect(result).toEqual({ kind: 'saved', version: VERSION, isNewVersion: true });
+  });
+
+  it('gives the path and the reason of each rules format error', async () => {
+    const detail = [{ loc: ['body', 'rules', 'exits', 'exit_after_bars'], msg: 'Input should be greater than or equal to 1' }];
+
+    const result = await saveStrategyRules(respondWith(422, { detail }), 4, BLANK_RULES);
+
+    expect(result).toEqual({
+      kind: 'check_failed',
+      problems: [{ line: 0, message: 'body.rules.exits.exit_after_bars: Input should be greater than or equal to 1' }],
+    });
+  });
+});
+
+describe('generateRulesCode', () => {
+  it('returns the code of the rules', async () => {
+    const result = await generateRulesCode(respondWith(200, { code: 'class RulesStrategy: ...\n' }), BLANK_RULES);
+
+    expect(result).toEqual({ kind: 'ok', value: 'class RulesStrategy: ...\n' });
   });
 });

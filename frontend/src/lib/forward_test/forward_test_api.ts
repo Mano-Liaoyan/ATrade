@@ -13,6 +13,7 @@ export type FillComparison = components['schemas']['FillComparisonResponse'];
 export type ComparedInterruption = components['schemas']['ComparedInterruptionResponse'];
 export type ForwardTestDetail = components['schemas']['ForwardTestDetailResponse'];
 export type ForwardTestFill = components['schemas']['ForwardTestFillResponse'];
+export type ForwardTestInstrument = components['schemas']['ForwardTestInstrumentResponse'];
 export type ForwardTestInterruption = components['schemas']['InterruptionResponse'];
 type BarPeriod = components['schemas']['BarPeriod'];
 type ForwardTestsMessage = components['schemas']['ForwardTestsMessage'];
@@ -70,6 +71,34 @@ export function describeForwardTestStatus(status: ForwardTestStatus): string {
   return STATUS_LABELS[status];
 }
 
+// The universe name of a multi-instrument forward test for the page header (section 12.16), for example
+// "Watchlist (12)" with the instrument count of the detail. Null for one instrument.
+export function describeForwardTestUniverse(forwardTest: ForwardTest, instrumentCount?: number): string | null {
+  if (forwardTest.universe_kind === 'rule') {
+    return `Top ${String(forwardTest.universe_top_n)} by trading value`;
+  }
+  if (forwardTest.universe_kind !== 'list') {
+    return null;
+  }
+  return instrumentCount === undefined ? 'Watchlist' : `Watchlist (${String(instrumentCount)})`;
+}
+
+// The bar periods of the start dialog: a multi-instrument forward test runs on daily bars only (section 12.17).
+export function findUniverseBarPeriods<Period extends { value: string }>(
+  universeKind: ForwardTest['universe_kind'],
+  livePeriods: readonly Period[],
+): readonly Period[] {
+  return universeKind === 'single' ? livePeriods : livePeriods.filter((period) => period.value === '1-DAY');
+}
+
+// The instrument of a single-instrument forward test. Null for a multi-instrument forward test.
+export function readForwardTestInstrument(
+  forwardTest: ForwardTest,
+): { symbol: string; exchange: string; currency: string } | null {
+  const { symbol, exchange, currency } = forwardTest;
+  return symbol === null || exchange === null || currency === null ? null : { symbol, exchange, currency };
+}
+
 export function findForwardTestStatusKind(status: ForwardTestStatus): StatusKind {
   return STATUS_KINDS[status];
 }
@@ -116,25 +145,16 @@ export function canStop(forwardTest: ForwardTest): boolean {
   return forwardTest.desired_state === 'running' && forwardTest.client_id !== null;
 }
 
-/**
- * The forward tests that hold a client ID, each with its instrument. ATrade refuses paper orders by hand on these
- * instruments (docs/architecture.md section 12.2). The label is the label of the backend refusal.
- */
-export function listForwardTestsOnInstruments(
-  forwardTests: readonly ForwardTest[],
-): { label: string; symbol: string; exchange: string }[] {
-  return forwardTests
-    .filter((forwardTest) => forwardTest.client_id !== null)
-    .map((forwardTest) => ({
-      label: `Forward test ${String(forwardTest.id)} (${forwardTest.strategy_name} v${String(forwardTest.version_number)})`,
-      symbol: forwardTest.symbol,
-      exchange: forwardTest.exchange,
-    }));
+/** The start of the equity curve and of the Net profit: the allocated capital, or the start balance of an old forward
+ * test without an allocated capital (docs/architecture/forward_test.md 12.18). Null until an old forward test has a
+ * start balance. */
+export function readStartCapital(forwardTest: ForwardTest): string | null {
+  return forwardTest.allocated_capital_usd ?? forwardTest.start_balance_usd;
 }
 
-/** The same period backtest uses the start balance as its paper capital (docs/architecture/forward_test.md 12.10). */
+/** The same period backtest uses the start capital as its paper capital (docs/architecture/forward_test.md 12.10). */
 export function canBacktestSamePeriod(forwardTest: ForwardTest): boolean {
-  return forwardTest.start_balance_usd !== null;
+  return readStartCapital(forwardTest) !== null;
 }
 
 export function readForwardTestsMessage(message: unknown): ForwardTest[] | null {

@@ -13,6 +13,8 @@ const forwardTest: ForwardTest = {
   exchange: 'NASDAQ',
   currency: 'USD',
   bar_period: '1-MINUTE',
+  universe_kind: 'single',
+  universe_top_n: null,
   desired_state: 'running',
   status: 'running',
   client_id: 10,
@@ -23,6 +25,8 @@ const forwardTest: ForwardTest = {
   end_time_utc: null,
   crash_count: 0,
   interruptions: [],
+  allocated_capital_usd: '10000',
+  split_checks_needed: [],
 };
 
 describe('listForwardTestEvents', () => {

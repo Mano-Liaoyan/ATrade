@@ -1,4 +1,4 @@
-// Public entry of ibkr: reads GET /api/ibkr/gateway for the IB Gateway status line of the app shell.
+// Public entry of ibkr: reads GET /api/ibkr/gateway for the Connections button of the app shell.
 
 import type { components } from '#lib/api';
 
@@ -29,17 +29,4 @@ export async function fetchGatewayStatus(fetchFunction: typeof fetch): Promise<G
     return { kind: 'connected' };
   }
   return { kind: 'unreachable', address: `${gatewayStatus.host}:${String(gatewayStatus.port)}` };
-}
-
-export function describeGatewayStatus(gatewayStatus: GatewayStatus): string {
-  switch (gatewayStatus.kind) {
-    case 'connected':
-      return 'IB Gateway connected.';
-    case 'unreachable':
-      return `IB Gateway not reachable at ${gatewayStatus.address}. ATrade keeps trying to connect. Make sure that the ib-gateway service runs and is logged in.`;
-    case 'unknown':
-      return 'IB Gateway status not known.';
-    case 'checking':
-      return 'Checking IB Gateway.';
-  }
 }

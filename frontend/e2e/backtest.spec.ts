@@ -1,13 +1,34 @@
 // Backtest workbench (#104): start a backtest of the template strategy on saved bars from the New backtest dialog, and
 // see the list and the result on one page that does not scroll: the key metric row, the equity and drawdown curves,
-// and the Trades / Orders / Logs panel. The bar chart saves the bars first: the IBKR fake of
+// and the Trades / Orders / Logs / Metrics panel. The bar chart saves the bars first: the IBKR fake of
 // backend/tests/e2e_server.py has one daily bar for each day, with saw-tooth prices. The form offers only watchlist
 // instruments with saved bars of the selected bar period.
 import { expect, test, type Page } from '@playwright/test';
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
-const KEY_METRIC_NAMES = ['Total return', 'Net profit (USD)', 'Max drawdown', 'Win rate', 'Trades', 'Final equity (USD)'];
+const KEY_METRIC_NAMES = [
+  'Total return',
+  'Net profit (USD)',
+  'Max drawdown',
+  'Sharpe ratio',
+  'Win rate',
+  'Trades',
+  'Final equity (USD)',
+];
+const METRIC_TABLE_NAMES = [
+  'CAGR',
+  'Annual volatility',
+  'Sharpe ratio',
+  'Sortino ratio',
+  'Calmar ratio',
+  'Profit factor',
+  'Win rate',
+  'Average win (USD)',
+  'Average loss (USD)',
+  'Exposure',
+  'Turnover',
+];
 
 async function expectNoPageScroll(page: Page): Promise<void> {
   const sizes = await page.evaluate(() => ({
@@ -58,6 +79,33 @@ async function expectTradesOrdersAndLogs(page: Page): Promise<void> {
   await expect(tables).toContainText('No logs');
 }
 
+// The Metrics tab: the columns Metric and All with right-aligned values. Each metric name has a tooltip with its
+// definition and the risk-free rate. A "–" value has a tooltip with its reason. The table scrolls with a visible track.
+async function expectMetricTable(page: Page): Promise<void> {
+  const tables = page.getByRole('region', { name: 'Backtest tables' });
+  await tables.getByRole('tab', { name: 'Metrics' }).click();
+  const table = tables.getByRole('region', { name: 'Metrics' }).getByRole('table');
+  await expect(table.getByRole('columnheader')).toHaveText(['Metric', 'All']);
+  await expect(table.getByRole('rowheader')).toHaveText(METRIC_TABLE_NAMES);
+  await expect(table.getByRole('cell').first()).toHaveAttribute('align', 'right');
+  const track = tables.getByRole('scrollbar', { name: 'Metrics scroll bar' });
+  await expect(track).toBeVisible();
+  await expect(track.locator('.scroll-thumb')).toBeVisible();
+
+  await table.getByRole('button', { name: 'Sharpe ratio', exact: true }).focus();
+  await expect(page.getByRole('tooltip')).toHaveText(
+    'Mean of the daily returns / standard deviation of the daily returns × √252. Risk-free rate: 0',
+  );
+  // Keyboard focus on a row below the fold scrolls the table. The tooltip of the focused name stays open.
+  await table.getByRole('button', { name: 'Turnover', exact: true }).focus();
+  await expect(page.getByRole('tooltip')).toHaveText('Amount of all fills / mean equity / years. Risk-free rate: 0');
+  const dashes = table.getByRole('button', { name: '–', exact: true });
+  for (const dash of await dashes.all()) {
+    await dash.focus();
+    await expect(page.getByRole('tooltip')).toHaveText(/\S/);
+  }
+}
+
 test('starts a backtest and sees its metrics, curves, and trades on the workbench', async ({ page, request }, currentTest) => {
   test.setTimeout(BACKTEST_TIMEOUT_MILLISECONDS * 2);
   // The chart saves the daily bars from 2023-01-02 to 2026-01-01 in PostgreSQL. Backtests read only saved bars.
@@ -87,7 +135,7 @@ test('starts a backtest and sees its metrics, curves, and trades on the workbenc
   await expect(heading.getByRole('link', { name: `${strategyName} v1` })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: 'AAPL', exact: true })).toHaveAttribute('href', '/instruments/NASDAQ/AAPL?currency=USD');
   await expect(heading).toContainText('1 day');
-  await expect(chartPanel.getByRole('status', { name: 'Backtest status' })).toHaveText('Finished', {
+  await expect(chartPanel.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,
   });
   // The open backtest is the current row of the list.
@@ -99,7 +147,7 @@ test('starts a backtest and sees its metrics, curves, and trades on the workbenc
   await expect(chartPanel.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   await expect(metrics.nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
   await expect(chartPanel.getByRole('img', { name: 'Equity and drawdown' }).locator('canvas').first()).toBeVisible();
-  await expect(chartPanel.getByRole('link', { name: 'TradingView', exact: true })).toBeVisible();
+  await expect(chartPanel.getByRole('link', { name: 'Charting by TradingView' })).toBeVisible();
   // Daily bars are live bars, so the forward test of the same version, instrument, and bar period can start.
   await expect(chartPanel.getByRole('button', { name: 'Start forward test', exact: true })).not.toHaveAttribute(
     'aria-disabled',
@@ -107,6 +155,7 @@ test('starts a backtest and sees its metrics, curves, and trades on the workbenc
   await expectNoPageScroll(page);
 
   await expectTradesOrdersAndLogs(page);
+  await expectMetricTable(page);
 
   // /backtests opens the newest backtest.
   await page.goto('/backtests');

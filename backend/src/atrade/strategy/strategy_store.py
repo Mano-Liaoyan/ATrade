@@ -4,9 +4,21 @@ import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
+from typing import Any, Final, Literal
 
 import psycopg
 from psycopg.rows import class_row
+from psycopg.types.json import Jsonb
+
+# The version source (docs/architecture/strategy.md section 9.1.1). A CHECK constraint holds the same values.
+VersionSource = Literal["user", "rule_builder", "ai_assistant"]
+# A version is discarded when strategy_version_discard has a row for it (docs/architecture/assistant.md 25.5.1).
+VERSION_COLUMNS: Final = """
+    id, strategy_id, version_number, code, code_sha256, created_at_utc, source, rules, conversation_id,
+    EXISTS (
+        SELECT 1 FROM strategy_version_discard WHERE strategy_version_discard.strategy_version_id = strategy_version.id
+    ) AS discarded
+"""
 
 
 @dataclass(frozen=True)
@@ -31,6 +43,27 @@ class StrategyVersionRecord:
     code: str
     code_sha256: str
     created_at_utc: datetime
+    source: VersionSource
+    rules: dict[str, Any] | None
+    conversation_id: int | None
+    discarded: bool
+
+
+@dataclass(frozen=True)
+class VersionContent:
+    """What a save stores in a new version. Only versions with the source rule_builder have rules. Only versions
+    with the source ai_assistant have a conversation."""
+
+    code: str
+    source: VersionSource
+    rules: dict[str, Any] | None
+    conversation_id: int | None = None
+
+
+class DiscardResult(Enum):
+    DISCARDED = "discarded"
+    NOT_FOUND = "not_found"
+    NOT_AI_ASSISTANT = "not_ai_assistant"
 
 
 class DeleteResult(Enum):
@@ -91,8 +124,8 @@ async def select_strategy(connection: psycopg.AsyncConnection, strategy_id: int)
 async def select_versions(connection: psycopg.AsyncConnection, strategy_id: int) -> list[StrategyVersionRecord]:
     async with connection.cursor(row_factory=class_row(StrategyVersionRecord)) as cursor:
         await cursor.execute(
-            """
-            SELECT id, strategy_id, version_number, code, code_sha256, created_at_utc
+            f"""
+            SELECT {VERSION_COLUMNS}
             FROM strategy_version
             WHERE strategy_id = %(strategy_id)s
             ORDER BY version_number
@@ -107,8 +140,8 @@ async def select_version(
 ) -> StrategyVersionRecord | None:
     async with connection.cursor(row_factory=class_row(StrategyVersionRecord)) as cursor:
         await cursor.execute(
-            """
-            SELECT id, strategy_id, version_number, code, code_sha256, created_at_utc
+            f"""
+            SELECT {VERSION_COLUMNS}
             FROM strategy_version
             WHERE strategy_id = %(strategy_id)s AND version_number = %(version_number)s
             """,
@@ -118,9 +151,11 @@ async def select_version(
 
 
 async def save_version(
-    connection: psycopg.AsyncConnection, *, strategy_id: int, code: str, created_at_utc: datetime
+    connection: psycopg.AsyncConnection, *, strategy_id: int, content: VersionContent, created_at_utc: datetime
 ) -> SavedVersion | None:
     """Appends a version when the code differs from the latest version. Returns None when the strategy is missing.
+
+    A rule builder save also appends a version when only the rules differ (section 9.1).
 
     The caller runs this in a transaction. FOR UPDATE on the strategy row makes two saves of the same
     strategy wait for each other, so they cannot get the same version number.
@@ -132,8 +167,8 @@ async def save_version(
         return None
     async with connection.cursor(row_factory=class_row(StrategyVersionRecord)) as cursor:
         await cursor.execute(
-            """
-            SELECT id, strategy_id, version_number, code, code_sha256, created_at_utc
+            f"""
+            SELECT {VERSION_COLUMNS}
             FROM strategy_version
             WHERE strategy_id = %(strategy_id)s
             ORDER BY version_number DESC
@@ -142,18 +177,23 @@ async def save_version(
             {"strategy_id": strategy_id},
         )
         latest_version = await cursor.fetchone()
-    code_sha256 = calculate_code_sha256(code)
-    if latest_version is not None and latest_version.code_sha256 == code_sha256:
+    if latest_version is not None and is_same_content(latest_version, content):
         return SavedVersion(version=latest_version, is_new_version=False)
     next_version_number = 1 if latest_version is None else latest_version.version_number + 1
     new_version = await insert_version(
         connection,
         strategy_id=strategy_id,
         version_number=next_version_number,
-        code=code,
+        content=content,
         created_at_utc=created_at_utc,
     )
     return SavedVersion(version=new_version, is_new_version=True)
+
+
+def is_same_content(latest_version: StrategyVersionRecord, content: VersionContent) -> bool:
+    if latest_version.code_sha256 != calculate_code_sha256(content.code):
+        return False
+    return content.source != "rule_builder" or latest_version.rules == content.rules
 
 
 async def insert_version(
@@ -161,22 +201,30 @@ async def insert_version(
     *,
     strategy_id: int,
     version_number: int,
-    code: str,
+    content: VersionContent,
     created_at_utc: datetime,
 ) -> StrategyVersionRecord:
     async with connection.cursor(row_factory=class_row(StrategyVersionRecord)) as cursor:
         await cursor.execute(
-            """
-            INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc)
-            VALUES (%(strategy_id)s, %(version_number)s, %(code)s, %(code_sha256)s, %(created_at_utc)s)
-            RETURNING id, strategy_id, version_number, code, code_sha256, created_at_utc
+            f"""
+            INSERT INTO strategy_version (
+                strategy_id, version_number, code, code_sha256, created_at_utc, source, rules, conversation_id
+            )
+            VALUES (
+                %(strategy_id)s, %(version_number)s, %(code)s, %(code_sha256)s, %(created_at_utc)s, %(source)s, %(rules)s,
+                %(conversation_id)s
+            )
+            RETURNING {VERSION_COLUMNS}
             """,
             {
                 "strategy_id": strategy_id,
                 "version_number": version_number,
-                "code": code,
-                "code_sha256": calculate_code_sha256(code),
+                "code": content.code,
+                "code_sha256": calculate_code_sha256(content.code),
                 "created_at_utc": created_at_utc,
+                "source": content.source,
+                "rules": None if content.rules is None else Jsonb(content.rules),
+                "conversation_id": content.conversation_id,
             },
         )
         inserted_version = await cursor.fetchone()
@@ -184,6 +232,26 @@ async def insert_version(
         message = "INSERT ... RETURNING returned no row."
         raise RuntimeError(message)
     return inserted_version
+
+
+async def discard_version(
+    connection: psycopg.AsyncConnection, *, strategy_id: int, version_number: int, discarded_at_utc: datetime
+) -> DiscardResult:
+    """Adds the discarded mark to a version that the AI assistant saved. A second discard changes nothing."""
+    version = await select_version(connection, strategy_id=strategy_id, version_number=version_number)
+    if version is None:
+        return DiscardResult.NOT_FOUND
+    if version.source != "ai_assistant":
+        return DiscardResult.NOT_AI_ASSISTANT
+    await connection.execute(
+        """
+        INSERT INTO strategy_version_discard (strategy_version_id, discarded_at_utc)
+        VALUES (%(strategy_version_id)s, %(discarded_at_utc)s)
+        ON CONFLICT (strategy_version_id) DO NOTHING
+        """,
+        {"strategy_version_id": version.id, "discarded_at_utc": discarded_at_utc},
+    )
+    return DiscardResult.DISCARDED
 
 
 async def delete_strategy(connection: psycopg.AsyncConnection, strategy_id: int) -> DeleteResult:

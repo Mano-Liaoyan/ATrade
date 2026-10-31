@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The single quality gate: the same checks as CI (.github/workflows/ci.yml).
-#   ./scripts/check [all|backend|frontend|e2e]   default: all
+#   ./scripts/check [all|backend|frontend|assistant|e2e]   default: all
 # Environment:
 #   ATRADE_TEST_DATABASE_URL    PostgreSQL for pytest and Playwright. When it is not set, this script
 #                               starts a temporary postgres:18.3 container with Docker and removes it at exit.
@@ -97,6 +97,19 @@ check_frontend() {
   vp build
 }
 
+check_assistant() {
+  require_vite_plus
+  cd "$repo_root/assistant"
+  log_step "Assistant: vp install"
+  vp install --frozen-lockfile
+  log_step "Assistant: ESLint"
+  vp run lint:eslint
+  log_step "Assistant: TypeScript"
+  vp run check:types
+  log_step "Assistant: Vitest (fake model server, no real model provider)"
+  vp test run
+}
+
 check_e2e() {
   local projects="${ATRADE_PLAYWRIGHT_PROJECTS:-chromium firefox webkit msedge}"
   if [[ "$projects" == "none" ]]; then
@@ -123,6 +136,7 @@ case "$scope" in
     start_test_database
     check_backend
     check_frontend
+    check_assistant
     check_e2e
     ;;
   backend)
@@ -132,12 +146,15 @@ case "$scope" in
   frontend)
     check_frontend
     ;;
+  assistant)
+    check_assistant
+    ;;
   e2e)
     start_test_database
     check_e2e
     ;;
   *)
-    printf 'Usage: ./scripts/check [all|backend|frontend|e2e]\n' >&2
+    printf 'Usage: ./scripts/check [all|backend|frontend|assistant|e2e]\n' >&2
     exit 1
     ;;
 esac

@@ -4,13 +4,15 @@ import {
   canBacktestSamePeriod,
   canStop,
   describeForwardTestStatus,
+  describeForwardTestUniverse,
   findForwardTestStatusKind,
+  findUniverseBarPeriods,
   formatLocalTime,
   isLiveBarPeriod,
-  listForwardTestsOnInstruments,
   readEndTimeUtc,
   readForwardTestComparison,
   readForwardTestsMessage,
+  readStartCapital,
   startForwardTest,
   startSamePeriodBacktest,
   stopForwardTest,
@@ -24,6 +26,7 @@ const request: ForwardTestRequest = {
   exchange: 'NASDAQ',
   currency: 'USD',
   bar_period: '1-MINUTE',
+  allocated_capital_usd: '10000',
 };
 
 const runningForwardTest: ForwardTest = {
@@ -36,6 +39,8 @@ const runningForwardTest: ForwardTest = {
   exchange: 'NASDAQ',
   currency: 'USD',
   bar_period: '1-MINUTE',
+  universe_kind: 'single',
+  universe_top_n: null,
   desired_state: 'running',
   status: 'running',
   client_id: 10,
@@ -46,6 +51,8 @@ const runningForwardTest: ForwardTest = {
   end_time_utc: null,
   crash_count: 0,
   interruptions: [],
+  allocated_capital_usd: '10000',
+  split_checks_needed: [],
 };
 
 function makeFetch(status: number, body: unknown, requests: Request[] = []): typeof fetch {
@@ -67,7 +74,7 @@ describe('startForwardTest', () => {
   });
 
   it('shows the limit of running forward tests', async () => {
-    const body = { detail: 'limit of running forward tests reached', forward_test_id: null };
+    const body = { detail: 'limit of running forward tests reached', forward_test_id: null, unallocated_usd: null };
 
     const result = await startForwardTest(makeFetch(409, body), request);
 
@@ -144,9 +151,21 @@ describe('findForwardTestStatusKind', () => {
 });
 
 describe('canBacktestSamePeriod', () => {
-  it('needs the start balance, because the backtest uses it as the paper capital', () => {
-    expect(canBacktestSamePeriod(runningForwardTest)).toBe(true);
-    expect(canBacktestSamePeriod({ ...runningForwardTest, start_balance_usd: null })).toBe(false);
+  it('uses the allocated capital as the paper capital, also before the start balance is read', () => {
+    expect(canBacktestSamePeriod({ ...runningForwardTest, start_balance_usd: null })).toBe(true);
+  });
+
+  it('needs the start balance of an old forward test without an allocated capital', () => {
+    const oldForwardTest = { ...runningForwardTest, allocated_capital_usd: null };
+    expect(canBacktestSamePeriod(oldForwardTest)).toBe(true);
+    expect(canBacktestSamePeriod({ ...oldForwardTest, start_balance_usd: null })).toBe(false);
+  });
+});
+
+describe('readStartCapital', () => {
+  it('is the allocated capital, or the start balance of an old forward test', () => {
+    expect(readStartCapital({ ...runningForwardTest, start_balance_usd: null })).toBe('10000');
+    expect(readStartCapital({ ...runningForwardTest, allocated_capital_usd: null })).toBe('100000.00');
   });
 });
 
@@ -215,12 +234,32 @@ describe('the end time', () => {
   });
 });
 
-describe('listForwardTestsOnInstruments', () => {
-  it('names each forward test that holds a client ID, with its instrument', () => {
-    const stoppedForwardTest: ForwardTest = { ...runningForwardTest, id: 4, symbol: 'SPY', client_id: null, status: 'stopped' };
+describe('describeForwardTestUniverse', () => {
+  it('names the universe of a multi-instrument forward test and null for one instrument', () => {
+    expect(describeForwardTestUniverse(runningForwardTest)).toBeNull();
+    expect(
+      describeForwardTestUniverse({ ...runningForwardTest, symbol: null, universe_kind: 'rule', universe_top_n: 500 }),
+    ).toBe('Top 500 by trading value');
+    expect(describeForwardTestUniverse({ ...runningForwardTest, symbol: null, universe_kind: 'list' })).toBe(
+      'Watchlist',
+    );
+  });
 
-    expect(listForwardTestsOnInstruments([runningForwardTest, stoppedForwardTest])).toEqual([
-      { label: 'Forward test 3 (Trend v2)', symbol: 'AAPL', exchange: 'NASDAQ' },
-    ]);
+  it('counts the watchlist members when the instruments are known', () => {
+    expect(describeForwardTestUniverse({ ...runningForwardTest, symbol: null, universe_kind: 'list' }, 12)).toBe(
+      'Watchlist (12)',
+    );
+  });
+});
+
+describe('findUniverseBarPeriods', () => {
+  it('offers only 1 day for top N and watchlist, and all IB live bar periods for one instrument', () => {
+    const periods = [
+      { value: '1-MINUTE', label: '1 min' },
+      { value: '1-DAY', label: '1 day' },
+    ] as const;
+    expect(findUniverseBarPeriods('rule', periods)).toEqual([{ value: '1-DAY', label: '1 day' }]);
+    expect(findUniverseBarPeriods('list', periods)).toEqual([{ value: '1-DAY', label: '1 day' }]);
+    expect(findUniverseBarPeriods('single', periods)).toEqual(periods);
   });
 });

@@ -17,23 +17,26 @@ function makePosition(symbol: string, exchange: string, quantity: string): Paper
     market_price: '110.00',
     market_value: '1100.00',
     unrealized_pnl: '100.00',
+    owners: [],
+    unattributed_quantity: quantity,
+    split_check: null,
   };
 }
 
 function makeAccount(check: PaperAccountMessage['check'], positions: PaperPosition[] = []): PaperAccountMessage {
-  return { type: 'account', check, balance: null, positions };
+  return { type: 'account', check, balance: null, positions, unattributed_cash_usd: null };
 }
 
 const PASSED = { status: 'passed', message: null, actual_accounts: ['DU1234567'], expected_account: 'DU1234567' } as PaperAccountMessage['check'];
 
 describe('findInstrumentOrderBlock', () => {
   it('blocks the order while the paper account is not read', () => {
-    expect(findInstrumentOrderBlock(null, AAPL, [])).toEqual({ kind: 'in-progress', text: 'Reading the paper account.' });
+    expect(findInstrumentOrderBlock(null, AAPL)).toEqual({ kind: 'in-progress', text: 'Reading the paper account.' });
   });
 
   it('blocks the order when IB Gateway is not connected', () => {
     const account = makeAccount({ status: 'disconnected', message: null, actual_accounts: [], expected_account: null });
-    expect(findInstrumentOrderBlock(account, AAPL, [])).toEqual({
+    expect(findInstrumentOrderBlock(account, AAPL)).toEqual({
       kind: 'warning',
       text: 'Paper account not checked. IB Gateway is not connected.',
     });
@@ -41,23 +44,23 @@ describe('findInstrumentOrderBlock', () => {
 
   it('blocks the order when the paper account check failed', () => {
     const account = makeAccount({ status: 'failed', message: 'Wrong account.', actual_accounts: ['U1'], expected_account: 'DU1' });
-    expect(findInstrumentOrderBlock(account, AAPL, [])).toEqual({
+    expect(findInstrumentOrderBlock(account, AAPL)).toEqual({
       kind: 'error',
       text: 'Paper account check failed. ATrade sends no orders.',
     });
   });
 
-  it('blocks the order when a forward test trades the instrument', () => {
-    const blocking = [{ label: 'Forward test 7 (Bar count v1)', symbol: 'AAPL', exchange: 'NASDAQ' }];
-    expect(findInstrumentOrderBlock(makeAccount(PASSED), AAPL, blocking)).toEqual({
+  it('blocks the order while the instrument needs a split check', () => {
+    const splitCheck = { id: 7, stock_split_id: 3, split_ratio: '4', account_quantity_before: '10', account_quantity_after: '40' };
+    const account = makeAccount(PASSED, [{ ...makePosition('AAPL', 'NASDAQ', '40'), split_check: splitCheck }]);
+    expect(findInstrumentOrderBlock(account, AAPL)).toEqual({
       kind: 'warning',
-      text: 'Forward test 7 (Bar count v1) trades AAPL / NASDAQ. Stop the forward test to send an order by hand.',
+      text: 'AAPL needs a split check. Apply the split or keep the ledger on the paper trading page.',
     });
   });
 
-  it('lets the order go when the check passed and no forward test trades the instrument', () => {
-    const blocking = [{ label: 'Forward test 7 (Bar count v1)', symbol: 'MSFT', exchange: 'NASDAQ' }];
-    expect(findInstrumentOrderBlock(makeAccount(PASSED), AAPL, blocking)).toBeNull();
+  it('lets the order go when the check passed', () => {
+    expect(findInstrumentOrderBlock(makeAccount(PASSED), AAPL)).toBeNull();
   });
 });
 

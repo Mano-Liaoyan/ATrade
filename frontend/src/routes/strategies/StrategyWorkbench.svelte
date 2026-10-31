@@ -1,17 +1,25 @@
 <!-- Strategy page: a workbench (foundation/workbench, spec #99, ticket #106) like the QuantConnect editor. URL:
-     /strategies/<id> opens the latest version; /strategies/<id>/versions/<n> opens version n, and then the address
+     /strategies/<id> opens the latest version that is not discarded; /strategies/<id>/versions/<n> opens version n, and then the address
      follows the open version; /strategies opens the first strategy of the list.
      Left: the "Strategies" side column with the "New strategy" button. Center: the toolbar line (strategy name, version,
-     and icon buttons with the state in their icon and color), then the results panel and the editor panel with a
+     "Show discarded versions" when the strategy has a discarded version, and icon buttons with the state in their icon and color), then the results panel and the editor panel with a
      splitter between them. The swap button puts the editor on top or at the bottom; the browser keeps the choice.
      Run backtest and Start forward test open the dialogs of the backtest page and the forward test page with the
      open version. The results panel has one tab for each backtest of the strategy (number and total return), then Trades, Orders,
-     and Logs. A backtest that ends opens in its tab. The editor panel has the file tab and the code editor. Unsaved
-     edits stay in localStorage (drafts of the strategy capability).
+     and Logs. A backtest that ends opens in its tab. The editor panel has the "Rules" tab (the rule builder, RulesTab) and
+     the `strategy.py` tab (the code editor). While "Rules" is open, the save button and Ctrl S save the rules as a new
+     version. When the code of the open version changed after the rules, the tab shows a warning, and the save first
+     shows the diff of that code and the new code in a dialog. Unsaved edits of the code and of the rules stay in
+     localStorage (drafts of the strategy capability).
      Below the two panels is the problems and output panel (ticket #107, like the VS Code panel). It starts minimized
      to its 24px status bar: the error and warning counts open the Problems tab, "Output" opens the Output tab. A click
      on the selected tab minimizes it again. A save that the code checks refuse opens Problems; a click on a problem goes
-     to its line in the editor. Output lists the events and errors of saves, backtests, and forward tests. -->
+     to its line in the editor. Output lists the events and errors of saves, backtests, forward tests, and the AI
+     assistant.
+     Right: the "AI assistant" side column (AssistantColumn of routes/assistant/, docs/architecture/assistant.md
+     25.12). A click on a diff card opens a diff tab in the editor panel; Keep opens the new version, Discard keeps the
+     open version. A diff card on another page opens this page, and then its diff tab. Maximize of the side column
+     hides the center area: the Workbench shows only a 32px rail. -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import ErrorFilled16 from '@carbon/icons/es/error--filled/16.js';
@@ -29,12 +37,11 @@
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
   import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
-  import { Dialog, Icon, IconButton, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
-  import { CodeEditor } from '#lib/foundation/code_editor';
+  import { Dialog, Icon, IconButton, InlineNotification, Select, Toggle } from '#lib/foundation/carbon';
+  import { CodeDiff, CodeEditor } from '#lib/foundation/code_editor';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
   import { startPolling } from '#lib/foundation/polling';
-  import { ChangeText } from '#lib/foundation/value_format';
   import {
     Panel,
     PanelHeader,
@@ -46,39 +53,59 @@
   } from '#lib/foundation/workbench';
   import { ForwardTestsOnInstrumentsFeed, stopForwardTest, type ForwardTest } from '#lib/forward_test';
   import {
+    BLANK_RULES,
     clearDraft,
+    clearRulesDraft,
     connectStrategyLanguageServer,
-    createStrategy,
     deleteStrategy,
+    describeRulesWarning,
+    findRulesVersionNumber,
     formatVersionLabel,
+    generateRulesCode,
     listStrategies,
     readDraft,
     readStrategy,
+    readRulesDraft,
     readStrategyVersion,
+    saveStrategyRules,
     saveStrategyVersion,
     writeDraft,
+    writeRulesDraft,
     type CodeProblem,
     type StrategyDetail,
     type StrategyListItem,
+    type StrategyRules,
     type StrategyVersion,
     type StrategyVersionKey,
   } from '#lib/strategy';
+  import NewStrategyDialog from './NewStrategyDialog.svelte';
   import StartBacktestDialog from '../backtests/StartBacktestDialog.svelte';
   import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
+  import AssistantColumn from '../assistant/AssistantColumn.svelte';
+  import { assistantSession } from '../assistant/assistant_session.svelte';
+  import { AssistantDiff, DIFF_TAB_VALUE } from './assistant_diff.svelte';
   import StrategyList from './StrategyList.svelte';
   import StrategyOutput from './StrategyOutput.svelte';
+  import RulesTab from './RulesTab.svelte';
   import StrategyResults from './StrategyResults.svelte';
+  import BacktestTabLabel from './BacktestTabLabel.svelte';
+  import ClosedBacktestMenu from './ClosedBacktestMenu.svelte';
+  import { ClosedBacktestTabsState } from './closed_backtest_tabs.svelte';
   import {
-    createBacktestTab,
     createOutputLine,
     describeBacktestEvent,
+    describeFixRequest,
+    describeNoBacktestText,
     describeProblemCounts,
     describeShortcut,
     describeSwapButton,
+    findDefaultVersionNumber,
     findFinishedBacktest,
     findRunningForwardTest,
     isMacPlatform,
+    listClosedBacktestTabs,
     listResultTabs,
+    listVersionItems,
     listWorkbenchPanels,
     PANE_ORDER_STORAGE_KEY,
     readPaneOrder,
@@ -93,16 +120,18 @@
     type WorkbenchShortcut,
   } from './strategy_workbench';
 
-  // versionNumber comes from the version address /strategies/<id>/versions/<n>. Without it, the latest version opens.
+  // versionNumber comes from the version address /strategies/<id>/versions/<n>. Without it, the latest version that is
+  // not discarded opens.
   const {
     strategyId,
     versionNumber: addressVersionNumber = null,
   }: { strategyId: number | null; versionNumber?: number | null } = $props();
 
-  // The backend refuses a longer name.
-  const STRATEGY_NAME_MAX_LENGTH = 100;
   const LIST_CHECK_INTERVAL_MILLISECONDS = 2000;
-  const FILE_TABS = [{ value: 'strategy', label: 'strategy.py' }];
+  const FILE_TABS = [
+    { value: 'rules', label: 'Rules' },
+    { value: 'strategy', label: 'strategy.py' },
+  ];
   const isMac = isMacPlatform(navigator);
 
   let strategies: StrategyListItem[] = $state([]);
@@ -113,7 +142,14 @@
   let listReadCount = $state(0);
   let strategy = $state<StrategyDetail | null>(null);
   let openVersion = $state<StrategyVersion | null>(null);
+  // "Show discarded versions": the version Select hides the discarded versions until the user turns it on.
+  let showDiscarded = $state(false);
   let editorCode = $state('');
+  let fileTab = $state<'rules' | 'strategy'>('strategy');
+  // The rules of the "Rules" tab, and the version that they come from (0: the blank rules, no version has rules).
+  let rules = $state<StrategyRules | null>(null);
+  let savedRules = $state<StrategyRules | null>(null);
+  let rulesVersionNumber = $state(0);
   let problems: CodeProblem[] = $state([]);
   let outputLines: string[] = $state([]);
   let outputTab = $state<OutputTab>('problems');
@@ -126,16 +162,18 @@
   let backtestReadCount = $state(0);
   let selection = $state<ResultSelection>({ tab: null, backtestId: null });
   let paneOrder = $state<PaneOrder>(readPaneOrder(readStoredLayout(PANE_ORDER_STORAGE_KEY)));
+  // The closed backtest tabs of each strategy. A closed tab is only hidden on this page; the backtest stays.
+  const closedTabs = new ClosedBacktestTabsState();
   let isStoppingForwardTest = $state(false);
   let isNewStrategyDialogOpen = $state(false);
-  let newStrategyName = $state('');
-  let createMessage = $state('');
-  let isCreating = $state(false);
   let isDeleteDialogOpen = $state(false);
   let isDeleting = $state(false);
   let isBacktestDialogOpen = $state(false);
   let isForwardTestDialogOpen = $state(false);
-  let newStrategyForm: HTMLFormElement | undefined = $state();
+  // The new code of the rules while the diff dialog before a rules save is open (section 9.8.4), else null.
+  let replacingCode = $state<string | null>(null);
+  // The diff tab of a diff card. fileTab keeps the file tab to go back to.
+  const assistantDiff = new AssistantDiff();
 
   const forwardTestFeed = new ForwardTestsOnInstrumentsFeed();
   $effect(() => forwardTestFeed.start(window.location));
@@ -147,28 +185,42 @@
   });
 
   const activeStrategyId = $derived(strategyId ?? strategies[0]?.id ?? null);
-  const resultTabs = $derived(listResultTabs(backtests, activeStrategyId));
-  const shownResult = $derived(resolveResultTab(selection, backtests, activeStrategyId));
+  const closedBacktestIds = $derived(closedTabs.ids(activeStrategyId));
+  const resultTabs = $derived(listResultTabs(backtests, activeStrategyId, closedBacktestIds));
+  const allResultTabs = $derived([...resultTabs.backtestTabs, ...resultTabs.tableTabs]);
+  const shownResult = $derived(resolveResultTab(selection, backtests, activeStrategyId, closedBacktestIds));
   const shownBacktest = $derived(backtests.find((backtest) => backtest.id === shownResult.backtestId) ?? null);
   const runningBacktest = $derived(
     selectStrategyBacktests(backtests, activeStrategyId).find((backtest) => !isFinalStatus(backtest.status)) ?? null,
   );
   const runningForwardTest = $derived(findRunningForwardTest(forwardTestFeed.forwardTests, activeStrategyId));
-  const hasUnsavedChanges = $derived(openVersion !== null && editorCode !== openVersion.code);
-  const versionItems = $derived(
-    (strategy?.versions ?? []).map((version) => ({
-      value: String(version.version_number),
-      label: `v${String(version.version_number)}`,
-    })),
+  const hasUnsavedCode = $derived(openVersion !== null && editorCode !== openVersion.code);
+  const rulesWarning = $derived(
+    openVersion === null ? null : describeRulesWarning(openVersion.version_number, rulesVersionNumber),
   );
+  const hasUnsavedRules = $derived(rules !== null && JSON.stringify(rules) !== JSON.stringify(savedRules));
+  const hasUnsavedChanges = $derived(fileTab === 'rules' ? hasUnsavedRules : hasUnsavedCode);
+  const saveLabel = $derived(fileTab === 'rules' ? 'Save rules as new version' : 'Save version');
+  const versionItems = $derived(
+    listVersionItems(strategy?.versions ?? [], {
+      showDiscarded,
+      openVersionNumber: openVersion?.version_number ?? null,
+    }),
+  );
+  const hasDiscardedVersion = $derived((strategy?.versions ?? []).some((version) => version.discarded));
   const openVersionKey = $derived<StrategyVersionKey | null>(
     openVersion === null ? null : { strategyId: openVersion.strategy_id, versionId: openVersion.id },
   );
+  const fileTabs = $derived(assistantDiff.tab === null ? FILE_TABS : [...FILE_TABS, assistantDiff.tab]);
   const problemCounts = $derived(describeProblemCounts(problems));
   const swapButton = $derived(describeSwapButton(paneOrder));
   const panels = $derived(listWorkbenchPanels(paneOrder));
   const isDialogOpen = $derived(
-    isNewStrategyDialogOpen || isDeleteDialogOpen || isBacktestDialogOpen || isForwardTestDialogOpen,
+    isNewStrategyDialogOpen ||
+      isDeleteDialogOpen ||
+      isBacktestDialogOpen ||
+      isForwardTestDialogOpen ||
+      replacingCode !== null,
   );
 
   $effect(() => {
@@ -211,7 +263,7 @@
         failureText = '';
         const finished = findFinishedBacktest(backtests, result.value, activeStrategyId);
         if (finished !== null) {
-          selection = { tab: createBacktestTab(finished.id), backtestId: finished.id };
+          showBacktest(finished.id);
           writeOutput(describeBacktestEvent(finished));
         }
         backtests = result.value;
@@ -227,14 +279,22 @@
     strategy = null;
     strategyMessage = '';
     openVersion = null;
+    rules = null;
     problems = [];
     selection = { tab: null, backtestId: null };
+    assistantDiff.close();
     if (id !== null) {
       // The address gives the first version only. A later version change writes the address (openStrategyVersion).
       void loadStrategy(
         id,
         untrack(() => addressVersionNumber),
-      );
+      ).then(() => {
+        // A diff card on another page opened this strategy for its diff.
+        const diffVersionNumber = assistantSession.takeRequestedDiff(id);
+        if (diffVersionNumber !== null) {
+          void openDiff(diffVersionNumber);
+        }
+      });
     }
   });
 
@@ -247,7 +307,7 @@
     }
     strategyMessage = '';
     strategy = result.value;
-    const versionNumber = versionNumberToOpen ?? result.value.versions.at(-1)?.version_number;
+    const versionNumber = versionNumberToOpen ?? findDefaultVersionNumber(result.value.versions);
     if (versionNumber !== undefined) {
       await openStrategyVersion(id, versionNumber);
     }
@@ -260,6 +320,7 @@
       return;
     }
     const draft = readDraft(localStorage, { strategyId: id, versionNumber });
+    await loadRules(id, result.value);
     openVersion = result.value;
     editorCode = draft ?? result.value.code;
     problems = [];
@@ -276,6 +337,39 @@
     }
   }
 
+  // Decided (#173): the "Rules" tab opens the rules of the open version when it has rules, or else of the latest
+  // version with rules (vM), or else the blank rules. A rules draft of that version replaces them.
+  async function loadRules(id: number, version: StrategyVersion): Promise<void> {
+    const versionNumber = findRulesVersionNumber(strategy?.versions ?? [], version.version_number);
+    let versionRules: StrategyRules = BLANK_RULES;
+    if (versionNumber === version.version_number && version.rules !== null) {
+      versionRules = version.rules as StrategyRules;
+    } else if (versionNumber !== null) {
+      const result = await readStrategyVersion(fetch, id, versionNumber);
+      if (result.kind === 'failed') {
+        writeOutputError(`Rules not read: ${result.message}`);
+        return;
+      }
+      versionRules = (result.value.rules ?? BLANK_RULES) as StrategyRules;
+    }
+    rulesVersionNumber = versionNumber ?? 0;
+    savedRules = versionRules;
+    rules = readRulesDraft(localStorage, { strategyId: id, versionNumber: rulesVersionNumber }) ?? versionRules;
+  }
+
+  function changeRules(changed: StrategyRules): void {
+    rules = changed;
+    if (strategy === null) {
+      return;
+    }
+    const draftKey = { strategyId: strategy.id, versionNumber: rulesVersionNumber };
+    if (JSON.stringify(changed) === JSON.stringify(savedRules)) {
+      clearRulesDraft(localStorage, draftKey);
+    } else {
+      writeRulesDraft(localStorage, draftKey, changed);
+    }
+  }
+
   function changeCode(code: string): void {
     editorCode = code;
     if (openVersion === null) {
@@ -289,15 +383,38 @@
     }
   }
 
+  // In the warning case (section 9.8.4), a rules save first shows the diff of the open version code and the new code.
+  // When the code request fails, the save runs at once and shows the problems.
   async function saveVersion(): Promise<void> {
+    if (openVersion === null || strategy === null || isSaving) {
+      return;
+    }
+    if (fileTab === 'rules' && rules !== null && rulesWarning !== null) {
+      isSaving = true;
+      const result = await generateRulesCode(fetch, rules);
+      isSaving = false;
+      if (result.kind === 'ok') {
+        replacingCode = result.value;
+        return;
+      }
+    }
+    await saveNow();
+  }
+
+  async function saveNow(): Promise<void> {
     if (openVersion === null || strategy === null || isSaving) {
       return;
     }
     const id = strategy.id;
     const name = strategy.name;
     const baseVersionNumber = openVersion.version_number;
+    const savedRulesVersionNumber = rulesVersionNumber;
+    const rulesToSave = fileTab === 'rules' ? rules : null;
     isSaving = true;
-    const result = await saveStrategyVersion(fetch, id, editorCode);
+    const result =
+      rulesToSave === null
+        ? await saveStrategyVersion(fetch, id, editorCode)
+        : await saveStrategyRules(fetch, id, rulesToSave);
     isSaving = false;
     problems = [];
     if (result.kind === 'check_failed') {
@@ -310,11 +427,51 @@
       writeOutputError(`Version not saved: ${result.message}`);
       return;
     }
-    clearDraft(localStorage, { strategyId: id, versionNumber: baseVersionNumber });
+    if (rulesToSave === null) {
+      clearDraft(localStorage, { strategyId: id, versionNumber: baseVersionNumber });
+    } else {
+      clearRulesDraft(localStorage, { strategyId: id, versionNumber: savedRulesVersionNumber });
+    }
     const label = formatVersionLabel(name, result.version.version_number);
     await loadStrategy(id, result.version.version_number);
     listReadCount += 1;
     writeOutput(result.isNewVersion ? `Saved as ${label}.` : `Saved. The code is the same as ${label}.`);
+  }
+
+  async function openDiff(versionNumber: number): Promise<void> {
+    if (strategy === null) {
+      return;
+    }
+    const error = await assistantDiff.open(fetch, strategy.id, versionNumber);
+    if (error === null) {
+      panelSplit?.openPanel('editor');
+    } else {
+      writeOutputError(`Diff not read: ${error}`);
+    }
+  }
+
+  // Keep: the editor opens the new version (docs/architecture/assistant.md 25.5.2).
+  async function keepVersion(versionNumber: number): Promise<void> {
+    if (strategy === null) {
+      return;
+    }
+    assistantDiff.close(versionNumber);
+    await loadStrategy(strategy.id, versionNumber);
+    writeOutput(`Kept ${formatVersionLabel(strategy.name, versionNumber)}.`);
+  }
+
+  // Discard: the editor stays on the open version. The version list reads the discarded mark again.
+  async function showDiscardedVersion(versionNumber: number): Promise<void> {
+    if (strategy === null) {
+      return;
+    }
+    assistantDiff.close(versionNumber);
+    const label = formatVersionLabel(strategy.name, versionNumber);
+    const result = await readStrategy(fetch, strategy.id);
+    if (result.kind === 'ok') {
+      strategy = result.value;
+    }
+    writeOutput(`Discarded ${label}.`);
   }
 
   function writeOutput(text: string): void {
@@ -389,28 +546,43 @@
 
   function selectResultTab(value: string): void {
     const tab = value as ResultTab;
-    const backtestId = resultTabs.find((item) => item.value === tab)?.backtestId ?? null;
+    const backtestId = allResultTabs.find((item) => item.value === tab)?.backtestId ?? null;
     selection = { tab, backtestId: backtestId ?? shownResult.backtestId };
   }
 
+  function closeResultTab(value: string): void {
+    const backtestId = resultTabs.backtestTabs.find((item) => item.value === value)?.backtestId ?? null;
+    if (backtestId !== null && activeStrategyId !== null) {
+      closedTabs.close(activeStrategyId, backtestId);
+    }
+  }
+
+  // A backtest that opens from elsewhere (the "Closed backtests" menu, a new backtest, a backtest that ends): a closed
+  // tab opens again, and the tab is selected.
+  function showBacktest(backtestId: number): void {
+    if (activeStrategyId !== null) {
+      selection = closedTabs.open(activeStrategyId, backtestId);
+    }
+  }
+
+
+  // "Ask AI to fix": the AI assistant reads the error itself (read_backtest). Without an open conversation the message
+  // stays in the message input of the AI assistant column, so the user can send it.
+  function askAssistantToFix(backtestId: number): void {
+    assistantSession.text = describeFixRequest(backtestId);
+    if (assistantSession.connection === 'open') {
+      assistantSession.send();
+    }
+  }
+
   function openNewStrategyDialog(): void {
-    newStrategyName = '';
-    createMessage = '';
     isNewStrategyDialogOpen = true;
   }
 
-  async function submitNewStrategy(event: SubmitEvent): Promise<void> {
-    event.preventDefault();
-    isCreating = true;
-    const result = await createStrategy(fetch, newStrategyName);
-    isCreating = false;
-    if (result.kind === 'failed') {
-      createMessage = result.message;
-      return;
-    }
+  async function openCreatedStrategy(created: StrategyDetail): Promise<void> {
     isNewStrategyDialogOpen = false;
     listReadCount += 1;
-    await goto(resolve('/strategies/[strategyId]', { strategyId: String(result.strategy.id) }));
+    await goto(resolve('/strategies/[strategyId]', { strategyId: String(created.id) }));
   }
 
   async function removeStrategy(): Promise<void> {
@@ -432,16 +604,18 @@
 
 <svelte:window onkeydown={runShortcut} />
 
+{#snippet closedBacktestMenu()}
+  <ClosedBacktestMenu
+    tabs={listClosedBacktestTabs(backtests, activeStrategyId, closedBacktestIds)}
+    onReopen={showBacktest}
+    onReopenAll={() => {
+      closedTabs.reopenAll(activeStrategyId);
+    }}
+  />
+{/snippet}
+
 {#snippet resultTabLabel(item: { value: string; label: string })}
-  {@const tab = resultTabs.find((candidate) => candidate.value === item.value)}
-  {#if tab === undefined || tab.changeText === ''}
-    {item.label}
-  {:else}
-    <span class="result-tab-label">
-      {tab.name}
-      <ChangeText value={tab.change} text={tab.changeText} />
-    </span>
-  {/if}
+  <BacktestTabLabel tab={allResultTabs.find((candidate) => candidate.value === item.value)} label={item.label} />
 {/snippet}
 
 <Workbench>
@@ -469,6 +643,15 @@
             }}
           />
         </div>
+        {#if hasDiscardedVersion}
+          <Toggle
+            label="Show discarded versions"
+            checked={showDiscarded}
+            onCheckedChange={(checked: boolean) => {
+              showDiscarded = checked;
+            }}
+          />
+        {/if}
         {#snippet end()}
           <IconButton
             label="Delete strategy"
@@ -485,7 +668,7 @@
             onclick={swapPanels}
           />
           <IconButton
-            label={isSaving ? 'Saving version…' : hasUnsavedChanges ? 'Save version, unsaved changes' : 'Save version'}
+            label={isSaving ? 'Saving version…' : hasUnsavedChanges ? `${saveLabel}, unsaved changes` : saveLabel}
             icon={Save16}
             tone="neutral"
             shortcut={describeShortcut('save', isMac)}
@@ -543,22 +726,56 @@
               label="Results"
               tabs={{
                 label: 'Results',
-                items: resultTabs,
+                items: resultTabs.backtestTabs,
+                fixedItems: resultTabs.tableTabs,
                 value: shownResult.tab,
                 onValueChange: selectResultTab,
+                onCloseItem: closeResultTab,
                 itemLabel: resultTabLabel,
+                stripEnd: closedBacktestMenu,
               }}
             >
-              <StrategyResults backtest={shownBacktest} tab={shownResult.tab} />
+              <StrategyResults
+                backtest={shownBacktest}
+                tab={shownResult.tab}
+                emptyText={describeNoBacktestText(backtests, activeStrategyId)}
+                onAskAssistant={askAssistantToFix}
+              />
             </Panel>
           {:else if id === 'editor'}
             <Panel
               {...state}
               label="Editor"
-              tabs={{ label: 'Files', items: FILE_TABS, value: 'strategy', onValueChange: () => {} }}
+              tabs={{
+                label: 'Files',
+                items: fileTabs,
+                value: assistantDiff.isSelected ? DIFF_TAB_VALUE : fileTab,
+                onValueChange: (value: string) => {
+                  assistantDiff.isSelected = value === DIFF_TAB_VALUE;
+                  if (!assistantDiff.isSelected) {
+                    fileTab = value === 'rules' ? 'rules' : 'strategy';
+                  }
+                },
+              }}
             >
-              {#if openVersion !== null}
-                <div class="editor">
+              {#if assistantDiff.diff !== null && assistantDiff.isSelected}
+                {@const diff = assistantDiff.diff}
+                <CodeDiff
+                  firstCode={diff.firstCode}
+                  secondCode={diff.secondCode}
+                  firstLabel={`v${String(diff.versionNumber - 1)}`}
+                  secondLabel={`v${String(diff.versionNumber)}`}
+                  fill
+                />
+              {/if}
+              {#if fileTab === 'rules' && !assistantDiff.isSelected}
+                {#if rules !== null}
+                  {#key `${String(shownStrategy.id)}.${String(rulesVersionNumber)}`}
+                    <RulesTab {rules} onRulesChange={changeRules} warning={rulesWarning} />
+                  {/key}
+                {/if}
+              {:else if openVersion !== null}
+                <div class="editor" hidden={assistantDiff.isSelected || fileTab === 'rules'}>
                   {#key shownStrategy.id}
                     <CodeEditor
                       bind:this={codeEditor}
@@ -624,25 +841,25 @@
       <EmptyText text="No strategies" />
     {/if}
   </div>
+
+  <AssistantColumn
+    openStrategy={strategy === null ? null : { strategyId: strategy.id, versionNumber: openVersion?.version_number ?? null }}
+    onOpenDiff={(versionNumber: number) => void openDiff(versionNumber)}
+    onKeep={(versionNumber: number) => void keepVersion(versionNumber)}
+    onDiscarded={(versionNumber: number) => void showDiscardedVersion(versionNumber)}
+    onError={writeOutputError}
+  />
 </Workbench>
 
-<Dialog
+<NewStrategyDialog
   open={isNewStrategyDialogOpen}
   onOpenChange={(open: boolean) => {
     isNewStrategyDialogOpen = open;
   }}
-  title="New strategy"
-  primaryText={isCreating ? 'Creating…' : 'Create strategy'}
-  busy={isCreating}
-  onPrimary={() => newStrategyForm?.requestSubmit()}
->
-  <form class="new-strategy-form" aria-label="New strategy" bind:this={newStrategyForm} onsubmit={submitNewStrategy}>
-    <TextInput label="Strategy name" name="name" bind:value={newStrategyName} required maxlength={STRATEGY_NAME_MAX_LENGTH} />
-  </form>
-  {#if createMessage !== ''}
-    <InlineNotification kind="error" lowContrast title="Strategy not created" subtitle={createMessage} />
-  {/if}
-</Dialog>
+  onCreated={(created: StrategyDetail) => {
+    void openCreatedStrategy(created);
+  }}
+/>
 
 {#if strategy !== null}
   <Dialog
@@ -662,6 +879,32 @@
   </Dialog>
 {/if}
 
+{#if openVersion !== null}
+  <Dialog
+    open={replacingCode !== null}
+    onOpenChange={(open: boolean) => {
+      if (!open) {
+        replacingCode = null;
+      }
+    }}
+    title="Replace code changes of v{openVersion.version_number}"
+    size="lg"
+    primaryText="Save rules as new version"
+    busy={isSaving}
+    onPrimary={() => {
+      replacingCode = null;
+      void saveNow();
+    }}
+  >
+    <CodeDiff
+      firstCode={openVersion.code}
+      secondCode={replacingCode ?? ''}
+      firstLabel="v{openVersion.version_number}"
+      secondLabel="Code from the rules"
+    />
+  </Dialog>
+{/if}
+
 <StartBacktestDialog
   open={isBacktestDialogOpen}
   onOpenChange={(open: boolean) => {
@@ -670,7 +913,7 @@
   strategyVersion={openVersionKey}
   onStarted={(started: Backtest) => {
     // The new backtest opens in its tab at once; it shows its status until it ends.
-    selection = { tab: createBacktestTab(started.id), backtestId: started.id };
+    showBacktest(started.id);
     backtestReadCount += 1;
     writeOutput(describeBacktestEvent(started));
   }}
@@ -698,6 +941,10 @@
     min-block-size: 0;
   }
 
+  .editor[hidden] {
+    display: none;
+  }
+
   .strategy-name {
     flex: 0 1 auto;
     min-inline-size: 0;
@@ -705,19 +952,14 @@
 
   .version-select {
     flex: none;
-    inline-size: var(--cds-spacing-11);
+    /* Room for "v123" and the tag "Discarded". */
+    inline-size: calc(var(--cds-spacing-13) + var(--cds-spacing-07));
   }
 
   .main :global(.cds--inline-notification) {
     flex: none;
     max-inline-size: none;
     margin-block: 0;
-  }
-
-  .result-tab-label {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--cds-spacing-03);
   }
 
   .editor {
@@ -750,7 +992,4 @@
     fill: var(--cds-support-warning);
   }
 
-  .new-strategy-form {
-    margin-block-end: var(--cds-spacing-05);
-  }
 </style>

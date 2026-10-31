@@ -13,13 +13,16 @@
     EquityDrawdownChart,
     isFinalStatus,
     listBacktests,
+    readBacktestInstrument,
     type Backtest,
     type BacktestComparison,
+    type BacktestInstrument,
     type ComparedTest,
     type DrawdownCurve,
   } from '#lib/backtest';
   import { Button, InlineNotification } from '#lib/foundation/carbon';
   import { CodeDiff } from '#lib/foundation/code_editor';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { startPolling } from '#lib/foundation/polling';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -111,8 +114,17 @@
       href: resolve('/backtests/[[backtestId]]', { backtestId: String(backtest.id) }),
       metrics: backtest.metrics,
       startCapitalUsd: backtest.paper_capital_usd,
-      trades: backtest.trades,
     };
+  }
+
+  // The instrument of both backtests, when they are single-instrument backtests of the same instrument.
+  function findSharedInstrument(first: Backtest, second: Backtest): BacktestInstrument | undefined {
+    const firstInstrument = readBacktestInstrument(first);
+    const secondInstrument = readBacktestInstrument(second);
+    if (firstInstrument === undefined || secondInstrument === undefined) {
+      return undefined;
+    }
+    return isSameInstrument(firstInstrument, secondInstrument) ? firstInstrument : undefined;
   }
 </script>
 
@@ -145,10 +157,13 @@
                   >{compared.strategy_name}</a
                 >
                 <!-- The instrument and the bar period show when both backtests have the same one. -->
-                {#if isSameInstrument(compared.first, compared.second)}
-                  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
-                  <a class="cds--link" href={createInstrumentHref(compared.first)}>{compared.first.symbol}</a>
-                {/if}
+                {#snippet instrumentLink(sharedInstrument: BacktestInstrument | undefined)}
+                  {#if sharedInstrument !== undefined}
+                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
+                    <a class="cds--link" href={createInstrumentHref(sharedInstrument)}>{sharedInstrument.symbol}</a>
+                  {/if}
+                {/snippet}
+                {@render instrumentLink(findSharedInstrument(compared.first, compared.second))}
                 {#if compared.first.bar_period === compared.second.bar_period}
                   <span class="run-period">{formatBarPeriod(compared.first.bar_period)}</span>
                 {/if}
@@ -175,12 +190,7 @@
           >
             {#if compared.first.code === compared.second.code}
               <!-- Saving the same code again keeps the version, so the same code means the same strategy version. -->
-              <InlineNotification
-                kind="info"
-                label="Code difference"
-                title="Same strategy version: no code difference."
-                lowContrast
-              />
+              <EmptyText text="No code difference" />
               <div class="same-code-action">
                 <Button
                   kind="ghost"

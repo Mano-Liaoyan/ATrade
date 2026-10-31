@@ -1,6 +1,6 @@
 // Labels and values that the backtest pages show.
 import type { StatusKind } from '#lib/foundation/carbon';
-import { formatSignedPercent } from '#lib/foundation/value_format';
+import { formatSignedPercent, MISSING_VALUE } from '#lib/foundation/value_format';
 import type { BacktestStatus } from './backtest_api';
 
 const STATUS_LABELS: Record<BacktestStatus, string> = {
@@ -9,17 +9,19 @@ const STATUS_LABELS: Record<BacktestStatus, string> = {
   finished: 'Finished',
   failed: 'Failed',
   timed_out: 'Timed out',
+  cancelled: 'Cancelled',
 };
-// The status indicator kind of each status. The indicator also shows an icon and the status word, so the color is
-// never the only sign.
+// The status icon kind of each status. Each kind has its own icon shape, and the tooltip names the status, so the color
+// is never the only sign.
 const STATUS_KINDS: Record<BacktestStatus, StatusKind> = {
   queued: 'neutral',
   running: 'in-progress',
   finished: 'success',
   failed: 'error',
   timed_out: 'warning',
+  cancelled: 'neutral',
 };
-const FINAL_STATUSES: readonly BacktestStatus[] = ['finished', 'failed', 'timed_out'];
+const FINAL_STATUSES: readonly BacktestStatus[] = ['finished', 'failed', 'timed_out', 'cancelled'];
 const SECONDS_PER_MINUTE = 60;
 const WHOLE_NUMBER_PATTERN = /^\d+$/;
 const AMOUNT_FORMAT = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -30,6 +32,11 @@ export function describeBacktestStatus(status: BacktestStatus): string {
 
 export function findBacktestStatusKind(status: BacktestStatus): StatusKind {
   return STATUS_KINDS[status];
+}
+
+/** The last line of an error message that is not empty, for example the exception line of a traceback. */
+export function findErrorSummary(errorMessage: string | null): string {
+  return (errorMessage ?? '').split('\n').findLast((line) => line.trim() !== '')?.trim() ?? '';
 }
 
 export function isFinalStatus(status: BacktestStatus): boolean {
@@ -58,6 +65,16 @@ export function formatMaxDrawdown(maxDrawdownPercent: string): { text: string; c
 
 export function formatUsd(amount: string): string {
   return AMOUNT_FORMAT.format(Number(amount));
+}
+
+/** A ratio of the API with 2 decimal places ("1.23"), or "–" for null. */
+export function formatRatio(ratio: string | null): string {
+  return ratio === null ? MISSING_VALUE : AMOUNT_FORMAT.format(Number(ratio));
+}
+
+/** A share of the API without a sign ("66.67 %"), or "–" for null. */
+export function formatUnsignedPercent(percent: string | null): string {
+  return percent === null ? MISSING_VALUE : `${AMOUNT_FORMAT.format(Number(percent))} %`;
 }
 
 // The backend stores the timeout in seconds. The UI shows and takes it in minutes.

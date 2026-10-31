@@ -66,8 +66,8 @@ A screen starts from one list of instruments of its market:
 | HK | The HK instrument list (`market_data.md`, the HK instrument list section) | Yes |
 | HK | The HK instruments of the watchlist | No |
 
-- An HK screen shows a warning: "The universe has survivorship bias: it has
-  no instruments that stopped trading." Source text (#145): 品种池含幸存者偏差：缺少已退市的品种。
+- An HK screen shows the warning "Survivorship bias"; its tooltip says that
+  instruments that stopped trading are missing. Source text (#145): 品种池含幸存者偏差：缺少已退市的品种。
 - The user keeps the HK instrument list. The screen page does not change it.
 
 ## 24.3 Conditions and order
@@ -123,6 +123,11 @@ document.
   `assistant_conversation_id` becomes null (#150 A3, B4).
 - PostgreSQL deletes the rows and the excluded list of a screen result with
   the screen result (`ON DELETE CASCADE`).
+- Decided (#205): the migration `d41ce3053ba2_screen_create_tables.py` makes
+  the 4 tables with these column names. `screen_result.screen_id` is
+  `ON DELETE CASCADE`: a delete of a screen deletes its screen results. A
+  backtest keeps its own copy of the screen (section 24.1). `result_count`
+  and `screen_result_row.position` are at most 500.
 
 ### 24.4.1 Screen definition
 
@@ -151,6 +156,18 @@ The definition is JSON. The indicator reference is the reference of section
   (US), or `hk_instrument_list`, `watchlist` (HK).
 - Numbers are decimal strings, as in the other routes.
 - `keep_first` is optional.
+- Decided (#205): the JSON has exactly these keys. All 4 top-level keys are
+  required. The `filters` and `indicator_conditions` lists can be empty.
+
+  | Part | Keys | Values |
+  |---|---|---|
+  | Filter `still_trading` | `field` | |
+  | Filter `last_price`, `average_trading_value_20` | `field`, `operator`, `value` | `operator`: `<`, `<=`, `>`, `>=`. `value`: a decimal string. |
+  | Filter `exchange` | `field`, `values` | A list of 1 or more exchanges. |
+  | Condition `compare` | `kind`, `indicator`, `operator`, `value` | As the number filters. |
+  | Condition `close_versus_line` | `kind`, `indicator`, `side` | `indicator`: `sma` or `ema` with the output `value`, or `donchian_channel` with the output `upper`. `side`: `above` or `below`. |
+  | Condition `rank` | `kind`, `indicator`, `end`, `percent` | `end`: `top` or `bottom`. `percent`: an integer from 1 to 100. |
+  | `order` | `indicator`, `direction`, optional `keep_first` | `direction`: `ascending` or `descending`. `keep_first`: an integer from 1 to 500. |
 
 ## 24.5 Run flow
 
@@ -182,6 +199,53 @@ Source: [Indicator library scope and calculation place](https://github.com/Mano-
 | Universe of a quarter | The top 500 US instruments of a quarter (#141). |
 | Instrument name | The "Name" column of the result table (section 24.10). |
 
+Decided (#206):
+
+- Code: `screen/screen_run.py` (`run_screen_steps`, the 2 steps without a
+  database), `screen/screen_running.py` (`run_saved_screen`: the start
+  instruments, the reads, and the save), and the store functions of
+  `screen/screen_store.py`. Tests: `tests/screen/test_screen_run.py` and
+  `tests/screen/test_screen_run_routes.py`.
+- The start instruments come from these reads of `market_data` and
+  `watchlist`: `read_us_universe_members` with the quarter of the first
+  trading day of the run date (`quarter_universe`),
+  `read_daily_bar_summaries_of_currency` with `USD`
+  (`all_with_daily_bars`), `read_hk_instrument_list`
+  (`hk_instrument_list`), and `read_watchlist_instruments` with only the
+  instruments in the currency of the market (`USD` or `HKD`).
+- The daily bar summary has no trading status (`market_data.md` section
+  8.14). "Still trading" is a rule of `screen`: the last daily bar of the
+  instrument is at most 7 calendar days older than the daily bars date of
+  the run. The daily bars date is the date of the newest last daily bar of
+  the start instruments.
+- A start instrument without a summary row is excluded with the reason
+  "No daily bars". A filter on the average trading value (20) of an
+  instrument with fewer than 20 daily bars gives "No value: Avg trading
+  value (20)".
+- Step 2 reads the daily bars before the day after the daily bars date
+  with one `read_last_daily_bars` call. Its `bar_count` is the longest
+  look-back of the indicators (section 23.4). Each indicator gets only its
+  own look-back bars, the last bars of the read.
+- An instrument with "no value" for an indicator of a condition or of the
+  order gets the reason "No value: <indicator>" with the first such
+  indicator. The other excluded instruments get the reason of the first
+  condition that is not true, in the form "<location>: <condition>", for
+  example "filters[1]: Close > 5", "indicator_conditions[0]: RSI(14) < 30",
+  "indicator_conditions[1]: Close above SMA(200)", or
+  "indicator_conditions[2]: 12-1 momentum(252, 21) top 20%".
+- The percentile of a rank condition is 100 × the share of the values that
+  are lower or equal. "Top N" keeps a percentile above 100 − N. "Bottom N"
+  keeps the instruments whose share of lower values is below N percent.
+  Equal values get the same percentile and the same answer.
+- The sort uses the order indicator, then the symbol. When more than 500
+  instruments pass, the result keeps the first 500 of the order.
+  `after_indicator_conditions_count` counts all passing instruments.
+- A run saves the full excluded list, also for a run with all US
+  instruments.
+- `market_data` has no instrument name (`market_data.md` has no name
+  source), so the result has no "Name" column yet. The name source needs a
+  decision of the user.
+
 ## 24.6 Checks
 
 Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) B5.
@@ -199,19 +263,31 @@ gives the location of the condition and the reason. The checks:
 - Each operator and each field is known.
 - The name is 1 to 100 characters.
 
+Decided (#205): the check is `check_screen` in `screen/screen_check.py`. The
+`422` body is `{"problems": [{"location", "message"}]}`. `location` is the
+path in the request body, a list of keys and list indexes, for example
+`["definition", "indicator_conditions", 0, "indicator", "parameters", "period"]`.
+The indicator problems of section 23.6 get the location of their condition
+before their own location. A name that another screen has gives the
+problem `["name"]` with the reason "A screen with the name '<name>' exists.".
+The market is a problem `["market"]` when it is not `US` or `HK`.
+
 ## 24.7 HTTP routes
 
 Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) A8 and B3.
-The paths are proposals of #150. The implementation sets them.
+Decided (#205): the paths and the field names of this table are final.
+`screen/http_routes.py` has the first 5 routes.
 
 | Route | Behavior |
 |---|---|
-| `GET /api/screens` | `200` with `[{"id", "name", "market", "kept", "updated_at_utc"}]`. |
-| `GET /api/screens/{screen_id}` | `200` with the screen (`id`, `name`, `market`, `definition`, `kept`, `assistant_conversation_id`, `created_at_utc`, `updated_at_utc`) and its recent screen results (`id`, `run_at_utc`, `result_count`). `404` when the screen does not exist. |
-| `POST /api/screens` | Body `{"name", "market", "definition"}`. `201` with the screen. `422` with the problem list (section 24.6). |
+| `GET /api/screens` | `200` with `[{"id", "name", "market", "kept", "updated_at_utc"}]`, the last changed screen first. |
+| `GET /api/screens/{screen_id}` | `200` with the screen (`id`, `name`, `market`, `definition`, `kept`, `assistant_conversation_id`, `created_at_utc`, `updated_at_utc`) and `recent_screen_results`: the last 10 screen results (`id`, `run_at_utc`, `result_count`), the last run first. `404` when the screen does not exist. |
+| `POST /api/screens` | Body `{"name", "market", "definition"}`. `201` with the screen, as `GET /api/screens/{screen_id}` gives it. A screen of the user has `kept` true and `assistant_conversation_id` null. `422` with the problem list (section 24.6). |
 | `PUT /api/screens/{screen_id}` | Body `{"name", "definition"}`. `200` with the screen. `422` with the problem list. `404` when the screen does not exist. On the AI assistant port, `403` for each screen that section 24.8 does not allow. |
-| `DELETE /api/screens/{screen_id}` | `204`. `404` when the screen does not exist. Not on the AI assistant port. |
-| `POST /api/screens/{screen_id}/runs` | Runs the saved screen. `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
+| `DELETE /api/screens/{screen_id}` | `204`. Also deletes the screen results of the screen. `404` when the screen does not exist. Not on the AI assistant port. Discard of the condition card uses it (#210). |
+| `POST /api/screens/{screen_id}/keep` | Keep of the condition card (#210). `200` with the screen, as `GET /api/screens/{screen_id}` gives it, with `kept` true. A screen that is kept already also gets `200`. `updated_at_utc` does not change. `404` when the screen does not exist. Not on the AI assistant port. |
+| `POST /api/screens/{screen_id}/runs` | Runs the saved screen. With the optional body `{market, definition}`, runs that market and definition in place of the saved ones and does not change the saved screen (#212). `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
+| `GET /api/screen-indicators` | `200` with the indicator catalog of section 23.3, in its order: `[{"key", "name", "parameters": [{"name", "value_type" ("int" or "float"), "default", "minimum", "maximum", "is_in_name"}], "outputs"}]`. The edit popover of the screen page reads it (#212). Not on the AI assistant port. |
 | `GET /api/screen-results/{screen_result_id}?offset=&limit=` | `200` with the summary and one page of rows. Default `limit` 50. `404` when the screen result does not exist. |
 
 The screen result answer:
@@ -221,6 +297,33 @@ The screen result answer:
 - `definition`: the copy of the screen.
 - `rows`: each row has all columns of the result table (section 24.10).
 - `exclusions`: the excluded instruments with their reasons.
+
+Decided (#206): the screen result answer is
+`{"id", "screen_id", "market", "assistant_conversation_id", "summary", "definition", "rows", "exclusions"}`.
+
+- `summary`: `row_count` (all rows, also the rows that are not on the
+  page), `start_count`, `after_filters_count`,
+  `after_indicator_conditions_count`, `result_count`, `exclusion_counts`
+  (`[{"reason", "count"}]`, the most frequent reason first),
+  `daily_bars_date` (null when no start instrument has daily bars),
+  `run_at_utc`, and `run_seconds`.
+- Each row: `position`, `symbol`, `exchange`, `currency`, `last_price`
+  (decimal string), `average_trading_value_20` (null with fewer than 20
+  daily bars), `indicator_values` (the value of each indicator of a
+  condition or of the order by its name, for example `{"RSI(14)": 28.4}`),
+  and `percentiles` (the percentile of each rank condition by the name of
+  its indicator).
+- `exclusions`: all excluded instruments (`symbol`, `exchange`,
+  `currency`, `reason`), by symbol. The route does not page them.
+- `offset` is 0 or more. `limit` is 1 to 500, default 50.
+- A run of the user has `assistant_conversation_id` null.
+
+Decided (#207): the screen result answer also has `indicator_names`:
+`{"indicator_conditions": ["RSI(14)", ...], "order": "Momentum(252, 21)"}`.
+It has one UI name for each indicator condition, in the order of the
+definition, and the name of the order indicator. These names are the keys of
+`indicator_values` and `percentiles`. The condition bar and the result table
+use them, so the frontend has no copy of the indicator catalog.
 
 ## 24.8 AI assistant access
 
@@ -238,20 +341,33 @@ card. This section gives only what the screen routes must allow.
 | `read_screen_result` | `GET /api/screen-results/{id}` | Default: the summary and the first 50 rows. The AI assistant can read more pages. |
 | `run_backtest` | `POST /api/backtests` with the universe fields | Section 24.9. |
 
+Decided (#209): the port 8001 routes read the conversation from the header
+`X-ATrade-Conversation-Id` (assistant section 25.3.2). A missing header or
+an unknown conversation gets `422`. The new screen has `kept` false. The
+store tries "<name> (AI)", then "<name> (AI 2)", "<name> (AI 3)", and so
+on, until a name is free. Because of the suffix, the name in the request
+has at most 95 characters. When no free name fits in 100 characters, the
+answer is `422` with a `name` problem. `PUT` answers `404` for a screen that does not
+exist, and `403` when the screen has `kept` true or another
+`assistant_conversation_id`. A delete of the conversation sets
+`assistant_conversation_id` to null on its screens and screen results
+(`ON DELETE SET NULL`, section 24.4). They stay.
+
 - The AI assistant never overwrites a screen that the user saved. To change
   one, it saves a new screen.
 - The name of a new screen of the AI assistant is the old name with
   " (AI)". When that name is in use, it adds a number, for example
   "Momentum leaders (AI 2)". The user can rename it.
-- Keep: the screen stays, and `kept` becomes true.
+- Keep: the screen stays, and `kept` becomes true
+  (`POST /api/screens/{id}/keep`, #210).
 - Discard: deletes the screen that the AI assistant made. Old backtests keep
-  their copy of the screen.
+  their copy of the screen (`DELETE /api/screens/{id}`, #210).
 - When the user selects neither Keep nor Discard, the screen stays.
 - Not on the AI assistant port: `DELETE /api/screens/{id}`, watchlist
   changes (also "Add to watchlist"), HK instrument list changes, the daily
   bar update, and parameter sweeps.
-- The AI assistant discusses screens only in the AI assistant side column
-  of the strategy page. The screen page has no AI assistant.
+- The AI assistant discusses screens in the AI assistant side column. The
+  screen page has it too (assistant section 25.12).
 
 ## 24.9 Screens as a backtest universe
 
@@ -270,6 +386,22 @@ kinds:
 - A point-in-time run uses the rules of sections 23.1 and 24.5 with a date.
   It uses only bars that close at or before the rebalance. Its filter
   values must equal the values that the daily bar summary had at that date.
+- Done in #208: `POST /api/backtests` takes a fixed list by
+  `screen_result_id` (backtest.md section 10.10.6). The public entry of
+  `screen` exports `read_screen_result_members(*, database_url,
+  screen_result_id)`: the instruments of the screen result in position
+  order, or `None` when it does not exist.
+- Done in #208: the point-in-time kind. The public entry also exports
+  `read_saved_screen(*, database_url, screen_id)` (the copy of the start
+  route) and `run_screen_at(*, database_url, market, definition, as_of_utc)`
+  (`screen/screen_point_in_time.py`). `run_screen_at` gets the daily bar
+  summary of each start instrument from the last 20 daily bars that start
+  before `as_of_utc` (`read_daily_bar_summaries_before` of `market_data`,
+  the same calculation as the saved summary) and reads the indicator bars
+  only before `as_of_utc`. It saves no screen result. The start list of
+  `quarter_universe` is the last quarter that starts at or before
+  `as_of_utc`. The other start lists are the lists of today. The form source
+  "Screen" and the screen page buttons are in `backtest.md` section 10.10.7.
 - For a fixed list from the AI assistant, the tool result has the
   survivorship bias warning. The AI assistant must write the warning in its
   answer.
@@ -295,6 +427,8 @@ Page addresses:
 Layout:
 
 - Side column "Screens" at the start side:
+  - Its header has the "New screen" icon button (Carbon Add icon). The
+    button is always available, also when no screen exists.
   - Each row has the name and the market.
   - The current screen expands to its recent runs (time, instrument count).
   - The user can drag its width and minimize it
@@ -304,7 +438,7 @@ Layout:
      screen", and "Save screen" (only when the screen has unsaved changes).
   2. Condition bar (section 24.10.1).
   3. Table toolbar: the "Result N" / "Excluded N" switch, the daily bar date
-     and the run time, "Add to watchlist", and "Run backtest on this screen
+     (the run list gives the run time), "Add to watchlist", and "Run backtest on this screen
      result". When the user selects rows, the toolbar changes to the batch
      actions "Add to watchlist" and "Run backtest on selected".
   4. Result table, or the excluded table.
@@ -332,11 +466,41 @@ Behavior:
   |---|---|---|
   | Subject (indicator or field) | `RSI(14)` | `$text-primary` |
   | Operation | `≥`, `top`, `above` | `$text-helper` |
-  | Value | `30` | blue 70 (`#0043ce`) |
+  | Value | `30` | `$link-primary` (decided #207, see section 24.13) |
 
 - When there are many conditions, the bar has 2 or 3 lines.
 - Filters and indicator conditions are told apart by their order and the
   group strips, not by color.
+- Decided (#212): the edit popover (Bits UI Popover below the tag) has the
+  name of the part as its title, the fields of the part, and the buttons
+  "Remove" (a filter or an indicator condition), "Cancel", and "Apply":
+
+  | Part | Fields |
+  |---|---|
+  | Start instruments | Instruments (the start instruments of the market, section 24.2) |
+  | Still trading | none |
+  | Close, Avg trading value (20) | Operator, Value |
+  | Exchange | A checkbox for each exchange of the market: US NASDAQ and NYSE, HK SEHK |
+  | Indicator (compare) | Indicator, its parameters, Output (only for MACD, Bollinger Bands, and the Donchian channel), Operator, Value |
+  | Close vs line | Close (above or below), Line (SMA, EMA, or the Donchian channel upper line), its parameters |
+  | Rank | Keep (Top or Bottom), %, Indicator, its parameters |
+  | Order | Indicator, its parameters, Output, Direction (High first or Low first), First (empty for all) |
+
+  The parameters show the parameters that are in the UI name (section 23.3);
+  `bars_per_year` keeps its value. The fields scroll in their own
+  `ScrollRegion`. The page does not check the values: the run route checks
+  them, and each problem of the `422` list shows next to its tag (the
+  Carbon error icon, an error outline, and the text in `$text-error`). A
+  problem without a tag location (for example the name of "Save as new
+  screen") shows in an error notification. While a change has a problem,
+  the bar has no funnel counts.
+- Decided (#212): "Add condition" is a menu: Close, Avg trading value (20),
+  Exchange, Still trading, then Indicator, Close vs line, and Rank. An item
+  opens the edit popover of a new condition with the values of the #145
+  prototype (Close ≥ 5, Avg trading value (20) ≥ 20,000,000, all exchanges
+  of the market, RSI(14) < 30, Close above SMA(200), top 20% by
+  12-1 momentum). Its button "Add condition" adds it to the filters or to
+  the indicator conditions and runs the screen.
 
 ### 24.10.2 Result table
 
@@ -358,7 +522,7 @@ Behavior:
 - `backtest` imports `screen` for the point-in-time runs of section 24.9.
 - HTTP routes: `screen/http_routes.py` with `create_screen_router(...)`.
 - Frontend: `frontend/src/lib/screen/` has the HTTP client and the screen
-  page parts. `src/routes/screens/[screenId]/` is the page.
+  page parts. `src/routes/screens/[[screenId]]/` is the page.
 
 ## 24.12 Phase
 
@@ -371,32 +535,85 @@ Behavior:
 
 ## 24.13 Left to the implementation
 
-- The final route paths and the field names (#150 calls them proposals).
-- The form of the problem location in the `422` list.
-- The route for Keep. Discard can use `DELETE /api/screens/{id}` on the Web
-  port.
-- How a run of a screen with unsaved changes works: the run route takes a
-  saved screen only.
-- How the user runs a screen again after new daily bars. The final title row
-  of #145 has no "Run screen" button.
-- What the result does when more than 500 instruments pass. #145 and #150
-  give at most 500 rows.
-- The rank method for ties in a percentile.
-- The operators of a comparison (the tickets show `<` and `≥`).
-- The default order of a new screen.
-- Where `/screens` stores the last opened screen.
-- What happens to the screen results when the user deletes a screen.
-- How many recent runs the side column and `GET /api/screens/{id}` show.
-- Whether `screen` saves the full excluded list of a run with all US
-  instruments (about 10000).
-- How `market_data` sets "Still trading" from the saved data.
-- How the point-in-time run of a backtest uses the source order: the global
-  source order or the source order of the backtest.
-- The survivorship bias warning of a point-in-time backtest whose screen
-  starts from the watchlist or the HK instrument list.
-- How "Add to watchlist" adds many instruments. The watchlist add route
+- Decided (#205): the final route paths and the field names (section
+  24.7).
+- Decided (#205): the form of the problem location in the `422` list
+  (section 24.6).
+- Decided (#210): the route for Keep is `POST /api/screens/{id}/keep` on the
+  Web port (section 24.7). It sets the column `kept`, so `update_screen`
+  gets `403` after it. Discard uses `DELETE /api/screens/{id}` on the Web
+  port. Neither route is on the AI assistant port.
+- Decided (#209): how the API tells the screen routes the AI assistant
+  caller and the conversation: port 8001 has its own router
+  (`create_screen_assistant_router`), and the conversation comes from the
+  header `X-ATrade-Conversation-Id` (section 24.8).
+- Decided (#212): a run of a screen with unsaved changes sends the changed
+  market and definition in the body of `POST /api/screens/{id}/runs`. The
+  screen result keeps its copy of that definition. The saved screen stays
+  the same until "Save screen" (`PUT`) or "Save as new screen" (`POST`).
+- Decided (#212): a screen keeps its market. A US / HK switch makes a
+  draft that "Save as new screen" saves; "Save screen" does not show for it.
+  The switch sets the start instruments of the market (US: quarter
+  universe, HK: HK instrument list) and removes the exchange filters.
+- Decided (#212): a click on a tag opens its edit popover, and "Add
+  condition" is a menu of the 7 conditions (section 24.10.1). The edit
+  popover reads the indicator catalog from `GET /api/screen-indicators`
+  (section 24.7).
+- Decided (#212): "Save as new screen" names the new screen
+  "<name> copy" (or "<name> copy N" when that name is in use).
+- Decided (#212): how the user runs a screen again after new daily bars:
+  "Apply" in any edit popover runs the screen again, also without a change.
+  The page adds no "Run screen" button (#145).
+- Decided (#206): what the result does when more than 500 instruments
+  pass (section 24.5).
+- Decided (#206): the rank method for ties in a percentile (section 24.5).
+- Decided (#205): the operators of a comparison are `<`, `<=`, `>`, and
+  `>=` (section 24.4.1).
+- Decided (#212): "Save as new screen" copies the order of the open
+  screen. The definition requires the order (section 24.4.1).
+- Decided: "New screen" in the header of the "Screens" side column sends
+  `POST /api/screens` with the market `US`, the start `quarter_universe`, no
+  filters, no indicator conditions, and the order Avg trading value (20),
+  high first: `{"indicator": {"indicator": "average_trading_value",
+  "parameters": {"period": 20}, "output": "value"}, "direction":
+  "descending"}`. The name is "New screen", or "New screen N" when that
+  name is in use. Then the page runs the new screen and opens its screen
+  result. A failed create shows the error notification "Screen not
+  created" with the reason above the screen list.
+- Decided (#207): `/screens` stores the id of the last opened screen in the
+  browser storage (key `atrade.screen-page.last-screen`). The choice belongs
+  to the browser. Without a stored id, or when that screen does not exist,
+  `/screens` opens the first screen of the list.
+- Decided (#207): the side column shows the recent runs of
+  `GET /api/screens/{id}` (the last 10). `?result=<id>` opens one run.
+  Without it, the page opens the last run.
+- Decided (#207): the tag value color is `$link-primary`: blue 60 in g10 and
+  blue 40 in g100. Blue 70 (`#0043ce`) is not a Carbon token and has no g100
+  value.
+- Decided (#207): the result table has no "Name" column yet. The result rows
+  have no instrument name, and no source for the name is decided (#206).
+- Decided (#205): a delete of a screen deletes its screen results (section
+  24.4).
+- Decided (#205): `GET /api/screens/{id}` shows the last 10 runs. The side
+  column is left to the screen page.
+- Decided (#206): `screen` saves the full excluded list of a run with all
+  US instruments (section 24.5).
+- Decided (#206): `screen` sets "Still trading" from `last_day_start_utc`
+  of the daily bar summary (section 24.5). Decided (#195): `market_data`
+  stores no status ([`market_data.md`](market_data.md) section 8.14).
+- Decided (#208): the point-in-time run of a backtest uses the global
+  source order, as the screen page. The source order of the backtest applies
+  to the bars of the run.
+- Decided (#208): a point-in-time backtest whose screen does not start from
+  `quarter_universe` (the watchlist, all US instruments with daily bars, or
+  the HK instrument list) has `survivorship_bias` true, and the form shows
+  the warning: these start lists are the lists of today.
+- Decided (#207): "Add to watchlist" adds many instruments with one
+  `POST /api/watchlist` for each instrument, one after the other. The route
   checks each instrument with IBKR ([`market_data.md`](market_data.md)
-  section 8.3).
-- The Carbon token for blue 70 in the g100 theme (Dark).
+  section 8.3), so 500 instruments take about 500 seconds. The page then
+  shows how many instruments it added, and the last refusal (for example an
+  instrument that is in the watchlist already). Without selected rows, it
+  adds all rows of the screen result.
 - How the API reports the AI assistant caller and the conversation ID to the
   screen routes (the AI assistant section).

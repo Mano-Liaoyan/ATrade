@@ -1,6 +1,6 @@
 // The browser keeps the layout of each workbench part in localStorage. Blocked storage does not stop the page.
 import { afterEach, describe, expect, it, vi } from 'vite-plus/test';
-import { readSideColumnLayout, readStoredLayout, writeStoredLayout } from './index';
+import { readStoredLayout, writeStoredLayout } from './index';
 
 function createMemoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -26,21 +26,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('readSideColumnLayout', () => {
-  it('reads a collapsed column and opens the column for a missing or a damaged value', () => {
-    expect(readSideColumnLayout({ isCollapsed: true })).toEqual({ isCollapsed: true });
-    expect(readSideColumnLayout(null)).toEqual({ isCollapsed: false });
-    expect(readSideColumnLayout({ isCollapsed: 'yes' })).toEqual({ isCollapsed: false });
-  });
-});
-
 describe('readStoredLayout and writeStoredLayout', () => {
   it('reads the value that was written', () => {
     vi.stubGlobal('localStorage', createMemoryStorage());
 
-    writeStoredLayout('atrade.test', { isCollapsed: true });
+    writeStoredLayout('atrade.test', { isMinimized: true });
 
-    expect(readStoredLayout('atrade.test')).toEqual({ isCollapsed: true });
+    expect(readStoredLayout('atrade.test')).toEqual({ isMinimized: true });
   });
 
   it('reads null for a missing key and for damaged JSON', () => {
@@ -64,7 +56,7 @@ describe('readStoredLayout and writeStoredLayout', () => {
 
     expect(readStoredLayout('atrade.test')).toBeNull();
     expect(() => {
-      writeStoredLayout('atrade.test', { isCollapsed: true });
+      writeStoredLayout('atrade.test', { isMinimized: true });
     }).not.toThrow();
   });
 });

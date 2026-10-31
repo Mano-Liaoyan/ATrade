@@ -1,6 +1,8 @@
 // The home page is the account overview workbench (#108): the watchlist column, the key numbers of the paper account,
 // the Positions panel, and the Orders panel. With the IBKR fake of backend/tests/e2e_server.py: account DU1234567,
-// a balance, 40 positions, and 30 open orders of forward test 42.
+// a balance, 40 TEST positions, 4 positions in the "Split check needed" state (one for each browser project), and 30
+// open orders of forward test 42. The owner ledger of "By hand" has 10 shares of each TEST position, but only 5 of
+// TEST05.
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
 function positionsPanel(page: Page): Locator {
@@ -19,13 +21,30 @@ test('the home page fills the window and shows the key numbers of the paper acco
   await expect(balance.getByRole('term')).toHaveText(['Net liquidation (USD)', 'Cash (USD)']);
   await expect(balance.getByRole('definition')).toHaveText(['101,234.50', '25,000.00']);
   await expect(page.getByRole('complementary', { name: 'Watchlist' })).toBeVisible();
-  await expect(positionsPanel(page).getByRole('heading', { name: 'Positions (40)' })).toBeVisible();
+  await expect(positionsPanel(page).getByRole('heading', { name: 'Positions (44)' })).toBeVisible();
   await expect(ordersPanel(page).getByRole('tab', { name: /^Open orders/ })).toHaveAttribute('aria-selected', 'true');
   const hasPageScroll = await page.evaluate(() => {
     const root = document.documentElement;
     return root.scrollHeight > root.clientHeight || root.scrollWidth > root.clientWidth;
   });
   expect(hasPageScroll).toBe(false);
+});
+
+test('the Positions table shows the owner of each row and the unattributed difference', async ({ page }) => {
+  await page.goto('/');
+  const table = positionsPanel(page);
+
+  await expect(table.getByRole('columnheader', { name: 'Owner' })).toBeVisible();
+  await expect(table.getByRole('row', { name: /TEST01/ })).toContainText('By hand');
+  const rows = table.getByRole('row', { name: /TEST05/ });
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(0)).toContainText('By hand');
+  await expect(rows.nth(0).getByRole('cell').nth(2)).toHaveText('5');
+  const unattributed = rows.nth(1);
+  // The difference is the quantity. The warning icon before the symbol has the name and the tooltip.
+  await expect(unattributed.getByRole('cell').nth(2)).toHaveText('5');
+  await expect(unattributed.getByRole('img', { name: 'Unattributed: 5' })).toBeVisible();
+  await expect(unattributed).not.toContainText('Unattributed');
 });
 
 test('the home page has no paper order form', async ({ page }) => {
@@ -54,7 +73,9 @@ test('the watchlist rows and the position rows are 32px high', async ({ page, re
 
 test('position table has a visible scroll track and its last row can be scrolled into view', async ({ page }) => {
   await page.goto('/');
-  const lastRow = positionsPanel(page).getByRole('row', { name: /TEST40/ });
+  // The last row of the table, not a fixed symbol: other tests (for example the split check) add positions after
+  // TEST40.
+  const lastRow = positionsPanel(page).getByRole('row').last();
   const track = page.getByRole('scrollbar', { name: 'Positions scroll bar' });
   const thumb = track.locator('.scroll-thumb');
 

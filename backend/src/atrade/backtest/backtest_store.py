@@ -1,27 +1,94 @@
 """SQL for the backtest, backtest_equity_point, and backtest_trade tables. Only the backtest capability uses them."""
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Final, Literal
+from typing import Any, Final, Literal
 
 import psycopg
 from psycopg.rows import class_row
+from psycopg.types.json import Jsonb
 
-from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
+from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint, find_split_time
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
+from atrade.market_data import BarSource
 
-type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out"]
+type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out", "cancelled"]
+# The values of the parameters of a parameter sweep run, by parameter name (docs/architecture/backtest.md 10.11).
+type ParameterValues = dict[str, int | float | bool]
+# docs/architecture/backtest.md section 10.10.2.
+type BacktestUniverseKind = Literal["single", "rule", "list", "screen"]
+type MultiInstrumentKind = Literal["rule", "list", "screen"]
+type UniverseRebalancePeriod = Literal["quarter", "month"]
+
+
+@dataclass(frozen=True)
+class UniverseScreen:
+    """The copy of the screen of a `screen` universe. A later change or delete of the screen does not change it."""
+
+    screen_id: int
+    name: str
+    market: str
+    definition: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class BacktestUniverse:
+    """The universe of a multi-instrument backtest. All members are in `currency`. `top_n` is only for `rule`;
+    `screen` and `rebalance_period` are only for `screen`."""
+
+    kind: MultiInstrumentKind
+    currency: str
+    top_n: int | None = None
+    screen: UniverseScreen | None = None
+    rebalance_period: UniverseRebalancePeriod | None = None
+
+
+@dataclass(frozen=True)
+class UniversePeriod:
+    """The members of the universe from `start_utc` to the start of the next period, or to the backtest end."""
+
+    start_utc: datetime
+    members: list[Instrument]
 
 
 @dataclass(frozen=True)
 class BacktestRequest:
     strategy_version_id: int
-    instrument: Instrument
+    # None for a multi-instrument backtest: then `universe` names the members.
+    instrument: Instrument | None
     bar_period: BarPeriod
     time_range: TimeRange
     paper_capital_usd: Decimal
+    # The last percent of the range that is out of sample (docs/architecture/backtest.md section 10.9.4). 0 is no
+    # split. The same-period backtest of a forward test uses 0, because a forward test has no split.
+    out_of_sample_share: int = 0
+    # The source order of the bars and the look-back bars. None in a new request: the global source order. None in
+    # a saved backtest only for a row from before the source order (docs/architecture/backtest.md section 10.12).
+    source_order: list[BarSource] | None = None
+    universe: BacktestUniverse | None = None
+    # The parameter values of a parameter sweep run. The child gives them to the strategy configuration.
+    parameters: ParameterValues | None = None
+
+    @property
+    def universe_kind(self) -> BacktestUniverseKind:
+        return "single" if self.universe is None else self.universe.kind
+
+    @property
+    def currency(self) -> str:
+        """The currency of the instrument or of all universe members."""
+        if self.universe is not None:
+            return self.universe.currency
+        return self.single_instrument.currency
+
+    @property
+    def single_instrument(self) -> Instrument:
+        """The instrument of a single-instrument backtest."""
+        if self.instrument is None:
+            message = "A multi-instrument backtest has no single instrument."
+            raise ValueError(message)
+        return self.instrument
 
 
 @dataclass(frozen=True)
@@ -29,15 +96,17 @@ class BacktestResult:
     equity_curve: list[EquityPoint]
     trades: list[BacktestTrade]
     metrics: BacktestMetrics
+    # The bar count of each bar source in the backtest range, without the look-back bars.
+    bar_count_by_source: dict[BarSource, int]
 
 
 @dataclass(frozen=True)
 class BacktestRow:
     id: int
     strategy_version_id: int
-    symbol: str
-    exchange: str
-    currency: str
+    symbol: str | None
+    exchange: str | None
+    currency: str | None
     bar_period: str
     start_utc: datetime
     end_utc: datetime
@@ -51,22 +120,77 @@ class BacktestRow:
     total_return_percent: Decimal | None
     max_drawdown_percent: Decimal | None
     trade_count: int | None
+    cagr_percent: Decimal | None
+    annual_volatility_percent: Decimal | None
+    sharpe_ratio: Decimal | None
+    sortino_ratio: Decimal | None
+    calmar_ratio: Decimal | None
+    profit_factor: Decimal | None
+    average_win_usd: Decimal | None
+    average_win_percent: Decimal | None
+    average_loss_usd: Decimal | None
+    exposure_percent: Decimal | None
+    turnover_per_year: Decimal | None
+    win_rate_percent: Decimal | None
+    conversation_id: int | None
+    out_of_sample_share: int
+    split_time_utc: datetime | None
+    source_order: list[str] | None
+    bar_count_by_source: dict[str, int] | None
+    universe_kind: BacktestUniverseKind
+    universe_top_n: int | None
+    sweep_id: int | None
+    parameters: ParameterValues | None
+    universe_screen: dict[str, Any] | None
+    universe_rebalance_period: UniverseRebalancePeriod | None
 
 
 BACKTEST_COLUMNS: Final = """
     id, strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc, paper_capital_usd,
     status, error_message, created_at_utc, started_at_utc, ended_at_utc,
-    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count
+    final_equity_usd, total_return_percent, max_drawdown_percent, trade_count,
+    cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
+    average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
+    out_of_sample_share, split_time_utc, conversation_id, source_order, bar_count_by_source, universe_kind,
+    universe_top_n, sweep_id, parameters, universe_screen, universe_rebalance_period
 """
+
+
+@dataclass(frozen=True)
+class OverlappingBacktest:
+    id: int
+    strategy_version_id: int
+
+
+def read_row_instrument(row: BacktestRow) -> Instrument | None:
+    if row.symbol is None or row.exchange is None or row.currency is None:
+        return None
+    return Instrument(symbol=row.symbol, exchange=row.exchange, currency=row.currency)
+
+
+def read_universe(row: BacktestRow) -> BacktestUniverse | None:
+    if row.universe_kind == "single" or row.currency is None:
+        return None
+    return BacktestUniverse(
+        kind=row.universe_kind,
+        currency=row.currency,
+        top_n=row.universe_top_n,
+        screen=None if row.universe_screen is None else UniverseScreen(**row.universe_screen),
+        rebalance_period=row.universe_rebalance_period,
+    )
 
 
 def read_request(row: BacktestRow) -> BacktestRequest:
     return BacktestRequest(
         strategy_version_id=row.strategy_version_id,
-        instrument=Instrument(symbol=row.symbol, exchange=row.exchange, currency=row.currency),
+        instrument=read_row_instrument(row),
         bar_period=BarPeriod(row.bar_period),
         time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
         paper_capital_usd=row.paper_capital_usd,
+        out_of_sample_share=row.out_of_sample_share,
+        source_order=None if row.source_order is None else [BarSource(value) for value in row.source_order],
+        universe=read_universe(row),
+        parameters=row.parameters,
     )
 
 
@@ -83,44 +207,149 @@ def read_metrics(row: BacktestRow) -> BacktestMetrics | None:
         total_return_percent=row.total_return_percent,
         max_drawdown_percent=row.max_drawdown_percent,
         trade_count=row.trade_count,
+        cagr_percent=row.cagr_percent,
+        annual_volatility_percent=row.annual_volatility_percent,
+        sharpe_ratio=row.sharpe_ratio,
+        sortino_ratio=row.sortino_ratio,
+        calmar_ratio=row.calmar_ratio,
+        profit_factor=row.profit_factor,
+        average_win_usd=row.average_win_usd,
+        average_win_percent=row.average_win_percent,
+        average_loss_usd=row.average_loss_usd,
+        exposure_percent=row.exposure_percent,
+        turnover_per_year=row.turnover_per_year,
+        win_rate_percent=row.win_rate_percent,
     )
 
 
-async def insert_backtest(
-    connection: psycopg.AsyncConnection, *, request: BacktestRequest, created_at_utc: datetime
+async def insert_backtest(  # noqa: PLR0913 readability-exception: the keywords of a backtest or a sweep run.
+    connection: psycopg.AsyncConnection,
+    *,
+    request: BacktestRequest,
+    created_at_utc: datetime,
+    universe_periods: list[UniversePeriod] | None = None,
+    conversation_id: int | None = None,
+    sweep_id: int | None = None,
 ) -> BacktestRow:
-    async with connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
+    """Adds a queued backtest, and the members of each universe period of a multi-instrument backtest. One
+    transaction."""
+    instrument = request.instrument
+    async with connection.transaction(), connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
         await cursor.execute(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
-                paper_capital_usd, status, created_at_utc)
+                paper_capital_usd, out_of_sample_share, split_time_utc, status, created_at_utc, conversation_id,
+                source_order, universe_kind, universe_top_n, sweep_id, parameters, universe_screen,
+                universe_rebalance_period)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
-                %(end_utc)s, %(paper_capital_usd)s, 'queued', %(created_at_utc)s)
+                %(end_utc)s, %(paper_capital_usd)s, %(out_of_sample_share)s, %(split_time_utc)s, 'queued',
+                %(created_at_utc)s, %(conversation_id)s, %(source_order)s, %(universe_kind)s, %(universe_top_n)s,
+                %(sweep_id)s, %(parameters)s, %(universe_screen)s, %(universe_rebalance_period)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
                 "strategy_version_id": request.strategy_version_id,
-                "symbol": request.instrument.symbol,
-                "exchange": request.instrument.exchange,
-                "currency": request.instrument.currency,
+                "symbol": None if instrument is None else instrument.symbol,
+                "exchange": None if instrument is None else instrument.exchange,
+                "currency": request.currency,
                 "bar_period": request.bar_period.value,
                 "start_utc": request.time_range.start_utc,
                 "end_utc": request.time_range.end_utc,
                 "paper_capital_usd": request.paper_capital_usd,
+                "out_of_sample_share": request.out_of_sample_share,
+                "split_time_utc": find_split_time(request.time_range, request.out_of_sample_share),
                 "created_at_utc": created_at_utc,
+                "conversation_id": conversation_id,
+                "source_order": None
+                if request.source_order is None
+                else Jsonb([bar_source.value for bar_source in request.source_order]),
+                "universe_kind": request.universe_kind,
+                "universe_top_n": None if request.universe is None else request.universe.top_n,
+                "sweep_id": sweep_id,
+                "parameters": None if request.parameters is None else Jsonb(request.parameters),
+                "universe_screen": None
+                if request.universe is None or request.universe.screen is None
+                else Jsonb(asdict(request.universe.screen)),
+                "universe_rebalance_period": None if request.universe is None else request.universe.rebalance_period,
             },
         )
         inserted_row = await cursor.fetchone()
-    if inserted_row is None:
-        message = "INSERT ... RETURNING returned no row."
-        raise RuntimeError(message)
+        if inserted_row is None:
+            message = "INSERT ... RETURNING returned no row."
+            raise RuntimeError(message)
+        await insert_universe_members(cursor, inserted_row.id, universe_periods or [])
     return inserted_row
 
 
+async def insert_universe_members(
+    cursor: psycopg.AsyncCursor[Any], backtest_id: int, universe_periods: list[UniversePeriod]
+) -> None:
+    await cursor.executemany(
+        """
+        INSERT INTO backtest_universe_member (backtest_id, period_start_utc, symbol, exchange)
+        VALUES (%(backtest_id)s, %(period_start_utc)s, %(symbol)s, %(exchange)s)
+        """,
+        [
+            {
+                "backtest_id": backtest_id,
+                "period_start_utc": period.start_utc,
+                "symbol": member.symbol,
+                "exchange": member.exchange,
+            }
+            for period in universe_periods
+            for member in period.members
+        ],
+    )
+
+
+async def replace_universe_members(
+    connection: psycopg.AsyncConnection, *, backtest_id: int, universe_periods: list[UniversePeriod]
+) -> None:
+    """The child of a `screen` universe writes the members of each period that its screen runs gave. A period with
+    no member has no row. One transaction."""
+    async with connection.transaction(), connection.cursor() as cursor:
+        await cursor.execute(
+            "DELETE FROM backtest_universe_member WHERE backtest_id = %(backtest_id)s", {"backtest_id": backtest_id}
+        )
+        await insert_universe_members(cursor, backtest_id, universe_periods)
+
+
+async def select_universe_periods(
+    connection: psycopg.AsyncConnection, *, backtest_id: int, currency: str
+) -> list[UniversePeriod]:
+    """The members of each universe period of the backtest, oldest period first."""
+    cursor = await connection.execute(
+        """
+        SELECT period_start_utc, symbol, exchange FROM backtest_universe_member
+        WHERE backtest_id = %(backtest_id)s ORDER BY period_start_utc, symbol, exchange
+        """,
+        {"backtest_id": backtest_id},
+    )
+    periods: list[UniversePeriod] = []
+    for period_start_utc, symbol, exchange in await cursor.fetchall():
+        if not periods or periods[-1].start_utc != period_start_utc:
+            periods.append(UniversePeriod(start_utc=period_start_utc, members=[]))
+        periods[-1].members.append(Instrument(symbol=symbol, exchange=exchange, currency=currency))
+    return periods
+
+
+async def count_member_periods(connection: psycopg.AsyncConnection, backtest_id: int) -> dict[tuple[str, str], int]:
+    """The number of universe periods of each member of the backtest. Empty for a single-instrument backtest."""
+    cursor = await connection.execute(
+        """
+        SELECT symbol, exchange, count(*) FROM backtest_universe_member
+        WHERE backtest_id = %(backtest_id)s GROUP BY symbol, exchange
+        """,
+        {"backtest_id": backtest_id},
+    )
+    return {(symbol, exchange): count for symbol, exchange, count in await cursor.fetchall()}
+
+
 async def select_backtests(connection: psycopg.AsyncConnection) -> list[BacktestRow]:
-    """Returns all backtests, the newest first."""
+    """Returns all backtests that are not runs of a parameter sweep, the newest first (docs/architecture/backtest.md
+    section 10.11.4)."""
     async with connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
-        await cursor.execute(f"SELECT {BACKTEST_COLUMNS} FROM backtest ORDER BY id DESC")
+        await cursor.execute(f"SELECT {BACKTEST_COLUMNS} FROM backtest WHERE sweep_id IS NULL ORDER BY id DESC")
         return await cursor.fetchall()
 
 
@@ -131,6 +360,68 @@ async def select_backtest(connection: psycopg.AsyncConnection, backtest_id: int)
             {"backtest_id": backtest_id},
         )
         return await cursor.fetchone()
+
+
+async def delete_backtest(connection: psycopg.AsyncConnection, backtest_id: int) -> str | None:
+    """Deletes a backtest with a final status and its result rows (ON DELETE CASCADE). Returns the reason of a
+    refusal, or None after the delete. The caller has checked that the backtest exists. Section 10.5."""
+    async with connection.transaction():
+        cursor = await connection.execute(
+            "SELECT status, sweep_id FROM backtest WHERE id = %(backtest_id)s FOR UPDATE",
+            {"backtest_id": backtest_id},
+        )
+        found = await cursor.fetchone()
+        if found is None:
+            return None
+        status, sweep_id = found
+        if status in ("queued", "running"):
+            return f"Backtest #{backtest_id} is {status}. Wait for its end."
+        if sweep_id is not None:
+            return f"Backtest #{backtest_id} is a run of sweep #{sweep_id}. Delete the sweep."
+        try:
+            async with connection.transaction():
+                await connection.execute(
+                    "DELETE FROM backtest WHERE id = %(backtest_id)s", {"backtest_id": backtest_id}
+                )
+        except psycopg.errors.RestrictViolation:
+            # Only forward_test_same_period_backtest refuses the delete (ON DELETE RESTRICT); the result tables cascade.
+            return f"Backtest #{backtest_id} is the same-period backtest of a forward test."
+    return None
+
+
+async def select_overlapping_out_of_sample_parts(
+    connection: psycopg.AsyncConnection, row: BacktestRow
+) -> list[OverlappingBacktest]:
+    """The backtests of the same instrument or universe and bar period whose out-of-sample part overlaps the
+    out-of-sample part of `row`: the finished backtests and `row` itself. A universe is the same as in
+    `select_finished_backtests_of`. The caller filters them by strategy, because the strategy tables belong to the
+    strategy capability."""
+    async with connection.cursor(row_factory=class_row(OverlappingBacktest)) as cursor:
+        await cursor.execute(
+            """
+            SELECT id, strategy_version_id FROM backtest
+            WHERE id = %(id)s
+                OR (status = 'finished'
+                    AND symbol IS NOT DISTINCT FROM %(symbol)s AND exchange IS NOT DISTINCT FROM %(exchange)s
+                    AND currency IS NOT DISTINCT FROM %(currency)s AND bar_period = %(bar_period)s
+                    AND universe_kind = %(universe_kind)s
+                    AND universe_top_n IS NOT DISTINCT FROM %(universe_top_n)s
+                    AND split_time_utc < %(end_utc)s AND %(split_time_utc)s < end_utc)
+            ORDER BY id
+            """,
+            {
+                "id": row.id,
+                "symbol": row.symbol,
+                "exchange": row.exchange,
+                "currency": row.currency,
+                "bar_period": row.bar_period,
+                "universe_kind": row.universe_kind,
+                "universe_top_n": row.universe_top_n,
+                "end_utc": row.end_utc,
+                "split_time_utc": row.split_time_utc,
+            },
+        )
+        return await cursor.fetchall()
 
 
 async def select_equity_curve(connection: psycopg.AsyncConnection, backtest_id: int) -> list[EquityPoint]:
@@ -146,11 +437,64 @@ async def select_equity_curve(connection: psycopg.AsyncConnection, backtest_id: 
         return await cursor.fetchall()
 
 
+@dataclass(frozen=True)
+class TrialRow:
+    """A finished backtest that can count as a trial of another backtest (docs/architecture/backtest.md 10.9.5)."""
+
+    id: int
+    strategy_version_id: int
+    paper_capital_usd: Decimal
+
+
+async def select_finished_backtests_of(connection: psycopg.AsyncConnection, row: BacktestRow) -> list[TrialRow]:
+    """The finished backtests of the same instrument or universe and the bar period of `row`, for all time ranges.
+    A universe is the same when the kind, the currency, and `universe_top_n` are the same
+    (docs/architecture/backtest.md section 10.10.8)."""
+    async with connection.cursor(row_factory=class_row(TrialRow)) as cursor:
+        await cursor.execute(
+            """
+            SELECT id, strategy_version_id, paper_capital_usd FROM backtest
+            WHERE status = 'finished' AND symbol IS NOT DISTINCT FROM %(symbol)s
+                AND exchange IS NOT DISTINCT FROM %(exchange)s AND currency IS NOT DISTINCT FROM %(currency)s
+                AND bar_period = %(bar_period)s AND universe_kind = %(universe_kind)s
+                AND universe_top_n IS NOT DISTINCT FROM %(universe_top_n)s
+            ORDER BY id
+            """,
+            {
+                "symbol": row.symbol,
+                "exchange": row.exchange,
+                "currency": row.currency,
+                "bar_period": row.bar_period,
+                "universe_kind": row.universe_kind,
+                "universe_top_n": row.universe_top_n,
+            },
+        )
+        return await cursor.fetchall()
+
+
+async def select_equity_curves(
+    connection: psycopg.AsyncConnection, backtest_ids: list[int]
+) -> dict[int, list[EquityPoint]]:
+    """The equity curves of the backtests, by backtest ID, with one query. A backtest without points has []."""
+    equity_curves: dict[int, list[EquityPoint]] = {backtest_id: [] for backtest_id in backtest_ids}
+    cursor = await connection.execute(
+        """
+        SELECT backtest_id, time_utc, equity_usd FROM backtest_equity_point
+        WHERE backtest_id = ANY(%(backtest_ids)s)
+        ORDER BY backtest_id, time_utc
+        """,
+        {"backtest_ids": backtest_ids},
+    )
+    for backtest_id, time_utc, equity_usd in await cursor.fetchall():
+        equity_curves[backtest_id].append(EquityPoint(time_utc=time_utc, equity_usd=equity_usd))
+    return equity_curves
+
+
 async def select_trades(connection: psycopg.AsyncConnection, backtest_id: int) -> list[BacktestTrade]:
     async with connection.cursor(row_factory=class_row(BacktestTrade)) as cursor:
         await cursor.execute(
             """
-            SELECT time_utc, side, quantity_shares, price_usd, commission_usd FROM backtest_trade
+            SELECT time_utc, side, quantity_shares, price_usd, commission_usd, symbol, exchange FROM backtest_trade
             WHERE backtest_id = %(backtest_id)s
             ORDER BY time_utc, id
             """,
@@ -235,8 +579,10 @@ async def save_result(
         )
         await cursor.executemany(
             """
-            INSERT INTO backtest_trade (backtest_id, time_utc, side, quantity_shares, price_usd, commission_usd)
-            VALUES (%(backtest_id)s, %(time_utc)s, %(side)s, %(quantity_shares)s, %(price_usd)s, %(commission_usd)s)
+            INSERT INTO backtest_trade (backtest_id, time_utc, side, quantity_shares, price_usd, commission_usd,
+                symbol, exchange)
+            VALUES (%(backtest_id)s, %(time_utc)s, %(side)s, %(quantity_shares)s, %(price_usd)s, %(commission_usd)s,
+                %(symbol)s, %(exchange)s)
             """,
             [
                 {
@@ -246,6 +592,8 @@ async def save_result(
                     "quantity_shares": trade.quantity_shares,
                     "price_usd": trade.price_usd,
                     "commission_usd": trade.commission_usd,
+                    "symbol": trade.symbol,
+                    "exchange": trade.exchange,
                 }
                 for trade in result.trades
             ],
@@ -254,15 +602,21 @@ async def save_result(
             """
             UPDATE backtest SET status = 'finished', ended_at_utc = %(ended_at_utc)s, final_equity_usd = %(final_equity_usd)s,
                 total_return_percent = %(total_return_percent)s, max_drawdown_percent = %(max_drawdown_percent)s,
-                trade_count = %(trade_count)s
+                trade_count = %(trade_count)s, cagr_percent = %(cagr_percent)s,
+                annual_volatility_percent = %(annual_volatility_percent)s, sharpe_ratio = %(sharpe_ratio)s,
+                sortino_ratio = %(sortino_ratio)s, calmar_ratio = %(calmar_ratio)s, profit_factor = %(profit_factor)s,
+                average_win_usd = %(average_win_usd)s, average_win_percent = %(average_win_percent)s,
+                average_loss_usd = %(average_loss_usd)s, exposure_percent = %(exposure_percent)s,
+                turnover_per_year = %(turnover_per_year)s, win_rate_percent = %(win_rate_percent)s,
+                bar_count_by_source = %(bar_count_by_source)s
             WHERE id = %(backtest_id)s
             """,
             {
                 "backtest_id": backtest_id,
-                "final_equity_usd": result.metrics.final_equity_usd,
-                "total_return_percent": result.metrics.total_return_percent,
-                "max_drawdown_percent": result.metrics.max_drawdown_percent,
-                "trade_count": result.metrics.trade_count,
+                **asdict(result.metrics),
+                "bar_count_by_source": Jsonb(
+                    {bar_source.value: count for bar_source, count in result.bar_count_by_source.items()}
+                ),
                 "ended_at_utc": ended_at_utc,
             },
         )

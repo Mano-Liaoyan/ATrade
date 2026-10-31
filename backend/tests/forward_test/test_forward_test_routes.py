@@ -13,10 +13,11 @@ import pytest
 from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
 from tests.fakes.clock import FixedClock
-from tests.fakes.ibkr import FakeGatewayConnection
+from tests.fakes.ibkr import FakeGatewayConnection, make_balance_values
 
 TEST_STRATEGY_FILE = Path(__file__).parents[1] / "backtest" / "strategies" / "buy_and_sell_by_bar_count.py"
 FORWARD_TESTS_PATH = "/api/forward-tests"
+FAKE_ACCOUNT_ID = "DU1234567"
 
 type JsonObject = dict[str, Any]
 
@@ -29,14 +30,26 @@ async def save_test_strategy_version(web_client: httpx.AsyncClient) -> int:
     return version["id"]
 
 
-def make_start_request(strategy_version_id: int, *, symbol: str = "AAPL") -> JsonObject:
+def make_start_request(
+    strategy_version_id: int, *, symbol: str = "AAPL", allocated_capital_usd: str = "10000"
+) -> JsonObject:
     return {
         "strategy_version_id": strategy_version_id,
         "symbol": symbol,
         "exchange": "NASDAQ",
         "currency": "USD",
         "bar_period": "1-MINUTE",
+        "allocated_capital_usd": allocated_capital_usd,
     }
+
+
+def make_paper_gateway(net_liquidation_usd: str = "100000") -> FakeGatewayConnection:
+    gateway_connection = FakeGatewayConnection(managed_accounts=[FAKE_ACCOUNT_ID])
+    gateway_connection.connected = True
+    gateway_connection.account_values = make_balance_values(
+        FAKE_ACCOUNT_ID, net_liquidation_usd=net_liquidation_usd, cash_usd=net_liquidation_usd
+    )
+    return gateway_connection
 
 
 @pytest.mark.anyio
@@ -56,6 +69,7 @@ async def test_starts_a_forward_test_with_the_lowest_free_client_id(web_client: 
     assert forward_test["status"] == "starting"
     assert forward_test["client_id"] == 10
     assert forward_test["start_balance_usd"] is None
+    assert forward_test["allocated_capital_usd"] == "10000"
     assert forward_test["created_at_utc"] == "2026-01-02T03:04:05Z"
 
 
@@ -106,7 +120,8 @@ async def test_the_list_reads_all_forward_tests_with_a_fixed_number_of_connectio
 
     listed = [(item["symbol"], item["strategy_name"], len(item["interruptions"])) for item in response.json()]
     assert listed == [("MSFT", "Template", 0), ("AAPL", "Bar count", 1)]
-    assert connection_count == 3
+    # The forward tests, the strategy versions, and the "Split check needed" instruments.
+    assert connection_count == 4
 
 
 @pytest.mark.anyio
@@ -119,21 +134,108 @@ async def test_refuses_start_when_no_client_id_is_free(web_client: httpx.AsyncCl
     response = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, symbol="AMD"))
 
     assert response.status_code == 409
-    assert response.json() == {"detail": "limit of running forward tests reached", "forward_test_id": None}
+    assert response.json() == {
+        "detail": "limit of running forward tests reached",
+        "forward_test_id": None,
+        "unallocated_usd": None,
+    }
 
 
 @pytest.mark.anyio
-async def test_refuses_a_second_forward_test_on_the_same_instrument(web_client: httpx.AsyncClient) -> None:
+async def test_two_forward_tests_can_run_on_the_same_instrument(web_client: httpx.AsyncClient) -> None:
     strategy_version_id = await save_test_strategy_version(web_client)
-    first = (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))).json()
+    first = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
 
-    response = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
+    second = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
+
+    assert (first.status_code, second.status_code) == (201, 201)
+    assert (first.json()["client_id"], second.json()["client_id"]) == (10, 11)
+
+
+@pytest.mark.anyio
+async def test_refuses_an_allocated_capital_larger_than_the_unallocated_amount(
+    web_client: httpx.AsyncClient,
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    await web_client.post(
+        FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, allocated_capital_usd="78750")
+    )
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, allocated_capital_usd="30000")
+    )
 
     assert response.status_code == 409
     assert response.json() == {
-        "detail": f"Forward test {first['id']} (Bar count v2) already runs on AAPL / NASDAQ.",
-        "forward_test_id": first["id"],
+        "detail": "The allocated capital 30,000.00 USD is larger than the unallocated 21,250.00 USD.",
+        "forward_test_id": None,
+        "unallocated_usd": "21250",
     }
+
+
+@pytest.mark.parametrize("allocated_capital_usd", ["0", "-5"])
+@pytest.mark.anyio
+async def test_refuses_an_allocated_capital_that_is_not_larger_than_0(
+    web_client: httpx.AsyncClient, allocated_capital_usd: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, allocated_capital_usd=allocated_capital_usd)
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_the_capital_route_gives_the_allocated_and_the_unallocated_amounts(
+    web_client: httpx.AsyncClient,
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    await web_client.post(
+        FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, allocated_capital_usd="30000")
+    )
+
+    response = await web_client.get(f"{FORWARD_TESTS_PATH}/capital")
+
+    assert response.status_code == 200
+    assert response.json() == {"net_liquidation_usd": "100000", "allocated_usd": "30000", "unallocated_usd": "70000"}
+
+
+@pytest.mark.anyio
+async def test_without_a_passed_check_the_capital_is_unknown_and_the_start_is_refused(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    settings = Settings(database_url=database_url, frontend_build_dir=frontend_build_dir)
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=make_paper_gateway())
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        strategy_version_id = await save_test_strategy_version(client)
+        capital = await client.get(f"{FORWARD_TESTS_PATH}/capital")
+        start = await client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
+
+    assert capital.json() == {"net_liquidation_usd": None, "allocated_usd": None, "unallocated_usd": None}
+    assert start.status_code == 409
+    assert start.json()["detail"].startswith("The paper account check failed:")
+
+
+@pytest.mark.anyio
+async def test_refuses_the_start_without_a_net_liquidation_value_in_usd(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    settings = Settings(
+        database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
+    )
+    gateway_connection = make_paper_gateway()
+    gateway_connection.account_values = []
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+        strategy_version_id = await save_test_strategy_version(client)
+        capital = await client.get(f"{FORWARD_TESTS_PATH}/capital")
+        start = await client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))
+
+    assert capital.json() == {"net_liquidation_usd": None, "allocated_usd": None, "unallocated_usd": None}
+    assert start.status_code == 409
+    assert start.json()["detail"].startswith("The paper account has no NetLiquidation value in USD.")
 
 
 @pytest.mark.anyio
@@ -183,10 +285,11 @@ async def test_uses_the_client_id_range_of_the_settings(
     settings = Settings(
         database_url=database_url,
         frontend_build_dir=frontend_build_dir,
+        ibkr_account_id=FAKE_ACCOUNT_ID,
         forward_test_client_id_first=21,
         forward_test_client_id_last=21,
     )
-    app = create_web_app(settings=settings, clock=clock, gateway_connection=FakeGatewayConnection(managed_accounts=[]))
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=make_paper_gateway())
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
         strategy_version_id = await save_test_strategy_version(client)
         first = await client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, symbol="AAPL"))
@@ -213,3 +316,212 @@ async def test_the_end_time_is_optional_and_must_be_later_than_now(web_client: h
     # The database stores UTC (section 12.1).
     assert later_response.json()["end_time_utc"] == "2026-01-03T01:30:00Z"
     assert (later_response.json()["crash_count"], later_response.json()["interruptions"]) == (0, [])
+
+
+def make_universe_request(strategy_version_id: int, universe: JsonObject, bar_period: str = "1-DAY") -> JsonObject:
+    return {
+        "strategy_version_id": strategy_version_id,
+        "universe": universe,
+        "bar_period": bar_period,
+        "allocated_capital_usd": "10000",
+    }
+
+
+@pytest.mark.anyio
+async def test_a_single_instrument_forward_test_has_the_universe_kind_single(web_client: httpx.AsyncClient) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    universe = {"kind": "single", "symbol": "AAPL", "exchange": "NASDAQ", "currency": "USD"}
+
+    response = await web_client.post(FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, universe))
+
+    assert response.status_code == 201
+    assert response.json()["universe_kind"] == "single"
+    assert response.json()["universe_top_n"] is None
+    assert response.json()["symbol"] == "AAPL"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("universe", "bar_period"),
+    [
+        ({"kind": "rule", "top_n": 10}, "1-MINUTE"),
+        ({"kind": "list"}, "1-HOUR"),
+        ({"kind": "rule", "top_n": 0}, "1-DAY"),
+        ({"kind": "rule", "top_n": 501}, "1-DAY"),
+    ],
+)
+async def test_refuses_a_multi_instrument_universe_with_a_wrong_bar_period_or_top_n(
+    web_client: httpx.AsyncClient, universe: JsonObject, bar_period: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, universe, bar_period)
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_refuses_a_watchlist_forward_test_with_an_empty_watchlist(web_client: httpx.AsyncClient) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "The watchlist has no instrument."
+
+
+@pytest.mark.anyio
+async def test_starts_a_watchlist_forward_test_and_records_the_members(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        for symbol in ["AAPL", "MSFT"]:
+            connection.execute(
+                """
+                INSERT INTO watchlist_instrument (symbol, exchange, currency, added_at_utc)
+                VALUES (%(symbol)s, 'NASDAQ', 'USD', now())
+                """,
+                {"symbol": symbol},
+            )
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+
+    assert response.status_code == 201
+    forward_test = response.json()
+    assert forward_test["universe_kind"] == "list"
+    assert forward_test["universe_top_n"] is None
+    assert forward_test["symbol"] is None
+    assert forward_test["client_id"] == 10
+    assert read_recorded_members(database_url, forward_test["id"]) == [
+        ("2026-01-01", "AAPL", "NASDAQ"),
+        ("2026-01-01", "MSFT", "NASDAQ"),
+    ]
+
+
+def read_recorded_members(database_url: str, forward_test_id: int) -> list[tuple[str, str, str]]:
+    with psycopg.connect(database_url) as connection:
+        rows = connection.execute(
+            """
+            SELECT quarter_start_utc, symbol, exchange FROM forward_test_universe_member
+            WHERE forward_test_id = %(id)s ORDER BY quarter_start_utc, symbol
+            """,
+            {"id": forward_test_id},
+        ).fetchall()
+    return [(f"{quarter_start_utc:%Y-%m-%d}", symbol, exchange) for quarter_start_utc, symbol, exchange in rows]
+
+
+def save_us_universe_members(database_url: str, quarter_start_utc: str, symbols: list[str]) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        for rank, symbol in enumerate(symbols, start=1):
+            connection.execute(
+                """
+                INSERT INTO us_universe_member (
+                    quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+                )
+                VALUES (%(quarter_start_utc)s, %(rank)s, %(symbol)s, 'NASDAQ', 'USD', 1000000, '2025-12-31T00:00:00Z')
+                """,
+                {"quarter_start_utc": quarter_start_utc, "rank": rank, "symbol": symbol},
+            )
+
+
+@pytest.mark.anyio
+async def test_starts_a_top_n_forward_test_with_the_members_of_the_current_quarter(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    save_us_universe_members(database_url, "2025-10-01T00:00:00Z", ["OLD"])
+    # The clock is at 2026-01-02 03:04:05 UTC, the first trading day of the quarter.
+    save_us_universe_members(database_url, "2026-01-02T00:00:00Z", ["NVDA", "AAPL", "MSFT"])
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "rule", "top_n": 2})
+    )
+
+    assert response.status_code == 201
+    assert (response.json()["universe_kind"], response.json()["universe_top_n"]) == ("rule", 2)
+    assert read_recorded_members(database_url, response.json()["id"]) == [
+        ("2026-01-02", "AAPL", "NASDAQ"),
+        ("2026-01-02", "NVDA", "NASDAQ"),
+    ]
+
+
+@pytest.mark.anyio
+async def test_refuses_a_top_n_forward_test_without_a_stored_current_quarter(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    save_us_universe_members(database_url, "2025-10-01T00:00:00Z", ["OLD"])
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "rule", "top_n": 2})
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "The US universe has no saved members for the quarter from 2026-01-01."
+
+
+async def start_watchlist_forward_test(web_client: httpx.AsyncClient, database_url: str) -> JsonObject:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO watchlist_instrument (symbol, exchange, currency, added_at_utc)
+            VALUES ('AAPL', 'NASDAQ', 'USD', now())
+            """
+        )
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+    assert response.status_code == 201
+    return response.json()
+
+
+@pytest.mark.anyio
+async def test_a_multi_instrument_forward_test_counts_in_the_limit_of_4_client_ids(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    watchlist_forward_test = await start_watchlist_forward_test(web_client, database_url)
+    strategy_version_id = watchlist_forward_test["strategy_version_id"]
+    for symbol in ["MSFT", "AMZN", "ABNB"]:
+        await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, symbol=symbol))
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+
+    assert watchlist_forward_test["client_id"] == 10
+    assert response.status_code == 409
+    assert response.json()["detail"] == "limit of running forward tests reached"
+
+
+@pytest.mark.anyio
+async def test_the_detail_of_a_multi_instrument_forward_test_has_no_instrument(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url)
+
+    response = await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")
+
+    assert response.status_code == 200
+    assert response.json()["forward_test"]["universe_kind"] == "list"
+    assert response.json()["fills"] == []
+
+
+@pytest.mark.anyio
+async def test_refuses_a_same_period_backtest_of_a_multi_instrument_forward_test_with_an_empty_period(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url)
+
+    response = await web_client.post(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/same-period-backtests")
+
+    assert response.status_code == 422
+    # The forward test started now: its period is empty.
+    assert response.json()["detail"] == "The time range must end after it starts."

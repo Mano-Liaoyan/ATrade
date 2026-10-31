@@ -1,0 +1,160 @@
+"""`BarStoreDataClient`: a NautilusTrader data client that gives the strategy the bars of the bar store
+(docs/architecture/forward_test.md section 12.19). It never asks IBKR.
+
+New bars: the bar fetcher saves them in the bar store. The universe poller of the child calls `send_new_bars`
+(section 12.24). The members of a multi-instrument forward test come as `UniverseUpdate` custom data, as in the
+multi-instrument backtest: after the strategy start, and at each new quarter (`send_universe_update`).
+"""
+
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import override
+
+from nautilus_trader.common import Clock
+from nautilus_trader.config import DataClientConfig
+from nautilus_trader.live import (
+    BarsResponse,
+    ClientCache,
+    RequestBars,
+    SubscribeBars,
+    UnsubscribeBars,
+)
+from nautilus_trader.live.clients import DataClient, DataClientFactory
+from nautilus_trader.model import BarType
+
+from atrade.backtest import make_universe_update
+from atrade.forward_test.atrade_instruments import convert_bar, create_equity, read_bar_period
+from atrade.foundation.bar import Bar, TimeRange, floor_to_bar_start
+from atrade.foundation.instrument import Instrument
+from atrade.market_data import BarRequest, read_saved_bars, read_source_order
+
+BAR_STORE_DATA_CLIENT_NAME = "ATRADE_BAR_STORE"
+# A request without a start reads from this time.
+FIRST_BAR_UTC = datetime(1970, 1, 1, tzinfo=UTC)
+NANOSECONDS_PER_SECOND = 1_000_000_000
+
+
+@dataclass(frozen=True)
+class BarStoreInput:
+    database_url: str
+    instruments: tuple[Instrument, ...]
+
+
+def read_utc(clock: Clock) -> datetime:
+    return datetime.fromtimestamp(clock.timestamp_ns() / NANOSECONDS_PER_SECOND, UTC)
+
+
+class BarStoreDataClient(DataClient):
+    def __init__(
+        self, *, name: str, config: DataClientConfig, cache: ClientCache, clock: Clock, bar_store_input: BarStoreInput
+    ) -> None:
+        super().__init__(name=name, config=config, cache=cache, clock=clock, venue=None)
+        self.bar_store_input = bar_store_input
+        self.instruments = {str(create_equity(instrument).id): instrument for instrument in bar_store_input.instruments}
+        # Bar type -> the start of the next bar to send.
+        self.next_bar_starts: dict[BarType, datetime] = {}
+
+    def add_instruments(self, instruments: tuple[Instrument, ...]) -> None:
+        """The new members of a quarter: the strategy and the bar requests can use them."""
+        for instrument in instruments:
+            equity = create_equity(instrument)
+            if str(equity.id) not in self.instruments:
+                self.instruments[str(equity.id)] = instrument
+                self._handle_instrument(equity)
+
+    def send_universe_update(self, bar_types: tuple[str, ...]) -> None:
+        """Tells the strategy the members of the quarter (section 12.17). The time is now.
+
+        The data engine publishes the custom data to each `subscribe_data(DataType("UniverseUpdate"))` of the node.
+        NautilusTrader 2.0.0rc7 does not send that subscription to the data client, so the universe poller sends
+        the first update after the strategy start.
+        """
+        self._handle_data(make_universe_update(read_utc(self.clock), list(bar_types)))
+
+    @override
+    async def _connect(self) -> None:
+        for instrument in self.bar_store_input.instruments:
+            self._handle_instrument(create_equity(instrument))
+
+    @override
+    async def _disconnect(self) -> None:
+        self.next_bar_starts.clear()
+
+    async def read_bars(self, bar_type: BarType, time_range: TimeRange) -> list[Bar]:
+        instrument = self.instruments.get(str(bar_type.instrument_id))
+        if instrument is None:
+            return []
+        bar_request = BarRequest(instrument, read_bar_period(bar_type), time_range)
+        # The global source order (docs/architecture/market_data.md section 8.7.2), as in a backtest.
+        database_url = self.bar_store_input.database_url
+        source_order = await read_source_order(database_url=database_url)
+        saved_bars = await read_saved_bars(
+            database_url=database_url, bar_request=bar_request, source_order=source_order
+        )
+        return saved_bars.bars
+
+    @override
+    async def _subscribe_bars(self, command: SubscribeBars) -> None:
+        """Sends only the bars that start at the current bar period or later."""
+        self.next_bar_starts[command.bar_type] = floor_to_bar_start(
+            read_utc(self.clock), read_bar_period(command.bar_type)
+        )
+
+    @override
+    async def _unsubscribe_bars(self, command: UnsubscribeBars) -> None:
+        self.next_bar_starts.pop(command.bar_type, None)
+
+    async def send_new_bars(self) -> int:
+        """Sends the saved bars of each subscription that the strategy did not get yet, in time order. Returns the
+        number of sent bars."""
+        sent_count = 0
+        for bar_type, next_bar_start in list(self.next_bar_starts.items()):
+            bar_period = read_bar_period(bar_type)
+            end_utc = floor_to_bar_start(read_utc(self.clock), bar_period) + bar_period.length
+            if end_utc <= next_bar_start:
+                continue
+            bars = await self.read_bars(bar_type, TimeRange(next_bar_start, end_utc))
+            for bar in bars:
+                self._handle_data(convert_bar(bar, bar_type, bar_period))
+            sent_count += len(bars)
+            if bars and bar_type in self.next_bar_starts:
+                self.next_bar_starts[bar_type] = bars[-1].start_utc + bar_period.length
+        return sent_count
+
+    @override
+    async def _request_bars(self, request: RequestBars) -> None:
+        bar_type = request.bar_type
+        bar_period = read_bar_period(bar_type)
+        start_utc = FIRST_BAR_UTC if request.start is None else request.start
+        end_utc = read_utc(self.clock) if request.end is None else request.end
+        bars = await self.read_bars(bar_type, TimeRange(start_utc, end_utc)) if start_utc < end_utc else []
+        if request.limit:
+            bars = bars[-request.limit :]
+        self._handle_response(
+            BarsResponse(
+                self.client_id,
+                bar_type,
+                [convert_bar(bar, bar_type, bar_period) for bar in bars],
+                request.request_id,
+                self.clock.timestamp_ns(),
+                request.start_ns,
+                request.end_ns,
+                request.params,  # pyright: ignore[reportUnknownMemberType] - the stub has no dict types
+            )
+        )
+
+
+class BarStoreDataClientFactory(DataClientFactory):
+    """Holds the bar store input, and the created client for the caller of `send_new_bars`."""
+
+    def __init__(self, bar_store_input: BarStoreInput) -> None:
+        self.bar_store_input = bar_store_input
+        self.client: BarStoreDataClient | None = None
+
+    def create(  # pyright: ignore[reportIncompatibleMethodOverride] - an instance factory (python_adapters.md)
+        self, *, name: str, config: DataClientConfig, cache: ClientCache, clock: Clock
+    ) -> BarStoreDataClient:
+        self.client = BarStoreDataClient(
+            name=name, config=config, cache=cache, clock=clock, bar_store_input=self.bar_store_input
+        )
+        return self.client

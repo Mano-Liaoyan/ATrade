@@ -5,7 +5,15 @@ import { expect, test, type Locator, type Page, type TestInfo } from '@playwrigh
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
-const KEY_METRIC_NAMES = ['Total return', 'Net profit (USD)', 'Max drawdown', 'Win rate', 'Trades', 'Final equity (USD)'];
+const KEY_METRIC_NAMES = [
+  'Total return',
+  'Net profit (USD)',
+  'Max drawdown',
+  'Sharpe ratio',
+  'Win rate',
+  'Trades',
+  'Final equity (USD)',
+];
 
 function createUniqueName(currentTest: TestInfo, title: string): string {
   return `${title} ${currentTest.project.name} ${String(Date.now())}`;
@@ -65,7 +73,7 @@ test('swaps the results and the editor, keeps the order after a reload, and size
 
   // Maximize: the other panel shows only its tab line, and no splitter shows. Escape restores.
   await editor.getByRole('button', { name: 'Maximize panel' }).click();
-  await expect(page.getByRole('separator')).toHaveCount(0);
+  await expect(page.getByRole('separator', { name: /^Resize the / })).toHaveCount(0);
   await expect(results.getByRole('button', { name: 'Minimize panel' })).toBeVisible();
   await expect(results.getByText('No backtests')).toBeHidden();
   await page.keyboard.press('Escape');
@@ -135,17 +143,18 @@ test('runs a backtest from the toolbar and opens its result in a new tab', async
   // A child process runs the backtest for some seconds. Meanwhile the user looks at another tab. The finished backtest
   // then opens in its own tab, with its number and total return.
   const results = page.getByRole('region', { name: 'Results' });
-  const backtestTab = results.getByRole('tab', { name: /^Backtest #\d+/ });
+  // The status icon in front of the name gives the status in the accessible name of the tab, not in its text.
+  const backtestTab = results.getByRole('tab', { name: /Backtest #\d+/ });
   await expect(backtestTab).toBeVisible();
   // The list reads again every 2 seconds, so the running state shows at least until the next read.
   await expect(page.getByRole('button', { name: 'Backtest is running' })).toHaveAttribute('aria-disabled', 'true');
   await results.getByRole('tab', { name: 'Logs' }).click();
-  await expect(backtestTab).toHaveText(/^Backtest #\d+\s+[+-]?[\d,]+\.\d{2} %$/, { timeout: BACKTEST_TIMEOUT_MILLISECONDS });
+  await expect(backtestTab).toHaveText(/^\s*Backtest #\d+\s+[+-]?[\d,]+\.\d{2} %$/, { timeout: BACKTEST_TIMEOUT_MILLISECONDS });
   await expect(backtestTab).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('button', { name: 'Run backtest' })).toBeVisible();
   await expect(results.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   await expect(results.getByRole('img', { name: 'Equity and drawdown' }).locator('canvas').first()).toBeVisible();
-  await expect(results.getByRole('link', { name: 'TradingView', exact: true })).toBeVisible();
+  await expect(results.getByRole('link', { name: 'Charting by TradingView' })).toBeVisible();
 
   await results.getByRole('tab', { name: 'Trades' }).click();
   await expect(results.getByRole('scrollbar', { name: 'Trades scroll bar' })).toBeVisible();
@@ -188,6 +197,7 @@ test('starts a forward test from the toolbar and stops it with the same button',
     stopped_at_utc: null,
     end_time_utc: null,
     crash_count: 0,
+    allocated_capital_usd: '1000',
     interruptions: [],
   };
   await page.route('**/api/forward-tests', async (route) => {
@@ -212,6 +222,7 @@ test('starts a forward test from the toolbar and stops it with the same button',
   await dialog.getByLabel('Exchange').fill('arca');
   await dialog.getByRole('combobox', { name: 'Bar period' }).click();
   await page.getByRole('option', { name: '1 minute', exact: true }).click();
+  await dialog.getByLabel('Capital (USD)').fill('1000');
   await dialog.getByRole('button', { name: 'Start forward test' }).click();
   await expect(dialog).toHaveCount(0);
   expect(startRequests).toEqual([
@@ -267,7 +278,7 @@ test('opens problems and output from the 24px status bar and minimizes them agai
 
   // The open panel maximizes and restores like the other panels.
   await outputPanel.getByRole('button', { name: 'Maximize panel' }).click();
-  await expect(page.getByRole('separator')).toHaveCount(0);
+  await expect(page.getByRole('separator', { name: /^Resize the / })).toHaveCount(0);
   await expect(editor.getByRole('textbox', { name: 'Strategy code' })).toBeHidden();
   await outputPanel.getByRole('button', { name: 'Restore panel' }).click();
   await expect(editor.getByRole('textbox', { name: 'Strategy code' })).toBeVisible();

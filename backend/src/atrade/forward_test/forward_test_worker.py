@@ -15,6 +15,7 @@ import psycopg
 from atrade.forward_test import forward_test_store
 from atrade.forward_test.forward_test_store import ForwardTestRow
 from atrade.foundation.clock import Clock
+from atrade.paper_trading import transfer_to_by_hand
 
 COMPARE_INTERVAL_SECONDS = 2.0
 # The child exits with this code when the paper account check fails. It sent no order, so there is no retry.
@@ -52,18 +53,48 @@ class RunningChild:
     mode: ChildMode
     started_at_utc: datetime
     is_stop_requested: bool = False
+    # A stock split restart (section 12.22): the end is not a stop and not a crash.
+    is_restart_requested: bool = False
 
 
 def describe_crash(exit_code: int) -> str:
     return f"The forward test process ended with exit code {exit_code}. The forward-test log has the reason."
 
 
+# True when the run child of the row can start. The worker app waits for the warm-up fill of a multi-instrument
+# forward test (section 12.17).
+type IsReadyToRun = Callable[[ForwardTestRow], bool]
+
+
+def is_always_ready(_row: ForwardTestRow) -> bool:
+    return True
+
+
 class ForwardTestWorker:
-    def __init__(self, *, database_url: str, clock: Clock, start_child: StartForwardTestChild) -> None:
+    def __init__(
+        self,
+        *,
+        database_url: str,
+        clock: Clock,
+        start_child: StartForwardTestChild,
+        is_ready_to_run: IsReadyToRun = is_always_ready,
+    ) -> None:
         self.database_url = database_url
         self.clock = clock
         self.start_child = start_child
+        self.is_ready_to_run = is_ready_to_run
         self.running_children: dict[int, RunningChild] = {}
+
+    def request_restart(self, forward_test_ids: list[int]) -> None:
+        """Asks the run child of each forward test to stop. The next comparison starts it again, without a crash
+        count and without an interruption (section 12.22). The new child restores the strategy positions from the
+        owner ledger."""
+        for forward_test_id in forward_test_ids:
+            running_child = self.running_children.get(forward_test_id)
+            if running_child is None or running_child.mode != "run" or running_child.is_stop_requested:
+                continue
+            running_child.child.request_stop()
+            running_child.is_restart_requested = True
 
     async def keep_comparing(self) -> None:
         """Runs until the caller cancels it."""
@@ -101,7 +132,7 @@ class ForwardTestWorker:
                 await self.start_running_child(row.id, "cancel_orders")
                 await forward_test_store.write_status(connection, forward_test_id=row.id, status="stopping")
             return
-        if row.status not in {"starting", "running", "waiting_for_gateway"}:
+        if row.status not in {"starting", "running", "waiting_for_gateway"} or not self.is_ready_to_run(row):
             return
         # A row with status "running" and no child is a forward test of an earlier worker: start it again.
         if row.status == "running":
@@ -123,11 +154,17 @@ class ForwardTestWorker:
         self, connection: psycopg.AsyncConnection, row: ForwardTestRow, running_child: RunningChild, exit_code: int
     ) -> None:
         now_utc = self.clock.read_now_utc()
+        if running_child.is_restart_requested and exit_code == 0 and not running_child.is_stop_requested:
+            await forward_test_store.write_status(connection, forward_test_id=row.id, status="starting")
+            return
         is_stop = running_child.mode == "cancel_orders" or running_child.is_stop_requested
         if is_stop and exit_code == 0:
-            await forward_test_store.write_end(
-                connection, forward_test_id=row.id, status="stopped", stopped_at_utc=now_utc, error_message=None
-            )
+            async with connection.transaction():
+                await forward_test_store.write_end(
+                    connection, forward_test_id=row.id, status="stopped", stopped_at_utc=now_utc, error_message=None
+                )
+                # The positions and the remaining cash go to "By hand". The records do not change (section 12.6).
+                await transfer_to_by_hand(connection, forward_test_id=row.id, time_utc=now_utc)
             return
         if is_stop:
             await forward_test_store.write_failure_with_client_id(
@@ -135,13 +172,16 @@ class ForwardTestWorker:
             )
             return
         if exit_code == PAPER_CHECK_FAILED_EXIT_CODE:
-            await forward_test_store.write_end(
-                connection,
-                forward_test_id=row.id,
-                status="failed",
-                stopped_at_utc=now_utc,
-                error_message=PAPER_CHECK_FAILED_MESSAGE,
-            )
+            async with connection.transaction():
+                await forward_test_store.write_end(
+                    connection,
+                    forward_test_id=row.id,
+                    status="failed",
+                    stopped_at_utc=now_utc,
+                    error_message=PAPER_CHECK_FAILED_MESSAGE,
+                )
+                # The capital is not allocated any more, so it goes back to "By hand" (section 12.18).
+                await transfer_to_by_hand(connection, forward_test_id=row.id, time_utc=now_utc)
             return
         if exit_code == GATEWAY_UNREACHABLE_EXIT_CODE:
             await forward_test_store.write_waiting_for_gateway(

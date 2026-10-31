@@ -4,17 +4,18 @@ and read or change the backtest limits (timeout and concurrency).
 A new backtest waits in the queue. The backtest runner of the Web process starts it (backtest_runner.py).
 """
 
-from datetime import datetime
+from dataclasses import asdict, replace
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, NoReturn
 
 import psycopg
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import AwareDatetime, BaseModel, Field
 
 from atrade.backtest import backtest_store
-from atrade.backtest.backtest_access import check_backtest_request, check_saved_bars
-from atrade.backtest.backtest_exchange_rates import save_exchange_rates
+from atrade.backtest.backtest_access import has_survivorship_bias
+from atrade.backtest.backtest_exchange_rates import USD
 from atrade.backtest.backtest_limits import (
     MAX_CONCURRENCY,
     MAX_TIMEOUT_SECONDS,
@@ -22,30 +23,86 @@ from atrade.backtest.backtest_limits import (
     read_backtest_limits,
     save_backtest_limits,
 )
-from atrade.backtest.backtest_metrics import BacktestMetrics
-from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus
+from atrade.backtest.backtest_metrics import (
+    PERCENT,
+    BacktestMetrics,
+    BacktestTrade,
+    EquityPoint,
+    SplitMetrics,
+    calculate_split_metrics,
+    round_value,
+)
+from atrade.backtest.backtest_robustness import SharpeProbabilityKind, read_robustness
+from atrade.backtest.backtest_start import BacktestRefusal, start_backtest
+from atrade.backtest.backtest_store import (
+    BacktestRequest,
+    BacktestRow,
+    BacktestStatus,
+    BacktestUniverse,
+    BacktestUniverseKind,
+    ParameterValues,
+    UniversePeriod,
+    UniverseRebalancePeriod,
+    UniverseScreen,
+)
+from atrade.backtest.backtest_universe import (
+    MAX_UNIVERSE_SIZE,
+    check_list_members,
+    describe_missing_universe,
+    find_rule_periods,
+    make_list_periods,
+)
+from atrade.backtest.sharpe_probability import SharpeProbabilityStatus
+from atrade.backtest.universe_instruments import summarize_instruments
+from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import ExchangeRateReader
-from atrade.strategy import read_strategy_version
+from atrade.market_data import BarSource, ExchangeRateReader, read_us_universe_quarter_starts
+from atrade.screen import MARKET_CURRENCIES, read_saved_screen, read_screen_result_members
+from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
+DEFAULT_OUT_OF_SAMPLE_SHARE = 30
+MAX_OUT_OF_SAMPLE_SHARE = 50
 
 InstrumentField = Annotated[str, Field(min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH)]
 
 
-class StartBacktestRequest(BaseModel):
-    strategy_version_id: int
+class InstrumentBody(BaseModel):
     symbol: InstrumentField
     exchange: InstrumentField
     currency: InstrumentField
+
+
+class StartBacktestRequest(BaseModel):
+    """`universe_kind` `single` (the default) needs `symbol`, `exchange`, and `currency`, `rule` needs `top_n`, and
+    `list` needs `instruments` or `screen_result_id`, and `screen` needs `screen_id` (docs/architecture/backtest.md
+    section 10.10.6)."""
+
+    strategy_version_id: int
+    universe_kind: BacktestUniverseKind = "single"
+    symbol: InstrumentField | None = None
+    exchange: InstrumentField | None = None
+    currency: InstrumentField | None = None
+    top_n: Annotated[int, Field(ge=1, le=MAX_UNIVERSE_SIZE)] | None = None
+    instruments: Annotated[list[InstrumentBody], Field(max_length=MAX_UNIVERSE_SIZE)] | None = None
+    # A `list` from a screen result: all its rows, or only `symbols` (docs/architecture/screen.md section 24.9).
+    screen_result_id: int | None = None
+    symbols: Annotated[list[InstrumentField], Field(max_length=MAX_UNIVERSE_SIZE)] | None = None
+    # A `screen` universe: the screen runs again at each period start. Without `rebalance_period`, each quarter.
+    screen_id: int | None = None
+    rebalance_period: UniverseRebalancePeriod | None = None
     bar_period: BarPeriod
     start_utc: AwareDatetime
     end_utc: AwareDatetime
     # Required, with no default: a backtest never starts with an unknown amount (docs/architecture.md section 10).
     paper_capital_usd: Annotated[Decimal, Field(gt=0)]
+    # The last percent of the range that is out of sample (docs/architecture/backtest.md section 10.9.4). 0 is no split.
+    out_of_sample_share: Annotated[int, Field(ge=0, le=MAX_OUT_OF_SAMPLE_SHARE)] = DEFAULT_OUT_OF_SAMPLE_SHARE
+    # Only for this backtest. Without it, the global source order (docs/architecture/backtest.md section 10.12).
+    source_order: list[BarSource] | None = None
 
 
 class BacktestLimitsBody(BaseModel):
@@ -56,10 +113,35 @@ class BacktestLimitsBody(BaseModel):
 
 
 class BacktestMetricsResponse(BaseModel):
+    """The metrics of docs/architecture/backtest.md section 10.9.2. A metric without a meaning is null, and
+    `missing_reasons` gives its reason by its field name (section 10.9.3). The page shows "–" with the reason."""
+
     final_equity_usd: Decimal
     total_return_percent: Decimal
     max_drawdown_percent: Decimal
     trade_count: int
+    cagr_percent: Decimal | None
+    annual_volatility_percent: Decimal | None
+    sharpe_ratio: Decimal | None
+    sortino_ratio: Decimal | None
+    calmar_ratio: Decimal | None
+    profit_factor: Decimal | None
+    average_win_usd: Decimal | None
+    average_win_percent: Decimal | None
+    average_loss_usd: Decimal | None
+    exposure_percent: Decimal | None
+    turnover_per_year: Decimal | None
+    win_rate_percent: Decimal | None
+    missing_reasons: dict[str, str]
+
+
+class UniverseScreenResponse(BaseModel):
+    """The copy of the screen that a `screen` universe saved at its start (docs/architecture/screen.md 24.9)."""
+
+    screen_id: int
+    name: str
+    market: str
+    definition: dict[str, Any]
 
 
 class BacktestResponse(BaseModel):
@@ -68,9 +150,15 @@ class BacktestResponse(BaseModel):
     strategy_id: int
     strategy_name: str
     version_number: int
-    symbol: str
-    exchange: str
-    currency: str
+    universe_kind: BacktestUniverseKind
+    # Null for a multi-instrument backtest. The currency is the currency of all universe members.
+    symbol: str | None
+    exchange: str | None
+    currency: str | None
+    universe_top_n: int | None
+    # The copy of the screen of a `screen` universe, and its rebalance period. Null for the other kinds.
+    universe_screen: UniverseScreenResponse | None
+    universe_rebalance_period: UniverseRebalancePeriod | None
     bar_period: BarPeriod
     start_utc: datetime
     end_utc: datetime
@@ -80,7 +168,23 @@ class BacktestResponse(BaseModel):
     created_at_utc: datetime
     started_at_utc: datetime | None
     ended_at_utc: datetime | None
+    out_of_sample_share: int
+    split_time_utc: datetime | None
     metrics: BacktestMetricsResponse | None
+    # The conversation of the AI assistant that started the backtest. Null for a backtest of the user.
+    conversation_id: int | None
+    # Null for a backtest from before the source order. The bar counts are null until the backtest finishes.
+    source_order: list[BarSource] | None
+    bar_count_by_source: dict[BarSource, int] | None
+    survivorship_bias: bool
+    # The parameter sweep of a sweep run and its parameter values (section 10.11). Null for another backtest.
+    sweep_id: int | None
+    parameters: ParameterValues | None
+
+
+class SplitMetricsResponse(BaseModel):
+    in_sample: BacktestMetricsResponse
+    out_of_sample: BacktestMetricsResponse
 
 
 class EquityPointResponse(BaseModel):
@@ -94,11 +198,48 @@ class TradeResponse(BaseModel):
     quantity_shares: Decimal
     price_usd: Decimal
     commission_usd: Decimal
+    # The real exchange, not the simulated venue SMART. Null for a trade from before the multi-instrument backtest.
+    symbol: str | None
+    exchange: str | None
+
+
+class BacktestRobustnessResponse(BaseModel):
+    """The robustness checks of docs/architecture/backtest.md sections 10.9.4 and 10.9.5, calculated at each read. A
+    value without a meaning is null. `missing_reasons` gives the reason of a null `sharpe_probability_percent`."""
+
+    trial_count: int
+    sharpe_probability_percent: Decimal | None
+    sharpe_probability_kind: SharpeProbabilityKind
+    sharpe_probability_status: SharpeProbabilityStatus | None
+    missing_reasons: dict[str, str]
+    # Null without a split, when a Sharpe ratio is null, or when the in-sample Sharpe ratio is 0 or below.
+    out_of_sample_to_in_sample_sharpe_percent: Decimal | None
+    # Null without a split.
+    out_of_sample_use_count: int | None
+
+
+class UniverseInstrumentResponse(BaseModel):
+    symbol: str
+    exchange: str
+    trade_count: int
+    net_profit_usd: Decimal
+    quarter_count: int
+
+
+class UsUniverseRangeResponse(BaseModel):
+    """The first and the last quarter start with US universe data. Null without universe data."""
+
+    first_day_utc: datetime | None
+    last_day_utc: datetime | None
 
 
 class BacktestDetailResponse(BacktestResponse):
     equity_curve: list[EquityPointResponse]
     trades: list[TradeResponse]
+    # One row for each universe member (docs/architecture/backtest.md 10.10.7). Empty for a single-instrument backtest.
+    instruments: list[UniverseInstrumentResponse]
+    split_metrics: SplitMetricsResponse | None
+    robustness: BacktestRobustnessResponse
 
 
 class ComparedBacktestResponse(BacktestDetailResponse):
@@ -115,11 +256,124 @@ class BacktestComparisonResponse(BaseModel):
 def to_metrics_response(metrics: BacktestMetrics | None) -> BacktestMetricsResponse | None:
     if metrics is None:
         return None
+    return to_present_metrics_response(metrics)
+
+
+def to_present_metrics_response(metrics: BacktestMetrics) -> BacktestMetricsResponse:
     return BacktestMetricsResponse(
         final_equity_usd=metrics.final_equity_usd,
         total_return_percent=metrics.total_return_percent,
         max_drawdown_percent=metrics.max_drawdown_percent,
         trade_count=metrics.trade_count,
+        cagr_percent=metrics.cagr_percent,
+        annual_volatility_percent=metrics.annual_volatility_percent,
+        sharpe_ratio=metrics.sharpe_ratio,
+        sortino_ratio=metrics.sortino_ratio,
+        calmar_ratio=metrics.calmar_ratio,
+        profit_factor=metrics.profit_factor,
+        average_win_usd=metrics.average_win_usd,
+        average_win_percent=metrics.average_win_percent,
+        average_loss_usd=metrics.average_loss_usd,
+        exposure_percent=metrics.exposure_percent,
+        turnover_per_year=metrics.turnover_per_year,
+        win_rate_percent=metrics.win_rate_percent,
+        missing_reasons=metrics.missing_reasons,
+    )
+
+
+def find_extra_universe_fields(request: StartBacktestRequest) -> list[str]:
+    """The universe fields of the request that its `universe_kind` does not use (docs/architecture/backtest.md
+    section 10.10.6)."""
+    used = {
+        "single": {"symbol", "exchange", "currency"},
+        "rule": {"top_n"},
+        "list": {"instruments", "screen_result_id", "symbols"},
+        "screen": {"screen_id", "rebalance_period"},
+    }[request.universe_kind]
+    values = {
+        "symbol": request.symbol,
+        "exchange": request.exchange,
+        "currency": request.currency,
+        "top_n": request.top_n,
+        "instruments": request.instruments,
+        "screen_result_id": request.screen_result_id,
+        "symbols": request.symbols,
+        "screen_id": request.screen_id,
+        "rebalance_period": request.rebalance_period,
+    }
+    return [name for name, value in values.items() if value is not None and name not in used]
+
+
+def refuse(detail: str) -> NoReturn:
+    raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+
+
+def calculate_finished_split_metrics(
+    row: BacktestRow, equity_curve: list[EquityPoint], trades: list[BacktestTrade]
+) -> SplitMetrics | None:
+    """The split metrics from the saved equity curve and fills, or None without a split or a result."""
+    if row.split_time_utc is None or backtest_store.read_metrics(row) is None:
+        return None
+    return calculate_split_metrics(
+        paper_capital_usd=row.paper_capital_usd,
+        time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
+        equity_curve=equity_curve,
+        trades=trades,
+        split_time_utc=row.split_time_utc,
+    )
+
+
+def calculate_sharpe_percent(split_metrics: SplitMetrics | None) -> Decimal | None:
+    """The out-of-sample Sharpe ratio as a percent of the in-sample Sharpe ratio. None when the in-sample Sharpe ratio
+    is 0 or below, because a percent of such a value has no meaning."""
+    if split_metrics is None:
+        return None
+    in_sample_sharpe = split_metrics.in_sample.sharpe_ratio
+    out_of_sample_sharpe = split_metrics.out_of_sample.sharpe_ratio
+    if in_sample_sharpe is None or out_of_sample_sharpe is None or in_sample_sharpe <= 0:
+        return None
+    return round_value(out_of_sample_sharpe / in_sample_sharpe * PERCENT)
+
+
+def make_backtest_response(row: BacktestRow, strategy_version: StrategyVersion | None) -> BacktestResponse:
+    """The response of a backtest row. `strategy_version` is the version of the row. A missing version is an error."""
+    if strategy_version is None:
+        message = f"Backtest {row.id} refers to strategy version {row.strategy_version_id}, which is missing."
+        raise RuntimeError(message)
+    request = backtest_store.read_request(row)
+    return BacktestResponse(
+        id=row.id,
+        strategy_version_id=row.strategy_version_id,
+        strategy_id=strategy_version.strategy_id,
+        strategy_name=strategy_version.strategy_name,
+        version_number=strategy_version.version_number,
+        universe_kind=row.universe_kind,
+        symbol=row.symbol,
+        exchange=row.exchange,
+        currency=row.currency,
+        universe_top_n=row.universe_top_n,
+        universe_screen=None if row.universe_screen is None else UniverseScreenResponse(**row.universe_screen),
+        universe_rebalance_period=row.universe_rebalance_period,
+        bar_period=BarPeriod(row.bar_period),
+        start_utc=row.start_utc,
+        end_utc=row.end_utc,
+        paper_capital_usd=row.paper_capital_usd,
+        status=row.status,
+        error_message=row.error_message,
+        created_at_utc=row.created_at_utc,
+        started_at_utc=row.started_at_utc,
+        ended_at_utc=row.ended_at_utc,
+        out_of_sample_share=row.out_of_sample_share,
+        split_time_utc=row.split_time_utc,
+        metrics=to_metrics_response(backtest_store.read_metrics(row)),
+        conversation_id=row.conversation_id,
+        source_order=request.source_order,
+        bar_count_by_source=None
+        if row.bar_count_by_source is None
+        else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
+        survivorship_bias=has_survivorship_bias(request),
+        sweep_id=row.sweep_id,
+        parameters=row.parameters,
     )
 
 
@@ -135,67 +389,132 @@ class BacktestRoutes:
         strategy_version = await read_strategy_version(
             database_url=self.database_url, strategy_version_id=row.strategy_version_id
         )
-        if strategy_version is None:
-            message = f"Backtest {row.id} refers to strategy version {row.strategy_version_id}, which is missing."
-            raise RuntimeError(message)
-        return BacktestResponse(
-            id=row.id,
-            strategy_version_id=row.strategy_version_id,
-            strategy_id=strategy_version.strategy_id,
-            strategy_name=strategy_version.strategy_name,
-            version_number=strategy_version.version_number,
-            symbol=row.symbol,
-            exchange=row.exchange,
-            currency=row.currency,
-            bar_period=BarPeriod(row.bar_period),
-            start_utc=row.start_utc,
-            end_utc=row.end_utc,
-            paper_capital_usd=row.paper_capital_usd,
-            status=row.status,
-            error_message=row.error_message,
-            created_at_utc=row.created_at_utc,
-            started_at_utc=row.started_at_utc,
-            ended_at_utc=row.ended_at_utc,
-            metrics=to_metrics_response(backtest_store.read_metrics(row)),
-        )
-
-    async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
-        backtest_request = BacktestRequest(
-            strategy_version_id=request.strategy_version_id,
-            instrument=Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency),
-            bar_period=request.bar_period,
-            time_range=TimeRange(start_utc=request.start_utc, end_utc=request.end_utc),
-            paper_capital_usd=request.paper_capital_usd,
-        )
-        refusal = check_backtest_request(backtest_request)
-        if refusal is not None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=refusal)
-        strategy_version = await read_strategy_version(
-            database_url=self.database_url, strategy_version_id=request.strategy_version_id
-        )
-        if strategy_version is None:
-            detail = f"Strategy version {request.strategy_version_id} does not exist."
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
-        # Refuse before the row exists: a backtest without saved bars can only fail (docs/architecture/backtest.md 10.3).
-        missing_bars = await check_saved_bars(database_url=self.database_url, request=backtest_request)
-        if missing_bars is not None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=missing_bars)
-        # The child never calls IBKR, so the rates of an instrument that is not in USD are saved first (section 10.8).
-        missing_rates = await save_exchange_rates(
-            database_url=self.database_url, exchange_rate_reader=self.exchange_rate_reader, request=backtest_request
-        )
-        if missing_rates is not None:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=missing_rates)
-        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            row = await backtest_store.insert_backtest(
-                connection, request=backtest_request, created_at_utc=self.clock.read_now_utc()
-            )
-        return await self.to_backtest_response(row)
+        return make_backtest_response(row, strategy_version)
 
     async def list_backtests(self) -> list[BacktestResponse]:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             rows = await backtest_store.select_backtests(connection)
-        return [await self.to_backtest_response(row) for row in rows]
+        # One connection and one query for the versions of all rows: the pages read the list each 2 seconds.
+        versions = await read_strategy_versions(
+            database_url=self.database_url, strategy_version_ids=sorted({row.strategy_version_id for row in rows})
+        )
+        return [make_backtest_response(row, versions.get(row.strategy_version_id)) for row in rows]
+
+    async def find_universe_periods(self, request: StartBacktestRequest, time_range: TimeRange) -> list[UniversePeriod]:
+        """The universe periods of a multi-instrument request. Raises a 422 HTTPException when it has no members."""
+        if request.universe_kind == "rule":
+            periods = await find_rule_periods(
+                database_url=self.database_url, top_n=request.top_n or 0, time_range=time_range
+            )
+            if not periods:
+                refuse(describe_missing_universe(time_range))
+            return periods
+        members = await self.find_list_members(request)
+        refusal = check_list_members(members)
+        if refusal is not None:
+            refuse(refusal)
+        return make_list_periods(time_range, members)
+
+    async def find_list_members(self, request: StartBacktestRequest) -> list[Instrument]:
+        """The members of a `list` universe: `instruments`, or the rows of a screen result (all, or only
+        `symbols`). Raises a 422 HTTPException when the screen result is missing or a symbol is not in it."""
+        if request.screen_result_id is None:
+            if request.symbols is not None:
+                refuse("A list universe takes symbols only with screen_result_id.")
+            return [
+                Instrument(symbol=body.symbol, exchange=body.exchange, currency=body.currency)
+                for body in request.instruments or []
+            ]
+        if request.instruments is not None:
+            refuse("A list universe takes instruments or screen_result_id, not both.")
+        rows = await read_screen_result_members(
+            database_url=self.database_url, screen_result_id=request.screen_result_id
+        )
+        if rows is None:
+            refuse(f"Screen result {request.screen_result_id} does not exist.")
+        if request.symbols is None:
+            return rows
+        symbols_in_result = {row.symbol for row in rows}
+        missing = [symbol for symbol in request.symbols if symbol not in symbols_in_result]
+        if missing:
+            refuse(f"Screen result {request.screen_result_id} does not have {', '.join(missing)}.")
+        # A symbol can be on two exchanges of the screen result: each of its rows is a member.
+        return [row for symbol in dict.fromkeys(request.symbols) for row in rows if row.symbol == symbol]
+
+    async def make_backtest_request(
+        self, request: StartBacktestRequest
+    ) -> tuple[BacktestRequest, list[UniversePeriod]]:
+        """The backtest request and the universe periods (none for a single-instrument backtest)."""
+        time_range = TimeRange(start_utc=request.start_utc, end_utc=request.end_utc)
+        backtest_request = BacktestRequest(
+            strategy_version_id=request.strategy_version_id,
+            instrument=None,
+            bar_period=request.bar_period,
+            time_range=time_range,
+            paper_capital_usd=request.paper_capital_usd,
+            out_of_sample_share=request.out_of_sample_share,
+            source_order=request.source_order,
+        )
+        extra_fields = find_extra_universe_fields(request)
+        if extra_fields:
+            refuse(f"A {request.universe_kind} universe does not take {', '.join(extra_fields)}.")
+        if request.universe_kind == "single":
+            if request.symbol is None or request.exchange is None or request.currency is None:
+                refuse("A single-instrument backtest needs symbol, exchange, and currency.")
+            instrument = Instrument(symbol=request.symbol, exchange=request.exchange, currency=request.currency)
+            return replace(backtest_request, instrument=instrument), []
+        if request.universe_kind == "screen":
+            return replace(backtest_request, universe=await self.make_screen_universe(request)), []
+        if request.universe_kind == "rule" and request.top_n is None:
+            refuse("A rule universe needs top_n.")
+        periods = await self.find_universe_periods(request, time_range)
+        # The rule universe is US only. A list has one currency (check_list_members).
+        currency = USD if request.universe_kind == "rule" else periods[0].members[0].currency
+        universe = BacktestUniverse(kind=request.universe_kind, currency=currency, top_n=request.top_n)
+        return replace(backtest_request, universe=universe), periods
+
+    async def make_screen_universe(self, request: StartBacktestRequest) -> BacktestUniverse:
+        """A copy of the screen and the rebalance period. The child runs the screen at each period start, so the
+        start route writes no members (docs/architecture/backtest.md section 10.10.8)."""
+        if request.screen_id is None:
+            refuse("A screen universe needs screen_id.")
+        screen = await read_saved_screen(database_url=self.database_url, screen_id=request.screen_id)
+        if screen is None:
+            refuse(f"Screen {request.screen_id} does not exist.")
+        return BacktestUniverse(
+            kind="screen",
+            currency=MARKET_CURRENCIES[screen.market],
+            screen=UniverseScreen(
+                screen_id=screen.id, name=screen.name, market=screen.market, definition=screen.definition
+            ),
+            rebalance_period=request.rebalance_period or "quarter",
+        )
+
+    async def start_backtest(self, request: StartBacktestRequest) -> BacktestResponse:
+        """The start of port 8000: a backtest without a conversation."""
+        return await self.start_with_conversation(request, None)
+
+    async def start_with_conversation(
+        self, request: StartBacktestRequest, conversation_id: int | None
+    ) -> BacktestResponse:
+        """Port 8001 gives the conversation of the request."""
+        backtest_request, periods = await self.make_backtest_request(request)
+        started = await start_backtest(
+            database_url=self.database_url,
+            exchange_rate_reader=self.exchange_rate_reader,
+            request=backtest_request,
+            created_at_utc=self.clock.read_now_utc(),
+            universe_periods=periods,
+            conversation_id=conversation_id,
+        )
+        if isinstance(started, BacktestRefusal):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=started.detail)
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            row = await backtest_store.select_backtest(connection, started)
+        if row is None:
+            message = f"Backtest {started} is missing after its start."
+            raise RuntimeError(message)
+        return await self.to_backtest_response(row)
 
     async def compare_backtests(self, first_backtest_id: int, second_backtest_id: int) -> BacktestComparisonResponse:
         """Compare two backtests of the same strategy: two versions, or one version with other request fields."""
@@ -236,11 +555,30 @@ class BacktestRoutes:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backtest not found.")
             equity_curve = await backtest_store.select_equity_curve(connection, backtest_id)
             trades = await backtest_store.select_trades(connection, backtest_id)
+            quarter_counts = await backtest_store.count_member_periods(connection, backtest_id)
+            out_of_sample_use_count = await self.count_out_of_sample_uses(connection, row)
         backtest = await self.to_backtest_response(row)
+        split_metrics = calculate_finished_split_metrics(row, equity_curve, trades)
+        robustness = await read_robustness(
+            database_url=self.database_url, row=row, strategy_id=backtest.strategy_id, equity_curve=equity_curve
+        )
         return BacktestDetailResponse(
             **backtest.model_dump(),
+            robustness=BacktestRobustnessResponse(
+                trial_count=robustness.trial_count,
+                sharpe_probability_percent=robustness.sharpe_probability_percent,
+                sharpe_probability_kind=robustness.sharpe_probability_kind,
+                sharpe_probability_status=robustness.sharpe_probability_status,
+                missing_reasons=robustness.missing_reasons,
+                out_of_sample_to_in_sample_sharpe_percent=calculate_sharpe_percent(split_metrics),
+                out_of_sample_use_count=out_of_sample_use_count,
+            ),
             equity_curve=[
                 EquityPointResponse(time_utc=point.time_utc, equity_usd=point.equity_usd) for point in equity_curve
+            ],
+            instruments=[
+                UniverseInstrumentResponse(**asdict(instrument))
+                for instrument in summarize_instruments(trades, quarter_counts)
             ],
             trades=[
                 TradeResponse(
@@ -249,10 +587,51 @@ class BacktestRoutes:
                     quantity_shares=trade.quantity_shares,
                     price_usd=trade.price_usd,
                     commission_usd=trade.commission_usd,
+                    symbol=trade.symbol,
+                    exchange=trade.exchange,
                 )
                 for trade in trades
             ],
+            split_metrics=(
+                None
+                if split_metrics is None
+                else SplitMetricsResponse(
+                    in_sample=to_present_metrics_response(split_metrics.in_sample),
+                    out_of_sample=to_present_metrics_response(split_metrics.out_of_sample),
+                )
+            ),
         )
+
+    async def delete_backtest(self, backtest_id: int) -> None:
+        """A true delete (section 10.5). 409 while the backtest is queued or running, for a sweep run, and for the
+        same-period backtest of a forward test."""
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            if await backtest_store.select_backtest(connection, backtest_id) is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backtest not found.")
+            refusal = await backtest_store.delete_backtest(connection, backtest_id)
+        if refusal is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=refusal)
+
+    async def count_out_of_sample_uses(self, connection: psycopg.AsyncConnection, row: BacktestRow) -> int | None:
+        """The finished backtests of the same strategy (all versions), instrument, and bar period whose out-of-sample
+        part overlaps the out-of-sample part of `row`. The count includes `row`. None without a split."""
+        if row.split_time_utc is None:
+            return None
+        overlapping = await backtest_store.select_overlapping_out_of_sample_parts(connection, row)
+        versions = await read_strategy_versions(
+            database_url=self.database_url,
+            strategy_version_ids=sorted({backtest.strategy_version_id for backtest in overlapping}),
+        )
+        strategy_id = versions[row.strategy_version_id].strategy_id
+        return sum(versions[backtest.strategy_version_id].strategy_id == strategy_id for backtest in overlapping)
+
+    async def read_us_universe_range(self) -> UsUniverseRangeResponse:
+        quarter_starts = await read_us_universe_quarter_starts(
+            database_url=self.database_url, end_utc=datetime.max.replace(tzinfo=UTC)
+        )
+        if not quarter_starts:
+            return UsUniverseRangeResponse(first_day_utc=None, last_day_utc=None)
+        return UsUniverseRangeResponse(first_day_utc=quarter_starts[0], last_day_utc=quarter_starts[-1])
 
     async def read_limits(self) -> BacktestLimitsBody:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
@@ -266,26 +645,69 @@ class BacktestRoutes:
         return request
 
 
+REFUSED: dict[int | str, dict[str, Any]] = {status.HTTP_422_UNPROCESSABLE_CONTENT: REFUSED_OR_NOT_VALID_RESPONSE}
+NOT_FOUND: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
+
+
+def add_read_routes(router: APIRouter, routes: BacktestRoutes) -> None:
+    """The read routes that port 8001 also has (docs/architecture/assistant.md 25.3.3)."""
+    router.add_api_route("/backtests", routes.list_backtests, methods=["GET"])
+    router.add_api_route("/backtests/{backtest_id}", routes.read_backtest, methods=["GET"], responses=NOT_FOUND)
+    router.add_api_route(
+        "/backtests/{first_backtest_id}/comparison/{second_backtest_id}",
+        routes.compare_backtests,
+        methods=["GET"],
+        responses={**REFUSED, **NOT_FOUND},
+    )
+
+
 def create_backtest_router(*, database_url: str, clock: Clock, exchange_rate_reader: ExchangeRateReader) -> APIRouter:
     routes = BacktestRoutes(database_url=database_url, clock=clock, exchange_rate_reader=exchange_rate_reader)
     router = APIRouter(prefix="/api")
-    refused: dict[int | str, dict[str, Any]] = {status.HTTP_422_UNPROCESSABLE_CONTENT: REFUSED_OR_NOT_VALID_RESPONSE}
-    not_found: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
     router.add_api_route(
         "/backtests",
         routes.start_backtest,
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
-        responses=refused,
+        responses=REFUSED,
     )
-    router.add_api_route("/backtests", routes.list_backtests, methods=["GET"])
-    router.add_api_route("/backtests/{backtest_id}", routes.read_backtest, methods=["GET"], responses=not_found)
     router.add_api_route("/backtest-limits", routes.read_limits, methods=["GET"])
+    router.add_api_route("/us-universe/range", routes.read_us_universe_range, methods=["GET"])
     router.add_api_route("/backtest-limits", routes.change_limits, methods=["PUT"])
+    add_read_routes(router, routes)
     router.add_api_route(
-        "/backtests/{first_backtest_id}/comparison/{second_backtest_id}",
-        routes.compare_backtests,
-        methods=["GET"],
-        responses={**refused, **not_found},
+        "/backtests/{backtest_id}",
+        routes.delete_backtest,
+        methods=["DELETE"],
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses={**NOT_FOUND, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
     )
+    return router
+
+
+def create_backtest_assistant_router(
+    *, database_url: str, clock: Clock, exchange_rate_reader: ExchangeRateReader, conversation_exists: ConversationCheck
+) -> APIRouter:
+    """The backtest routes of port 8001 (docs/architecture/assistant.md 25.3.3). No backtest limits routes.
+
+    A start records the conversation of the request. Like port 8000, it saves the daily exchange rates from IBKR
+    that a backtest of an instrument that is not in USD needs (docs/architecture/backtest.md 10.13).
+    """
+    routes = BacktestRoutes(database_url=database_url, clock=clock, exchange_rate_reader=exchange_rate_reader)
+    read_conversation_id = create_conversation_dependency(conversation_exists)
+
+    async def start_ai_assistant_backtest(
+        request: StartBacktestRequest, conversation_id: Annotated[int, Depends(read_conversation_id)]
+    ) -> BacktestResponse:
+        return await routes.start_with_conversation(request, conversation_id)
+
+    router = APIRouter(prefix="/api")
+    router.add_api_route(
+        "/backtests",
+        start_ai_assistant_backtest,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        responses=REFUSED,
+    )
+    add_read_routes(router, routes)
     return router

@@ -4,7 +4,8 @@
      today), live from /ws/paper-trading. The open orders cancel from their row menu. The home page has no order form:
      paper orders are sent on the instrument page. -->
 <script lang="ts">
-  import { StatusIndicator } from '#lib/foundation/carbon';
+  import { InlineNotification } from '#lib/foundation/carbon';
+  import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
   import { MetricRow, MetricTile } from '#lib/foundation/metric_tile';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -12,7 +13,6 @@
     describeBalanceCurrency,
     describePaperAccountCheck,
     FilledManualOrderList,
-    findPaperAccountCheckKind,
     listBalanceMetrics,
     OpenOrderList,
     PaperAccountFeed,
@@ -51,18 +51,15 @@
 
   <div class="overview">
     <LiveUpdatesNotification isConnected={accountFeed.isConnected} />
-    {#if account === null || checkDescription === null}
-      <div class="account-status">
-        <StatusIndicator kind="in-progress" label="Reading the paper account." />
-      </div>
-    {:else}
+    {#if account !== null && checkDescription !== null}
       {#if account.check.status !== 'passed'}
-        <div class="account-status" role="status" aria-label="Paper account check">
-          <StatusIndicator kind={findPaperAccountCheckKind(account.check.status)} label={checkDescription.title} />
-          {#if checkDescription.detail !== null}
-            <p class="check-detail">{checkDescription.detail}</p>
-          {/if}
-        </div>
+        <InlineNotification
+          kind={account.check.status === 'failed' ? 'error' : 'warning'}
+          label="Paper account check"
+          title={checkDescription.title}
+          subtitle={checkDescription.detail ?? undefined}
+          lowContrast
+        />
       {/if}
       {#if account.balance !== null}
         <MetricRow label="Paper account balance">
@@ -71,9 +68,7 @@
           {/each}
         </MetricRow>
         {#if account.balance.usd_per_base_unit === null}
-          <div class="account-status">
-            <StatusIndicator kind="error" label={describeBalanceCurrency(account.balance)} />
-          </div>
+          <InlineNotification kind="error" title={describeBalanceCurrency(account.balance)} lowContrast />
         {/if}
       {/if}
     {/if}
@@ -87,7 +82,7 @@
             {/snippet}
             <div class="table">
               {#if account === null}
-                <p role="status">Reading the paper account.</p>
+                <EmptyText text="Loading" role="status" />
               {:else}
                 <PositionTable positions={account.positions} fill />
               {/if}
@@ -127,20 +122,6 @@
     flex-direction: column;
     min-block-size: 0;
     min-inline-size: 0;
-  }
-
-  /* A status line above or below the key numbers, with the same bottom divider as the metric row. */
-  .account-status {
-    flex: none;
-    padding: var(--cds-spacing-03) var(--cds-spacing-05);
-    border-block-end: 1px solid var(--cds-border-subtle-01);
-  }
-
-  .check-detail {
-    margin: var(--cds-spacing-02) 0 0;
-    font-size: var(--cds-body-compact-01-font-size);
-    line-height: var(--cds-body-compact-01-line-height);
-    color: var(--cds-text-secondary);
   }
 
   .table {

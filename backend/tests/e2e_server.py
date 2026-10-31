@@ -16,10 +16,14 @@ import uvicorn
 
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.web import create_web_app
+from atrade.assistant.system_prompt import make_default_text
 from atrade.forward_test import ForwardTestWorker
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
+from atrade.strategy import STRATEGY_TEMPLATE
+from tests.e2e_split_checks import add_split_checks
 from tests.fakes.clock import FixedClock
+from tests.fakes.e2e_assistant import E2EAssistantService
 from tests.fakes.forward_test_child import FakeChildStarter
 from tests.fakes.ibkr import (
     SAMPLE_INSTRUMENTS,
@@ -28,10 +32,14 @@ from tests.fakes.ibkr import (
     make_forward_test_order,
     make_stock_position,
 )
+from tests.saved_ranges import save_ibkr_saved_range
 
 FAKE_ACCOUNT_ID = "DU1234567"
 E2E_POSITION_COUNT = 40
 E2E_FORWARD_TEST_ORDER_COUNT = 30
+E2E_CASH_USD = "25000.00"
+E2E_UNATTRIBUTED_POSITION_NUMBER = 5
+E2E_SHORT_LEDGER_QUANTITY = 5
 E2E_FORWARD_TEST_ID = 42
 E2E_FORWARD_TEST_CLIENT_ID = 10
 E2E_FORWARD_TEST_STRATEGY_NAME = "E2E stopped forward tests"
@@ -50,6 +58,34 @@ E2E_COMPARED_FILL_COUNT = 40
 # An interruption over these bars: no equity points, and the chart marks them grey.
 E2E_COMPARED_INTERRUPTED_BAR_NUMBERS = range(20, 23)
 E2E_COMPARED_INTERRUPTION_OFFSET = timedelta(hours=1)
+# A stopped watchlist forward test with an allocated capital, for the comparison with a backtest of the same period of
+# its recorded members (forward_test.md 12.10): FTUA and FTUB in the first quarter, FTUA and FTUC from 2026-04-01.
+E2E_UNIVERSE_COMPARED_STRATEGY_NAME = "E2E universe compared forward test"
+E2E_UNIVERSE_COMPARED_STRATEGY_FILE = Path(__file__).parent / "backtest" / "strategies" / "follow_universe.py"
+E2E_UNIVERSE_COMPARED_MEMBERS = {
+    datetime(2026, 1, 1, tzinfo=UTC): ("FTUA", "FTUB"),
+    datetime(2026, 4, 1, tzinfo=UTC): ("FTUA", "FTUC"),
+}
+# The ledger fills of this forward test are on another account: add_owner_ledger_start() clears the rows of the fake
+# account, and the paper trading page shows only the rows of the fake account.
+E2E_UNIVERSE_COMPARED_ACCOUNT = "DU7654321"
+# The look-back bars of the strategy (SMA 20 on 60 days) start before the forward test.
+E2E_UNIVERSE_COMPARED_FIRST_BAR_START_UTC = datetime(2026, 1, 1, tzinfo=UTC)
+# A strategy with a discarded version of the AI assistant (docs/architecture/assistant.md 25.5.3): v1 of the user,
+# v2 of the AI assistant with the discarded mark and a failed backtest, and v3 of the AI assistant.
+E2E_DISCARDED_STRATEGY_NAME = "E2E discarded version"
+# A failed HK backtest and a failed US backtest of 2026: only the HK backtest shows the survivorship bias warning
+# (docs/architecture/backtest.md section 10.12). They never run, so their strategy version needs no real code.
+E2E_SURVIVORSHIP_STRATEGY_NAME = "E2E survivorship bias"
+E2E_SURVIVORSHIP_STRATEGY_CODE = "# The strategy version of the e2e survivorship bias backtests.\n"
+E2E_SURVIVORSHIP_INSTRUMENTS = [
+    Instrument(symbol="700", exchange="SEHK", currency="HKD"),
+    Instrument(symbol="SBUS", exchange="ARCA", currency="USD"),
+]
+# The US universe of the quarter of the fixed clock: enough members to overflow the Instruments tab of a top N forward
+# test (docs/architecture/forward_test.md section 12.16). The stored quarter start is before the fixed clock.
+E2E_UNIVERSE_QUARTER_START_UTC = datetime(2026, 1, 2, tzinfo=UTC)
+E2E_UNIVERSE_MEMBER_COUNT = 30
 LISTEN_HOST = "127.0.0.1"
 # The Playwright projects run at the same time against one database. The watchlist holds each instrument once,
 # so each project gets its own watchlist instruments: <PROJECT NAME>01 ... <PROJECT NAME>25 (frontend/e2e/watchlist.spec.ts).
@@ -59,6 +95,14 @@ WATCHLIST_INSTRUMENTS = [
     Instrument(symbol=f"{project_name.upper()}{number:02d}", exchange="ARCA", currency="USD")
     for project_name in PLAYWRIGHT_PROJECT_NAMES
     for number in range(1, WATCHLIST_INSTRUMENTS_PER_PROJECT + 1)
+]
+# The HK instrument list holds each instrument once too: <PROJECT NAME>HK01 ... <PROJECT NAME>HK20 on SEHK
+# (frontend/e2e/hk_instrument_list.spec.ts).
+HK_INSTRUMENTS_PER_PROJECT = 20
+HK_INSTRUMENTS = [
+    Instrument(symbol=f"{project_name.upper()}HK{number:02d}", exchange="SEHK", currency="HKD")
+    for project_name in PLAYWRIGHT_PROJECT_NAMES
+    for number in range(1, HK_INSTRUMENTS_PER_PROJECT + 1)
 ]
 
 
@@ -120,7 +164,7 @@ def add_compared_bars(connection: psycopg.Connection) -> None:
     with connection.cursor() as cursor:
         cursor.executemany(
             """
-            INSERT INTO bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
             VALUES (%(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(close)s, %(high)s, %(low)s, %(close)s, 1000)
             ON CONFLICT DO NOTHING
             """,
@@ -134,6 +178,13 @@ def add_compared_bars(connection: psycopg.Connection) -> None:
                 }
                 for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
             ],
+        )
+        save_ibkr_saved_range(
+            connection,
+            Instrument(symbol=E2E_COMPARED_SYMBOL, exchange="ARCA", currency="USD"),
+            "1-DAY",
+            E2E_COMPARED_FIRST_BAR_START_UTC,
+            E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
         )
 
 
@@ -216,6 +267,248 @@ def add_compared_forward_test(database_url: str) -> None:
         add_compared_records(connection, int(forward_test_row[0]))
 
 
+def add_universe_compared_bars(connection: psycopg.Connection) -> None:
+    """Saved daily bars of the 3 members from the look-back start to the forward test stop."""
+    end_utc = E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT)
+    day_count = (end_utc - E2E_UNIVERSE_COMPARED_FIRST_BAR_START_UTC).days
+    with connection.cursor() as cursor:
+        for symbol in ("FTUA", "FTUB", "FTUC"):
+            cursor.executemany(
+                """
+                INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close,
+                    volume)
+                VALUES (%(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(close)s, %(high)s, %(low)s, %(close)s,
+                    1000)
+                ON CONFLICT DO NOTHING
+                """,
+                [
+                    {
+                        "symbol": symbol,
+                        "start_utc": E2E_UNIVERSE_COMPARED_FIRST_BAR_START_UTC + timedelta(days=day),
+                        "close": make_compared_close_usd(day + 1),
+                        "high": make_compared_close_usd(day + 1) + 1,
+                        "low": make_compared_close_usd(day + 1) - 1,
+                    }
+                    for day in range(day_count)
+                ],
+            )
+            save_ibkr_saved_range(
+                connection,
+                Instrument(symbol=symbol, exchange="ARCA", currency="USD"),
+                "1-DAY",
+                E2E_UNIVERSE_COMPARED_FIRST_BAR_START_UTC,
+                end_utc,
+            )
+
+
+def add_universe_compared_records(connection: psycopg.Connection, forward_test_id: int) -> None:
+    """The recorded members of each quarter, owner ledger fills of FTUA and FTUB like the ATrade execution client writes
+    them (a buy and a sell of 1 share, so the forward test holds no position), and 1 equity point at each bar end."""
+    bar_ends_utc = [
+        E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=bar_number)
+        for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
+    ]
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO forward_test_universe_member (forward_test_id, quarter_start_utc, symbol, exchange, currency)
+            VALUES (%s, %s, %s, 'ARCA', 'USD')
+            """,
+            [
+                (forward_test_id, quarter_start_utc, symbol)
+                for quarter_start_utc, symbols in E2E_UNIVERSE_COMPARED_MEMBERS.items()
+                for symbol in symbols
+            ],
+        )
+        fills = [
+            (
+                bar_ends_utc[fill_number] + timedelta(seconds=1),
+                "FTUA" if fill_number // 2 % 2 == 0 else "FTUB",
+                1 if fill_number % 2 == 0 else -1,
+                make_compared_close_usd(fill_number + 1) + Decimal("0.01"),
+            )
+            for fill_number in range(E2E_COMPARED_FILL_COUNT)
+        ]
+        cursor.executemany(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %(id)s, 'fill', %(time_utc)s, %(account)s, %(symbol)s, 'ARCA', 'USD',
+                %(quantity_change)s, %(price)s, 0, %(cash_change)s, %(execution_id)s, %(order_id)s)
+            """,
+            [
+                {
+                    "id": forward_test_id,
+                    "time_utc": time_utc,
+                    "account": E2E_UNIVERSE_COMPARED_ACCOUNT,
+                    "symbol": symbol,
+                    "quantity_change": quantity_change,
+                    "price": price,
+                    "cash_change": -quantity_change * price,
+                    "execution_id": f"E2E-FTU-{forward_test_id}-{fill_number}",
+                    "order_id": fill_number + 1,
+                }
+                for fill_number, (time_utc, symbol, quantity_change, price) in enumerate(fills)
+            ],
+        )
+        cursor.executemany(
+            "INSERT INTO forward_test_equity_point (forward_test_id, time_utc, equity_usd) VALUES (%s, %s, %s)",
+            [
+                (forward_test_id, bar_end_utc, Decimal(10000) + bar_number)
+                for bar_number, bar_end_utc in enumerate(bar_ends_utc, start=1)
+            ],
+        )
+
+
+def add_universe_compared_forward_test(database_url: str) -> None:
+    """A stopped watchlist forward test with an allocated capital, its records, and the saved bars of its members."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_id = insert_strategy_version(
+            connection,
+            name=E2E_UNIVERSE_COMPARED_STRATEGY_NAME,
+            code=E2E_UNIVERSE_COMPARED_STRATEGY_FILE.read_text(),
+        )
+        if version_id is None:
+            return
+        add_universe_compared_bars(connection)
+        forward_test_row = connection.execute(
+            """
+            INSERT INTO forward_test (strategy_version_id, universe_kind, bar_period, desired_state, status,
+                allocated_capital_usd, created_at_utc, stopped_at_utc)
+            VALUES (%(version_id)s, 'list', '1-DAY', 'stopped', 'stopped', 10000, %(start_utc)s, %(stopped_utc)s)
+            RETURNING id
+            """,
+            {
+                "version_id": version_id,
+                "start_utc": E2E_COMPARED_FIRST_BAR_START_UTC,
+                "stopped_utc": E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+            },
+        ).fetchone()
+        assert forward_test_row is not None
+        add_universe_compared_records(connection, int(forward_test_row[0]))
+
+
+def add_discarded_version(database_url: str) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_1_id = insert_strategy_version(
+            connection, name=E2E_DISCARDED_STRATEGY_NAME, code=E2E_COMPARED_STRATEGY_FILE.read_text()
+        )
+        if version_1_id is None:
+            return
+        # A conversation needs a prompt version and a fixed prompt (#184). Version 1 is the default prompt, as the app saves it.
+        connection.execute(
+            """
+            INSERT INTO assistant_prompt_version (version_number, text, created_at_utc)
+            SELECT 1, %(text)s, %(now)s WHERE NOT EXISTS (SELECT 1 FROM assistant_prompt_version)
+            """,
+            {"text": make_default_text(STRATEGY_TEMPLATE), "now": FIXED_NOW_UTC},
+        )
+        conversation_row = connection.execute(
+            """
+            INSERT INTO assistant_conversation (strategy_id, title, created_at_utc, prompt_version_id, fixed_prompt)
+            SELECT strategy_id, 'E2E conversation', %(now)s,
+                (SELECT id FROM assistant_prompt_version ORDER BY version_number DESC LIMIT 1), 'E2E fixed prompt.'
+            FROM strategy_version WHERE id = %(version_id)s
+            RETURNING id, strategy_id
+            """,
+            {"version_id": version_1_id, "now": FIXED_NOW_UTC},
+        ).fetchone()
+        assert conversation_row is not None
+        conversation_id, strategy_id = conversation_row
+        version_ids: list[int] = []
+        for version_number in (2, 3):
+            code = f"{E2E_COMPARED_STRATEGY_FILE.read_text()}\n# Version {version_number} of the AI assistant.\n"
+            version_row = connection.execute(
+                """
+                INSERT INTO strategy_version (strategy_id, version_number, code, code_sha256, created_at_utc, source,
+                    conversation_id)
+                VALUES (%(strategy_id)s, %(version_number)s, %(code)s, %(code_sha256)s, %(now)s, 'ai_assistant',
+                    %(conversation_id)s)
+                RETURNING id
+                """,
+                {
+                    "strategy_id": strategy_id,
+                    "version_number": version_number,
+                    "code": code,
+                    "code_sha256": hashlib.sha256(code.encode()).hexdigest(),
+                    "now": FIXED_NOW_UTC,
+                    "conversation_id": conversation_id,
+                },
+            ).fetchone()
+            assert version_row is not None
+            version_ids.append(int(version_row[0]))
+        discarded_version_id = version_ids[0]
+        connection.execute(
+            "INSERT INTO strategy_version_discard (strategy_version_id, discarded_at_utc) VALUES (%(id)s, %(now)s)",
+            {"id": discarded_version_id, "now": FIXED_NOW_UTC},
+        )
+        connection.execute(
+            """
+            INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
+                paper_capital_usd, status, error_message, created_at_utc, started_at_utc, ended_at_utc, conversation_id)
+            VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(end_utc)s, 10000, 'failed',
+                'E2E backtest of a discarded version.', %(now)s, %(now)s, %(now)s, %(conversation_id)s)
+            """,
+            {
+                "version_id": discarded_version_id,
+                "symbol": E2E_COMPARED_SYMBOL,
+                "start_utc": E2E_COMPARED_FIRST_BAR_START_UTC,
+                "end_utc": E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+                "now": FIXED_NOW_UTC,
+                "conversation_id": conversation_id,
+            },
+        )
+
+
+def add_survivorship_bias_backtests(database_url: str) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_id = insert_strategy_version(
+            connection, name=E2E_SURVIVORSHIP_STRATEGY_NAME, code=E2E_SURVIVORSHIP_STRATEGY_CODE
+        )
+        if version_id is None:
+            return
+        for instrument in E2E_SURVIVORSHIP_INSTRUMENTS:
+            connection.execute(
+                """
+                INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
+                    paper_capital_usd, status, error_message, created_at_utc, ended_at_utc, source_order)
+                VALUES (%(version_id)s, %(symbol)s, %(exchange)s, %(currency)s, '1-DAY', %(start_utc)s, %(end_utc)s,
+                    10000, 'failed', 'E2E backtest without a run.', %(now)s, %(now)s, '["ibkr", "databento"]')
+                """,
+                {
+                    "version_id": version_id,
+                    "symbol": instrument.symbol,
+                    "exchange": instrument.exchange,
+                    "currency": instrument.currency,
+                    "start_utc": datetime(2026, 3, 2, tzinfo=UTC),
+                    "end_utc": datetime(2026, 4, 1, tzinfo=UTC),
+                    "now": FIXED_NOW_UTC,
+                },
+            )
+
+
+def add_us_universe(database_url: str) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO us_universe_member (
+                quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+            ) VALUES (%s, %s, %s, 'NASDAQ', 'USD', %s, %s)
+            ON CONFLICT DO NOTHING
+            """,
+            [
+                (
+                    E2E_UNIVERSE_QUARTER_START_UTC,
+                    rank,
+                    f"UNIV{rank:02d}",
+                    Decimal(1_000_000_000 - rank),
+                    E2E_UNIVERSE_QUARTER_START_UTC - timedelta(days=1),
+                )
+                for rank in range(1, E2E_UNIVERSE_MEMBER_COUNT + 1)
+            ],
+        )
+
+
 async def serve_with_forward_test_worker(server: uvicorn.Server, worker: ForwardTestWorker) -> None:
     # The forward-test service of Compose runs the worker. Here it runs in the same process, with fake children.
     worker_task = asyncio.create_task(worker.keep_comparing())
@@ -225,6 +518,36 @@ async def serve_with_forward_test_worker(server: uvicorn.Server, worker: Forward
         worker_task.cancel()
 
 
+def add_owner_ledger_start(database_url: str) -> None:
+    """The owner ledger of "By hand" starts with 10 shares of each TEST position and the account cash, but only 5
+    shares of TEST05. So the Positions table shows "Unattributed: 5" for TEST05 (section 11.7)."""
+    rows = [
+        (f"TEST{number:02d}", Decimal(E2E_SHORT_LEDGER_QUANTITY if number == E2E_UNATTRIBUTED_POSITION_NUMBER else 10))
+        for number in range(1, E2E_POSITION_COUNT + 1)
+    ]
+    with psycopg.connect(database_url) as connection:
+        # The backend tests can leave rows of the same account in the test database.
+        connection.execute("DELETE FROM owner_ledger_entry WHERE account = %s", (FAKE_ACCOUNT_ID,))
+        with connection.cursor() as cursor:
+            cursor.executemany(
+                """
+                INSERT INTO owner_ledger_entry (
+                    owner_kind, entry_kind, time_utc, account, symbol, exchange, currency, quantity_change, price,
+                    cash_change
+                ) VALUES ('by_hand', 'ledger_start', %s, %s, %s, 'NASDAQ', 'USD', %s, 100, 0)
+                """,
+                [(FIXED_NOW_UTC, FAKE_ACCOUNT_ID, symbol, quantity) for symbol, quantity in rows],
+            )
+        connection.execute(
+            """
+            INSERT INTO owner_ledger_entry (
+                owner_kind, entry_kind, time_utc, account, currency, quantity_change, cash_change
+            ) VALUES ('by_hand', 'ledger_start', %s, %s, 'USD', 0, %s)
+            """,
+            (FIXED_NOW_UTC, FAKE_ACCOUNT_ID, Decimal(E2E_CASH_USD)),
+        )
+
+
 def main() -> None:
     database_url = os.environ["ATRADE_TEST_DATABASE_URL"]
     frontend_build_dir = Path(os.environ["ATRADE_E2E_FRONTEND_BUILD_DIR"])
@@ -232,20 +555,29 @@ def main() -> None:
     upgrade_database(database_url)
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
+    add_universe_compared_forward_test(database_url)
+    add_discarded_version(database_url)
+    add_owner_ledger_start(database_url)
+    split_positions = add_split_checks(database_url, account=FAKE_ACCOUNT_ID, project_names=PLAYWRIGHT_PROJECT_NAMES)
+    add_survivorship_bias_backtests(database_url)
+    add_us_universe(database_url)
     settings = Settings(
         database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=FAKE_ACCOUNT_ID
     )
     gateway_connection = FakeGatewayConnection(
-        managed_accounts=[FAKE_ACCOUNT_ID], instruments=[*SAMPLE_INSTRUMENTS, *WATCHLIST_INSTRUMENTS]
+        managed_accounts=[FAKE_ACCOUNT_ID], instruments=[*SAMPLE_INSTRUMENTS, *WATCHLIST_INSTRUMENTS, *HK_INSTRUMENTS]
     )
     gateway_connection.account_values = make_balance_values(
-        FAKE_ACCOUNT_ID, net_liquidation_usd="101234.50", cash_usd="25000.00"
+        FAKE_ACCOUNT_ID, net_liquidation_usd="101234.50", cash_usd=E2E_CASH_USD
     )
+    # Rule 2 of the owner ledger converts the amount of a buy order of 700 / SEHK to USD.
+    gateway_connection.exchange_rates[("HKD", "USD")] = Decimal("0.128")
     # Enough positions to overflow the position table, so that the e2e tests can check its scroll track.
     gateway_connection.portfolio = [
         make_stock_position(FAKE_ACCOUNT_ID, symbol=f"TEST{number:02d}", quantity="10", market_price="100")
         for number in range(1, E2E_POSITION_COUNT + 1)
     ]
+    gateway_connection.portfolio.extend(split_positions)
     # Enough forward test orders to overflow the order list, so that the e2e tests can check its scroll track.
     gateway_connection.open_orders = [
         make_forward_test_order(
@@ -258,7 +590,12 @@ def main() -> None:
         for number in range(1, E2E_FORWARD_TEST_ORDER_COUNT + 1)
     ]
     clock = FixedClock(FIXED_NOW_UTC)
-    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    app = create_web_app(
+        settings=settings,
+        clock=clock,
+        gateway_connection=gateway_connection,
+        assistant_service=E2EAssistantService(database_url),
+    )
     # Each fake child stops at once, like a stop that cancelled all orders (section 17.5).
     child_starter = FakeChildStarter(is_ending_children_at_once=True)
     worker = ForwardTestWorker(database_url=database_url, clock=clock, start_child=child_starter.start_child)

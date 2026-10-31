@@ -1,6 +1,7 @@
 // Paper orders by hand: checks the order form, writes the confirmation text, and calls the order routes.
 // The order list comes from the "orders" message of /ws/paper-trading (docs/architecture/paper_trading.md).
 import type { components } from '#lib/api';
+import type { StatusKind } from '#lib/foundation/carbon';
 import { describeErrorBody, readJsonBody, sendRequest } from '#lib/foundation/http_request';
 import { readSocketMessage } from '#lib/foundation/live_socket';
 
@@ -29,14 +30,6 @@ export interface OrderForm {
 export type OrderFormResult = { kind: 'valid'; request: SendOrderRequest } | { kind: 'invalid'; message: string };
 export type SendOrderResult = { kind: 'sent'; ibkrOrderId: number } | { kind: 'failed'; message: string };
 export type CancelOrderResult = { kind: 'cancel_sent' } | { kind: 'failed'; message: string };
-
-// A forward test that holds a client ID on an instrument. src/routes/ makes the list from the forward tests.
-export interface BlockingForwardTest {
-  // For example "Forward test 7 (Bar count v1)".
-  label: string;
-  symbol: string;
-  exchange: string;
-}
 
 export interface ConfirmationLine {
   label: string;
@@ -99,23 +92,6 @@ export function describeOrderForConfirmation(request: SendOrderRequest): Confirm
   ];
 }
 
-/**
- * Why ATrade refuses an order by hand on the instrument of the form, or null. A forward test that holds a client ID on
- * the instrument blocks the orders by hand on it (docs/architecture.md section 12.2). The backend checks it again.
- */
-export function findOrderBlock(
-  form: Pick<OrderForm, 'symbol' | 'exchange'>,
-  blockingForwardTests: readonly BlockingForwardTest[],
-): string | null {
-  const symbol = form.symbol.trim().toUpperCase();
-  const exchange = form.exchange.trim().toUpperCase();
-  const blocking = blockingForwardTests.find((forwardTest) => forwardTest.symbol === symbol && forwardTest.exchange === exchange);
-  if (blocking === undefined) {
-    return null;
-  }
-  return `${blocking.label} trades ${symbol} / ${exchange}. Stop the forward test to send an order by hand.`;
-}
-
 export function describeOrderSource(source: OrderSource): string {
   if (source.kind === 'forward_test') {
     return `forward test ${String(source.forward_test_id)}`;
@@ -126,6 +102,27 @@ export function describeOrderSource(source: OrderSource): string {
 export interface CancelAction {
   label: string;
   disabled: boolean;
+}
+
+/**
+ * The status icon kind of an IBKR order status. The icon goes before the symbol, and the tooltip shows the IBKR status.
+ * An order that IBKR still works on is in progress. An unknown status is neutral.
+ */
+export function findOpenOrderStatusKind(status: string): StatusKind {
+  switch (status) {
+    case 'Submitted':
+    case 'PreSubmitted':
+    case 'PendingSubmit':
+    case 'PendingCancel':
+    case 'ApiPending':
+      return 'in-progress';
+    case 'Filled':
+      return 'success';
+    case 'Inactive':
+      return 'warning';
+    default:
+      return 'neutral';
+  }
 }
 
 /** The cancel item of the row menu. A disabled item says why ATrade cannot cancel the order. */

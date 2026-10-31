@@ -15,7 +15,15 @@ const CHANGED_CODE_LINE = '# Compared version: one more comment line.';
 // More changed lines than the code difference region shows, so that it scrolls with a visible track.
 const ADDED_COMMENT_LINES = Array.from({ length: 40 }, (_, index) => `# Added line ${String(index + 1)}.`).join('\n');
 // The key metrics of the backtest page, in the same order.
-const KEY_METRIC_NAMES = ['Total return', 'Net profit (USD)', 'Max drawdown', 'Win rate', 'Trades', 'Final equity (USD)'];
+const KEY_METRIC_NAMES = [
+  'Total return',
+  'Net profit (USD)',
+  'Max drawdown',
+  'Sharpe ratio',
+  'Win rate',
+  'Trades',
+  'Final equity (USD)',
+];
 
 interface StrategyVersion {
   id: number;
@@ -148,10 +156,11 @@ test('compares two versions of the same strategy and refuses different strategie
   await expect(track).toBeVisible();
   await expect(track.locator('.scroll-thumb')).toBeVisible();
 
-  // The Carbon batch action bar shows when 2 rows are checked.
+  // The Carbon batch action bar shows when a row is checked. Compare shows when 2 rows are checked.
   const selection = list.getByRole('status', { name: 'Comparison selection' });
   await list.getByRole('checkbox', { name: `Select backtest #${String(firstBacktestId)}`, exact: true }).check();
-  await expect(selection).toHaveCount(0);
+  await expect(selection).toHaveText('1 backtest selected');
+  await expect(list.getByRole('button', { name: 'Compare', exact: true })).toHaveCount(0);
   await list.getByRole('checkbox', { name: `Select backtest #${String(otherBacktestId)}`, exact: true }).check();
   await expect(selection).toHaveText('Only backtests of the same strategy can be compared');
   await expect(list.getByRole('button', { name: 'Compare', exact: true })).toBeDisabled();
@@ -196,9 +205,7 @@ test('shows a note instead of an empty code difference for the same strategy ver
 
   await page.goto(`/backtests/${String(firstBacktestId)}/comparison/${String(secondBacktestId)}`);
 
-  await expect(page.getByRole('status', { name: 'Code difference' })).toHaveText(
-    'Same strategy version: no code difference.',
-  );
+  await expect(page.getByText('No code difference', { exact: true })).toBeVisible();
   await expect(page.locator('.cm-mergeView')).toHaveCount(0);
   await page.getByText('Show the code').click();
   // The full code shows: no collapsed lines. CodeMirror draws only the lines near the visible part.

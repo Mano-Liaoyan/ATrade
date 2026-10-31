@@ -1,19 +1,22 @@
 <!-- The body of the results panel of the strategy workbench. A backtest tab shows the key metric row and the equity and
      drawdown chart of that backtest, or its status while it has no metrics. Trades, Orders, and Logs show the tables of
      the last selected backtest, like the backtest page: the API has no orders, and Logs shows the strategy error. The
-     detail reads again when the status of the backtest changes, for example to finished. -->
+     detail reads again when the status of the backtest changes, for example to finished.
+     A failed or timed out backtest tab shows its error at once: the status with the last error line, the "Ask AI to fix"
+     button (the AI assistant reads the error itself with read_backtest), and the full log. -->
 <script lang="ts">
   import {
     BacktestTradeTable,
     describeBacktestStatus,
     EquityDrawdownChart,
     findBacktestStatusKind,
+    findErrorSummary,
     KeyMetricRow,
     readBacktest,
     type Backtest,
     type BacktestDetail,
   } from '#lib/backtest';
-  import { InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
+  import { Button, InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import type { ResultTab } from './strategy_workbench';
@@ -22,9 +25,13 @@
     /** The backtest of the tab, or of Trades, Orders, and Logs. Null when the strategy has no backtest. */
     backtest: Backtest | null;
     tab: ResultTab;
+    /** The text without a backtest: "No backtests", or "No open backtests" when all backtest tabs are closed. */
+    emptyText: string;
+    /** Sends the error of a failed backtest to the AI assistant. */
+    onAskAssistant: (backtestId: number) => void;
   }
 
-  const { backtest, tab }: Props = $props();
+  const { backtest, tab, emptyText, onAskAssistant }: Props = $props();
 
   let detail = $state<BacktestDetail | null>(null);
   let detailMessage = $state('');
@@ -59,7 +66,7 @@
 </script>
 
 {#if backtest === null}
-  <EmptyText text="No backtests" />
+  <EmptyText text={emptyText} />
 {:else if detailMessage !== ''}
   <InlineNotification kind="error" title="Backtest not read" subtitle={detailMessage} lowContrast />
 {:else if shownDetail !== null}
@@ -76,12 +83,36 @@
         <pre class="log-text">{run.error_message}</pre>
       </ScrollRegion>
     {/if}
+  {:else if run.metrics === null && (run.status === 'failed' || run.status === 'timed_out')}
+    <div class="failure">
+      <InlineNotification
+        kind={run.status === 'failed' ? 'error' : 'warning'}
+        title={describeBacktestStatus(run.status)}
+        subtitle={findErrorSummary(run.error_message)}
+        lowContrast
+      />
+      {#if run.status === 'failed' && run.error_message !== null && run.error_message !== ''}
+        <div class="failure-actions">
+          <Button
+            size="sm"
+            onclick={() => {
+              onAskAssistant(run.id);
+            }}>Ask AI to fix</Button
+          >
+        </div>
+        <div class="failure-log">
+          <ScrollRegion label="Log" fill>
+            <pre class="log-text">{run.error_message}</pre>
+          </ScrollRegion>
+        </div>
+      {/if}
+    </div>
   {:else if run.metrics === null}
     <div class="state-area" role="status" aria-label="Backtest status">
       <StatusIndicator label={describeBacktestStatus(run.status)} kind={findBacktestStatusKind(run.status)} />
     </div>
   {:else}
-    <KeyMetricRow metrics={run.metrics} startCapitalUsd={run.paper_capital_usd} trades={run.trades} />
+    <KeyMetricRow metrics={run.metrics} startCapitalUsd={run.paper_capital_usd} />
     <div class="chart">
       {#key run.id}
         <EquityDrawdownChart
@@ -110,6 +141,32 @@
     flex: 1;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
+  }
+
+  .failure {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: var(--cds-spacing-05);
+    min-block-size: 0;
+    padding: var(--cds-spacing-05);
+  }
+
+  .failure :global(.cds--inline-notification) {
+    flex: none;
+    max-inline-size: none;
+    margin: 0;
+  }
+
+  .failure-actions {
+    display: flex;
+    flex: none;
+  }
+
+  .failure-log {
+    flex: 1;
+    min-block-size: 0;
+    border: 1px solid var(--cds-border-subtle-01);
   }
 
   .log-text {
