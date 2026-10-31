@@ -558,9 +558,7 @@ def create_screen_router(*, database_url: str, clock: Clock) -> APIRouter:
         status_code=status.HTTP_204_NO_CONTENT,
         responses=not_found,
     )
-    router.add_api_route(
-        "/api/screens/{screen_id}/keep", routes.keep_screen, methods=["POST"], responses=not_found
-    )
+    router.add_api_route("/api/screens/{screen_id}/keep", routes.keep_screen, methods=["POST"], responses=not_found)
     router.add_api_route(
         "/api/screens/{screen_id}/runs",
         routes.run_screen,

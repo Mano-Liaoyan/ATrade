@@ -115,7 +115,14 @@ class ScreenRunFinished:
 
 
 type RunEvent = (
-    TextDelta | MessageEnd | RunError | ToolStep | StrategyVersionSaved | BacktestFinished | ScreenSaved | ScreenRunFinished
+    TextDelta
+    | MessageEnd
+    | RunError
+    | ToolStep
+    | StrategyVersionSaved
+    | BacktestFinished
+    | ScreenSaved
+    | ScreenRunFinished
 )
 
 TOOL_STEP_STATUSES: dict[str, Literal["running", "succeeded", "failed"]] = {
