@@ -1,4 +1,5 @@
-<!-- The conversation log of the assistant side column (docs/architecture/assistant.md 25.12.1): the messages, the
+<!-- The conversation log of the assistant side column (docs/architecture/assistant.md 25.12.1): the messages (an AI
+     assistant message renders its markdown, 25.12.6), the
      tool steps (one StatusIndicator line each; 2 or more consecutive steps are one group "<n> tool steps" that is open
      while a step runs, and a click opens or closes it), the diff cards, the metric cards, and the condition cards, in a ChatLog. Each AI assistant
      message shows its model and its credential name. A click on a diff card opens CodeDiff in the editor panel of the
@@ -9,6 +10,7 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { describeToolStep, describeToolStepGroup, groupToolSteps, type DiffItem, type LogItem } from '#lib/assistant';
   import { arrangeChatLog, Button, ChatDivider, ChatLog, ChatMessage, Icon, StatusIndicator } from '#lib/foundation/carbon';
+  import { Markdown } from '#lib/foundation/markdown';
   import AssistantMetricCard from './AssistantMetricCard.svelte';
   import AssistantScreenCard from './AssistantScreenCard.svelte';
   import type { DiffChoice } from './assistant_session.svelte';
@@ -91,7 +93,9 @@
           author={item.role === 'user' ? 'You' : 'AI assistant'}
           continued={entry.continued}
           streaming={item.streaming}
-        >{item.text}{#if item.modelLine !== null}<span class="message-model">{item.modelLine}</span>{/if}</ChatMessage
+        >{#if item.role === 'user'}{item.text}{:else}<Markdown text={item.text} />{/if}{#if item.modelLine !== null}<span
+              class="message-model">{item.modelLine}</span
+            >{/if}</ChatMessage
         >
       {:else if item.kind === 'tool_step'}
         {@const step = describeToolStep(item)}

@@ -1,0 +1,45 @@
+// The code colors of the markdown code blocks and diffs, as CSS variables. They are the colors of the code editor
+// (foundation/code_editor/code_colors.ts): plain text and comments are Carbon text tokens; Carbon has no syntax color
+// tokens, so the syntax colors come from the Carbon palette, grade 70 on g10 and grade 40 on g100. The theme rules
+// are the rules of foundation/carbon/carbon.scss.
+// The shiki theme of code_highlight.ts and the CSS variable theme of the diff view (@pierre/diffs) read the
+// --diffs-* variables.
+@use '@carbon/colors';
+
+@mixin code-colors($grade) {
+  --diffs-foreground: var(--cds-text-primary);
+  --diffs-token-comment: var(--cds-text-secondary);
+  --diffs-token-punctuation: var(--cds-text-primary);
+  --diffs-token-parameter: var(--cds-text-primary);
+  @if $grade == 70 {
+    --diffs-token-keyword: #{colors.$magenta-70};
+    --diffs-token-string: #{colors.$green-70};
+    --diffs-token-string-expression: #{colors.$green-70};
+    --diffs-token-constant: #{colors.$blue-70};
+    --diffs-token-function: #{colors.$purple-70};
+    --diffs-token-type: #{colors.$orange-70};
+    --diffs-token-link: #{colors.$purple-70};
+  } @else {
+    --diffs-token-keyword: #{colors.$magenta-40};
+    --diffs-token-string: #{colors.$green-40};
+    --diffs-token-string-expression: #{colors.$green-40};
+    --diffs-token-constant: #{colors.$blue-40};
+    --diffs-token-function: #{colors.$purple-40};
+    --diffs-token-type: #{colors.$orange-40};
+    --diffs-token-link: #{colors.$purple-40};
+  }
+}
+
+:root {
+  @include code-colors(70);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    @include code-colors(40);
+  }
+}
+
+:root[data-theme='dark'] {
+  @include code-colors(40);
+}

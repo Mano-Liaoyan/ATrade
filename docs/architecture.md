@@ -93,6 +93,7 @@ and its revision comments.
 | Frontend API types | `openapi-typescript` generates types from the OpenAPI document. Pydantic exports JSON Schema for WebSocket messages, and types come from that schema. The frontend does no runtime validation. | Data types have one definition, in the backend. |
 | Bar chart | `lightweight-charts`. | It does not depend on the framework. |
 | Code editor | CodeMirror 6, `@codemirror/lang-python`, `@codemirror/merge`, in our own Svelte component. | Small size, low Safari risk, official diff and LSP extensions. |
+| Markdown of AI assistant messages | `marked` (MIT) reads the text. `shiki` (MIT) colors the code, `@pierre/diffs` (Apache-2.0, vanilla JavaScript API) shows a diff, and `pele` (MIT) draws a Mermaid diagram. Exact versions. The page loads `shiki`, `@pierre/diffs`, and `pele` only when a block needs them. | Small, maintained, framework-free libraries. The blocks hold text only, so no HTML of a message renders (`docs/architecture/assistant.md` 25.12.6). |
 | Code completion | basedpyright language server in the backend, `@codemirror/lsp-client` in the frontend. | NautilusTrader 2.0 ships `.pyi` stubs, so basedpyright can resolve `Strategy`. |
 | Real-time communication | WebSocket. | One technology for live data and for the language server. |
 | IBKR connection | TWS API through IB Gateway. Image `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest. | IB Gateway is the official IBKR program. The Client Portal Web API has a lower rate limit. |
@@ -1062,7 +1063,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   style needs one color value for each syntax role, so
   `foundation/code_editor/code_colors.ts` imports the colors from the
   official Carbon packages `@carbon/colors` and `@carbon/themes`. It has no
-  color literal.
+  color literal. `foundation/markdown/markdown.scss` puts the same colors
+  (`@carbon/colors` SCSS) in the `--diffs-token-*` CSS variables that the
+  code blocks and the diff view of AI assistant messages read
+  (`docs/architecture/assistant.md` 25.12.6).
 
 ## 14. Deployment and external access
 

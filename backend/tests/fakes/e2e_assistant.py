@@ -7,6 +7,8 @@ The text of a prompt selects the answer:
 - "change": a save_strategy_version tool step, a new strategy version of the AI assistant, and a diff card.
 - "backtest": a run_backtest tool step with a finished backtest, and a metric card.
 - "notitle": a normal answer, but the title generation fails.
+- "markdown": a streamed markdown answer with a heading, bold text, a table, a bash block, a diff block, and a
+  Mermaid block (docs/architecture/assistant.md 25.12.6).
 - other text: a streamed answer.
 The answer ends with the model of the prompt, the name of its credential, and its thinking level. A model without the
 requested thinking level runs with "off". The messages are kept, so a reload shows them.
@@ -42,6 +44,33 @@ from atrade.assistant import (
 from tests.fakes.assistant import FakeAssistantService
 
 STREAM_PAUSE_SECONDS = 0.05
+MARKDOWN_ANSWER = """### Backtest summary
+
+The strategy has a **higher Sharpe ratio**.
+
+| Symbol | Return |
+|---|---|
+| AAPL | 12.5% |
+| MSFT | -3.2% |
+
+```bash
+$ pnpm install
+```
+
+```diff
+--- a/strategy.py
++++ b/strategy.py
+@@ -1,2 +1,2 @@
+ period = 20
+-threshold = 30
++threshold = 25
+```
+
+```mermaid
+flowchart LR
+  Screen --> Backtest
+```
+"""
 E2E_ALL_THINKING_LEVELS: tuple[ThinkingLevel, ...] = ("off", "minimal", "low", "medium", "high", "xhigh", "max")
 E2E_LONG_MODEL_NAME = "GPT Long Context Reasoning Preview Edition"
 E2E_BACKTEST_START_UTC = datetime(2026, 3, 2, tzinfo=UTC)
@@ -166,11 +195,15 @@ class E2EAssistantService(FakeAssistantService):
                 yield event
             yield self.answer_end(conversation_id, "The backtest finished.", selection)
             return
-        answer = "Hello from the fake AI assistant."
-        for part in ("Hello ", "from the fake ", "AI assistant."):
+        if "markdown" in text:
+            # Parts that end inside a table and inside a code fence, so the log shows incomplete markdown.
+            parts = [MARKDOWN_ANSWER[start : start + 40] for start in range(0, len(MARKDOWN_ANSWER), 40)]
+        else:
+            parts = ["Hello ", "from the fake ", "AI assistant."]
+        for part in parts:
             await anyio.sleep(STREAM_PAUSE_SECONDS)
             yield TextDelta(text=part)
-        yield self.answer_end(conversation_id, answer, selection)
+        yield self.answer_end(conversation_id, "".join(parts), selection)
 
     async def abort(self, conversation_id: int) -> None:
         self.aborts.append(conversation_id)
