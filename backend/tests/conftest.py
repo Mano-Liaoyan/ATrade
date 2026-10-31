@@ -7,6 +7,7 @@ import os
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 import psycopg
@@ -35,8 +36,22 @@ def migrated_database_url() -> str:
     database_url = os.environ.get(TEST_DATABASE_URL_VARIABLE)
     if database_url is None:
         pytest.skip(f"{TEST_DATABASE_URL_VARIABLE} is not set. Run ./scripts/check, which starts PostgreSQL.")
+    worker_id = os.environ.get("PYTEST_XDIST_WORKER")
+    if worker_id is not None:
+        database_url = create_worker_database(database_url, worker_id)
     upgrade_database(database_url)
     return database_url
+
+
+def create_worker_database(database_url: str, worker_id: str) -> str:
+    """Each pytest-xdist worker gets its own empty database on the same server, so that workers do not truncate the
+    tables of other workers."""
+    url_parts = urlsplit(database_url)
+    database_name = f"{url_parts.path.lstrip('/')}_{worker_id}"
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(database_name)))
+        connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(database_name)))
+    return urlunsplit(url_parts._replace(path=f"/{database_name}"))
 
 
 @pytest.fixture

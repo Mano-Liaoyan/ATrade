@@ -445,6 +445,8 @@ One command runs the same checks as CI:
 - The tests need a real PostgreSQL. When `ATRADE_TEST_DATABASE_URL` is not
   set, `./scripts/check` starts a temporary `postgres:18.3` container and
   removes it at exit.
+- pytest runs in parallel with 1 pytest-xdist worker for each CPU. Each
+  worker uses its own database `<database>_gw<N>` on the same server.
 - Playwright runs 4 projects: chromium, firefox, webkit, msedge. Set
   `ATRADE_PLAYWRIGHT_PROJECTS` to the browsers on your machine, for example
   `ATRADE_PLAYWRIGHT_PROJECTS="chromium firefox"`. The value `none` skips the
