@@ -163,10 +163,23 @@ test('new, rename, and delete conversation; the Credentials and Prompt dialogs o
   await column.getByRole('button', { name: 'Credentials' }).click();
   await expect(page.getByRole('dialog', { name: 'Credentials' })).toBeVisible();
   await expect(page.getByRole('dialog').getByText('Work key')).toBeVisible();
+  // The provider list is longer than the dialog. The dialog content does not cut it: the bottom of the list gets the hit.
+  await page.getByRole('dialog').getByRole('combobox', { name: 'Provider' }).click();
+  const providerList = page.getByRole('listbox');
+  await expect(providerList.getByRole('option', { name: 'Subscription 1', exact: true })).toBeVisible();
+  expect(
+    await providerList.evaluate((list) => {
+      const box = list.getBoundingClientRect();
+      return list.contains(document.elementFromPoint(box.left + box.width / 2, box.bottom - 4));
+    }),
+  ).toBe(true);
+  await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   await column.getByRole('button', { name: 'Prompt' }).click();
   await expect(page.getByRole('dialog').getByRole('button', { name: 'Save as new version' })).toBeVisible();
-  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
+  await expect(column.getByRole('button', { name: 'Prompt' })).toBeVisible();
 });
 
 test('the column is 28rem wide; Minimize gives a rail, Maximize takes the center area, Escape restores', async ({

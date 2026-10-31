@@ -79,34 +79,45 @@
           </button>
         {/snippet}
       </Select.Trigger>
-      <Select.ContentStatic>
-        {#snippet child({ props })}
-          <div {...props} class="cds--list-box__menu">
-            {#each items as item (item.value)}
-              <Select.Item value={item.value} label={item.label}>
-                {#snippet child({ props: itemProps, selected, highlighted })}
-                  <div {...itemProps} class={dropdownMenuItemClasses({ highlighted, selected })}>
-                    <div class="cds--list-box__menu-item__option">
-                      {item.label}
-                      {#if item.tag !== undefined}
-                        <Tag label={item.tag} size="sm" />
-                      {/if}
-                      {#if selected}
-                        <Icon icon={Checkmark16} class="cds--list-box__menu-item__selected-icon" />
-                      {/if}
+      <!-- Floating and fixed, not static: a scrolling parent (for example the content of a Dialog) does not cut the list. -->
+      <Select.Content side="bottom" align="start" sideOffset={0} strategy="fixed">
+        {#snippet child({ props, wrapperProps })}
+          <div {...wrapperProps}>
+            <div {...props} class="cds--list-box__menu floating-menu">
+              {#each items as item (item.value)}
+                <Select.Item value={item.value} label={item.label}>
+                  {#snippet child({ props: itemProps, selected, highlighted })}
+                    <div {...itemProps} class={dropdownMenuItemClasses({ highlighted, selected })}>
+                      <div class="cds--list-box__menu-item__option">
+                        {item.label}
+                        {#if item.tag !== undefined}
+                          <Tag label={item.tag} size="sm" />
+                        {/if}
+                        {#if selected}
+                          <Icon icon={Checkmark16} class="cds--list-box__menu-item__selected-icon" />
+                        {/if}
+                      </div>
                     </div>
-                  </div>
-                {/snippet}
-              </Select.Item>
-            {/each}
+                  {/snippet}
+                </Select.Item>
+              {/each}
+            </div>
           </div>
         {/snippet}
-      </Select.ContentStatic>
+      </Select.Content>
     </div>
   </Select.Root>
 </div>
 
 <style>
+  /* As in MenuButton.svelte: Bits UI places the floating wrapper, so the Carbon offsets go. The list keeps the width of
+     the field. */
+  .floating-menu {
+    position: relative;
+    inset: auto;
+    inline-size: var(--bits-select-anchor-width);
+  }
+
   /* Carbon has no tag inside a dropdown item. The tag stays on the line of the label. */
   .cds--list-box__field :global(.cds--tag),
   .cds--list-box__menu-item__option :global(.cds--tag) {
