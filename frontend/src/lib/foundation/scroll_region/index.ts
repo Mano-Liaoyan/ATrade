@@ -2,3 +2,4 @@
 export { default as ScrollRegion } from './ScrollRegion.svelte';
 export { computeScrollThumb, computeScrollTopForThumbTop, type ScrollThumb } from './scroll_thumb';
 export { default as HorizontalScrollTrack } from './HorizontalScrollTrack.svelte';
+export { computeScrollLeftToShow, type StripItemPosition } from './scroll_into_strip';

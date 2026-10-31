@@ -6,8 +6,9 @@
      at the end of the tab line, in a line with the class `lineClass`. `itemLabel` renders the text of a tab, for
      example a name with a ChangeText; without it, the tab shows its `label`. `onSelectedTabClick` runs when the user
      clicks the tab that was already selected (or presses Enter or Space on it), for example to minimize a panel.
-     With `fixedItems`, the `items` are in a strip that scrolls sideways with its own track along its top edge (HorizontalScrollTrack), and
-     the `fixedItems` stay visible at the end of the tab line. With `onCloseItem`, each tab of `items` has a Carbon
+     The `items` are in a strip that scrolls sideways with its own track along its top edge (HorizontalScrollTrack), so a
+     narrow tab line never cuts a tab and `lineEnd` stays visible. The selected tab scrolls into view in the strip. With
+     `fixedItems`, those tabs stay visible after the strip. With `onCloseItem`, each tab of `items` has a Carbon
      dismissable close button; the Delete key on the focused tab does the same. -->
 <script module lang="ts">
   export interface TabItem {
@@ -20,7 +21,7 @@
   import Close16 from '@carbon/icons/es/close/16.js';
   import { Tabs } from 'bits-ui';
   import type { Snippet } from 'svelte';
-  import { HorizontalScrollTrack } from '#lib/foundation/scroll_region';
+  import { computeScrollLeftToShow, HorizontalScrollTrack } from '#lib/foundation/scroll_region';
   import Icon from './Icon.svelte';
 
   interface Props {
@@ -65,10 +66,26 @@
   let stripContent: HTMLDivElement | undefined = $state();
 
   // The selected tab of the strip scrolls into view, for example a new backtest tab or a tab chosen with the keys.
+  // Only the strip scrolls, not the panels around it. The close button of a dismissable tab shows with its tab.
   $effect(() => {
     const selected = value;
     const selectedTrigger = stripContent?.querySelector<HTMLElement>(`[data-tab-value="${CSS.escape(selected)}"]`);
-    selectedTrigger?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (strip === undefined || stripContent === undefined || selectedTrigger === null || selectedTrigger === undefined) {
+      return;
+    }
+    const contentLeftPixels = stripContent.getBoundingClientRect().left;
+    const triggerRect = selectedTrigger.getBoundingClientRect();
+    const closeButton = selectedTrigger.nextElementSibling;
+    const itemRightPixels =
+      closeButton?.classList.contains('cds--tabs__nav-item--close') === true
+        ? closeButton.getBoundingClientRect().right
+        : triggerRect.right;
+    strip.scrollLeft = computeScrollLeftToShow({
+      scrollLeftPixels: strip.scrollLeft,
+      viewportWidthPixels: strip.getBoundingClientRect().width,
+      itemLeftPixels: triggerRect.left - contentLeftPixels,
+      itemWidthPixels: itemRightPixels - triggerRect.left,
+    });
   });
 
   function closeWithKey(event: KeyboardEvent, itemValue: string): void {
@@ -155,22 +172,18 @@
       contained && 'cds--tabs--contained',
       size === 'sm' && 'cds--layout--size-sm',
       onCloseItem !== undefined && 'cds--tabs--dismissable',
-      fixedItems !== undefined && 'tabs--strip',
+      'tabs--strip',
     ]}
   >
     <Tabs.List class="cds--tab--list" aria-label={label}>
-      {#if fixedItems === undefined}
-        {#each items as item (item.value)}
-          {@render trigger(item, onCloseItem !== undefined)}
-        {/each}
-      {:else}
-        <div class="tab-strip" id={stripId} bind:this={strip}>
-          <div class="tab-strip__content" bind:this={stripContent}>
-            {#each items as item (item.value)}
-              {@render trigger(item, onCloseItem !== undefined)}
-            {/each}
-          </div>
+      <div class="tab-strip" id={stripId} bind:this={strip}>
+        <div class="tab-strip__content" bind:this={stripContent}>
+          {#each items as item (item.value)}
+            {@render trigger(item, onCloseItem !== undefined)}
+          {/each}
         </div>
+      </div>
+      {#if fixedItems !== undefined && fixedItems.length > 0}
         <div class="tab-fixed">
           {#each fixedItems as item (item.value)}
             {@render trigger(item, false)}
@@ -178,9 +191,7 @@
         </div>
       {/if}
     </Tabs.List>
-    {#if fixedItems !== undefined}
-      <HorizontalScrollTrack {label} viewport={strip} content={stripContent} viewportId={stripId} class="tab-strip__track" />
-    {/if}
+    <HorizontalScrollTrack {label} viewport={strip} content={stripContent} viewportId={stripId} class="tab-strip__track" />
   </div>
 {/snippet}
 
@@ -201,7 +212,8 @@
 </Tabs.Root>
 
 <style>
-  /* The strip of `items` takes the free width of the tab line and scrolls sideways; the fixed tabs keep their width.
+  /* The strip of `items` takes the free width of the tab line and scrolls sideways; the fixed tabs and `lineEnd` keep
+     their width.
      Carbon tokens only. */
   .tabs--strip {
     position: relative;
