@@ -123,6 +123,11 @@ export function addLoginMessage(login: LoginView, message: LoginMessage): LoginV
   }
 }
 
+/** True while the login runs and shows nothing to do: before the first step of pi (about 9 s) and after an answer. */
+export function isLoginWaiting(login: LoginView): boolean {
+  return login.phase === 'running' && login.prompt === null && login.progress === null;
+}
+
 /** The prompt after its answer: no prompt waits until the next login step. */
 export function answerPrompt(login: LoginView): LoginView {
   return { ...login, prompt: null };
