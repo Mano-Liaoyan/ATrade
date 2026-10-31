@@ -29,7 +29,7 @@ jobs:
           --health-interval 2s --health-timeout 5s --health-retries 30
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.13.5"
       - run: ./scripts/check backend
@@ -80,7 +80,7 @@ jobs:
           --health-interval 2s --health-timeout 5s --health-retries 30
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.13.5"
       - uses: voidzero-dev/setup-vp@v1.22.0
