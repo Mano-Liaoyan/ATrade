@@ -1,7 +1,8 @@
 <!-- Carbon dropdown on Bits UI Select. The keyboard opens it (Enter, Space, arrow keys), the arrow keys move the
      highlight, Enter selects, and Escape closes it. The open, highlighted, and selected states of Bits UI become the
      Carbon classes (carbon_state.ts). `size` "sm" gives the 32px field of a toolbar line, and `hideLabel` keeps the
-     label only for screen readers when the layout names the field. A label that the field cuts shows in full in a
+     label only for screen readers when the layout names the field. `inline` gives the Carbon inline dropdown: no field
+     background, for a control line such as the composer of the AI assistant. A label that the field cuts shows in full in a
      native tooltip. The list is at least as wide as the field and wide enough for its longest label. -->
 <script module lang="ts">
   export interface SelectItem<T extends string> {
@@ -32,6 +33,7 @@
     hideLabel?: boolean;
     // Why the Select is disabled: the native tooltip of the field, and its accessible description.
     disabledReason?: string | null;
+    inline?: boolean;
   }
 
   const uid = $props.id();
@@ -45,6 +47,7 @@
     size = 'md',
     hideLabel = false,
     disabledReason = null,
+    inline = false,
   }: Props = $props();
 
   let open = $state(false);
@@ -65,7 +68,13 @@
 </script>
 
 <!-- The tooltip is on the wrapper too: a disabled button gets no pointer events in all browsers. -->
-<div class="cds--dropdown__wrapper cds--list-box__wrapper" title={fieldTitle}>
+<div
+  class={[
+    'cds--dropdown__wrapper cds--list-box__wrapper',
+    inline && 'cds--dropdown__wrapper--inline cds--list-box__wrapper--inline',
+  ]}
+  title={fieldTitle}
+>
   <label for={triggerId} class={['cds--label', hideLabel && 'cds--visually-hidden']}>{label}</label>
   {#if disabled && disabledReason !== null}
     <span id={reasonId} class="cds--visually-hidden">{disabledReason}</span>
@@ -85,7 +94,7 @@
       }
     }
   >
-    <div class={[...dropdownClasses({ open, disabled }), size === 'sm' && 'cds--dropdown--sm cds--list-box--sm']}>
+    <div class={[...dropdownClasses({ open, disabled, inline }), size === 'sm' && 'cds--dropdown--sm cds--list-box--sm']}>
       <Select.Trigger id={triggerId}>
         {#snippet child({ props })}
           <button

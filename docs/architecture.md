@@ -456,7 +456,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - `foundation/carbon` `StatusIndicator` shows a status as an icon and a word
   with a color: `kind` (`success`, `in-progress`, `warning`, `error`,
   `neutral`; each kind has its own icon shape) and `label`. `Select` takes
-  `placeholder` (the trigger text while no item is selected). `TextInput`
+  `placeholder` (the trigger text while no item is selected) and `inline`
+  (the Carbon inline dropdown: no field background, for a control line). `TextInput`
   takes `type` `datetime-local` for a native date and time input.
 - The forward test page (`/forward-tests/<id>`, spec #99, ticket
   [#105](https://github.com/Mano-Liaoyan/ATrade/issues/105)) is a workbench
@@ -704,7 +705,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   - The browser keeps each layout in `localStorage` (`readStoredLayout`,
     `writeStoredLayout`). Blocked storage gives the default layout.
 - `foundation/carbon` `IconButton` (`label`, `icon`, `align`, `disabled`, `onclick`) is the Carbon ghost icon-only button, size `sm`, with a Carbon
-  tooltip that gives the action name. A disabled `IconButton` has
+  tooltip that gives the action name. `kind` `primary` or `danger` makes it
+  the main action of a line (Send and Stop of the AI assistant composer), and
+  `describedBy` names a visible text that says more, for example why the
+  button is disabled. A disabled `IconButton` has
   `aria-disabled` and stays focusable, so its tooltip and its `label` say why
   it is disabled. A toolbar button can also take `shortcut` (shown in the
   tooltip after the label, and `aria-keyshortcuts`), `tone` (`neutral`,
@@ -1008,7 +1012,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     The components ([#187](https://github.com/Mano-Liaoyan/ATrade/issues/187)):
     - `ChatLog` (`label`): a `ScrollRegion` with `role="log"` and `fill`
       around an `<ol>` of messages and dividers.
-    - `ChatMessage` (`from`: `me` aligns to the end, `them` to the start;
+    - `ChatMessage` (`from`: `me` is a bubble at the end, `them` is text
+      over the full width without a bubble (assistant.md 25.12.5);
       `author`, which only screen readers announce; `continued`;
       `streaming`, a caret while the text arrives; `typing`, the typing
       indicator in place of the text; `typingText`, its screen reader text).

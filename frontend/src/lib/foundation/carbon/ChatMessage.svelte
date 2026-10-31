@@ -3,7 +3,8 @@
      Copyright 2019 IBM. Licensed under the Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0).
      ATrade changes: Svelte 5, `cds--` classes, no avatar, actions, attachments, meta, or delivery status.
 
-     One message of a ChatLog. `from="me"` aligns it to the end, `from="them"` to the start. `continued` marks a
+     One message of a ChatLog. `from="me"` is a bubble at the end. `from="them"` is text over the full width, without a
+     bubble (as in the AI coding apps), so long answers, tables, and code have room. `continued` marks a
      message after a message of the same author (arrangeChatLog). `streaming` shows a caret while the text arrives.
      `typing` shows the typing indicator in place of the text. -->
 <script lang="ts">
@@ -78,18 +79,20 @@
 
   .cds--chat-message__main {
     display: flex;
+    flex: 1;
     flex-direction: column;
     min-width: 0;
-    max-width: 82%;
   }
 
+  .cds--chat-message--me .cds--chat-message__main {
+    flex: 0 1 auto;
+    max-width: 85%;
+  }
+
+  /* A message of the other author: plain text over the full width. */
   .cds--chat-message__bubble {
     min-width: 0;
-    padding: var(--cds-spacing-03) var(--cds-spacing-05);
-    background-color: var(--cds-chat-bubble-agent);
-    /* The border is an inset shadow, so it does not change the size of the bubble. */
-    box-shadow: inset 0 0 0 1px var(--cds-chat-bubble-border);
-    color: var(--cds-chat-bubble-agent-text);
+    color: var(--cds-text-primary);
     font-size: var(--cds-body-01-font-size);
     line-height: var(--cds-body-01-line-height);
     letter-spacing: var(--cds-body-01-letter-spacing);
@@ -98,8 +101,8 @@
   }
 
   .cds--chat-message--me .cds--chat-message__bubble {
+    padding: var(--cds-spacing-03) var(--cds-spacing-05);
     background-color: var(--cds-chat-bubble-user);
-    box-shadow: none;
     color: var(--cds-chat-bubble-user-text);
   }
 
@@ -125,7 +128,7 @@
     display: flex;
     align-items: center;
     gap: var(--cds-spacing-02);
-    padding: var(--cds-spacing-04);
+    padding-block: var(--cds-spacing-03);
   }
 
   .cds--chat-message__dot {
