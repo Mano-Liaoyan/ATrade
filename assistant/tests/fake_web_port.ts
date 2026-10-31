@@ -24,6 +24,8 @@ export interface FakeWebPort {
   backtestStatuses: string[];
   /** POST /api/backtests answers 422: no saved bars. */
   hasNoSavedBars: boolean;
+  /** The answer of GET /api/backtests. */
+  backtestList: unknown[];
   /** The answers of the screen creates, changes, and runs, in order. After the last: the success answer. */
   screenAnswers: FakeAnswer[];
   close: () => Promise<void>;
@@ -95,11 +97,19 @@ export function versionBody(versionNumber: number) {
   };
 }
 
+/** The error message of a failed backtest: the traceback of a strategy exception, with an empty last line. */
+export const STRATEGY_TRACEBACK =
+  'Traceback (most recent call last):\n' +
+  '  File "/tmp/atrade-bt/strategy.py", line 42, in on_start\n' +
+  '    self.log.info(f"Start {self.id}")\n' +
+  "AttributeError: 'MovingAverageStrategy' object has no attribute 'id'\n";
+
 export function backtestBody(id: number, status: string) {
   return {
     id,
     strategy_version_id: 102,
     status,
+    error_message: status === 'failed' ? STRATEGY_TRACEBACK : null,
     metrics: status === 'finished' ? { final_equity_usd: '10500', trade_count: TRADE_COUNT } : null,
     conversation_id: 7,
     equity_curve: Array.from({ length: EQUITY_POINT_COUNT }, (_unused, index) => ({
@@ -155,7 +165,7 @@ class FakeRoutes {
       'POST /api/strategies': () => ({ status: 201, body: { ...STRATEGY, id: 4 } }),
       'POST /api/strategies/3/versions': () => this.save(),
       'POST /api/backtests': () => this.startBacktest(),
-      'GET /api/backtests': () => ({ status: 200, body: [backtestBody(11, 'finished')] }),
+      'GET /api/backtests': () => ({ status: 200, body: this.port.backtestList }),
       'GET /api/backtests/11/comparison/12': () => ({ status: 200, body: COMPARISON }),
       'GET /api/screens': () => ({ status: 200, body: SCREEN_LIST }),
       'GET /api/screens/5': () => ({ status: 200, body: SCREEN }),
@@ -204,6 +214,7 @@ export async function startFakeWebPort(): Promise<FakeWebPort> {
     saveAnswers: [] as FakeAnswer[],
     backtestStatuses: ['queued', 'running', 'finished'],
     hasNoSavedBars: false,
+    backtestList: [backtestBody(11, 'finished')],
     screenAnswers: [] as FakeAnswer[],
   };
   const routes = new FakeRoutes(state);

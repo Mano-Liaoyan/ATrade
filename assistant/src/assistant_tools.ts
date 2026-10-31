@@ -2,7 +2,13 @@
 // Each tool calls only the routes of port 8001 of web (25.3.3). The screen tools of 25.4.3 are in screen_tools.ts.
 import { defineTool, type ToolDefinition } from '@earendil-works/pi-coding-agent';
 import { Type } from 'typebox';
-import { readBacktest, runBacktest, type BacktestWait, type UserMessageBudget } from './backtest_tools.ts';
+import {
+  readBacktest,
+  runBacktest,
+  summarizeBacktestList,
+  type BacktestWait,
+  type UserMessageBudget,
+} from './backtest_tools.ts';
 import { createScreenTools } from './screen_tools.ts';
 import { answerResult, isSuccess, textResult } from './tool_results.ts';
 import type { WebPortClient } from './web_port_client.ts';
@@ -159,14 +165,21 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
     defineTool({
       name: 'list_backtests',
       label: 'List backtests',
-      description: 'Lists the backtests with their instrument, bar period, status, and metrics.',
+      description:
+        'Lists the backtests with their instrument, bar period, status, and metrics. ' +
+        'A failed backtest has error_summary, the last line of its error.',
       parameters: Type.Object({}),
-      execute: async (_id, _params, signal) => answerResult(await client.request('GET', '/api/backtests', undefined, signal)),
+      execute: async (_id, _params, signal) => {
+        const answer = await client.request('GET', '/api/backtests', undefined, signal);
+        return isSuccess(answer) ? textResult(summarizeBacktestList(answer.body)) : answerResult(answer);
+      },
     }),
     defineTool({
       name: 'read_backtest',
       label: 'Read backtest',
-      description: 'Reads one backtest: the metrics, at most 50 points of the equity curve, and the first 50 trades.',
+      description:
+        'Reads one backtest: the metrics, at most 50 points of the equity curve, and the first 50 trades. ' +
+        'A failed backtest has error_message (the full log) and error_summary (its last line).',
       parameters: Type.Object({ backtest_id: Id }),
       execute: (_id, params, signal) => readBacktest(client, params.backtest_id, signal),
     }),

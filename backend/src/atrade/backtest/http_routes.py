@@ -602,6 +602,16 @@ class BacktestRoutes:
             ),
         )
 
+    async def delete_backtest(self, backtest_id: int) -> None:
+        """A true delete (section 10.5). 409 while the backtest is queued or running, for a sweep run, and for the
+        same-period backtest of a forward test."""
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            if await backtest_store.select_backtest(connection, backtest_id) is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backtest not found.")
+            refusal = await backtest_store.delete_backtest(connection, backtest_id)
+        if refusal is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=refusal)
+
     async def count_out_of_sample_uses(self, connection: psycopg.AsyncConnection, row: BacktestRow) -> int | None:
         """The finished backtests of the same strategy (all versions), instrument, and bar period whose out-of-sample
         part overlaps the out-of-sample part of `row`. The count includes `row`. None without a split."""
@@ -665,6 +675,13 @@ def create_backtest_router(*, database_url: str, clock: Clock, exchange_rate_rea
     router.add_api_route("/us-universe/range", routes.read_us_universe_range, methods=["GET"])
     router.add_api_route("/backtest-limits", routes.change_limits, methods=["PUT"])
     add_read_routes(router, routes)
+    router.add_api_route(
+        "/backtests/{backtest_id}",
+        routes.delete_backtest,
+        methods=["DELETE"],
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses={**NOT_FOUND, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
+    )
     return router
 
 
