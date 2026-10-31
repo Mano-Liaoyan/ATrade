@@ -17,12 +17,22 @@ export function textInputClasses(invalid: boolean): string[] {
   return ['cds--text-input', ...(invalid ? ['cds--text-input--invalid'] : [])];
 }
 
-export function dropdownClasses({ open, disabled }: { open: boolean; disabled: boolean }): string[] {
+export function dropdownClasses({
+  open,
+  disabled,
+  inline = false,
+}: {
+  open: boolean;
+  disabled: boolean;
+  /** The Carbon inline dropdown: no field background, as wide as its text. */
+  inline?: boolean;
+}): string[] {
   return [
     'cds--dropdown',
     'cds--list-box',
     ...(open ? ['cds--list-box--expanded', 'cds--dropdown--open'] : []),
     ...(disabled ? ['cds--dropdown--disabled', 'cds--list-box--disabled'] : []),
+    ...(inline ? ['cds--dropdown--inline', 'cds--list-box--inline'] : []),
   ];
 }
 
