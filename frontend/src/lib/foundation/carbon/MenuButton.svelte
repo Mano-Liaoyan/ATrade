@@ -33,7 +33,9 @@
   <DropdownMenu.Portal>
     <DropdownMenu.Content side="bottom" align="start" sideOffset={0}>
       {#snippet child({ props, wrapperProps })}
-        <div {...wrapperProps}>
+        <!-- Above a Dialog (Carbon modal 9000), as the Carbon list box menu (9100): the Portal puts the menu outside it,
+             and the fixed wrapper is its own stacking context. -->
+        <div {...wrapperProps} style:z-index="9100">
           <ul {...props} class="cds--overflow-menu-options cds--overflow-menu-options--open cds--layout--size-sm floating-options">
             {#each items as item (item.label)}
               <li class={['cds--overflow-menu-options__option', item.divider === true && 'cds--overflow-menu--divider']} role="none">

@@ -325,6 +325,17 @@ test('new, rename, and delete conversation; the Credentials and Prompt dialogs o
   await column.getByRole('button', { name: 'Credentials' }).click();
   await expect(page.getByRole('dialog', { name: 'Credentials' })).toBeVisible();
   await expect(page.getByRole('dialog').getByText('Work key')).toBeVisible();
+  // The row menu opens above the dialog: its item gets the hit.
+  await page.getByRole('dialog').getByRole('button', { name: 'Actions for Work key' }).click();
+  const deleteItem = page.getByRole('menuitem', { name: 'Delete credential' });
+  await expect(deleteItem).toBeVisible();
+  expect(
+    await deleteItem.evaluate((item) => {
+      const box = item.getBoundingClientRect();
+      return item.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
+    }),
+  ).toBe(true);
+  await page.keyboard.press('Escape');
   // The provider list is longer than the dialog. The dialog content does not cut it: the bottom of the list gets the hit.
   await page.getByRole('dialog').getByRole('combobox', { name: 'Provider' }).click();
   const providerList = page.getByRole('listbox');
