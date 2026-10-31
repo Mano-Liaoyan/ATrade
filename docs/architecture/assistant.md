@@ -1195,7 +1195,11 @@ user stays plain text. `foundation/markdown` has the `Markdown` component;
 - Table: the Carbon data table structure (`cds--data-table--xs`). A column
   where each body cell is a number is right aligned with tabular numbers. A
   wide table scrolls in its own styled track.
-- Code block: the language name and a "Copy" button. A closed block gets
+- Code block: the code and a "Copy" icon button at the top end. No
+  label shows; the language is the accessible name of the block. After a
+  click, the icon changes for 2 seconds: a checkmark ("Copied") or a
+  warning icon ("Not copied"), each with its accessible name and tooltip
+  and no text next to it. A closed block gets
   syntax colors from `shiki` (JavaScript regex engine, loaded on demand)
   for Python, shell, JSON, YAML, SQL, TypeScript, JavaScript, and TOML. The
   colors are the colors of the code editor (CSS variables, so a theme
@@ -1207,7 +1211,8 @@ user stays plain text. `foundation/markdown` has the `Markdown` component;
 - Diff block (`diff` or `patch`, or a code block without a language that
   holds a unified diff): a closed block with file headers and a hunk shows
   in the diff view of `@pierre/diffs` (vanilla `FileDiff`, unified, "+" and
-  "-" markers, Carbon token colors). Else the block shows each line with
+  "-" markers, Carbon token colors). The "Copy" icon button is at the end
+  of its file header line. Else the block shows each line with
   its "+" or "-" marker and a line color.
 - Mermaid block: a closed block shows the diagram of `pele` (loaded on
   demand). Links and images in the diagram are off, and the SVG is cleaned

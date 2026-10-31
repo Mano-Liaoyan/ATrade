@@ -139,6 +139,7 @@ test('an answer shows its markdown: heading, bold, table, shell command, diff, a
   const diff = log.getByRole('figure', { name: 'diff' });
   await expect(diff).toContainText('threshold = 25');
   await expect(diff).toContainText('threshold = 30');
+  await expect(diff.getByRole('button', { name: 'Copy' })).toBeVisible();
 
   const diagram = log.getByRole('figure', { name: 'Mermaid diagram' });
   await expect(diagram.locator('svg')).toBeVisible();

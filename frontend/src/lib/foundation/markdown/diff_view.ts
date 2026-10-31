@@ -6,8 +6,11 @@ export interface DiffView {
   destroy: () => void;
 }
 
-/** Shows the diff in the element. Returns undefined when the text has no file diff with a hunk. */
-export type CreateDiffView = (element: HTMLElement, text: string) => DiffView | undefined;
+/**
+ * Shows the diff in the element, with `headerEnd` at the end of the file header line. Returns undefined when the text
+ * has no file diff with a hunk.
+ */
+export type CreateDiffView = (element: HTMLElement, text: string, headerEnd: HTMLElement) => DiffView | undefined;
 
 const THEME_NAME = 'atrade-carbon';
 let loaded: Promise<CreateDiffView> | undefined;
@@ -16,7 +19,7 @@ async function load(): Promise<CreateDiffView> {
   const { FileDiff, parsePatchFiles, registerCustomCSSVariableTheme } = await import('@pierre/diffs');
   // The theme colors are the --diffs-token-* variables of markdown.scss, so a theme change needs no new render.
   registerCustomCSSVariableTheme(THEME_NAME, {});
-  return (element, text) => {
+  return (element, text, headerEnd) => {
     let fileDiff: FileDiffMetadata | undefined;
     try {
       fileDiff = parsePatchFiles(text, undefined, true).flatMap((patch) => patch.files)[0];
@@ -32,6 +35,7 @@ async function load(): Promise<CreateDiffView> {
       diffIndicators: 'classic',
       overflow: 'scroll',
       hunkSeparators: 'simple',
+      renderHeaderMetadata: () => headerEnd,
     });
     view.render({ fileDiff, containerWrapper: element });
     return {

@@ -1,7 +1,9 @@
 <!-- A diff block of a markdown text. A closed block with a unified diff (file headers and hunks) shows in the diff view
      of @pierre/diffs, loaded on demand, with the + and - markers ("classic" indicators) and the Carbon code colors.
-     An open block, or a diff that the diff view cannot read, shows in the plain diff view of CodeBlock. -->
+     The Copy icon button sits at the end of the file header line of the diff view. An open block, or a diff that the
+     diff view cannot read, shows in the plain diff view of CodeBlock. -->
 <script lang="ts">
+  import { mount, unmount } from 'svelte';
   import CodeBlock from './CodeBlock.svelte';
   import CopyButton from './CopyButton.svelte';
   import { loadDiffView, type DiffView } from './diff_view';
@@ -14,7 +16,6 @@
 
   const { language, text, closed }: Props = $props();
 
-  const labelId = $props.id();
   let container: HTMLDivElement | undefined = $state();
   let shown = $state(false);
 
@@ -26,12 +27,14 @@
     }
     let view: DiffView | undefined;
     let current = true;
+    const copyTarget = document.createElement('div');
+    const copyButton = mount(CopyButton, { target: copyTarget, props: { text: source } });
     loadDiffView().then(
       (createView) => {
         if (!current) {
           return;
         }
-        view = createView(element, source);
+        view = createView(element, source, copyTarget);
         shown = view !== undefined;
       },
       () => {
@@ -41,17 +44,18 @@
     return () => {
       current = false;
       view?.destroy();
+      void unmount(copyButton);
       shown = false;
     };
   });
 </script>
 
 {#if closed}
-  <figure class={['markdown-diff', !shown && 'markdown-diff--hidden']} aria-labelledby={labelId} aria-hidden={!shown}>
-    <div class="markdown-diff__header">
-      <span id={labelId} class="markdown-diff__language">{language === '' ? 'diff' : language}</span>
-      <CopyButton {text} />
-    </div>
+  <figure
+    class={['markdown-diff', !shown && 'markdown-diff--hidden']}
+    aria-label={language === '' ? 'diff' : language}
+    aria-hidden={!shown}
+  >
     <div class="markdown-diff__view" bind:this={container}></div>
   </figure>
 {/if}
@@ -61,6 +65,7 @@
 
 <style>
   .markdown-diff {
+    position: relative;
     min-inline-size: 0;
     margin: 0;
     background-color: var(--cds-layer-01);
@@ -72,22 +77,6 @@
     block-size: 0;
     overflow: hidden;
     visibility: hidden;
-  }
-
-  .markdown-diff__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-block-size: var(--cds-spacing-07);
-    padding-inline-start: var(--cds-spacing-04);
-    border-block-end: 1px solid var(--cds-border-subtle-01);
-  }
-
-  .markdown-diff__language {
-    color: var(--cds-text-secondary);
-    font-size: var(--cds-label-01-font-size);
-    line-height: var(--cds-label-01-line-height);
-    letter-spacing: var(--cds-label-01-letter-spacing);
   }
 
   /* The diff view reads these variables in its shadow root. Carbon tokens only. */

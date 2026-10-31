@@ -1,4 +1,5 @@
-<!-- A code block of a markdown text: the language, a Copy button, and the code. A closed block gets syntax colors
+<!-- A code block of a markdown text: the code and a Copy icon button at the top end. The language is the accessible
+     name of the block; no label shows. A closed block gets syntax colors
      (shiki, loaded on demand); an open block (the text still streams in) shows plain text, so the lines do not flicker.
      A shell block shows each command after a "$" prompt that Copy does not copy. A diff block shows each line with its
      + or - marker and the line color (the plain diff view of DiffBlock). -->
@@ -17,7 +18,6 @@
 
   const { language, text, closed, display }: Props = $props();
 
-  const labelId = $props.id();
   const label = $derived(language === '' ? 'code' : language);
 
   interface Line {
@@ -61,11 +61,8 @@
   });
 </script>
 
-<figure class={['markdown-code-block', `markdown-code-block--${display}`]} aria-labelledby={labelId}>
-  <div class="markdown-code-block__header">
-    <span id={labelId} class="markdown-code-block__language">{label}</span>
-    <CopyButton text={copyText} />
-  </div>
+<figure class={['markdown-code-block', `markdown-code-block--${display}`]} aria-label={label}>
+  <div class="markdown-code-block__copy"><CopyButton text={copyText} /></div>
   <pre class="markdown-code-block__code"><code
       >{#each lines as line, index (index)}<span class={['markdown-code-block__line', `markdown-code-block__line--${line.kind}`]}
           >{#if line.kind === 'command'}<span class="markdown-code-block__prompt" aria-hidden="true">$ </span
@@ -78,26 +75,19 @@
 
 <style>
   .markdown-code-block {
+    position: relative;
     min-inline-size: 0;
     margin: 0;
     background-color: var(--cds-layer-01);
     box-shadow: inset 0 0 0 1px var(--cds-border-subtle-01);
   }
 
-  .markdown-code-block__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    min-block-size: var(--cds-spacing-07);
-    padding-inline-start: var(--cds-spacing-04);
-    border-block-end: 1px solid var(--cds-border-subtle-01);
-  }
-
-  .markdown-code-block__language {
-    color: var(--cds-text-secondary);
-    font-size: var(--cds-label-01-font-size);
-    line-height: var(--cds-label-01-line-height);
-    letter-spacing: var(--cds-label-01-letter-spacing);
+  .markdown-code-block__copy {
+    position: absolute;
+    z-index: 1;
+    inset-block-start: 1px;
+    inset-inline-end: 1px;
+    background-color: var(--cds-layer-01);
   }
 
   .markdown-code-block__code {
@@ -134,7 +124,7 @@
   .markdown-code-block__line {
     display: block;
     min-block-size: 1lh;
-    padding-inline: var(--cds-spacing-04);
+    padding-inline: var(--cds-spacing-04) var(--cds-spacing-08);
   }
 
   .markdown-code-block__prompt,
