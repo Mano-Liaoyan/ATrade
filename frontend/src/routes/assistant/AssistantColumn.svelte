@@ -3,9 +3,9 @@
      (assistant_session.svelte.ts) and one storage key, so a page change keeps the open conversation and Minimize.
      Header line: "Credentials" and "Prompt" open their dialogs. Top: the conversation Select (all conversations),
      "New conversation", "Rename conversation", "Delete conversation" (a danger Dialog first), and the prompt version of
-     the open conversation. Middle: the conversation log. Bottom: the Model (wide, for the full name) and Thinking Selects,
-     the Provider and Credential Selects, the message input, and "Send", which becomes "Stop" (abort) while the AI
-     assistant runs.
+     the open conversation. Middle: the conversation log. Bottom: the composer, one box with the message input, the inline
+     Model (the full name) and Thinking Selects, and the "Send" icon button, which becomes "Stop" (abort) while the AI
+     assistant runs. Under the box: the inline Provider and Credential Selects.
      The strategy page gives its open strategy, its diff card actions, and its Output tab for the errors. A page
      without an Output tab shows the last error in the column. A diff card of another strategy, or on another page,
      opens the strategy page: the card opens the diff there, and Keep opens the version. -->
@@ -15,6 +15,8 @@
   import Edit16 from '@carbon/icons/es/edit/16.js';
   import Password16 from '@carbon/icons/es/password/16.js';
   import Script16 from '@carbon/icons/es/script/16.js';
+  import SendFilled16 from '@carbon/icons/es/send--filled/16.js';
+  import StopFilledAlt16 from '@carbon/icons/es/stop--filled--alt/16.js';
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -28,7 +30,7 @@
     type DiffItem,
     type ThinkingLevel,
   } from '#lib/assistant';
-  import { Button, Dialog, IconButton, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
+  import { Dialog, IconButton, InlineNotification, Select, TextInput } from '#lib/foundation/carbon';
   import { SideColumn } from '#lib/foundation/workbench';
   import AssistantLog from './AssistantLog.svelte';
   import { assistantSession as session, type OpenStrategy } from './assistant_session.svelte';
@@ -240,37 +242,59 @@
   />
 
   <div class="assistant-bottom">
-    <div class="model-row">
-      <Select
-        label="Model"
-        hideLabel
-        size="sm"
-        items={items.models}
-        value={session.selection.model}
-        placeholder="No model"
-        disabled={items.models.length === 0}
-        onValueChange={(value: string) => {
-          session.selection = { ...session.selection, model: value };
-        }}
-      />
-      <Select
-        label="Thinking"
-        hideLabel
-        size="sm"
-        items={session.thinking.items}
-        value={session.thinking.value}
-        placeholder="No thinking"
-        disabled={session.thinking.disabledReason !== null}
-        disabledReason={session.thinking.disabledReason}
-        onValueChange={(value: ThinkingLevel) => {
-          session.chooseThinkingLevel(value);
-        }}
-      />
+    <div class="composer" role="group" aria-label="New message">
+      <textarea class="message-input" aria-label="Message" rows="2" bind:value={session.text} onkeydown={sendOnEnter}
+      ></textarea>
+      <div class="composer-bar">
+        <div class="model-field">
+          <Select
+            label="Model"
+            hideLabel
+            inline
+            size="sm"
+            items={items.models}
+            value={session.selection.model}
+            placeholder="No model"
+            disabled={items.models.length === 0}
+            onValueChange={(value: string) => {
+              session.selection = { ...session.selection, model: value };
+            }}
+          />
+        </div>
+        <div class="thinking-field">
+          <Select
+            label="Thinking"
+            hideLabel
+            inline
+            size="sm"
+            items={session.thinking.items}
+            value={session.thinking.value}
+            placeholder="No thinking"
+            disabled={session.thinking.disabledReason !== null}
+            disabledReason={session.thinking.disabledReason}
+            onValueChange={(value: ThinkingLevel) => {
+              session.chooseThinkingLevel(value);
+            }}
+          />
+        </div>
+        <div class="send-button">
+          <IconButton
+            kind={sendButton.action === 'stop' ? 'danger' : 'primary'}
+            label={sendButton.label}
+            icon={sendButton.action === 'stop' ? StopFilledAlt16 : SendFilled16}
+            align="left"
+            disabled={sendButton.disabledReason !== null}
+            describedBy={sendButton.disabledReason === null ? undefined : 'assistant-send-reason'}
+            onclick={pressSendButton}
+          />
+        </div>
+      </div>
     </div>
     <div class="credential-row">
       <Select
         label="Provider"
         hideLabel
+        inline
         size="sm"
         items={items.providers}
         value={session.selection.provider}
@@ -283,6 +307,7 @@
       <Select
         label="Credential"
         hideLabel
+        inline
         size="sm"
         items={items.credentials}
         value={session.selection.credentialId}
@@ -292,22 +317,6 @@
           session.selection = { ...session.selection, credentialId: value };
         }}
       />
-    </div>
-    <div class="message-row">
-      <textarea
-        class="cds--text-area message-input"
-        aria-label="Message"
-        rows="2"
-        bind:value={session.text}
-        onkeydown={sendOnEnter}
-      ></textarea>
-      <Button
-        kind={sendButton.action === 'stop' ? 'danger' : 'primary'}
-        size="md"
-        disabled={sendButton.disabledReason !== null}
-        aria-describedby={sendButton.disabledReason === null ? undefined : 'assistant-send-reason'}
-        onclick={pressSendButton}>{sendButton.label}</Button
-      >
     </div>
     {#if sendButton.disabledReason !== null}
       <p id="assistant-send-reason" class="cds--form__helper-text">{sendButton.disabledReason}</p>
@@ -401,36 +410,84 @@
     display: flex;
     flex: none;
     flex-direction: column;
-    gap: var(--cds-spacing-03);
-    padding: var(--cds-spacing-03) var(--cds-spacing-05);
-    border-block-start: 1px solid var(--cds-border-subtle-01);
-  }
-
-  /* The Model field takes 2 parts, so a long model name has room. */
-  .model-row,
-  .credential-row {
-    display: grid;
     gap: var(--cds-spacing-02);
+    padding: var(--cds-spacing-03) var(--cds-spacing-05) var(--cds-spacing-05);
   }
 
-  .model-row {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  }
-
-  .credential-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .message-row {
+  /* Carbon has no composer. One field box (the Carbon text area look): the message input on top, and a line with the
+     inline Model and Thinking Selects and the Send button. The focus outline goes around the whole box. */
+  .composer {
     display: flex;
-    align-items: flex-end;
-    gap: var(--cds-spacing-03);
+    flex-direction: column;
+    border-block-end: 1px solid var(--cds-border-strong-01);
+    background: var(--cds-field-01);
+  }
+
+  .composer:focus-within {
+    outline: 2px solid var(--cds-focus);
+    outline-offset: -2px;
   }
 
   .message-input {
-    flex: 1;
-    min-inline-size: 0;
+    box-sizing: border-box;
+    inline-size: 100%;
+    padding: var(--cds-spacing-04) var(--cds-spacing-05) var(--cds-spacing-02);
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--cds-text-primary);
+    font-family: inherit;
+    font-size: var(--cds-body-01-font-size);
+    line-height: var(--cds-body-01-line-height);
+    letter-spacing: var(--cds-body-01-letter-spacing);
     resize: none;
+  }
+
+  .message-input::placeholder {
+    color: var(--cds-text-placeholder);
+  }
+
+  .composer-bar {
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-02);
+    min-inline-size: 0;
+    padding: 0 var(--cds-spacing-02) var(--cds-spacing-02);
+  }
+
+  /* The Model field shrinks last: a long name gets the ellipsis, and the Select tooltip gives the full name. */
+  .model-field {
+    flex: 0 1 auto;
+    min-inline-size: 0;
+  }
+
+  .thinking-field {
+    flex: none;
+  }
+
+  .model-field :global(.cds--list-box__wrapper--inline) {
+    display: block;
+    max-inline-size: 100%;
+  }
+
+  .model-field :global(.cds--dropdown--inline) {
+    max-inline-size: 100%;
+  }
+
+  .send-button {
+    flex: none;
+    margin-inline-start: auto;
+  }
+
+  .credential-row {
+    display: flex;
+    gap: var(--cds-spacing-02);
+    min-inline-size: 0;
+  }
+
+  .credential-row > :global(*) {
+    flex: 0 1 auto;
+    min-inline-size: 0;
   }
 
   .rename-form {

@@ -1,10 +1,14 @@
 <!-- The conversation log of the assistant side column (docs/architecture/assistant.md 25.12.1): the messages, the
-     tool steps (one StatusIndicator line each), the diff cards, the metric cards, and the condition cards, in a ChatLog. Each AI assistant
+     tool steps (one StatusIndicator line each; 2 or more consecutive steps are one group "<n> tool steps" that is open
+     while a step runs, and a click opens or closes it), the diff cards, the metric cards, and the condition cards, in a ChatLog. Each AI assistant
      message shows its model and its credential name. A click on a diff card opens CodeDiff in the editor panel of the
      strategy page. Keep opens the new version in the editor, and Discard adds the discarded mark (25.5.2). -->
 <script lang="ts">
-  import { describeToolStep, type DiffItem, type LogItem } from '#lib/assistant';
-  import { arrangeChatLog, Button, ChatDivider, ChatLog, ChatMessage, StatusIndicator } from '#lib/foundation/carbon';
+  import ChevronDown16 from '@carbon/icons/es/chevron--down/16.js';
+  import ChevronRight16 from '@carbon/icons/es/chevron--right/16.js';
+  import { SvelteMap } from 'svelte/reactivity';
+  import { describeToolStep, describeToolStepGroup, groupToolSteps, type DiffItem, type LogItem } from '#lib/assistant';
+  import { arrangeChatLog, Button, ChatDivider, ChatLog, ChatMessage, Icon, StatusIndicator } from '#lib/foundation/carbon';
   import AssistantMetricCard from './AssistantMetricCard.svelte';
   import AssistantScreenCard from './AssistantScreenCard.svelte';
   import type { DiffChoice } from './assistant_session.svelte';
@@ -27,22 +31,58 @@
     $props();
 
   const entries = $derived(
-    arrangeChatLog(
-      items.map((item) => ({
-        author: item.kind === 'message' ? item.role : 'tool',
-        sentAtUtc: item.sentAtUtc,
-        item,
-      })),
+    groupToolSteps(
+      arrangeChatLog(
+        items.map((item) => ({
+          author: item.kind === 'message' ? item.role : 'tool',
+          sentAtUtc: item.sentAtUtc,
+          item,
+        })),
+      ),
     ),
   );
+  // The open or closed choice of the user for each tool step group, by the group ID. Without a choice, a group is open
+  // while a step runs.
+  const groupChoices = new SvelteMap<number, boolean>();
+
+  function entryKey(entry: (typeof entries)[number]): string {
+    if (entry.kind === 'divider') {
+      return `divider-${entry.dateUtc}`;
+    }
+    return entry.kind === 'tool_steps' ? `steps-${String(entry.id)}` : `item-${String(entry.message.item.id)}`;
+  }
   const last = $derived(items.at(-1));
   const isTyping = $derived(isRunning && !(last?.kind === 'message' && last.streaming));
 </script>
 
 <ChatLog label="Conversation messages">
-  {#each entries as entry (entry.kind === 'divider' ? `divider-${entry.dateUtc}` : entry.message.item.id)}
+  {#each entries as entry (entryKey(entry))}
     {#if entry.kind === 'divider'}
       <ChatDivider label={entry.dateUtc} />
+    {:else if entry.kind === 'tool_steps'}
+      {@const group = describeToolStepGroup(entry.steps)}
+      {@const isOpen = groupChoices.get(entry.id) ?? group.isRunning}
+      <li class="log-item step-group">
+        <button
+          type="button"
+          class="step-group__toggle"
+          aria-expanded={isOpen}
+          onclick={() => {
+            groupChoices.set(entry.id, !isOpen);
+          }}
+        >
+          <Icon icon={isOpen ? ChevronDown16 : ChevronRight16} />
+          <StatusIndicator label={group.label} kind={group.kind} />
+        </button>
+        {#if isOpen}
+          <ol class="step-group__steps">
+            {#each entry.steps as item (item.id)}
+              {@const step = describeToolStep(item)}
+              <li><StatusIndicator label={step.label} kind={step.kind} /></li>
+            {/each}
+          </ol>
+        {/if}
+      </li>
     {:else}
       {@const item = entry.message.item}
       {#if item.kind === 'message'}
@@ -116,6 +156,36 @@
 </ChatLog>
 
 <style>
+  .step-group {
+    flex-direction: column;
+  }
+
+  .step-group__toggle {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    gap: var(--cds-spacing-03);
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--cds-icon-secondary);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .step-group__toggle:focus-visible {
+    outline: 2px solid var(--cds-focus);
+  }
+
+  .step-group__steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cds-spacing-02);
+    margin: var(--cds-spacing-02) 0 0;
+    padding: 0 0 0 var(--cds-spacing-07);
+    list-style: none;
+  }
+
   .log-item {
     display: flex;
     margin-block-start: var(--cds-spacing-03);
