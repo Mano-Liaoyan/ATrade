@@ -139,21 +139,39 @@ function selectOpenBacktests(
   return selectStrategyBacktests(backtests, strategyId).filter((backtest) => !closedIds.has(backtest.id));
 }
 
+function describeBacktestTab(backtest: Backtest): ResultTabItem {
+  const name = `Backtest #${String(backtest.id)}`;
+  const tab = { value: createBacktestTab(backtest.id), name, backtestId: backtest.id, status: backtest.status };
+  if (backtest.metrics === null) {
+    return { ...tab, label: name, change: null, changeText: '' };
+  }
+  const changeText = formatPercent(backtest.metrics.total_return_percent);
+  return { ...tab, label: `${name} ${changeText}`, change: Number(backtest.metrics.total_return_percent), changeText };
+}
+
 export function listResultTabs(
   backtests: readonly Backtest[],
   strategyId: number | null,
   closedIds: ReadonlySet<number> = NO_CLOSED_TABS,
 ): ResultTabs {
-  const backtestTabs = selectOpenBacktests(backtests, strategyId, closedIds).map((backtest): ResultTabItem => {
-    const name = `Backtest #${String(backtest.id)}`;
-    const tab = { value: createBacktestTab(backtest.id), name, backtestId: backtest.id, status: backtest.status };
-    if (backtest.metrics === null) {
-      return { ...tab, label: name, change: null, changeText: '' };
-    }
-    const changeText = formatPercent(backtest.metrics.total_return_percent);
-    return { ...tab, label: `${name} ${changeText}`, change: Number(backtest.metrics.total_return_percent), changeText };
-  });
+  const backtestTabs = selectOpenBacktests(backtests, strategyId, closedIds).map(describeBacktestTab);
   return { backtestTabs, tableTabs: TABLE_TABS };
+}
+
+/** The closed backtests of the strategy as tab items, the newest first: the items of the "Closed backtests" menu. */
+export function listClosedBacktestTabs(
+  backtests: readonly Backtest[],
+  strategyId: number | null,
+  closedIds: ReadonlySet<number>,
+): ResultTabItem[] {
+  return selectStrategyBacktests(backtests, strategyId)
+    .filter((backtest) => closedIds.has(backtest.id))
+    .map(describeBacktestTab);
+}
+
+/** The empty text of the results panel: "No open backtests" when the strategy has backtests and all tabs are closed. */
+export function describeNoBacktestText(backtests: readonly Backtest[], strategyId: number | null): string {
+  return selectStrategyBacktests(backtests, strategyId).length > 0 ? 'No open backtests' : 'No backtests';
 }
 
 /** The stored closed tabs. A missing or damaged value gives no closed tabs; a wrong ID is left out. */
@@ -174,6 +192,31 @@ export function closeBacktestTab(closed: ClosedBacktestTabs, strategyId: number,
   const strategyKey = String(strategyId);
   const ids = closed[strategyKey] ?? [];
   return ids.includes(backtestId) ? closed : { ...closed, [strategyKey]: [...ids, backtestId] };
+}
+
+export function reopenBacktestTab(closed: ClosedBacktestTabs, strategyId: number, backtestId: number): ClosedBacktestTabs {
+  const strategyKey = String(strategyId);
+  const ids = closed[strategyKey] ?? [];
+  return ids.includes(backtestId) ? { ...closed, [strategyKey]: ids.filter((id) => id !== backtestId) } : closed;
+}
+
+export function reopenAllBacktestTabs(closed: ClosedBacktestTabs, strategyId: number): ClosedBacktestTabs {
+  return { ...closed, [String(strategyId)]: [] };
+}
+
+/**
+ * A backtest that opens from elsewhere (the "Closed backtests" menu, a new backtest, a backtest that ends): its tab
+ * opens again and is selected.
+ */
+export function openBacktestTab(
+  closed: ClosedBacktestTabs,
+  strategyId: number,
+  backtestId: number,
+): { closed: ClosedBacktestTabs; selection: ResultSelection } {
+  return {
+    closed: reopenBacktestTab(closed, strategyId, backtestId),
+    selection: { tab: createBacktestTab(backtestId), backtestId },
+  };
 }
 
 export function findClosedBacktestIds(closed: ClosedBacktestTabs, strategyId: number | null): ReadonlySet<number> {

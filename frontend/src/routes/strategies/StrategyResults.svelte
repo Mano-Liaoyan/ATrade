@@ -25,11 +25,13 @@
     /** The backtest of the tab, or of Trades, Orders, and Logs. Null when the strategy has no backtest. */
     backtest: Backtest | null;
     tab: ResultTab;
+    /** The text without a backtest: "No backtests", or "No open backtests" when all backtest tabs are closed. */
+    emptyText: string;
     /** Sends the error of a failed backtest to the AI assistant. */
     onAskAssistant: (backtestId: number) => void;
   }
 
-  const { backtest, tab, onAskAssistant }: Props = $props();
+  const { backtest, tab, emptyText, onAskAssistant }: Props = $props();
 
   let detail = $state<BacktestDetail | null>(null);
   let detailMessage = $state('');
@@ -64,7 +66,7 @@
 </script>
 
 {#if backtest === null}
-  <EmptyText text="No backtests" />
+  <EmptyText text={emptyText} />
 {:else if detailMessage !== ''}
   <InlineNotification kind="error" title="Backtest not read" subtitle={detailMessage} lowContrast />
 {:else if shownDetail !== null}

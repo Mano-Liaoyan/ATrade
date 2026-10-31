@@ -31,6 +31,8 @@
     fixedItems?: readonly { value: string; label: string }[];
     /** Closes a tab of `items` (Tabs `onCloseItem`). */
     onCloseItem?: (value: string) => void;
+    /** Content between the strip of `items` and the `fixedItems` (Tabs `stripEnd`). */
+    stripEnd?: Snippet;
   }
 </script>
 
@@ -121,6 +123,7 @@
       itemLabel={tabs.itemLabel}
       fixedItems={tabs.fixedItems}
       onCloseItem={tabs.onCloseItem}
+      stripEnd={tabs.stripEnd}
       onSelectedTabClick={hasStatusBar ? onToggleMinimized : undefined}
       size="sm"
       lineClass="atrade-panel-header"

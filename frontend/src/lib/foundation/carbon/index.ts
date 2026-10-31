@@ -18,6 +18,7 @@ export { default as ContentSwitcher, type ContentSwitcherItem } from './ContentS
 export { default as Dialog } from './Dialog.svelte';
 export { default as Popover } from './Popover.svelte';
 export { default as MenuButton, type MenuButtonItem } from './MenuButton.svelte';
+export { default as IconMenuButton, type IconMenuItem } from './IconMenuButton.svelte';
 export type { ButtonKind, ButtonSize } from './carbon_state';
 export { default as Icon } from './Icon.svelte';
 export { default as IconButton, type IconTone } from './IconButton.svelte';
