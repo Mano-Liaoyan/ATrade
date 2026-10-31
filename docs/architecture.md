@@ -1652,7 +1652,8 @@ Source: [Test method](https://github.com/Mano-Liaoyan/ATrade/issues/39).
 - Not in CI: `ibkr_paper`.
 - `.github/workflows/ci.yml` runs `./scripts/check backend`,
   `./scripts/check frontend`, `./scripts/check assistant`, and
-  `./scripts/check e2e` as 4 jobs. The backend
+  `./scripts/check e2e` in separate jobs. The end-to-end tests run as 12
+  jobs: 4 browsers, each in 3 shards (`ATRADE_PLAYWRIGHT_SHARD`). The backend
   and end-to-end jobs use a `postgres:18.3` service container. Local runs use
   the same script. Without `ATRADE_TEST_DATABASE_URL`, the script starts a
   temporary PostgreSQL container.
