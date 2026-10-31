@@ -18,6 +18,7 @@ import {
   SCREEN_DEFINITION,
   SCREEN_LIST,
   SOURCE_SCREEN,
+  STRATEGY_TRACEBACK,
   SCREEN_SUMMARY,
   screenRow,
   startFakeWebPort,
@@ -155,6 +156,24 @@ describe('the strategy and backtest tools', () => {
     expect(summary.trade_count_total).toBe(60);
     expect(summary.trades).toHaveLength(50);
     expect(summary.metrics).toEqual({ final_equity_usd: '10500', trade_count: 60 });
+  });
+
+  test('read_backtest and list_backtests give the last error line of a failed backtest as error_summary', async () => {
+    web.backtestStatuses = ['failed'];
+    web.backtestList = [backtestBody(12, 'failed'), backtestBody(11, 'finished')];
+    const conversations = await openConversations([
+      call('list_backtests'),
+      call('read_backtest', { backtest_id: 12 }),
+      { text: 'Read.' },
+    ]);
+
+    await runOnce(conversations);
+
+    const [listed, read] = readToolResults() as [Record<string, unknown>[], Record<string, unknown>];
+    const lastLine = "AttributeError: 'MovingAverageStrategy' object has no attribute 'id'";
+    expect(listed[0]).toEqual(expect.objectContaining({ id: 12, error_summary: lastLine }));
+    expect(listed[1]).not.toHaveProperty('error_summary');
+    expect(read).toEqual(expect.objectContaining({ id: 12, error_message: STRATEGY_TRACEBACK, error_summary: lastLine }));
   });
 
   test('save_strategy_version gives the problem list to the model, and the next save is announced', async () => {

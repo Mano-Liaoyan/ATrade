@@ -453,7 +453,12 @@ export interface paths {
         get: operations["read_backtest_api_backtests__backtest_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Backtest
+         * @description A true delete (section 10.5). 409 while the backtest is queued or running, for a sweep run, and for the
+         *     same-period backtest of a forward test.
+         */
+        delete: operations["delete_backtest_api_backtests__backtest_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -4622,6 +4627,53 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_backtest_api_backtests__backtest_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

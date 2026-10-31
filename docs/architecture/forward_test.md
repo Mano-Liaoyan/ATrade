@@ -578,9 +578,13 @@ null when free), `start_balance_usd`, `error_message`, `created_at_utc`,
 `3e7a1c5d9b77_forward_test_recovery_and_end_time.py`.
 
 `forward_test_same_period_backtest`: `forward_test_id`, `backtest_id`
-(both foreign keys with `ON DELETE CASCADE`, primary key on both). One row
-for each "Backtest the same period". Migration
-`3e7a1c5d9b79_forward_test_create_same_period_backtest.py`.
+(foreign keys, primary key on both). One row for each "Backtest the same
+period". Migration `3e7a1c5d9b79_forward_test_create_same_period_backtest.py`.
+`forward_test_id` has `ON DELETE CASCADE`. `backtest_id` has `ON DELETE
+RESTRICT` (migration
+`e2b3fdd9c1ee_forward_test_same_period_backtest_restrict.py`), so
+`DELETE /api/backtests/{backtest_id}` refuses the same-period backtest of a
+forward test with `409` (backtest section 10.5).
 
 `forward_test_interruption` (#77): `id`, `forward_test_id`, `reason`
 (`crash`, `gateway`, `worker_restart`), `started_at_utc`, `ended_at_utc`

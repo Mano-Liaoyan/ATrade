@@ -1,6 +1,6 @@
 // Calls the backtest HTTP routes and turns each answer into a result that the backtest pages can show.
 import { describe, expect, it } from 'vite-plus/test';
-import { changeBacktestLimits, readBacktestLimits, startBacktest, type BacktestRequest } from './index';
+import { changeBacktestLimits, deleteBacktest, readBacktestLimits, startBacktest, type BacktestRequest } from './index';
 
 const REQUEST: BacktestRequest = {
   strategy_version_id: 7,
@@ -81,5 +81,29 @@ describe('backtest limits', () => {
     expect(sentMethod).toBe('PUT');
     expect(JSON.parse(sentBody)).toEqual({ timeout_seconds: 600, concurrency: 2 });
     expect(result).toEqual({ kind: 'ok', value: { timeout_seconds: 600, concurrency: 2 } });
+  });
+});
+
+describe('deleteBacktest', () => {
+  it('sends DELETE to the backtest and reports the delete', async () => {
+    let sent = '';
+    const recordingFetch: typeof fetch = (path, init) => {
+      sent = `${init?.method ?? 'GET'} ${typeof path === 'string' ? path : ''}`;
+      return Promise.resolve(new Response(null, { status: 204 }));
+    };
+
+    const result = await deleteBacktest(recordingFetch, 21);
+
+    expect(sent).toBe('DELETE /api/backtests/21');
+    expect(result).toEqual({ kind: 'deleted' });
+  });
+
+  it('gives the reason when the backend refuses the delete', async () => {
+    const refusingFetch: typeof fetch = () =>
+      Promise.resolve(new Response(JSON.stringify({ detail: 'Backtest #21 is running. Wait for its end.' }), { status: 409 }));
+
+    const result = await deleteBacktest(refusingFetch, 21);
+
+    expect(result).toEqual({ kind: 'failed', message: 'Backtest #21 is running. Wait for its end.' });
   });
 });

@@ -5,7 +5,10 @@
      `size` "sm" gives the 32px tab line of a workbench panel. `lineEnd` puts content (for example the panel buttons)
      at the end of the tab line, in a line with the class `lineClass`. `itemLabel` renders the text of a tab, for
      example a name with a ChangeText; without it, the tab shows its `label`. `onSelectedTabClick` runs when the user
-     clicks the tab that was already selected (or presses Enter or Space on it), for example to minimize a panel. -->
+     clicks the tab that was already selected (or presses Enter or Space on it), for example to minimize a panel.
+     With `fixedItems`, the `items` are in a strip that scrolls sideways with its own track along its top edge (HorizontalScrollTrack), and
+     the `fixedItems` stay visible at the end of the tab line. With `onCloseItem`, each tab of `items` has a Carbon
+     dismissable close button; the Delete key on the focused tab does the same. -->
 <script module lang="ts">
   export interface TabItem {
     value: string;
@@ -14,8 +17,11 @@
 </script>
 
 <script lang="ts">
+  import Close16 from '@carbon/icons/es/close/16.js';
   import { Tabs } from 'bits-ui';
   import type { Snippet } from 'svelte';
+  import { HorizontalScrollTrack } from '#lib/foundation/scroll_region';
+  import Icon from './Icon.svelte';
 
   interface Props {
     /** The accessible name of the tab list. */
@@ -31,6 +37,10 @@
     panel?: Snippet;
     itemLabel?: Snippet<[TabItem]>;
     onSelectedTabClick?: (value: string) => void;
+    /** Tabs that never scroll away, after the scrolling strip of `items`. */
+    fixedItems?: readonly TabItem[];
+    /** Closes a tab of `items`. The parent removes it from `items`. */
+    onCloseItem?: (value: string) => void;
   }
 
   const {
@@ -46,7 +56,27 @@
     panel,
     itemLabel,
     onSelectedTabClick,
+    fixedItems,
+    onCloseItem,
   }: Props = $props();
+
+  const stripId = $props.id();
+  let strip: HTMLDivElement | undefined = $state();
+  let stripContent: HTMLDivElement | undefined = $state();
+
+  // The selected tab of the strip scrolls into view, for example a new backtest tab or a tab chosen with the keys.
+  $effect(() => {
+    const selected = value;
+    const selectedTrigger = stripContent?.querySelector<HTMLElement>(`[data-tab-value="${CSS.escape(selected)}"]`);
+    selectedTrigger?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  });
+
+  function closeWithKey(event: KeyboardEvent, itemValue: string): void {
+    if (event.key === 'Delete' && onCloseItem !== undefined) {
+      event.preventDefault();
+      onCloseItem(itemValue);
+    }
+  }
 
   // The selected tab when the press starts. Bits UI selects a tab on focus, so at the click the pressed tab is always
   // selected.
@@ -76,29 +106,81 @@
   }
 </script>
 
+{#snippet trigger(item: TabItem, isClosable: boolean)}
+  <Tabs.Trigger
+    value={item.value}
+    class={['cds--tabs__nav-item', 'cds--tabs__nav-link', item.value === value && 'cds--tabs__nav-item--selected']}
+    data-tab-value={item.value}
+    onpointerdown={notePress}
+    onpointercancel={forgetPress}
+    onpointerleave={forgetPress}
+    onkeydown={(event: KeyboardEvent) => {
+      notePressKey(event);
+      if (isClosable) {
+        closeWithKey(event, item.value);
+      }
+    }}
+    onclick={() => {
+      clickTab(item.value);
+    }}
+  >
+    <div class="cds--tabs__nav-item-label-wrapper">
+      <span class="cds--tabs__nav-item-label">
+        {#if itemLabel === undefined}{item.label}{:else}{@render itemLabel(item)}{/if}
+      </span>
+    </div>
+  </Tabs.Trigger>
+  {#if isClosable}
+    <!-- Carbon dismissable tab: the close button follows its tab. Like Carbon, it is not in the Tab order; the Delete
+         key on the focused tab closes it. -->
+    <div class="cds--tabs__nav-item--close">
+      <button
+        type="button"
+        class={['cds--tabs__nav-item--close-icon', item.value === value && 'cds--tabs__nav-item--close-icon--selected']}
+        tabindex="-1"
+        aria-label={`Close ${item.label}`}
+        title={`Close ${item.label}`}
+        onclick={() => onCloseItem?.(item.value)}
+      >
+        <Icon icon={Close16} />
+      </button>
+    </div>
+  {/if}
+{/snippet}
+
 {#snippet tabList()}
-  <div class={['cds--tabs', contained && 'cds--tabs--contained', size === 'sm' && 'cds--layout--size-sm']}>
+  <div
+    class={[
+      'cds--tabs',
+      contained && 'cds--tabs--contained',
+      size === 'sm' && 'cds--layout--size-sm',
+      onCloseItem !== undefined && 'cds--tabs--dismissable',
+      fixedItems !== undefined && 'tabs--strip',
+    ]}
+  >
     <Tabs.List class="cds--tab--list" aria-label={label}>
-      {#each items as item (item.value)}
-        <Tabs.Trigger
-          value={item.value}
-          class={['cds--tabs__nav-item', 'cds--tabs__nav-link', item.value === value && 'cds--tabs__nav-item--selected']}
-          onpointerdown={notePress}
-          onpointercancel={forgetPress}
-          onpointerleave={forgetPress}
-          onkeydown={notePressKey}
-          onclick={() => {
-            clickTab(item.value);
-          }}
-        >
-          <div class="cds--tabs__nav-item-label-wrapper">
-            <span class="cds--tabs__nav-item-label">
-              {#if itemLabel === undefined}{item.label}{:else}{@render itemLabel(item)}{/if}
-            </span>
+      {#if fixedItems === undefined}
+        {#each items as item (item.value)}
+          {@render trigger(item, onCloseItem !== undefined)}
+        {/each}
+      {:else}
+        <div class="tab-strip" id={stripId} bind:this={strip}>
+          <div class="tab-strip__content" bind:this={stripContent}>
+            {#each items as item (item.value)}
+              {@render trigger(item, onCloseItem !== undefined)}
+            {/each}
           </div>
-        </Tabs.Trigger>
-      {/each}
+        </div>
+        <div class="tab-fixed">
+          {#each fixedItems as item (item.value)}
+            {@render trigger(item, false)}
+          {/each}
+        </div>
+      {/if}
     </Tabs.List>
+    {#if fixedItems !== undefined}
+      <HorizontalScrollTrack {label} viewport={strip} content={stripContent} viewportId={stripId} class="tab-strip__track" />
+    {/if}
   </div>
 {/snippet}
 
@@ -117,3 +199,56 @@
     </Tabs.Content>
   {/if}
 </Tabs.Root>
+
+<style>
+  /* The strip of `items` takes the free width of the tab line and scrolls sideways; the fixed tabs keep their width.
+     Carbon tokens only. */
+  .tabs--strip {
+    position: relative;
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  .tabs--strip :global(.cds--tab--list) {
+    display: flex;
+    inline-size: 100%;
+    overflow: visible;
+  }
+
+  .tab-strip {
+    flex: 1;
+    min-inline-size: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .tab-strip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab-strip__content {
+    display: flex;
+    block-size: 100%;
+    inline-size: max-content;
+  }
+
+  .tab-fixed {
+    display: flex;
+    flex: none;
+    border-inline-start: 1px solid var(--cds-border-subtle-01);
+  }
+
+  /* The fixed tabs have no close button: the normal Carbon end padding. */
+  .tabs--strip.cds--tabs--dismissable .tab-fixed :global(.cds--tabs__nav-link) {
+    padding-inline-end: var(--cds-layout-density-padding-inline-local);
+  }
+
+  /* The track is along the top edge of the strip, so the selected tab line at the bottom stays visible. */
+  .tabs--strip :global(.tab-strip__track) {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    z-index: 1;
+  }
+</style>

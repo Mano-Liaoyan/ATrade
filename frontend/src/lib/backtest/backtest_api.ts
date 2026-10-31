@@ -1,7 +1,13 @@
 // Calls the backtest HTTP routes (backend/src/atrade/backtest/http_routes.py).
 
 import type { components } from '#lib/api';
-import { requestJson as requestBackendJson, type RequestResult } from '#lib/foundation/http_request';
+import {
+  BACKEND_NOT_REACHABLE,
+  readErrorMessage,
+  requestJson as requestBackendJson,
+  sendRequest,
+  type RequestResult,
+} from '#lib/foundation/http_request';
 
 // The generated type makes the fields with a default required. Without `out_of_sample_share`, the route uses 30.
 export type BacktestRequest = Omit<components['schemas']['StartBacktestRequest'], 'out_of_sample_share'> & {
@@ -54,6 +60,21 @@ export function startBacktest(fetchFunction: typeof fetch, request: BacktestRequ
 
 export function listBacktests(fetchFunction: typeof fetch): Promise<RequestResult<Backtest[]>> {
   return requestJson(fetchFunction, BACKTESTS_PATH);
+}
+
+export type DeleteBacktestResult = { kind: 'deleted' } | { kind: 'failed'; message: string };
+
+/** A true delete. The backend refuses a queued or running backtest, a sweep run, and the same-period backtest of a
+ * forward test (409 with the reason). */
+export async function deleteBacktest(fetchFunction: typeof fetch, backtestId: number): Promise<DeleteBacktestResult> {
+  const response = await sendRequest(fetchFunction, `${BACKTESTS_PATH}/${String(backtestId)}`, { method: 'DELETE' });
+  if (response === null) {
+    return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
+  }
+  if (!response.ok) {
+    return { kind: 'failed', message: await readErrorMessage(response, FAILED_ACTION) };
+  }
+  return { kind: 'deleted' };
 }
 
 export function readBacktest(fetchFunction: typeof fetch, backtestId: number): Promise<RequestResult<BacktestDetail>> {

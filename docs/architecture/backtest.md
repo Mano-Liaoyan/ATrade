@@ -134,7 +134,10 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
 - Because of the `strategy_version_id` foreign key, a strategy that a
   backtest uses cannot be deleted (section 9.1).
 - Rows of the result tables are deleted with their backtest
-  (`ON DELETE CASCADE`). This stage has no route that deletes a backtest.
+  (`ON DELETE CASCADE`). `DELETE /api/backtests/{backtest_id}` deletes a
+  backtest (section 10.5). `forward_test_same_period_backtest` refuses
+  the delete of its backtests (`ON DELETE RESTRICT`, forward test section
+  12.10).
 
 ### 10.2.1 New columns and tables
 
@@ -345,6 +348,7 @@ clock, exchange_rate_reader)`, `BacktestRunner(*, database_url, clock, process_c
 | `PUT /api/backtest-limits` | Body `{"timeout_seconds", "concurrency"}`. `200` with the saved limits. `422` when `timeout_seconds` is not from 1 to 604800 or `concurrency` is not from 1 to 16. |
 | `GET /api/us-universe/range` | `200` with `{"first_day_utc", "last_day_utc"}`: the first and the last quarter start in `us_universe_member`. Both are null without universe data. Done in #200 (section 10.10.6). |
 | `GET /api/backtests/{backtest_id}` | `200` with the backtest, `equity_curve` (`[{"time_utc", "equity_usd"}]`), and `trades`. `404` when the backtest does not exist. |
+| `DELETE /api/backtests/{backtest_id}` | A true delete of the backtest and its result rows. `204` when deleted. `404` when the backtest does not exist. `409` with the reason: "Backtest #<id> is queued. Wait for its end." (or running), "Backtest #<id> is a run of sweep #<sweep id>. Delete the sweep.", or "Backtest #<id> is the same-period backtest of a forward test." (the foreign key refuses the delete, so `backtest` does not read the forward test table). AI assistant conversations and their metric cards do not block the delete: the card of a deleted backtest reads `404`. Only port 8000 has this route; port 8001 does not (assistant section 25.3.3). |
 | `GET /api/backtests/{backtest_id}/comparison/{other_backtest_id}` | `200` with `{"strategy_id", "strategy_name", "first", "second"}`. `first` and `second` are the two backtests as `GET /api/backtests/{backtest_id}` gives them, each with the `code` of its strategy version. `422` when the two backtests use different strategies, or when the two IDs are the same. `404` when a backtest does not exist. Section 10.7. |
 
 A backtest has `id`, `strategy_version_id`, `strategy_id`, `strategy_name`,
@@ -473,13 +477,20 @@ section 9.5.
   Carbon selected row color, and a click on a row opens its backtest. The
   columns have fixed widths, and a long strategy name ends with an ellipsis.
   The list is in a `ScrollRegion` that fills the side column.
-- Each row has a check box. When 2 or more rows are checked, the Carbon batch
-  action bar shows above the list with "Compare" and "Cancel".
+- Each row has a check box. When a row is checked, the Carbon batch action
+  bar shows above the list with "Delete" and "Cancel". When 2 or more rows
+  are checked, it also has "Compare".
   `checkComparisonSelection()` of `#lib/backtest` accepts exactly 2
   backtests of the same strategy. For other selections, Compare is disabled
   and the status "Comparison selection" gives the reason. The backend route
   applies the same rule (section 10.5), so a typed URL with different
   strategies shows the refusal.
+- "Delete" opens a danger `Dialog` with only the title ("Delete backtest
+  #<id>?" or "Delete <n> backtests?") and the buttons "Cancel" and "Delete
+  backtest" (or "Delete backtests"). It sends `DELETE /api/backtests/{id}`
+  for each checked backtest. The reason of each refusal shows in an inline
+  notification ("Backtest not deleted") above the list. When the open
+  backtest is deleted, `/backtests` opens the newest backtest that is left.
 - Two backtests of the same strategy version are also accepted. They can
   differ in the instrument, the period, or the paper capital. Their code diff
   is empty.

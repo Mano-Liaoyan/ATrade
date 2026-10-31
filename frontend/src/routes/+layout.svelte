@@ -1,24 +1,22 @@
-<!-- App shell: the Carbon UI shell header (product name, page navigation, the server clock, the backend status icon,
-     the IB Gateway status icon, the Paper tag, the command palette, the theme button, and the Log out button behind
-     Cloudflare Access) and the main region for each page. -->
+<!-- App shell: the Carbon UI shell header (product name, page navigation, the Paper tag, a divider, then the header
+     actions: the Connections button, the command palette, the theme button, and the Log out button behind Cloudflare
+     Access) and the main region for each page. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import {
-    describeBackendHealth,
     fetchBackendHealth,
     readServerClock,
     SERVER_TIME_TICK_MILLISECONDS,
     type BackendHealth,
   } from '#lib/foundation/backend_health';
   import { LogOutButton } from '#lib/foundation/access_session';
-  import { StatusIcon, Tag, Tooltip, TooltipProvider } from '#lib/foundation/carbon';
+  import { Tag, Tooltip, TooltipProvider } from '#lib/foundation/carbon';
   import { ThemeButton } from '#lib/foundation/color_scheme';
   import { CommandPalette } from '#lib/foundation/command_palette';
   import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import {
-    describeGatewayStatus,
     fetchGatewayStatus,
     GATEWAY_STATUS_REFRESH_MILLISECONDS,
     type GatewayStatus,
@@ -30,6 +28,8 @@
     type PaperAccountCheck,
   } from '#lib/paper_trading';
   import { listWatchlist, type WatchlistInstrument } from '#lib/watchlist';
+  import HeaderConnections from './HeaderConnections.svelte';
+  import { summarizeConnections } from './header_connections';
   import { createPaletteCommandGroups } from './palette_commands';
 
   const { children }: { children: Snippet } = $props();
@@ -51,9 +51,8 @@
   let nowMilliseconds = $state(Date.now());
   let paletteWatchlist: WatchlistInstrument[] = $state([]);
   let paletteWatchlistReading = $state(false);
-  const backendDescription = $derived(describeBackendHealth(backendHealth));
   const serverClock = $derived(readServerClock(backendHealth, nowMilliseconds));
-  const gatewayDescription = $derived(describeGatewayStatus(gatewayStatus));
+  const connections = $derived(summarizeConnections(backendHealth, gatewayStatus, serverClock));
   const paletteCommandGroups = $derived(createPaletteCommandGroups(paletteWatchlist));
 
   // The palette reads the watchlist each time it opens, so it shows the instruments that the user added since.
@@ -137,23 +136,13 @@
       </ul>
     </nav>
     <div class="cds--header__global app-header-global">
-      {#if serverClock !== null}
-        <span class="app-header-clock" role="timer" aria-label="Server time">{serverClock}</span>
-      {/if}
-      <!-- Each status is an icon alone. Its tooltip and accessible name give the full status. -->
-      <span class="app-header-statuses">
-        <span role="status" aria-label="Backend status">
-          <StatusIcon kind={backendDescription.kind} label={backendDescription.text} align="bottom-end" />
-        </span>
-        <span role="status" aria-label="IB Gateway status">
-          <StatusIcon kind={gatewayDescription.kind} label={gatewayDescription.text} align="bottom-end" />
-        </span>
-      </span>
       <Tooltip text={describePaperAccountTag(paperAccountCheck)} align="bottom-end">
         {#snippet trigger({ props })}
           <Tag {...props} label="Paper" kind="blue" operational />
         {/snippet}
       </Tooltip>
+      <span class="app-header-divider" aria-hidden="true"></span>
+      <HeaderConnections {connections} />
       <CommandPalette groups={paletteCommandGroups} onOpen={readPaletteWatchlist} busy={paletteWatchlistReading} />
       <ThemeButton />
       <LogOutButton />
@@ -170,26 +159,29 @@
     display: block;
   }
 
+  /* The Paper tag, a divider, then the header actions side by side without gaps. */
   .app-header-global {
     align-items: center;
-    gap: var(--cds-spacing-05);
     min-inline-size: 0;
-    padding-inline: var(--cds-spacing-05);
+    padding-inline-start: var(--cds-spacing-05);
   }
 
-  /* The two 32px status icons stand side by side. */
-  .app-header-statuses {
-    display: inline-flex;
+  /* ATrade header actions are 40px cells (Carbon uses 48px), so the icon buttons after the divider sit close. */
+  .app-header-global :global(.cds--header__action) {
+    inline-size: var(--cds-spacing-08);
   }
 
-  .app-header-clock {
-    font-family: var(--cds-code-01-font-family);
-    font-size: var(--cds-code-01-font-size);
-    line-height: var(--cds-code-01-line-height);
-    letter-spacing: var(--cds-code-01-letter-spacing);
-    color: var(--cds-text-secondary);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
+  .app-header-divider {
+    inline-size: 1px;
+    block-size: var(--cds-spacing-06);
+    margin-inline: var(--cds-spacing-04) var(--cds-spacing-03);
+    background: var(--cds-border-subtle);
+  }
+
+  /* A header tooltip is the light Carbon high-contrast bubble. On the light page, the Carbon popover drop shadow
+     separates it from the page background. */
+  .app-header-global :global(.cds--popover--high-contrast .cds--popover) {
+    filter: var(--cds-popover-drop-shadow, drop-shadow(0 var(--cds-spacing-01) var(--cds-spacing-01) rgb(0 0 0 / 20%)));
   }
 
   /* The page heading of each document page. A workbench gives its headings their own style. */

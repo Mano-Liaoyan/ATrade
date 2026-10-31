@@ -36,8 +36,14 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
-  import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
-  import { Dialog, Icon, IconButton, InlineNotification, Select, Toggle } from '#lib/foundation/carbon';
+  import {
+    describeBacktestStatus,
+    findBacktestStatusKind,
+    isFinalStatus,
+    listBacktests,
+    type Backtest,
+  } from '#lib/backtest';
+  import { Dialog, Icon, IconButton, InlineNotification, Select, StatusIndicator, Toggle } from '#lib/foundation/carbon';
   import { CodeDiff, CodeEditor } from '#lib/foundation/code_editor';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
@@ -90,12 +96,16 @@
   import RulesTab from './RulesTab.svelte';
   import StrategyResults from './StrategyResults.svelte';
   import {
+    CLOSED_BACKTEST_TABS_STORAGE_KEY,
+    closeBacktestTab,
     createBacktestTab,
     createOutputLine,
     describeBacktestEvent,
+    describeFixRequest,
     describeProblemCounts,
     describeShortcut,
     describeSwapButton,
+    findClosedBacktestIds,
     findDefaultVersionNumber,
     findFinishedBacktest,
     findRunningForwardTest,
@@ -104,6 +114,7 @@
     listVersionItems,
     listWorkbenchPanels,
     PANE_ORDER_STORAGE_KEY,
+    readClosedBacktestTabs,
     readPaneOrder,
     readWorkbenchShortcut,
     resolveResultTab,
@@ -158,6 +169,8 @@
   let backtestReadCount = $state(0);
   let selection = $state<ResultSelection>({ tab: null, backtestId: null });
   let paneOrder = $state<PaneOrder>(readPaneOrder(readStoredLayout(PANE_ORDER_STORAGE_KEY)));
+  // The closed backtest tabs of each strategy. A closed tab is only hidden on this page; the backtest stays.
+  let closedBacktestTabs = $state(readClosedBacktestTabs(readStoredLayout(CLOSED_BACKTEST_TABS_STORAGE_KEY)));
   let isStoppingForwardTest = $state(false);
   let isNewStrategyDialogOpen = $state(false);
   let isDeleteDialogOpen = $state(false);
@@ -179,8 +192,10 @@
   });
 
   const activeStrategyId = $derived(strategyId ?? strategies[0]?.id ?? null);
-  const resultTabs = $derived(listResultTabs(backtests, activeStrategyId));
-  const shownResult = $derived(resolveResultTab(selection, backtests, activeStrategyId));
+  const closedBacktestIds = $derived(findClosedBacktestIds(closedBacktestTabs, activeStrategyId));
+  const resultTabs = $derived(listResultTabs(backtests, activeStrategyId, closedBacktestIds));
+  const allResultTabs = $derived([...resultTabs.backtestTabs, ...resultTabs.tableTabs]);
+  const shownResult = $derived(resolveResultTab(selection, backtests, activeStrategyId, closedBacktestIds));
   const shownBacktest = $derived(backtests.find((backtest) => backtest.id === shownResult.backtestId) ?? null);
   const runningBacktest = $derived(
     selectStrategyBacktests(backtests, activeStrategyId).find((backtest) => !isFinalStatus(backtest.status)) ?? null,
@@ -538,8 +553,26 @@
 
   function selectResultTab(value: string): void {
     const tab = value as ResultTab;
-    const backtestId = resultTabs.find((item) => item.value === tab)?.backtestId ?? null;
+    const backtestId = allResultTabs.find((item) => item.value === tab)?.backtestId ?? null;
     selection = { tab, backtestId: backtestId ?? shownResult.backtestId };
+  }
+
+  function closeResultTab(value: string): void {
+    const backtestId = resultTabs.backtestTabs.find((item) => item.value === value)?.backtestId ?? null;
+    if (backtestId === null || activeStrategyId === null) {
+      return;
+    }
+    closedBacktestTabs = closeBacktestTab(closedBacktestTabs, activeStrategyId, backtestId);
+    writeStoredLayout(CLOSED_BACKTEST_TABS_STORAGE_KEY, closedBacktestTabs);
+  }
+
+  // "Ask AI to fix": the AI assistant reads the error itself (read_backtest). Without an open conversation the message
+  // stays in the message input of the AI assistant column, so the user can send it.
+  function askAssistantToFix(backtestId: number): void {
+    assistantSession.text = describeFixRequest(backtestId);
+    if (assistantSession.connection === 'open') {
+      assistantSession.send();
+    }
   }
 
   function openNewStrategyDialog(): void {
@@ -572,13 +605,17 @@
 <svelte:window onkeydown={runShortcut} />
 
 {#snippet resultTabLabel(item: { value: string; label: string })}
-  {@const tab = resultTabs.find((candidate) => candidate.value === item.value)}
-  {#if tab === undefined || tab.changeText === ''}
+  {@const tab = allResultTabs.find((candidate) => candidate.value === item.value)}
+  {#if tab === undefined || tab.status === null}
     {item.label}
   {:else}
+    <!-- A status icon in front of the name, with no status word: its name and tooltip give the status. -->
     <span class="result-tab-label">
+      <StatusIndicator kind={findBacktestStatusKind(tab.status)} label={describeBacktestStatus(tab.status)} iconOnly />
       {tab.name}
-      <ChangeText value={tab.change} text={tab.changeText} />
+      {#if tab.changeText !== ''}
+        <ChangeText value={tab.change} text={tab.changeText} />
+      {/if}
     </span>
   {/if}
 {/snippet}
@@ -691,13 +728,15 @@
               label="Results"
               tabs={{
                 label: 'Results',
-                items: resultTabs,
+                items: resultTabs.backtestTabs,
+                fixedItems: resultTabs.tableTabs,
                 value: shownResult.tab,
                 onValueChange: selectResultTab,
+                onCloseItem: closeResultTab,
                 itemLabel: resultTabLabel,
               }}
             >
-              <StrategyResults backtest={shownBacktest} tab={shownResult.tab} />
+              <StrategyResults backtest={shownBacktest} tab={shownResult.tab} onAskAssistant={askAssistantToFix} />
             </Panel>
           {:else if id === 'editor'}
             <Panel

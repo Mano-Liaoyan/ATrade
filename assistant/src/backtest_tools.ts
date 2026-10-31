@@ -6,6 +6,7 @@
 // - A `screen` universe without a rebalance period rebalances each quarter. Each result of a fixed `list` universe
 //   has the survivorship bias warning.
 // - read_backtest returns the backtest with a summary of the equity curve and of the trades.
+// - read_backtest and list_backtests add `error_summary`, the last line of the error message, to a failed backtest.
 import type { AgentToolUpdateCallback } from '@earendil-works/pi-coding-agent';
 import { answerResult, errorResult, isSuccess, textResult, type ToolDetails, type ToolResult } from './tool_results.ts';
 import type { WebPortAnswer, WebPortClient } from './web_port_client.ts';
@@ -58,11 +59,36 @@ export function spreadSample<T>(items: readonly T[], count: number): T[] {
   return Array.from({ length: count }, (_unused, index) => items[Math.round(index * step)] as T);
 }
 
-/** The read_backtest content: all fields, the equity curve as at most 50 points, and the first 50 trades. */
+/** The last line of an error message that is not empty, for example the exception line of a traceback. */
+export function findErrorSummary(errorMessage: unknown): string | null {
+  if (typeof errorMessage !== 'string') {
+    return null;
+  }
+  return errorMessage.split('\n').findLast((line) => line.trim() !== '')?.trim() ?? null;
+}
+
+/** A backtest with `error_summary` when it has an error message (docs/architecture/assistant.md 25.4.1). */
+export function addErrorSummary<T extends Record<string, unknown>>(backtest: T): T & { error_summary?: string } {
+  const summary = findErrorSummary(backtest.error_message);
+  return summary === null ? backtest : { ...backtest, error_summary: summary };
+}
+
+/** The list_backtests content: the list of GET /api/backtests, each failed backtest with `error_summary`. */
+export function summarizeBacktestList(body: unknown): unknown {
+  if (!Array.isArray(body)) {
+    return body;
+  }
+  return body.map((item: unknown) =>
+    typeof item === 'object' && item !== null ? addErrorSummary(item as Record<string, unknown>) : item,
+  );
+}
+
+/** The read_backtest content: all fields, the equity curve as at most 50 points, the first 50 trades, and
+ * `error_summary` of a failed backtest. */
 export function summarizeBacktest(body: DetailBody): Record<string, unknown> {
   const { equity_curve: equityCurve = [], trades = [], ...backtest } = body;
   return {
-    ...backtest,
+    ...addErrorSummary(backtest),
     equity_curve_point_count: equityCurve.length,
     equity_curve: spreadSample(equityCurve, MAX_EQUITY_POINTS),
     trade_count_total: trades.length,

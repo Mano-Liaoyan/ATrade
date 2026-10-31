@@ -15,6 +15,7 @@ export { checkComparisonSelection, type ComparisonSelection } from './backtest_c
 export {
   changeBacktestLimits,
   compareBacktests,
+  deleteBacktest,
   listBacktests,
   readBacktestLimits,
   readBacktest,
@@ -30,6 +31,7 @@ export {
   type BacktestRequest,
   type BacktestStatus,
   type BacktestTrade,
+  type DeleteBacktestResult,
   type EquityPoint,
   type RequestResult,
   type UniverseInstrument,
@@ -52,6 +54,7 @@ export {
   convertTimeoutMinutesToSeconds,
   describeBacktestStatus,
   findBacktestStatusKind,
+  findErrorSummary,
   formatMaxDrawdown,
   formatPercent,
   formatTimeoutMinutes,

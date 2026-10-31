@@ -34,6 +34,11 @@ export function findBacktestStatusKind(status: BacktestStatus): StatusKind {
   return STATUS_KINDS[status];
 }
 
+/** The last line of an error message that is not empty, for example the exception line of a traceback. */
+export function findErrorSummary(errorMessage: string | null): string {
+  return (errorMessage ?? '').split('\n').findLast((line) => line.trim() !== '')?.trim() ?? '';
+}
+
 export function isFinalStatus(status: BacktestStatus): boolean {
   return FINAL_STATUSES.includes(status);
 }

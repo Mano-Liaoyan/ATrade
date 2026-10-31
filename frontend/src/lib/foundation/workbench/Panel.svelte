@@ -27,6 +27,10 @@
     onValueChange: (value: string) => void;
     /** The text of a tab (Tabs `itemLabel`), for example a name with a ChangeText. */
     itemLabel?: Snippet<[{ value: string; label: string }]>;
+    /** Tabs that never scroll away; then `items` scroll in a strip (Tabs `fixedItems`). */
+    fixedItems?: readonly { value: string; label: string }[];
+    /** Closes a tab of `items` (Tabs `onCloseItem`). */
+    onCloseItem?: (value: string) => void;
   }
 </script>
 
@@ -115,6 +119,8 @@
       value={tabs.value}
       onValueChange={selectTab}
       itemLabel={tabs.itemLabel}
+      fixedItems={tabs.fixedItems}
+      onCloseItem={tabs.onCloseItem}
       onSelectedTabClick={hasStatusBar ? onToggleMinimized : undefined}
       size="sm"
       lineClass="atrade-panel-header"

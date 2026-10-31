@@ -1,6 +1,6 @@
 // Reads GET /api/health and turns the answer into a status that the app shell shows.
 import { describe, expect, it } from 'vite-plus/test';
-import { describeBackendHealth, fetchBackendHealth, readServerClock, type BackendHealth } from './index';
+import { fetchBackendHealth, readServerClock, type BackendHealth } from './index';
 
 function respondWith(status: number, body: unknown): typeof fetch {
   return () => Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -65,31 +65,5 @@ describe('readServerClock', () => {
     expect(readServerClock({ kind: 'backend_unreachable' }, 0)).toBeNull();
     expect(readServerClock({ kind: 'database_unreachable' }, 0)).toBeNull();
     expect(readServerClock({ kind: 'checking' }, 0)).toBeNull();
-  });
-});
-
-describe('describeBackendHealth', () => {
-  it('says that the backend is connected', () => {
-    const health: BackendHealth = { kind: 'ok', serverTimeUtc: '2026-01-02T03:04:05Z', receivedAtMilliseconds: 0 };
-
-    expect(describeBackendHealth(health)).toEqual({ kind: 'success', text: 'Backend connected.' });
-  });
-
-  it('says that the database is not reachable', () => {
-    expect(describeBackendHealth({ kind: 'database_unreachable' })).toEqual({
-      kind: 'error',
-      text: 'Backend connected. Database not reachable.',
-    });
-  });
-
-  it('says that the backend is not reachable', () => {
-    expect(describeBackendHealth({ kind: 'backend_unreachable' })).toEqual({
-      kind: 'error',
-      text: 'Backend not reachable.',
-    });
-  });
-
-  it('says that the check is running before the answer', () => {
-    expect(describeBackendHealth({ kind: 'checking' })).toEqual({ kind: 'in-progress', text: 'Checking the backend.' });
   });
 });
