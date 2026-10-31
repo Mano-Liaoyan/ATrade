@@ -21,7 +21,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import read_order_source
 from atrade.ibkr import Execution, GatewayConnection, GatewayRequestError, OpenOrder, OrderSide
-from atrade.paper_trading import manual_order_store, owner_ledger_store
+from atrade.paper_trading import manual_order_store, owner_ledger_store, split_check_store
 from atrade.paper_trading.owner_ledger_store import BY_HAND, LedgerEntry, Owner, OwnerPosition
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
 
@@ -32,7 +32,7 @@ LAST_CLOSE_DAYS = 10
 CENT = Decimal("0.01")
 BOUGHT_SIDE = "BOT"
 
-type LedgerRule = Literal["sell_more_than_position", "buy_more_than_cash", "ledger_not_started"]
+type LedgerRule = Literal["sell_more_than_position", "buy_more_than_cash", "ledger_not_started", "split_check_needed"]
 
 
 @dataclass(frozen=True)
@@ -55,6 +55,21 @@ def format_quantity(quantity: Decimal) -> str:
 
 def format_usd(amount: Decimal) -> str:
     return f"{amount.quantize(CENT):f} USD"
+
+
+async def find_split_check_refusal(
+    connection: psycopg.AsyncConnection, account: str, instrument: Instrument
+) -> OrderRefusal | None:
+    """No owner can send an order on an instrument in the "Split check needed" state (section 11.11)."""
+    split_checks = await split_check_store.select_split_checks(connection, account=account, status="needed")
+    if not any(split_check.instrument == instrument for split_check in split_checks):
+        return None
+    return OrderRefusal(
+        rule="split_check_needed",
+        detail=(
+            f"{instrument.symbol} needs a split check. Apply the split or keep the ledger on the paper trading page."
+        ),
+    )
 
 
 class ManualOrderLedger:
@@ -150,6 +165,10 @@ class ManualOrderLedger:
                 rule="ledger_not_started",
                 detail="The owner ledger has no start: the paper account has no cash value in USD yet.",
             )
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            split_check_refusal = await find_split_check_refusal(connection, account, order.instrument)
+        if split_check_refusal is not None:
+            return split_check_refusal
         open_orders = [
             open_order
             for open_order in await self.paper_account_monitor.gateway_connection.read_open_orders()

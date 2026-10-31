@@ -107,6 +107,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/paper-trading/stock-splits/{split_check_id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Split */
+        post: operations["apply_split_api_paper_trading_stock_splits__split_check_id__apply_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/paper-trading/stock-splits/{split_check_id}/keep-ledger": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Keep Ledger */
+        post: operations["keep_ledger_api_paper_trading_stock_splits__split_check_id__keep_ledger_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/paper-trading/paper-capital": {
         parameters: {
             query?: never;
@@ -1613,7 +1647,11 @@ export interface components {
             /** Same Period Backtests */
             same_period_backtests: components["schemas"]["ComparedBacktestSummaryResponse"][];
         };
-        /** ForwardTestFillResponse */
+        /**
+         * ForwardTestFillResponse
+         * @description A fill, or a stock split adjustment (section 12.16). A split adjustment has no price, the split ratio, and the
+         *     cash in lieu as `amount_usd`. `side` gives the direction of the share change.
+         */
         ForwardTestFillResponse: {
             /** Symbol */
             symbol: string;
@@ -1625,6 +1663,11 @@ export interface components {
              */
             time_utc: string;
             /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "fill" | "split_adjustment";
+            /**
              * Side
              * @enum {string}
              */
@@ -1632,9 +1675,13 @@ export interface components {
             /** Quantity Shares */
             quantity_shares: string;
             /** Price Usd */
-            price_usd: string;
+            price_usd: string | null;
             /** Commission Usd */
             commission_usd: string;
+            /** Amount Usd */
+            amount_usd: string;
+            /** Split Ratio */
+            split_ratio: string | null;
         };
         /**
          * ForwardTestInstrumentResponse
@@ -1697,6 +1744,8 @@ export interface components {
             interruptions: components["schemas"]["InterruptionResponse"][];
             /** Allocated Capital Usd */
             allocated_capital_usd: string | null;
+            /** Split Checks Needed */
+            split_checks_needed: components["schemas"]["SplitCheckNeededResponse"][];
         };
         /** @enum {string} */
         ForwardTestStatus: "starting" | "running" | "waiting_for_gateway" | "stopping" | "stopped" | "stop_failed" | "failed";
@@ -1849,7 +1898,7 @@ export interface components {
         };
         JsonValue: unknown;
         /** @enum {string} */
-        LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started";
+        LedgerRule: "sell_more_than_position" | "buy_more_than_cash" | "ledger_not_started" | "split_check_needed";
         LeftOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"];
         /** ManualOrderListResponse */
         ManualOrderListResponse: {
@@ -2010,6 +2059,25 @@ export interface components {
         };
         /** @enum {string} */
         OrderType: "MKT" | "LMT";
+        /** @enum {string} */
+        OwnerKind: "by_hand" | "forward_test";
+        /** OwnerMessage */
+        OwnerMessage: {
+            kind: components["schemas"]["OwnerKind"];
+            /** Forward Test Id */
+            forward_test_id: number | null;
+        };
+        /**
+         * OwnerPositionMessage
+         * @description The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).
+         */
+        OwnerPositionMessage: {
+            owner: components["schemas"]["OwnerMessage"];
+            /** Quantity */
+            quantity: string;
+            /** Average Cost */
+            average_cost: string | null;
+        };
         /**
          * PaperCapitalResponse
          * @description The default paper capital of the backtest form (docs/architecture.md section 10).
@@ -2433,6 +2501,33 @@ export interface components {
             /** Source Order */
             source_order: components["schemas"]["BarSource"][];
         };
+        /**
+         * SplitCheckNeededResponse
+         * @description An instrument of the forward test in the "Split check needed" state (paper_trading.md section 11.11).
+         */
+        SplitCheckNeededResponse: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+        };
+        /**
+         * SplitCheckResolvedResponse
+         * @description The split check after "Apply split" or "Keep ledger" (section 11.11).
+         */
+        SplitCheckResolvedResponse: {
+            /** Id */
+            id: number;
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            status: components["schemas"]["SplitCheckStatus"];
+        };
+        /** @enum {string} */
+        SplitCheckStatus: "needed" | "applied" | "kept";
         /** SplitMetricsResponse */
         SplitMetricsResponse: {
             in_sample: components["schemas"]["BacktestMetricsResponse"];
@@ -2569,6 +2664,12 @@ export interface components {
             source_order?: components["schemas"]["BarSource"][] | null;
             /** Grid */
             grid: components["schemas"]["GridEntry"][];
+        };
+        /** StockSplitAppliedResponse */
+        StockSplitAppliedResponse: {
+            split_check: components["schemas"]["SplitCheckResolvedResponse"];
+            /** Owners */
+            owners: components["schemas"]["OwnerPositionMessage"][];
         };
         /** StrategyListItem */
         StrategyListItem: {
@@ -3121,25 +3222,6 @@ export interface components {
             /** Orders */
             orders: components["schemas"]["OpenOrderResponse"][];
         };
-        /** @enum {string} */
-        OwnerKind: "by_hand" | "forward_test";
-        /** OwnerMessage */
-        OwnerMessage: {
-            kind: components["schemas"]["OwnerKind"];
-            /** Forward Test Id */
-            forward_test_id: number | null;
-        };
-        /**
-         * OwnerPositionMessage
-         * @description The part of an IBKR position that belongs to one owner in the owner ledger (section 11.10).
-         */
-        OwnerPositionMessage: {
-            owner: components["schemas"]["OwnerMessage"];
-            /** Quantity */
-            quantity: string;
-            /** Average Cost */
-            average_cost: string | null;
-        };
         /**
          * PaperAccountBalanceMessage
          * @description The balance in USD. The base currency values and the rate show what ATrade converted (section 11.9).
@@ -3215,6 +3297,7 @@ export interface components {
             owners: components["schemas"]["OwnerPositionMessage"][];
             /** Unattributed Quantity */
             unattributed_quantity: string;
+            split_check: components["schemas"]["SplitCheckMessage"] | null;
         };
         /**
          * PromptMessage
@@ -3298,6 +3381,23 @@ export interface components {
             market: string;
             definition: components["schemas"]["JsonValue"];
             previous_definition: components["schemas"]["JsonValue"];
+        };
+        /**
+         * SplitCheckMessage
+         * @description The "Split check needed" state of the instrument (section 11.11). `id` is the ID of the stock split routes.
+         *     `stock_split_id` is None when only the position shows the stock split.
+         */
+        SplitCheckMessage: {
+            /** Id */
+            id: number;
+            /** Stock Split Id */
+            stock_split_id: number | null;
+            /** Split Ratio */
+            split_ratio: string;
+            /** Account Quantity Before */
+            account_quantity_before: string;
+            /** Account Quantity After */
+            account_quantity_after: string;
         };
         /**
          * SteerMessage
@@ -3612,6 +3712,122 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ManualOrderListResponse"];
+                };
+            };
+        };
+    };
+    apply_split_api_paper_trading_stock_splits__split_check_id__apply_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                split_check_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockSplitAppliedResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+        };
+    };
+    keep_ledger_api_paper_trading_stock_splits__split_check_id__keep_ledger_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                split_check_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SplitCheckResolvedResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Bad Gateway */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderErrorResponse"];
                 };
             };
         };

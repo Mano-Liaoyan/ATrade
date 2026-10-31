@@ -60,9 +60,15 @@ from atrade.market_data.stock_split_change import (
     StockSplitChange,
     StockSplitConfirmedError,
     apply_stock_split,
+    apply_stock_split_in_transaction,
 )
-from atrade.market_data.stock_split_evidence import StockSplitCandidate, read_stock_split_candidates
+from atrade.market_data.stock_split_evidence import (
+    StockSplitCandidate,
+    read_stock_split_candidates,
+    record_stock_split_evidence,
+)
 from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, find_previous_trading_day
+from atrade.market_data.us_trading_days import is_trading_day as is_us_trading_day
 from atrade.market_data.us_universe import (
     UsUniverseCalculationError,
     UsUniverseMember,
@@ -107,6 +113,7 @@ __all__ = [
     "UsUniverseUpdate",
     "WaitingSplit",
     "apply_stock_split",
+    "apply_stock_split_in_transaction",
     "calculate_us_universe_history",
     "check_import_detections",
     "check_source_order",
@@ -116,6 +123,7 @@ __all__ = [
     "has_saved_bars",
     "import_databento_files",
     "import_databento_files_with_ibkr",
+    "is_us_trading_day",
     "list_hourly_purchases",
     "read_daily_bar_summaries",
     "read_daily_bar_summaries_before",
@@ -131,6 +139,7 @@ __all__ = [
     "read_unsaved_ranges",
     "read_us_universe_members",
     "read_us_universe_quarter_starts",
+    "record_stock_split_evidence",
     "save_received_bars",
     "save_received_bars_blocking",
     "save_us_universe",

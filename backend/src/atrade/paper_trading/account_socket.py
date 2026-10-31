@@ -18,6 +18,8 @@ from atrade.paper_trading.manual_order_ledger import ManualOrderLedger, find_own
 from atrade.paper_trading.owner_ledger_store import LedgerEntry, OwnerKind, sum_owner_cash_usd
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
 from atrade.paper_trading.paper_orders import OpenOrderResponse, read_open_orders_of_checked_account
+from atrade.paper_trading.split_check_store import SplitCheck
+from atrade.paper_trading.stock_split_ledger import read_needed_split_checks
 
 PAPER_TRADING_SOCKET_PATH = "/ws/paper-trading"
 PUSH_INTERVAL_SECONDS = 0.25
@@ -61,6 +63,17 @@ class OwnerPositionMessage(BaseModel):
     average_cost: Decimal | None
 
 
+class SplitCheckMessage(BaseModel):
+    """The "Split check needed" state of the instrument (section 11.11). `id` is the ID of the stock split routes.
+    `stock_split_id` is None when only the position shows the stock split."""
+
+    id: int
+    stock_split_id: int | None
+    split_ratio: Decimal
+    account_quantity_before: Decimal
+    account_quantity_after: Decimal
+
+
 class PositionMessage(BaseModel):
     symbol: str
     security_type: str
@@ -74,6 +87,7 @@ class PositionMessage(BaseModel):
     owners: list[OwnerPositionMessage]
     # The IBKR quantity minus the sum of the owner quantities. Not 0 shows as "Unattributed" (section 11.7).
     unattributed_quantity: Decimal
+    split_check: SplitCheckMessage | None
 
 
 class OpenOrdersMessage(BaseModel):
@@ -94,7 +108,22 @@ class PaperAccountMessage(BaseModel):
 PAPER_TRADING_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [PaperAccountMessage, OpenOrdersMessage, HeartbeatMessage]
 
 
-def convert_position(position: PortfolioPosition, entries: list[LedgerEntry] | None) -> PositionMessage:
+def convert_split_check(instrument: Instrument, split_checks: list[SplitCheck]) -> SplitCheckMessage | None:
+    for split_check in split_checks:
+        if split_check.instrument == instrument:
+            return SplitCheckMessage(
+                id=split_check.id,
+                stock_split_id=split_check.stock_split_id,
+                split_ratio=split_check.detected_ratio,
+                account_quantity_before=split_check.account_quantity_before,
+                account_quantity_after=split_check.account_quantity_after,
+            )
+    return None
+
+
+def convert_position(
+    position: PortfolioPosition, entries: list[LedgerEntry] | None, split_checks: list[SplitCheck]
+) -> PositionMessage:
     instrument = Instrument(symbol=position.symbol, exchange=position.exchange, currency=position.currency)
     owner_positions = [] if entries is None else find_owner_positions(entries, instrument)
     owners = [
@@ -118,6 +147,7 @@ def convert_position(position: PortfolioPosition, entries: list[LedgerEntry] | N
         unrealized_pnl=position.unrealized_pnl,
         owners=owners,
         unattributed_quantity=position.quantity - owned_quantity,
+        split_check=convert_split_check(instrument, split_checks),
     )
 
 
@@ -143,6 +173,12 @@ async def build_account_message(
     check = paper_account_monitor.read_check()
     balance = await paper_account_monitor.read_balance()
     entries = await read_ledger_entries(paper_account_monitor, ledger)
+    account_id = paper_account_monitor.read_checked_account_id()
+    split_checks = (
+        []
+        if account_id is None
+        else await read_needed_split_checks(database_url=ledger.database_url, account=account_id)
+    )
     balance_message = None
     if balance is not None:
         balance_message = PaperAccountBalanceMessage(
@@ -163,7 +199,9 @@ async def build_account_message(
             expected_account=check.expected_account,
         ),
         balance=balance_message,
-        positions=[convert_position(position, entries) for position in paper_account_monitor.read_positions()],
+        positions=[
+            convert_position(position, entries, split_checks) for position in paper_account_monitor.read_positions()
+        ],
         unattributed_cash_usd=find_unattributed_cash_usd(None if balance is None else balance.cash_usd, entries),
     )
 

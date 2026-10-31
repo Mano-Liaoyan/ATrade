@@ -27,10 +27,14 @@ const FAILED_CHECK_KINDS: Record<'disconnected' | 'failed', InstrumentOrderBlock
 };
 
 /**
- * Why the order panel cannot send an order, as a status, or null. The paper account check must pass. The backend
- * checks it again. Forward tests and orders by hand share the instruments (docs/architecture/forward_test.md 12.2).
+ * Why the order panel cannot send an order, as a status, or null. The paper account check must pass, and the
+ * instrument must not need a split check (docs/architecture/paper_trading.md 11.11). The backend checks both again.
+ * Forward tests and orders by hand share the instruments (docs/architecture/forward_test.md 12.2).
  */
-export function findInstrumentOrderBlock(account: PaperAccountMessage | null): InstrumentOrderBlock | null {
+export function findInstrumentOrderBlock(
+  account: PaperAccountMessage | null,
+  instrument: OrderInstrument,
+): InstrumentOrderBlock | null {
   if (account === null) {
     return { kind: 'in-progress', text: 'Reading the paper account.' };
   }
@@ -40,6 +44,12 @@ export function findInstrumentOrderBlock(account: PaperAccountMessage | null): I
   }
   if (check.actual_accounts[0] === undefined) {
     return { kind: 'error', text: describePaperAccountCheck(check).title };
+  }
+  if (findInstrumentPosition(account, instrument)?.split_check) {
+    return {
+      kind: 'warning',
+      text: `${instrument.symbol} needs a split check. Apply the split or keep the ledger on the paper trading page.`,
+    };
   }
   return null;
 }

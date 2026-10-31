@@ -1,6 +1,7 @@
 """Forward-test worker entry point: compares the forward test states every 2 seconds and runs the child processes.
-It also runs the bar fetcher with its own client ID (docs/architecture/forward_test.md section 12.20) and the quarterly
-US universe update (docs/architecture/market_data.md section 8.9).
+It also runs the bar fetcher with its own client ID (docs/architecture/forward_test.md section 12.20), the daily stock
+split check with the same client ID (section 12.22), and the quarterly US universe update
+(docs/architecture/market_data.md section 8.9).
 
 Run with `python -m atrade.app.forward_test_worker`. The Compose service `forward-test` runs this module, so a
 restart of `web` does not stop forward tests (docs/architecture.md section 6.4).
@@ -16,7 +17,14 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from atrade.app.forward_test_process import FORWARD_TEST_PROCESS_COMMAND
-from atrade.forward_test import BarFetcher, ChildMode, ForwardTestRow, ForwardTestWorker, read_running_member_lists
+from atrade.forward_test import (
+    BarFetcher,
+    ChildMode,
+    ForwardTestRow,
+    ForwardTestWorker,
+    StockSplitCheck,
+    read_running_member_lists,
+)
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection
@@ -71,11 +79,14 @@ async def run_worker(settings: Settings) -> None:
             host=settings.ibkr_host, port=settings.ibkr_paper_port, client_id=settings.ibkr_bar_fetcher_client_id
         )
 
+    # The bar fetcher and the stock split check share the client ID, one connection at a time.
+    connection_lock = asyncio.Lock()
     bar_fetcher = BarFetcher(
         database_url=settings.database_url,
         clock=clock,
         open_gateway_connection=open_bar_fetcher_connection,
         read_member_lists=lambda: read_running_member_lists(settings.database_url),
+        connection_lock=connection_lock,
     )
 
     def is_ready_to_run(row: ForwardTestRow) -> bool:
@@ -88,8 +99,17 @@ async def run_worker(settings: Settings) -> None:
         start_child=start_forward_test_process,
         is_ready_to_run=is_ready_to_run,
     )
+    stock_split_check = StockSplitCheck(
+        database_url=settings.database_url,
+        clock=clock,
+        settings=settings,
+        open_gateway_connection=open_bar_fetcher_connection,
+        connection_lock=connection_lock,
+        request_restart=worker.request_restart,
+    )
     async with asyncio.TaskGroup() as task_group:
         task_group.create_task(worker.keep_comparing())
+        task_group.create_task(stock_split_check.keep_checking())
         task_group.create_task(bar_fetcher.keep_fetching())
         if universe_update is not None:
             task_group.create_task(universe_update.keep_updating())

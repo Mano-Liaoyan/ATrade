@@ -26,6 +26,7 @@ const forwardTest: ForwardTest = {
   crash_count: 0,
   interruptions: [],
   allocated_capital_usd: '10000',
+  split_checks_needed: [],
 };
 
 describe('listForwardTestEvents', () => {

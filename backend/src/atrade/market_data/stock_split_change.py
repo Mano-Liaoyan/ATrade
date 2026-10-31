@@ -75,25 +75,41 @@ def change_stored_bars_blocking(connection: psycopg.Connection, change: StockSpl
 
 async def apply_stock_split(
     *, database_url: str, change: StockSplitChange, confirmation: SplitConfirmation, recorded_at_utc: datetime
-) -> None:
+) -> int:
     """Confirms a stock split from IBKR evidence and changes the stored bars, in one transaction: writes the
     `stock_split` row, changes the bars before the ex-date in all bar tables and bar periods, and updates the daily
-    bar summary of the instrument. No IBKR call.
+    bar summary of the instrument. No IBKR call. Returns the ID of the `stock_split` row.
 
     Raises StockSplitConfirmedError when the stock split of the instrument and the ex-date is confirmed already, or is a
     Databento import split.
     """
     async with await psycopg.AsyncConnection.connect(database_url) as connection, connection.transaction():
-        parameters = create_change_parameters(change)
-        cursor = await connection.execute(
-            WRITE_STOCK_SPLIT, {**parameters, "confirmation": confirmation, "recorded_at_utc": recorded_at_utc}
+        return await apply_stock_split_in_transaction(
+            connection, change=change, confirmation=confirmation, recorded_at_utc=recorded_at_utc
         )
-        if await cursor.fetchone() is None:
-            message = (
-                f"The stock split of {change.instrument.symbol} on {change.ex_date_utc:%Y-%m-%d} is confirmed "
-                "already or waits for the import check."
-            )
-            raise StockSplitConfirmedError(message)
-        for query in CHANGE_BARS_QUERIES:
-            await connection.execute(query, parameters)
-        await update_daily_bar_summaries(connection, [change.instrument])
+
+
+async def apply_stock_split_in_transaction(
+    connection: psycopg.AsyncConnection,
+    *,
+    change: StockSplitChange,
+    confirmation: SplitConfirmation,
+    recorded_at_utc: datetime,
+) -> int:
+    """`apply_stock_split` in the transaction of the caller: the owner ledger change of a stock split writes its rows
+    in the same transaction (docs/architecture/paper_trading.md section 11.11). The caller commits."""
+    parameters = create_change_parameters(change)
+    cursor = await connection.execute(
+        WRITE_STOCK_SPLIT, {**parameters, "confirmation": confirmation, "recorded_at_utc": recorded_at_utc}
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        message = (
+            f"The stock split of {change.instrument.symbol} on {change.ex_date_utc:%Y-%m-%d} is confirmed "
+            "already or waits for the import check."
+        )
+        raise StockSplitConfirmedError(message)
+    for query in CHANGE_BARS_QUERIES:
+        await connection.execute(query, parameters)
+    await update_daily_bar_summaries(connection, [change.instrument])
+    return int(row[0])

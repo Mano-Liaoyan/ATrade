@@ -176,6 +176,39 @@ def test_records_each_new_fill_once_and_one_equity_point_at_the_end_of_each_bar(
     ]
 
 
+def test_the_equity_includes_the_cash_in_lieu_of_a_stock_split(database_url: str, tmp_path: Path) -> None:
+    forward_test_id = insert_forward_test(database_url)
+    insert_ledger_fills(database_url, forward_test_id)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        # The split adjustment of day 8 gives no new share and 7.50 USD cash in lieu (section 12.8).
+        connection.execute(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, cash_change, stock_split_id)
+            VALUES ('forward_test', %s, 'split_adjustment', %s, 'DU1234567', 'BTEST', 'ARCA', 'USD', 0, 7.5, 1)
+            """,
+            (forward_test_id, make_time(8)),
+        )
+
+    run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
+
+    equity_points = read_table_rows(
+        database_url, "SELECT time_utc, equity_usd FROM forward_test_equity_point ORDER BY time_utc"
+    )
+    assert [equity for _, equity in equity_points] == [
+        Decimal(10000),
+        Decimal(10000),
+        Decimal(10000),
+        Decimal(10020),
+        Decimal(10040),
+        Decimal("10067.5"),
+        Decimal("10047.5"),
+        Decimal("10027.5"),
+        Decimal("10027.5"),
+        Decimal("10027.5"),
+    ]
+
+
 def test_a_second_run_over_the_same_bars_adds_no_row(database_url: str, tmp_path: Path) -> None:
     forward_test_id = insert_forward_test(database_url)
     run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)

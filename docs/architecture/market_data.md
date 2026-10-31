@@ -857,6 +857,17 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   `StockSplitConfirmedError` and changes nothing, so the bars are not
   divided 2 times. The user check of the Databento import (section 8.14)
   uses the same bar change and also updates the daily bar summary.
+- Implemented (#220): `apply_stock_split()` returns the ID of the
+  `stock_split` row. `apply_stock_split_in_transaction(connection, *,
+  change, confirmation, recorded_at_utc)` does the same change in the
+  transaction of the caller, so the owner ledger change of a stock split
+  ([`paper_trading.md`](paper_trading.md) section 11.11) and the bar change
+  are one transaction. `record_stock_split_evidence(*, database_url,
+  gateway_connection, instruments, recorded_at_utc)` reads evidence A of
+  each instrument for the stock split check before the open
+  ([`forward_test.md`](forward_test.md) section 12.22); a lost connection
+  raises `GatewayRequestError`. `is_us_trading_day()` is the US trading day
+  rule of `us_trading_days.py`.
 
 ## 8.14 Left to the implementation
 

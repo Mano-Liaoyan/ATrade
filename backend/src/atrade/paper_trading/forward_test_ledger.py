@@ -19,7 +19,12 @@ from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import read_order_source
 from atrade.ibkr import GatewayConnection, OrderSide
 from atrade.paper_trading import owner_ledger_store
-from atrade.paper_trading.manual_order_ledger import LedgerOrder, OrderAmounts, check_owner_order
+from atrade.paper_trading.manual_order_ledger import (
+    LedgerOrder,
+    OrderAmounts,
+    check_owner_order,
+    find_split_check_refusal,
+)
 from atrade.paper_trading.owner_ledger_store import BY_HAND, LedgerEntry, LedgerFill, Owner
 
 
@@ -143,6 +148,10 @@ class ForwardTestLedger:
     async def check_order(self, order: OwnerOrder) -> str | None:
         """Returns the reason when a rule fails. An IBKR error also refuses the order: the rules need IBKR."""
         try:
+            async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+                split_check_refusal = await find_split_check_refusal(connection, self.account, order.instrument)
+            if split_check_refusal is not None:
+                return split_check_refusal.detail
             open_orders = [
                 open_order
                 for open_order in await self.gateway_connection.read_own_open_orders()

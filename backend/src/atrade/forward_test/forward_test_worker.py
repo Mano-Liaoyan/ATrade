@@ -53,6 +53,8 @@ class RunningChild:
     mode: ChildMode
     started_at_utc: datetime
     is_stop_requested: bool = False
+    # A stock split restart (section 12.22): the end is not a stop and not a crash.
+    is_restart_requested: bool = False
 
 
 def describe_crash(exit_code: int) -> str:
@@ -82,6 +84,17 @@ class ForwardTestWorker:
         self.start_child = start_child
         self.is_ready_to_run = is_ready_to_run
         self.running_children: dict[int, RunningChild] = {}
+
+    def request_restart(self, forward_test_ids: list[int]) -> None:
+        """Asks the run child of each forward test to stop. The next comparison starts it again, without a crash
+        count and without an interruption (section 12.22). The new child restores the strategy positions from the
+        owner ledger."""
+        for forward_test_id in forward_test_ids:
+            running_child = self.running_children.get(forward_test_id)
+            if running_child is None or running_child.mode != "run" or running_child.is_stop_requested:
+                continue
+            running_child.child.request_stop()
+            running_child.is_restart_requested = True
 
     async def keep_comparing(self) -> None:
         """Runs until the caller cancels it."""
@@ -141,6 +154,9 @@ class ForwardTestWorker:
         self, connection: psycopg.AsyncConnection, row: ForwardTestRow, running_child: RunningChild, exit_code: int
     ) -> None:
         now_utc = self.clock.read_now_utc()
+        if running_child.is_restart_requested and exit_code == 0 and not running_child.is_stop_requested:
+            await forward_test_store.write_status(connection, forward_test_id=row.id, status="starting")
+            return
         is_stop = running_child.mode == "cancel_orders" or running_child.is_stop_requested
         if is_stop and exit_code == 0:
             async with connection.transaction():

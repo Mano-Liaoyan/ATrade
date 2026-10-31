@@ -61,3 +61,18 @@ export function findChangeDirection(change: number | null): ChangeDirection {
 export function formatAmount(amount: string): string {
   return AMOUNT_FORMAT.format(Number(amount));
 }
+
+const MAX_SPLIT_RATIO_DENOMINATOR = 1000;
+const SPLIT_RATIO_TOLERANCE = 1e-9;
+
+/** The split ratio (new shares for 1 old share) as a fraction with the smallest denominator, for example "3:2". */
+export function formatSplitRatio(ratioText: string): string {
+  const ratio = Number(ratioText);
+  for (let denominator = 1; denominator <= MAX_SPLIT_RATIO_DENOMINATOR; denominator += 1) {
+    const numerator = Math.round(ratio * denominator);
+    if (numerator > 0 && Math.abs(numerator / denominator - ratio) < SPLIT_RATIO_TOLERANCE) {
+      return `${String(numerator)}:${String(denominator)}`;
+    }
+  }
+  return `${ratioText}:1`;
+}
