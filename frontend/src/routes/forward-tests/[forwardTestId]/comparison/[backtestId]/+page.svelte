@@ -30,6 +30,7 @@
     describeForwardTestUniverse,
     readForwardTestComparison,
     readForwardTestInstrument,
+    readStartCapital,
     type ForwardTest,
     type ForwardTestComparison,
   } from '#lib/forward_test';
@@ -71,7 +72,7 @@
         href: resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(forwardTest.id) }),
         // The forward test metrics of the comparison cover the backtest period only (the API gives them so).
         metrics: comparison.forward_test_metrics,
-        startCapitalUsd: forwardTest.start_balance_usd,
+        startCapitalUsd: readStartCapital(forwardTest),
       },
       {
         name: `Backtest #${String(backtest.id)}`,
@@ -191,7 +192,7 @@
             }}
           >
             {#if selectedTable === 'fills'}
-              <FillComparisonTable fills={compared.fills} />
+              <FillComparisonTable fills={compared.fills} showsSymbol={compared.forward_test.universe_kind !== 'single'} />
             {:else if compared.backtest.error_message === null}
               <EmptyText text="No logs" />
             {:else}

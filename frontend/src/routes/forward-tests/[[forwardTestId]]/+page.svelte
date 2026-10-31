@@ -44,6 +44,7 @@
     describeForwardTestStatus,
     describeForwardTestUniverse,
     readForwardTestInstrument,
+    readStartCapital,
     findForwardTestStatusKind,
     ForwardTestFillTable,
     ForwardTestsOnInstrumentsFeed,
@@ -329,10 +330,10 @@
                 />
               </div>
             {:else}
-              <KeyMetricRow metrics={records.metrics} startCapitalUsd={forwardTest.start_balance_usd} />
+              <KeyMetricRow metrics={records.metrics} startCapitalUsd={readStartCapital(forwardTest)} />
               <div class="chart">
                 <EquityDrawdownChart
-                  curves={[{ name: 'Equity', points: records.equity_curve, startCapitalUsd: forwardTest.start_balance_usd }]}
+                  curves={[{ name: 'Equity', points: records.equity_curve, startCapitalUsd: readStartCapital(forwardTest) }]}
                   label="Equity and drawdown"
                   interruptions={chartInterruptions}
                   fill

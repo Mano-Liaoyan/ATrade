@@ -14,6 +14,8 @@ from atrade.backtest import BacktestTrade, EquityPoint
 AVERAGE_PRICE_STEP = Decimal("0.0001")
 
 type FillSide = Literal["BUY", "SELL"]
+# The bar end, the side, the symbol, and the exchange of a row.
+type FillKey = tuple[datetime, FillSide, str, str]
 
 
 @dataclass(frozen=True)
@@ -27,6 +29,8 @@ class FillTotal:
 class FillComparisonRow:
     bar_end_utc: datetime
     side: FillSide
+    symbol: str
+    exchange: str
     forward_test: FillTotal | None
     backtest: FillTotal | None
     # The forward test price minus the backtest price. None when one side has no fill.
@@ -51,12 +55,10 @@ def sum_fills(trades: list[BacktestTrade]) -> FillTotal:
     )
 
 
-def group_fills(
-    trades: list[BacktestTrade], bar_ends_utc: list[datetime]
-) -> dict[tuple[datetime, FillSide], FillTotal]:
-    grouped_trades: dict[tuple[datetime, FillSide], list[BacktestTrade]] = {}
+def group_fills(trades: list[BacktestTrade], bar_ends_utc: list[datetime]) -> dict[FillKey, FillTotal]:
+    grouped_trades: dict[FillKey, list[BacktestTrade]] = {}
     for trade in trades:
-        key = (find_bar_end(bar_ends_utc, trade.time_utc), trade.side)
+        key = (find_bar_end(bar_ends_utc, trade.time_utc), trade.side, trade.symbol or "", trade.exchange or "")
         grouped_trades.setdefault(key, []).append(trade)
     return {key: sum_fills(group) for key, group in grouped_trades.items()}
 
@@ -67,14 +69,16 @@ def compare_fills(
     backtest_fills: list[BacktestTrade],
     equity_curves: list[list[EquityPoint]],
 ) -> list[FillComparisonRow]:
-    """One row for each bar and side with a fill on at least one side, in time order."""
+    """One row for each bar, side, and instrument with a fill on at least one side, in time order, then by symbol.
+    The fills name their instrument (`BacktestTrade.symbol` and `exchange`)."""
     bar_ends_utc = sorted({point.time_utc for curve in equity_curves for point in curve})
     forward_test_totals = group_fills(forward_test_fills, bar_ends_utc)
     backtest_totals = group_fills(backtest_fills, bar_ends_utc)
     rows: list[FillComparisonRow] = []
-    for bar_end_utc, side in sorted(forward_test_totals.keys() | backtest_totals.keys()):
-        forward_test_total = forward_test_totals.get((bar_end_utc, side))
-        backtest_total = backtest_totals.get((bar_end_utc, side))
+    for key in sorted(forward_test_totals.keys() | backtest_totals.keys()):
+        bar_end_utc, side, symbol, exchange = key
+        forward_test_total = forward_test_totals.get(key)
+        backtest_total = backtest_totals.get(key)
         price_difference_usd = None
         if forward_test_total is not None and backtest_total is not None:
             price_difference_usd = forward_test_total.price_usd - backtest_total.price_usd
@@ -82,6 +86,8 @@ def compare_fills(
             FillComparisonRow(
                 bar_end_utc=bar_end_utc,
                 side=side,
+                symbol=symbol,
+                exchange=exchange,
                 forward_test=forward_test_total,
                 backtest=backtest_total,
                 price_difference_usd=price_difference_usd,
