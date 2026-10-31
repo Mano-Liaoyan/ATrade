@@ -65,3 +65,21 @@ test('the last backtest table tab in a narrow panel scrolls into view and the pa
   await lastTab.click();
   await expect(tables.getByRole('region', { name: 'Bar sources' })).toBeVisible();
 });
+
+test('a click in a panel body draws no focus outline; keyboard focus does', async ({ page, request }) => {
+  const backtestId = await findBacktestId(request, '700');
+  await page.goto(`/backtests/${String(backtestId)}`);
+  const tables = page.getByRole('region', { name: 'Backtest tables' });
+  const panelBody = tables.getByRole('tabpanel');
+  await expect(panelBody).toBeVisible();
+
+  await panelBody.click({ position: { x: 20, y: 60 } });
+  await expect(panelBody).toBeFocused();
+  await expect(panelBody).toHaveCSS('outline-style', 'none');
+
+  // Shift+Tab leaves the panel body, and Tab comes back with the keyboard (:focus-visible): the outline shows.
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await expect(panelBody).toBeFocused();
+  await expect(panelBody).toHaveCSS('outline-style', 'solid');
+});
