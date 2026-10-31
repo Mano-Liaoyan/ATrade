@@ -39,8 +39,8 @@ jobs:
       # The node is ephemeral and has the tag tag:atrade-deploy. The tailnet policy lets this tag connect
       # only to the SSH port of the server.
       - name: Join the tailnet
-        # v4.2.0
-        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd
+        # v4.4.0
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c
         with:
           oauth-client-id: ${{ secrets.ATRADE_TAILSCALE_CLIENT_ID }}
           audience: ${{ secrets.ATRADE_TAILSCALE_AUDIENCE }}

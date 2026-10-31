@@ -28,8 +28,8 @@ jobs:
           --health-cmd "pg_isready --username=atrade"
           --health-interval 2s --health-timeout 5s --health-retries 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.13.5"
       - run: ./scripts/check backend
@@ -37,7 +37,7 @@ jobs:
   frontend:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           working-directory: frontend
@@ -47,7 +47,7 @@ jobs:
   assistant:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           working-directory: assistant
@@ -55,16 +55,18 @@ jobs:
       - run: ./scripts/check assistant
 
   e2e:
-    name: e2e (${{ matrix.browser }})
+    name: e2e (${{ matrix.browser }} ${{ matrix.shard }}/3)
     runs-on: ubuntu-24.04
-    # One job for each browser, so the 4 browsers run at the same time. On 2026-10-31 one job with all 4 browsers
-    # took 22 to 27 minutes. A hang fails the job, so it does not run for hours.
+    # One job for each browser and shard, so all 12 run at the same time. On 2026-10-31 one job with all 4 browsers
+    # took 22 to 27 minutes, and one job for each browser took up to 8.3 minutes. Each shard has its own database and
+    # server and the same 2 Playwright workers, so a test sees the same load as in one job. A hang fails the job.
     timeout-minutes: 30
     strategy:
-      # A failure in one browser does not cancel the others.
+      # A failure in one browser or shard does not cancel the others.
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit, msedge]
+        shard: [1, 2, 3]
     services:
       postgres:
         image: postgres:18.3
@@ -77,8 +79,8 @@ jobs:
           --health-cmd "pg_isready --username=atrade"
           --health-interval 2s --health-timeout 5s --health-retries 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.13.5"
       - uses: voidzero-dev/setup-vp@v1.22.0
@@ -92,9 +94,10 @@ jobs:
         timeout-minutes: 25
         env:
           ATRADE_PLAYWRIGHT_PROJECTS: ${{ matrix.browser }}
-      - uses: actions/upload-artifact@v4
+          ATRADE_PLAYWRIGHT_SHARD: ${{ matrix.shard }}/3
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: playwright-report-${{ matrix.browser }}
+          name: playwright-report-${{ matrix.browser }}-${{ matrix.shard }}
           path: frontend/test-results/
           retention-days: 7
