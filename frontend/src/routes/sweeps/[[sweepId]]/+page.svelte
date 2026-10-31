@@ -198,12 +198,14 @@
                   }}
                 >
                   <th scope="row" align="right">
-                    <StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} align="right" />
-                    <a
-                      class="row-link"
-                      href={resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) })}
-                      aria-current={item.id === sweepId ? 'page' : undefined}>#{item.id}</a
-                    >
+                    <span class="status-id">
+                      <StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} align="right" />
+                      <a
+                        class="row-link"
+                        href={resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) })}
+                        aria-current={item.id === sweepId ? 'page' : undefined}>#{item.id}</a
+                      >
+                    </span>
                   </th>
                   <td>
                     <span class="ellipsis" title={formatVersionLabel(item.strategy_name, item.version_number)}
@@ -526,5 +528,18 @@
 
   .heatmap {
     inline-size: auto;
+  }
+
+  /* The status icon keeps the start of the cell and the number keeps the end, so the icons are in one line for
+     each number length. */
+  .status-id {
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-03);
+  }
+
+  .status-id > a {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
   }
 </style>

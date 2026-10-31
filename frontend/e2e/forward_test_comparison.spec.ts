@@ -182,7 +182,7 @@ test('a stopped forward test shows the key metrics, the equity and drawdown char
   await expect(chartPanel.getByRole('definition').nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
   await expect(chartPanel.getByRole('definition').nth(5)).toHaveText('40');
   await expect(chartPanel.getByRole('img', { name: 'Equity and drawdown' }).locator('canvas').first()).toBeVisible();
-  await expect(chartPanel.getByRole('link', { name: 'TradingView', exact: true })).toBeVisible();
+  await expect(chartPanel.getByRole('link', { name: 'Charting by TradingView' })).toBeVisible();
   await expect(chartPanel.getByRole('list', { name: 'Equity and drawdown interruptions' }).getByRole('listitem')).toHaveText([
     'Interrupted from 2026-03-21 01:00:00 UTC to 2026-03-24 01:00:00 UTC',
   ]);

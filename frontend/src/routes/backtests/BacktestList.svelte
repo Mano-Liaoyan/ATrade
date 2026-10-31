@@ -210,16 +210,18 @@
                 />
               </td>
               <th scope="row" align="right">
-                <StatusIndicator
-                  label={describeBacktestStatus(item.status)}
-                  kind={findBacktestStatusKind(item.status)}
-                  align="right"
-                />
-                <a
-                  class="row-link"
-                  href={resolve('/backtests/[[backtestId]]', { backtestId: String(item.id) })}
-                  aria-current={item.id === openBacktestId ? 'page' : undefined}>#{item.id}</a
-                >
+                <span class="status-id">
+                  <StatusIndicator
+                    label={describeBacktestStatus(item.status)}
+                    kind={findBacktestStatusKind(item.status)}
+                    align="right"
+                  />
+                  <a
+                    class="row-link"
+                    href={resolve('/backtests/[[backtestId]]', { backtestId: String(item.id) })}
+                    aria-current={item.id === openBacktestId ? 'page' : undefined}>#{item.id}</a
+                  >
+                </span>
               </th>
               <td>
                 <span class="strategy-name" title={formatVersionLabel(item.strategy_name, item.version_number)}
@@ -315,5 +317,18 @@
   .row-link:focus-visible {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
+  }
+
+  /* The status icon keeps the start of the cell and the number keeps the end, so the icons are in one line for
+     each number length. */
+  .status-id {
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-03);
+  }
+
+  .status-id > a {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
   }
 </style>

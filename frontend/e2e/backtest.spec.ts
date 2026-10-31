@@ -147,7 +147,7 @@ test('starts a backtest and sees its metrics, curves, and trades on the workbenc
   await expect(chartPanel.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   await expect(metrics.nth(2)).toHaveText(/^\s*(-[\d,]+\.\d{2}|0\.00) %$/);
   await expect(chartPanel.getByRole('img', { name: 'Equity and drawdown' }).locator('canvas').first()).toBeVisible();
-  await expect(chartPanel.getByRole('link', { name: 'TradingView', exact: true })).toBeVisible();
+  await expect(chartPanel.getByRole('link', { name: 'Charting by TradingView' })).toBeVisible();
   // Daily bars are live bars, so the forward test of the same version, instrument, and bar period can start.
   await expect(chartPanel.getByRole('button', { name: 'Start forward test', exact: true })).not.toHaveAttribute(
     'aria-disabled',

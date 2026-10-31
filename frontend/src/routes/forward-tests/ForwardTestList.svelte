@@ -55,16 +55,18 @@
             }}
           >
             <th scope="row" align="right">
-              <StatusIndicator
-                kind={findForwardTestStatusKind(forwardTest.status)}
-                label={describeForwardTestStatus(forwardTest.status)}
-                align="right"
-              />
-              <a
-                class="row-link"
-                href={resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(forwardTest.id) })}
-                aria-current={forwardTest.id === openForwardTestId ? 'page' : undefined}>#{forwardTest.id}</a
-              >
+              <span class="status-id">
+                <StatusIndicator
+                  kind={findForwardTestStatusKind(forwardTest.status)}
+                  label={describeForwardTestStatus(forwardTest.status)}
+                  align="right"
+                />
+                <a
+                  class="row-link"
+                  href={resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(forwardTest.id) })}
+                  aria-current={forwardTest.id === openForwardTestId ? 'page' : undefined}>#{forwardTest.id}</a
+                >
+              </span>
             </th>
             <td><span class="strategy-name" title={versionLabel}>{versionLabel}</span></td>
             <td>{forwardTest.symbol ?? describeForwardTestUniverse(forwardTest)}</td>
@@ -130,5 +132,18 @@
   .row-link:focus-visible {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
+  }
+
+  /* The status icon keeps the start of the cell and the number keeps the end, so the icons are in one line for
+     each number length. */
+  .status-id {
+    display: flex;
+    align-items: center;
+    gap: var(--cds-spacing-03);
+  }
+
+  .status-id > a {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
   }
 </style>

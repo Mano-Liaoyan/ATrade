@@ -21,10 +21,7 @@ test('opens the bar chart of an instrument with the TradingView attribution', as
   const chart = page.getByRole('img', { name: 'Bar chart of 700 / SEHK / HKD, 1-HOUR bars' });
   await expect(chart.locator('canvas').first()).toBeVisible();
   await expect(chart.getByRole('link', { name: 'Charting by TradingView' })).toBeVisible();
-  await expect(page.getByRole('link', { name: 'TradingView', exact: true })).toHaveAttribute(
-    'href',
-    'https://www.tradingview.com/',
-  );
+  await expect(page.getByRole('link', { name: 'TradingView', exact: true })).toHaveCount(0);
 });
 
 test('changes the bar period with a click and keeps it in the page address', async ({ page }) => {
