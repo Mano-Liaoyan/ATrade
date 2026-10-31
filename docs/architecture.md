@@ -423,6 +423,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `secondaryText`, `busy`, `returnFocus`, `onPrimary`). The `Dialog` title is
   the accessible name of the dialog. Without `primaryText`, the `Dialog` is a
   Carbon passive modal: no footer, and its content has its own controls.
+  Without content (no children), the `Dialog` has only the title and the
+  buttons, for example a delete confirmation.
 - `foundation/carbon` `DataTable` writes the Carbon data table: `columns`
   (`header`, `align: 'right'` for a number column, `isMenu` for the column
   of row menus), `size`, and a `rows` snippet for the body rows. A number
@@ -455,7 +457,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   for example "Saving…", "Creating…", or "Starting…".
 - `foundation/carbon` `StatusIndicator` shows a status as an icon and a word
   with a color: `kind` (`success`, `in-progress`, `warning`, `error`,
-  `neutral`; each kind has its own icon shape) and `label`. `Select` takes
+  `neutral`; each kind has its own icon shape) and `label`. With `iconOnly`,
+  only the icon shows, in front of a name (for example a backtest tab): the
+  icon has `label` as its accessible name (`role="img"`) and as its tooltip
+  (`title`). No status word stands next to it. `Select` takes
   `placeholder` (the trigger text while no item is selected) and `inline`
   (the Carbon inline dropdown: no field background, for a control line). `TextInput`
   takes `type` `datetime-local` for a native date and time input.
@@ -596,6 +601,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   region takes the full height of its parent, for example a workbench panel.
   `role` is `region` (the default) or `log`. The bindable `viewport` gives
   the scrolling element to a parent that scrolls it, for example `ChatLog`.
+  `HorizontalScrollTrack` (`label`, `viewport`, `content`, `viewportId`) is
+  the same track and thumb for an element that scrolls sideways, for example
+  the tab strip of `Tabs` (`aria-orientation="horizontal"`, Arrow Left and
+  Right, Page Up, Page Down, Home, End). A vertical mouse wheel on the element
+  scrolls it sideways. The parent places the track.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
@@ -721,7 +731,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   that renders the text of a tab. `SideColumn` takes an `actions` snippet: icon buttons in its
   header line before the Minimize button. `Tabs` takes `size` (`sm` gives the 32px
   tab line), `lineEnd` (content at the end of the tab line), `lineClass`, and
-  `panelClass`.
+  `panelClass`. With `fixedItems` (also `Panel` `tabs`), the `items` are in a
+  strip that scrolls sideways with a `HorizontalScrollTrack` along its top
+  edge ("<label> scroll bar"), and the `fixedItems` stay at the end of the tab
+  line. The selected tab of the strip scrolls into view. With `onCloseItem`,
+  each tab of `items` is a Carbon dismissable tab: a close button ("Close
+  <tab label>") after the tab, and the Delete key on the focused tab.
 - The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
   The left `SideColumn` "Watchlist" lists the watchlist instruments in 32px
   rows: symbol, last price, and change from the previous close (from the
@@ -915,9 +930,28 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   results panel and the editor panel. The results are on top by default; the
   swap button changes the order, and the browser keeps it
   (`atrade.strategy-page.pane-order`). The results panel has one tab for each
-  backtest of the strategy (number and total return as `ChangeText`, the
-  newest first), then Trades, Orders, and Logs of the last selected backtest.
-  A backtest tab shows `KeyMetricRow` and `EquityDrawdownChart`. A backtest
+  backtest of the strategy (the newest first), then the fixed tabs Trades,
+  Orders, and Logs of the last selected backtest. A backtest tab has
+  the status icon of the backtest (`StatusIndicator` `iconOnly`: a check mark
+  for finished, an error icon for failed, an in-progress icon for running, no
+  status word), the number, and the total return as `ChangeText`. The
+  backtest tabs scroll sideways in their own strip with a visible track; the
+  fixed tabs never scroll away. Each backtest tab has a close button. Close
+  only hides the tab on this page; the backtest stays. The browser keeps the
+  closed tabs of each strategy (`atrade.strategy-page.closed-backtest-tabs`).
+  When the selected tab closes, the newest open backtest tab opens. A new
+  backtest always gets a tab. Delete a backtest on the backtest page
+  (backtest section 10.7).
+  A backtest tab shows `KeyMetricRow` and `EquityDrawdownChart`. A failed or
+  timed out backtest tab shows its error at once: an inline notification
+  with the status ("Failed") and the last error line (`findErrorSummary` of
+  `backtest`), the "Ask AI to fix" button, and the full error log in a
+  `ScrollRegion` ("Log"). "Ask AI to fix" puts "Backtest #<id> failed. Read
+  it with read_backtest and fix the strategy code." in the message input of
+  the AI assistant column and sends it when the conversation socket is open.
+  Without an open conversation, the message stays in the input. The AI
+  assistant reads the error itself (`read_backtest`, assistant section
+  25.4.1). A backtest
   of the strategy that ends opens in its tab. While the forward test socket is
   not connected, `LiveUpdatesNotification` shows under the toolbar. The editor panel has the file
   tabs "Rules" (the rule builder and the read-only code from the rules,

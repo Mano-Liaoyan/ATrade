@@ -214,8 +214,8 @@ prompt does not list the tools.
 | `create_strategy` | Creates a strategy with version 1 from the template. | The new strategy. |
 | `save_strategy_version` | Saves code as a new strategy version (25.5). | The new version. On `422`, the problem list `{"problems": [{"line", "message"}]}` of the checks before save (strategy section 9.3). |
 | `run_backtest` | Queues a backtest of a saved strategy version and waits for its end (25.4.2). | The backtest ID and its status. When it finished, the same content as `read_backtest`. |
-| `list_backtests` | Lists the backtests. | The answer of `GET /api/backtests`. |
-| `read_backtest` | Reads one backtest. | The metrics, a summary of the equity curve, and a summary of the trades. |
+| `list_backtests` | Lists the backtests. | The answer of `GET /api/backtests`. Each backtest with an error message also has `error_summary`. |
+| `read_backtest` | Reads one backtest. | The metrics, a summary of the equity curve, a summary of the trades, and `error_summary` of a backtest with an error message. |
 | `compare_backtests` | Compares 2 backtests. | The answer of the comparison route. |
 
 - The AI assistant does not change the rules of the rule builder. It changes
@@ -237,6 +237,14 @@ prompt does not list the tools.
   `equity_curve_point_count` gives the full count. `trades` has the first 50
   trades with all their fields (`time_utc`, `side`, `quantity_shares`,
   `price_usd`, `commission_usd`). `trade_count_total` gives the full count.
+- Decided: a backtest with an error message (for example a failed
+  backtest with a Python traceback) also has `error_summary`, the last line
+  of `error_message` that is not empty, in `read_backtest`, in the
+  `run_backtest` result, and in each item of `list_backtests`.
+  `error_message` keeps the full log text. So the AI assistant sees a failure
+  in the list and reads the full error itself. The "Ask AI to fix" button of
+  the strategy page sends "Backtest #<id> failed. Read it with read_backtest
+  and fix the strategy code." (docs/architecture.md section 13).
 
 ### 25.4.2 `run_backtest`
 

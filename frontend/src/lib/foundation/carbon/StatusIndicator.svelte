@@ -1,5 +1,6 @@
 <!-- A status as an icon and a word together with its color (Carbon status indicator pattern). The icon shape differs
-     for each kind, so the status does not depend on the color only. -->
+     for each kind, so the status does not depend on the color only. With `iconOnly`, only the icon shows, in front of a
+     name (for example a backtest tab); the word is its accessible name and its tooltip text (`title`). -->
 <script module lang="ts">
   export type StatusKind = 'success' | 'in-progress' | 'warning' | 'error' | 'neutral';
 </script>
@@ -16,9 +17,10 @@
   interface Props {
     kind: StatusKind;
     label: string;
+    iconOnly?: boolean;
   }
 
-  const { kind, label }: Props = $props();
+  const { kind, label, iconOnly = false }: Props = $props();
 
   function findIcon(statusKind: StatusKind): CarbonIconNode {
     switch (statusKind) {
@@ -36,10 +38,16 @@
   }
 </script>
 
-<span class={['status-indicator', `status-indicator--${kind}`]}>
-  <Icon icon={findIcon(kind)} class="status-indicator__icon" />
-  <span>{label}</span>
-</span>
+{#if iconOnly}
+  <span class={['status-indicator', `status-indicator--${kind}`]} title={label}>
+    <Icon icon={findIcon(kind)} {label} class="status-indicator__icon" />
+  </span>
+{:else}
+  <span class={['status-indicator', `status-indicator--${kind}`]}>
+    <Icon icon={findIcon(kind)} class="status-indicator__icon" />
+    <span>{label}</span>
+  </span>
+{/if}
 
 <style>
   /* vertical-align: top keeps a 32px table row at 32px, like ChangeText. */

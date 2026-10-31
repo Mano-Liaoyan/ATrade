@@ -172,6 +172,15 @@
     }
   }
 
+  // A deleted open backtest: /backtests opens the newest backtest that is left.
+  function removeDeletedBacktests(deletedIds: number[]): void {
+    backtests = backtests.filter((item) => !deletedIds.includes(item.id));
+    listReadCount += 1;
+    if (backtestId !== null && deletedIds.includes(backtestId)) {
+      void goto(resolve('/backtests/[[backtestId]]', { backtestId: undefined }), { replace: true });
+    }
+  }
+
   function openStartedBacktest(started: Backtest): void {
     listReadCount += 1;
     void goto(resolve('/backtests/[[backtestId]]', { backtestId: String(started.id) }));
@@ -229,7 +238,7 @@
         }}
       />
     {/snippet}
-    <BacktestList {backtests} errorMessage={listMessage} openBacktestId={backtestId} />
+    <BacktestList {backtests} errorMessage={listMessage} openBacktestId={backtestId} onDeleted={removeDeletedBacktests} />
   </SideColumn>
 
   {#if shownBacktest === null}

@@ -5,6 +5,7 @@ import {
   convertTimeoutMinutesToSeconds,
   describeBacktestStatus,
   findBacktestStatusKind,
+  findErrorSummary,
   formatMaxDrawdown,
   formatPercent,
   formatTimeoutMinutes,
@@ -90,5 +91,20 @@ describe('formatMaxDrawdown', () => {
   it('shows a max drawdown of 0 without a sign and without a direction', () => {
     expect(formatMaxDrawdown('0')).toEqual({ text: '0.00 %', change: 0 });
     expect(Object.is(formatMaxDrawdown('0.00').change, -0)).toBe(false);
+  });
+});
+
+describe('findErrorSummary', () => {
+  it('gives the last line of the error message that is not empty, for example the exception of a traceback', () => {
+    const traceback =
+      'Traceback (most recent call last):\n  File "strategy.py", line 42, in on_start\n' +
+      "AttributeError: 'MovingAverageStrategy' object has no attribute 'id'\n\n";
+
+    expect(findErrorSummary(traceback)).toBe("AttributeError: 'MovingAverageStrategy' object has no attribute 'id'");
+  });
+
+  it('gives an empty text without an error message', () => {
+    expect(findErrorSummary(null)).toBe('');
+    expect(findErrorSummary(' \n')).toBe('');
   });
 });

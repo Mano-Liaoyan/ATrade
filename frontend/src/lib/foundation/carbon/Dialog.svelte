@@ -28,7 +28,8 @@
     // The element that gets focus when the dialog closes, for example the button that opened the dialog from code.
     returnFocus?: HTMLElement | null;
     onPrimary?: () => void;
-    children: Snippet;
+    // Without it, the dialog has only the title and the buttons, for example a delete confirmation.
+    children?: Snippet;
   }
 
   const {
@@ -97,9 +98,11 @@
                   </Dialog.Close>
                 </div>
               </div>
-              <div class="cds--modal-content">
-                {@render children()}
-              </div>
+              {#if children !== undefined}
+                <div class="cds--modal-content">
+                  {@render children()}
+                </div>
+              {/if}
               {#if primaryText !== undefined}
               <div class="cds--modal-footer cds--btn-set">
                 <Dialog.Close>

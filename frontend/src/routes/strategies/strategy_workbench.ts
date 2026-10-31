@@ -1,7 +1,8 @@
 // The state of the strategy workbench (spec #99, tickets #106 and #107): the order of the results panel and the editor
-// panel, the problems and output panel below them, the result tabs (one for each backtest of the strategy, then Trades,
-// Orders, and Logs), the backtest that opens when it ends, the output lines, and the toolbar shortcuts.
-import { formatPercent, isFinalStatus, type Backtest } from '#lib/backtest';
+// panel, the problems and output panel below them, the result tabs (one for each backtest of the strategy that the user
+// did not close, then the fixed Trades, Orders, and Logs), the backtest that opens when it ends, the output lines, and
+// the toolbar shortcuts.
+import { formatPercent, isFinalStatus, type Backtest, type BacktestStatus } from '#lib/backtest';
 import type { ForwardTest } from '#lib/forward_test';
 import type { PanelSpec } from '#lib/foundation/workbench';
 import type { CodeProblem, StrategyVersionSummary } from '#lib/strategy';
@@ -18,6 +19,8 @@ export interface ResultTabItem {
   name: string;
   /** The backtest of a backtest tab; null for Trades, Orders, and Logs. */
   backtestId: number | null;
+  /** The status of the backtest of a backtest tab, for its status icon; null for Trades, Orders, and Logs. */
+  status: BacktestStatus | null;
   /** The total return of a finished backtest, for ChangeText. */
   change: number | null;
   changeText: string;
@@ -29,12 +32,23 @@ export interface ResultSelection {
   backtestId: number | null;
 }
 
+/** The backtest tabs and the fixed tabs of the results panel. */
+export interface ResultTabs {
+  backtestTabs: ResultTabItem[];
+  tableTabs: ResultTabItem[];
+}
+
+/** The closed backtest tabs of each strategy, by strategy ID. A closed tab is only hidden: the backtest stays. */
+export type ClosedBacktestTabs = Record<string, number[]>;
+
 export const PANE_ORDER_STORAGE_KEY = 'atrade.strategy-page.pane-order';
+export const CLOSED_BACKTEST_TABS_STORAGE_KEY = 'atrade.strategy-page.closed-backtest-tabs';
+const NO_CLOSED_TABS: ReadonlySet<number> = new Set();
 const SPLITTER_LABEL = 'Resize the results and the editor';
 const TABLE_TABS: ResultTabItem[] = [
-  { value: 'trades', label: 'Trades', name: 'Trades', backtestId: null, change: null, changeText: '' },
-  { value: 'orders', label: 'Orders', name: 'Orders', backtestId: null, change: null, changeText: '' },
-  { value: 'logs', label: 'Logs', name: 'Logs', backtestId: null, change: null, changeText: '' },
+  { value: 'trades', label: 'Trades', name: 'Trades', backtestId: null, status: null, change: null, changeText: '' },
+  { value: 'orders', label: 'Orders', name: 'Orders', backtestId: null, status: null, change: null, changeText: '' },
+  { value: 'logs', label: 'Logs', name: 'Logs', backtestId: null, status: null, change: null, changeText: '' },
 ];
 
 /** The toolbar shortcuts as CodeMirror key names. The editor and its language server client use none of them. */
@@ -116,35 +130,72 @@ export function selectStrategyBacktests(backtests: readonly Backtest[], strategy
   return backtests.filter((backtest) => backtest.strategy_id === strategyId).sort((first, second) => second.id - first.id);
 }
 
-export function listResultTabs(backtests: readonly Backtest[], strategyId: number | null): ResultTabItem[] {
-  const backtestTabs = selectStrategyBacktests(backtests, strategyId).map((backtest): ResultTabItem => {
+/** The backtests of the strategy whose tab the user did not close, the newest first. */
+function selectOpenBacktests(
+  backtests: readonly Backtest[],
+  strategyId: number | null,
+  closedIds: ReadonlySet<number>,
+): Backtest[] {
+  return selectStrategyBacktests(backtests, strategyId).filter((backtest) => !closedIds.has(backtest.id));
+}
+
+export function listResultTabs(
+  backtests: readonly Backtest[],
+  strategyId: number | null,
+  closedIds: ReadonlySet<number> = NO_CLOSED_TABS,
+): ResultTabs {
+  const backtestTabs = selectOpenBacktests(backtests, strategyId, closedIds).map((backtest): ResultTabItem => {
     const name = `Backtest #${String(backtest.id)}`;
+    const tab = { value: createBacktestTab(backtest.id), name, backtestId: backtest.id, status: backtest.status };
     if (backtest.metrics === null) {
-      return { value: createBacktestTab(backtest.id), label: name, name, backtestId: backtest.id, change: null, changeText: '' };
+      return { ...tab, label: name, change: null, changeText: '' };
     }
     const changeText = formatPercent(backtest.metrics.total_return_percent);
-    return {
-      value: createBacktestTab(backtest.id),
-      label: `${name} ${changeText}`,
-      name,
-      backtestId: backtest.id,
-      change: Number(backtest.metrics.total_return_percent),
-      changeText,
-    };
+    return { ...tab, label: `${name} ${changeText}`, change: Number(backtest.metrics.total_return_percent), changeText };
   });
-  return [...backtestTabs, ...TABLE_TABS];
+  return { backtestTabs, tableTabs: TABLE_TABS };
+}
+
+/** The stored closed tabs. A missing or damaged value gives no closed tabs; a wrong ID is left out. */
+export function readClosedBacktestTabs(stored: unknown): ClosedBacktestTabs {
+  if (typeof stored !== 'object' || stored === null || Array.isArray(stored)) {
+    return {};
+  }
+  const closed: ClosedBacktestTabs = {};
+  for (const [strategyKey, ids] of Object.entries(stored as Record<string, unknown>)) {
+    if (Array.isArray(ids)) {
+      closed[strategyKey] = ids.filter((id): id is number => Number.isInteger(id));
+    }
+  }
+  return closed;
+}
+
+export function closeBacktestTab(closed: ClosedBacktestTabs, strategyId: number, backtestId: number): ClosedBacktestTabs {
+  const strategyKey = String(strategyId);
+  const ids = closed[strategyKey] ?? [];
+  return ids.includes(backtestId) ? closed : { ...closed, [strategyKey]: [...ids, backtestId] };
+}
+
+export function findClosedBacktestIds(closed: ClosedBacktestTabs, strategyId: number | null): ReadonlySet<number> {
+  return strategyId === null ? NO_CLOSED_TABS : new Set(closed[String(strategyId)] ?? []);
+}
+
+/** The message of "Ask AI to fix": the AI assistant reads the error itself with read_backtest. */
+export function describeFixRequest(backtestId: number): string {
+  return `Backtest #${String(backtestId)} failed. Read it with read_backtest and fix the strategy code.`;
 }
 
 /**
- * The tab and the backtest that show. Without a selection, or when the selected backtest is not of the strategy, the
- * newest backtest shows. Trades, Orders, and Logs show the last selected backtest.
+ * The tab and the backtest that show. Without a selection, or when the selected backtest is not of the strategy or its
+ * tab is closed, the newest open backtest shows. Trades, Orders, and Logs show the last selected backtest.
  */
 export function resolveResultTab(
   selection: ResultSelection,
   backtests: readonly Backtest[],
   strategyId: number | null,
+  closedIds: ReadonlySet<number> = NO_CLOSED_TABS,
 ): { tab: ResultTab; backtestId: number | null } {
-  const strategyBacktests = selectStrategyBacktests(backtests, strategyId);
+  const strategyBacktests = selectOpenBacktests(backtests, strategyId, closedIds);
   const isKnown = strategyBacktests.some((backtest) => backtest.id === selection.backtestId);
   const backtestId = isKnown ? selection.backtestId : (strategyBacktests[0]?.id ?? null);
   const isTableTab = TABLE_TABS.some((tab) => tab.value === selection.tab);
