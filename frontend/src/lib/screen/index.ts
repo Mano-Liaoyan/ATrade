@@ -13,6 +13,7 @@ export {
 } from './condition_bar';
 export { describeExclusionReason, listResultColumns, sortResultRows, type ScreenResultRow } from './result_table';
 export { default as ConditionEditor } from './ConditionEditor.svelte';
+export { newScreen } from './new_screen';
 export {
   addCondition,
   groupProblems,

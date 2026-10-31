@@ -1,17 +1,18 @@
 <!-- Screen page (docs/architecture/screen.md section 24.10): a workbench. URL: /screens/<id>?result=<screen result id>;
      /screens opens the screen that the user opened last (browser storage), or the first screen of the list. Without
-     ?result, the page shows the last run. Start side: the "Screens" side column (ScreenList). Main region: the title
-     row (the name, the US / HK switch, "Save as new screen", and "Save screen" for unsaved changes), the condition
+     ?result, the page shows the last run. Start side: the "Screens" side column (ScreenList) with "New screen". Main
+     region: the title row (the name, the US / HK switch, "Save as new screen", and "Save screen" for unsaved changes), the condition
      bar with its edit popover, the table toolbar (Result N / Excluded N, the daily bars date, the run time, "Add to
      watchlist", and "Run backtest on this screen result"; batch actions when rows are selected), and the result or the
      excluded table. Each change of a condition runs the changed screen at once (section 24.13). An HK screen shows the
      survivorship bias warning. The backtest buttons open the "New backtest" form with the screen, the screen result,
      and the selected rows (screen.md section 24.9). -->
 <script lang="ts">
+  import Add16 from '@carbon/icons/es/add/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { navigating, page } from '$app/state';
-  import { ContentSwitcher, InlineNotification, Popover } from '#lib/foundation/carbon';
+  import { ContentSwitcher, IconButton, InlineNotification, Popover } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
@@ -28,6 +29,7 @@
     listScreens,
     nameDefinitionIndicators,
     newCondition,
+    newScreen,
     readScreen,
     readScreenResult,
     readTarget,
@@ -90,6 +92,9 @@
   // The edit popover of one tag, or of a new condition of "Add condition" (target null).
   let editing = $state<{ target: ConditionTarget | null; item: Definition; anchor: HTMLElement | null } | null>(null);
   let backtestSource = $state<ScreenSource | null>(null);
+  let isCreating = $state(false);
+  // The reason of the last failed "New screen".
+  let createMessage = $state('');
 
   const shownScreen = $derived(screen !== null && screen.id === screenId ? screen : null);
   const screenResultId = $derived.by(() => {
@@ -327,6 +332,28 @@
     await goto(run.kind === 'ok' ? `${target}?result=${String(run.value.id)}` : target);
   }
 
+  // "New screen": creates the default screen (section 24.13), runs it, and opens its screen result.
+  async function createNewScreen(): Promise<void> {
+    const body = newScreen(screens.map((item) => item.name));
+    isCreating = true;
+    createMessage = '';
+    const created = await createScreen(fetch, body);
+    if (created.kind !== 'ok') {
+      isCreating = false;
+      createMessage = created.kind === 'failed' ? created.message : created.problems.map((problem) => problem.message).join(' ');
+      return;
+    }
+    const listed = await listScreens(fetch);
+    if (listed.kind === 'ok') {
+      screens = listed.value;
+    }
+    const run = await runScreenDraft(fetch, created.value.id, { market: body.market, definition: body.definition });
+    isCreating = false;
+    const target = resolve('/screens/[[screenId]]', { screenId: String(created.value.id) });
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- the target is resolved.
+    await goto(run.kind === 'ok' ? `${target}?result=${String(run.value.id)}` : target);
+  }
+
   // The watchlist add route checks each instrument with IBKR, so the page adds the instruments one after the other.
   async function addRowsToWatchlist(result: ScreenResult, positions: number[] | null): Promise<void> {
     const rows = positions === null ? result.rows : result.rows.filter((row) => positions.includes(row.position));
@@ -371,9 +398,22 @@
 
 <Workbench>
   <SideColumn label="Screens" side="start" width="20rem" storageKey="atrade.screen-page.list-column">
+    {#snippet actions()}
+      <IconButton
+        label={isCreating ? 'Creating screen…' : 'New screen'}
+        icon={Add16}
+        disabled={isCreating}
+        busy={isCreating}
+        onclick={() => void createNewScreen()}
+      />
+    {/snippet}
     <ScreenList
       {screens}
       errorMessage={listMessage}
+      {createMessage}
+      onCreateMessageClose={() => {
+        createMessage = '';
+      }}
       openScreen={shownScreen}
       openScreenResultId={shownResult?.id ?? null}
     />
