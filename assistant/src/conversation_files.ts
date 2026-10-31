@@ -1,7 +1,7 @@
 // The JSONL file of each conversation in the pi directory (docs/architecture/assistant.md 25.8.1).
 // pi writes all messages, tool arguments, and tool results into it. PostgreSQL does not hold the messages.
-// Before each run the service adds a custom entry with the credential name, so each AI assistant message
-// can show its model and its credential name (25.8.2).
+// Each run adds a custom entry with the credential name and the thinking level of the run, so each AI assistant
+// message can show its model, its thinking level, and its credential name (25.8.2).
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
@@ -14,6 +14,14 @@ export interface ConversationMessage {
   provider: string | null;
   model: string | null;
   credential_name: string | null;
+  /** Null for a user message, and for a message of a run before the thinking level was recorded. */
+  thinking_level: string | null;
+}
+
+/** The data of the custom entry of each run. */
+export interface RunEntry {
+  credential_name: string;
+  thinking_level?: string;
 }
 
 interface LooseMessage {
@@ -49,13 +57,13 @@ export function readMessageText(content: unknown): string {
     .join('');
 }
 
-function toConversationMessage(message: LooseMessage, credentialName: string | null): ConversationMessage | null {
+function toConversationMessage(message: LooseMessage, run: RunEntry | null): ConversationMessage | null {
   const text = readMessageText(message.content);
   if (text === '') {
     return null;
   }
   if (message.role === 'user') {
-    return { role: 'user', text, provider: null, model: null, credential_name: null };
+    return { role: 'user', text, provider: null, model: null, credential_name: null, thinking_level: null };
   }
   if (message.role === 'assistant') {
     return {
@@ -63,7 +71,8 @@ function toConversationMessage(message: LooseMessage, credentialName: string | n
       text,
       provider: message.provider ?? null,
       model: message.model ?? null,
-      credential_name: credentialName,
+      credential_name: run?.credential_name ?? null,
+      thinking_level: run?.thinking_level ?? null,
     };
   }
   return null;
@@ -75,12 +84,12 @@ export function readConversationMessages(piDir: string, conversationId: string):
     return [];
   }
   const messages: ConversationMessage[] = [];
-  let credentialName: string | null = null;
+  let run: RunEntry | null = null;
   for (const entry of openConversationSession(piDir, conversationId).getBranch()) {
     if (entry.type === 'custom' && entry.customType === CREDENTIAL_ENTRY_TYPE) {
-      credentialName = (entry.data as { credential_name: string }).credential_name;
+      run = entry.data as RunEntry;
     } else if (entry.type === 'message') {
-      const message = toConversationMessage(entry.message as LooseMessage, credentialName);
+      const message = toConversationMessage(entry.message as LooseMessage, run);
       if (message !== null) {
         messages.push(message);
       }

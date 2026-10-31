@@ -1,7 +1,8 @@
 <!-- Carbon dropdown on Bits UI Select. The keyboard opens it (Enter, Space, arrow keys), the arrow keys move the
      highlight, Enter selects, and Escape closes it. The open, highlighted, and selected states of Bits UI become the
      Carbon classes (carbon_state.ts). `size` "sm" gives the 32px field of a toolbar line, and `hideLabel` keeps the
-     label only for screen readers when the layout names the field. -->
+     label only for screen readers when the layout names the field. A label that the field cuts shows in full in a
+     native tooltip. The list is at least as wide as the field and wide enough for its longest label. -->
 <script module lang="ts">
   export interface SelectItem<T extends string> {
     value: T;
@@ -29,6 +30,8 @@
     placeholder?: string;
     size?: 'sm' | 'md';
     hideLabel?: boolean;
+    // Why the Select is disabled: the native tooltip of the field, and its accessible description.
+    disabledReason?: string | null;
   }
 
   const uid = $props.id();
@@ -41,15 +44,32 @@
     placeholder = '',
     size = 'md',
     hideLabel = false,
+    disabledReason = null,
   }: Props = $props();
 
   let open = $state(false);
+  let isLabelCut = $state(false);
   const triggerId = `select-${uid}`;
+  const reasonId = `select-reason-${uid}`;
   const selectedItem = $derived(items.find((item) => item.value === value));
+  const fieldText = $derived(selectedItem?.label ?? placeholder);
+  const fieldTitle = $derived(
+    disabled && disabledReason !== null ? disabledReason : isLabelCut ? fieldText : undefined,
+  );
+
+  // Measured when the pointer comes to the field, so a resize of the column needs no observer.
+  function measureLabel(event: PointerEvent): void {
+    const label = (event.currentTarget as HTMLElement).querySelector('.cds--list-box__label');
+    isLabelCut = label !== null && label.scrollWidth > label.clientWidth;
+  }
 </script>
 
-<div class="cds--dropdown__wrapper cds--list-box__wrapper">
+<!-- The tooltip is on the wrapper too: a disabled button gets no pointer events in all browsers. -->
+<div class="cds--dropdown__wrapper cds--list-box__wrapper" title={fieldTitle}>
   <label for={triggerId} class={['cds--label', hideLabel && 'cds--visually-hidden']}>{label}</label>
+  {#if disabled && disabledReason !== null}
+    <span id={reasonId} class="cds--visually-hidden">{disabledReason}</span>
+  {/if}
   <Select.Root
     type="single"
     bind:open
@@ -68,8 +88,14 @@
     <div class={[...dropdownClasses({ open, disabled }), size === 'sm' && 'cds--dropdown--sm cds--list-box--sm']}>
       <Select.Trigger id={triggerId}>
         {#snippet child({ props })}
-          <button {...props} type="button" class="cds--list-box__field">
-            <span class="cds--list-box__label">{selectedItem?.label ?? placeholder}</span>
+          <button
+            {...props}
+            type="button"
+            class="cds--list-box__field"
+            onpointerenter={measureLabel}
+            aria-describedby={disabled && disabledReason !== null ? reasonId : undefined}
+          >
+            <span class="cds--list-box__label">{fieldText}</span>
             {#if selectedItem?.tag !== undefined}
               <Tag label={selectedItem.tag} size="sm" />
             {/if}
@@ -110,12 +136,14 @@
 </div>
 
 <style>
-  /* As in MenuButton.svelte: Bits UI places the floating wrapper, so the Carbon offsets go. The list keeps the width of
-     the field. */
+  /* As in MenuButton.svelte: Bits UI places the floating wrapper, so the Carbon offsets go. The list is at least as wide
+     as the field and as wide as its longest label, but not wider than the viewport. Bits UI moves it into the viewport. */
   .floating-menu {
     position: relative;
     inset: auto;
-    inline-size: var(--bits-select-anchor-width);
+    min-inline-size: var(--bits-select-anchor-width);
+    inline-size: max-content;
+    max-inline-size: calc(100vw - 2 * var(--cds-spacing-05));
   }
 
   /* Carbon has no tag inside a dropdown item. The tag stays on the line of the label. */

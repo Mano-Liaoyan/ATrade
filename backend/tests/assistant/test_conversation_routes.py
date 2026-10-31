@@ -104,7 +104,12 @@ async def test_read_returns_the_messages_of_the_assistant_service(
     assistant_service.messages[conversation_id] = [
         ConversationMessage(role="user", text="Hi.", provider=None, model=None, credential_name=None),
         ConversationMessage(
-            role="assistant", text="Hello.", provider="fake", model="fake-model", credential_name="Fake key"
+            role="assistant",
+            text="Hello.",
+            provider="fake",
+            model="fake-model",
+            credential_name="Fake key",
+            thinking_level="high",
         ),
     ]
 
@@ -112,13 +117,21 @@ async def test_read_returns_the_messages_of_the_assistant_service(
 
     assert response.status_code == httpx.codes.OK
     assert response.json()["messages"] == [
-        {"role": "user", "text": "Hi.", "provider": None, "model": None, "credential_name": None},
+        {
+            "role": "user",
+            "text": "Hi.",
+            "provider": None,
+            "model": None,
+            "credential_name": None,
+            "thinking_level": None,
+        },
         {
             "role": "assistant",
             "text": "Hello.",
             "provider": "fake",
             "model": "fake-model",
             "credential_name": "Fake key",
+            "thinking_level": "high",
         },
     ]
 

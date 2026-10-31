@@ -30,9 +30,11 @@ from tests.fakes.assistant import HOLD, FakeAssistantService
 from tests.fakes.clock import FixedClock
 
 MESSAGE_WAIT_SECONDS = 5
-FIRST_MODEL = {"provider": "fake", "model": "fake-model", "credential_id": "fake-key-1"}
-SECOND_MODEL = {"provider": "fake", "model": "fake-model-2", "credential_id": "fake-key-2"}
-FIRST_ANSWER = MessageEnd(text="Hello.", provider="fake", model="fake-model", credential_name="Fake key · first")
+FIRST_MODEL = {"provider": "fake", "model": "fake-model", "credential_id": "fake-key-1", "thinking_level": "medium"}
+SECOND_MODEL = {"provider": "fake", "model": "fake-model-2", "credential_id": "fake-key-2", "thinking_level": "high"}
+FIRST_ANSWER = MessageEnd(
+    text="Hello.", provider="fake", model="fake-model", credential_name="Fake key · first", thinking_level="medium"
+)
 SECOND_ANSWER = MessageEnd(text="Again.", provider="fake", model="fake-model-2", credential_name="Fake key · second")
 
 type JsonObject = dict[str, Any]
@@ -118,6 +120,7 @@ async def test_a_prompt_streams_the_answer_between_running_and_settled(
             "provider": "fake",
             "model": "fake-model",
             "credential_name": "Fake key · first",
+            "thinking_level": "medium",
         },
         {"type": "run_state", "state": "settled"},
     ]
@@ -125,7 +128,7 @@ async def test_a_prompt_streams_the_answer_between_running_and_settled(
         (
             connection.conversation_id,
             "Hi.",
-            ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1"),
+            ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1", thinking_level="medium"),
         )
     ]
 
@@ -228,7 +231,7 @@ async def test_the_next_answer_after_a_model_change_names_the_new_model_and_the_
     messages = await connection.receive_until_settled()
 
     assert [message["model"] for message in messages if message["type"] == "message_end"] == ["fake-model-2"]
-    assert assistant_service.runs[1][2].model == "fake-model-2"
+    assert (assistant_service.runs[1][2].model, assistant_service.runs[1][2].thinking_level) == ("fake-model-2", "high")
     conversation = await connection.read_conversation()
     assert (conversation["last_provider"], conversation["last_model"], conversation["last_credential_name"]) == (
         "fake",
@@ -330,6 +333,20 @@ async def test_a_message_that_is_not_valid_sends_an_error(connection: AssistantC
 
 
 @pytest.mark.anyio
+async def test_a_prompt_with_an_unknown_thinking_level_sends_an_error_and_does_not_run(
+    connection: AssistantConnection, assistant_service: FakeAssistantService
+) -> None:
+    await connection.prompt("Hi.", {**FIRST_MODEL, "thinking_level": "extreme"})
+
+    message = await connection.receive()
+
+    assert message["type"] == "error"
+    assert message["message"].startswith("The message is not valid:")
+    assert "thinking_level" in message["message"]
+    assert assistant_service.runs == []
+
+
+@pytest.mark.anyio
 async def test_the_title_is_generated_once_after_the_first_settled_run(
     connection: AssistantConnection, assistant_service: FakeAssistantService
 ) -> None:
@@ -343,7 +360,10 @@ async def test_the_title_is_generated_once_after_the_first_settled_run(
 
     assert (conversation["title"], conversation["title_state"]) == ("SMA crossover", "generated")
     assert assistant_service.title_requests == [
-        (connection.conversation_id, ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1"))
+        (
+            connection.conversation_id,
+            ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1", thinking_level="medium"),
+        )
     ]
 
 

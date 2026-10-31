@@ -53,9 +53,8 @@
           author={item.role === 'user' ? 'You' : 'AI assistant'}
           continued={entry.continued}
           streaming={item.streaming}
-        >{#if item.role === 'user'}{item.text}{:else}<Markdown text={item.text} />{/if}{#if item.model !== null}<span
-              class="message-model"
-              >{item.model} · {item.credentialName}</span
+        >{#if item.role === 'user'}{item.text}{:else}<Markdown text={item.text} />{/if}{#if item.modelLine !== null}<span
+              class="message-model">{item.modelLine}</span
             >{/if}</ChatMessage
         >
       {:else if item.kind === 'tool_step'}

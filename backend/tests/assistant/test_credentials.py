@@ -82,7 +82,9 @@ async def test_get_providers_answers_the_providers_of_the_assistant_service(
             id="anthropic",
             name="Anthropic",
             login_methods=["oauth", "api_key"],
-            models=[ProviderModel(id="claude-sonnet-4-5", name="Claude Sonnet 4.5")],
+            models=[
+                ProviderModel(id="claude-sonnet-4-5", name="Claude Sonnet 4.5", thinking_levels=["off", "low", "high"])
+            ],
         ),
         ProviderSummary(id="google", name="Google", login_methods=["api_key"], models=[]),
     ]
@@ -95,7 +97,9 @@ async def test_get_providers_answers_the_providers_of_the_assistant_service(
                 "id": "anthropic",
                 "name": "Anthropic",
                 "login_methods": ["oauth", "api_key"],
-                "models": [{"id": "claude-sonnet-4-5", "name": "Claude Sonnet 4.5"}],
+                "models": [
+                    {"id": "claude-sonnet-4-5", "name": "Claude Sonnet 4.5", "thinking_levels": ["off", "low", "high"]}
+                ],
             },
             {"id": "google", "name": "Google", "login_methods": ["api_key"], "models": []},
         ]
@@ -275,7 +279,16 @@ async def test_leaving_the_dialog_stops_the_login(
 async def test_a_socket_without_a_conversation_refuses_a_prompt(client: httpx.AsyncClient) -> None:
     async with aconnect_ws("/ws/assistant", client) as socket:
         await socket.send_text(
-            json.dumps({"type": "prompt", "text": "Hi.", "provider": "x", "model": "y", "credential_id": "z"})
+            json.dumps(
+                {
+                    "type": "prompt",
+                    "text": "Hi.",
+                    "provider": "x",
+                    "model": "y",
+                    "credential_id": "z",
+                    "thinking_level": "off",
+                }
+            )
         )
         message = await receive(socket)
 

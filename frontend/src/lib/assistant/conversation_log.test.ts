@@ -22,18 +22,18 @@ function toolStep(fields: Partial<{ status: 'running' | 'succeeded' | 'failed'; 
 }
 
 describe('the conversation log', () => {
-  it('shows the saved messages with the model and the credential name of each AI assistant message', () => {
+  it('shows the saved messages with the model, the thinking level, and the credential name of each AI assistant message', () => {
     const log = readConversationLog(
       [
-        { role: 'user', text: 'Hi.', provider: null, model: null, credential_name: null },
-        { role: 'assistant', text: 'Hello.', provider: 'openai', model: 'gpt-a', credential_name: 'Work key' },
+        { role: 'user', text: 'Hi.', provider: null, model: null, credential_name: null, thinking_level: null },
+        { role: 'assistant', text: 'Hello.', provider: 'openai', model: 'gpt-a', credential_name: 'Work key', thinking_level: 'high' },
       ],
       NOW,
     );
 
     expect(log.items).toEqual([
-      { kind: 'message', id: 0, sentAtUtc: NOW, role: 'user', text: 'Hi.', model: null, credentialName: null, streaming: false },
-      { kind: 'message', id: 1, sentAtUtc: NOW, role: 'assistant', text: 'Hello.', model: 'gpt-a', credentialName: 'Work key', streaming: false },
+      { kind: 'message', id: 0, sentAtUtc: NOW, role: 'user', text: 'Hi.', modelLine: null, streaming: false },
+      { kind: 'message', id: 1, sentAtUtc: NOW, role: 'assistant', text: 'Hello.', modelLine: 'gpt-a · high · Work key', streaming: false },
     ]);
     expect(log.isRunning).toBe(false);
   });
@@ -49,7 +49,7 @@ describe('the conversation log', () => {
 
     log = addServerMessage(
       log,
-      { type: 'message_end', text: 'Hello.', provider: 'openai', model: 'gpt-b', credential_name: 'Home key' },
+      { type: 'message_end', text: 'Hello.', provider: 'openai', model: 'gpt-b', credential_name: 'Home key', thinking_level: 'off' },
       NOW,
     );
     log = addServerMessage(log, { type: 'run_state', state: 'settled' }, NOW);
@@ -58,8 +58,8 @@ describe('the conversation log', () => {
     expect(log.items.at(-1)).toMatchObject({
       role: 'assistant',
       text: 'Hello.',
-      model: 'gpt-b',
-      credentialName: 'Home key',
+      // The level "off" adds nothing to the line.
+      modelLine: 'gpt-b · Home key',
       streaming: false,
     });
     expect(log.isRunning).toBe(false);

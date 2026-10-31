@@ -29,6 +29,7 @@ async function runOneMessage(script: ModelStep[], customTools: Parameters<typeof
   const session = await createAssistantSession({
     modelRuntime,
     model,
+    thinkingLevel: 'off',
     piDir: workDir,
     customTools,
     systemPrompt: 'You are the ATrade strategy assistant.',

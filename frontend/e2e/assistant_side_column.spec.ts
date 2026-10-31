@@ -62,15 +62,49 @@ test('a prompt streams the answer, which shows its model and credential, and a c
   // The generated title replaces "New conversation".
   await expect(column.getByRole('combobox', { name: 'Conversation' })).toHaveText('Title of Hi.');
 
+  // GPT B has thinking levels: the line shows the default level "medium" of pi.
   await selectOption(page, 'Model', 'GPT B');
   await selectOption(page, 'Credential', 'Home key');
   await sendMessage(page, 'Again.');
-  await expect(log.getByText('gpt-b · Home key')).toBeVisible();
+  await expect(log.getByText('gpt-b · medium · Home key')).toBeVisible();
   await expect(log.getByText('gpt-a · Work key')).toBeVisible();
 
   // A reload shows the saved messages.
   await page.reload();
-  await expect(conversationLog(page).getByText('gpt-b · Home key')).toBeVisible();
+  await expect(conversationLog(page).getByText('gpt-b · medium · Home key')).toBeVisible();
+});
+
+test('the Model list shows the full model names, and the chosen thinking level is sent and shown', async ({
+  page,
+}, currentTest) => {
+  await openStrategyWithConversation(page, createUniqueName(currentTest, 'Thinking'));
+  const column = assistantColumn(page);
+  const thinking = column.getByRole('combobox', { name: 'Thinking' });
+  // GPT A has no reasoning: the Select is disabled and says why.
+  await expect(thinking).toBeDisabled();
+  await expect(thinking).toHaveText('No thinking');
+  await expect(thinking).toHaveAccessibleDescription('The model has no thinking levels.');
+
+  await column.getByRole('combobox', { name: 'Model' }).click();
+  const longOption = page.getByRole('option', { name: 'GPT Long Context Reasoning Preview Edition', exact: true });
+  await expect(longOption).toBeVisible();
+  const isCut = await longOption
+    .locator('.cds--list-box__menu-item__option')
+    .evaluate((element) => element.scrollWidth > element.clientWidth);
+  expect(isCut).toBe(false);
+  await longOption.click();
+
+  await expect(thinking).toBeEnabled();
+  await expect(thinking).toHaveText('Medium');
+  await selectOption(page, 'Thinking', 'High');
+  await sendMessage(page, 'Think about it.');
+  const log = conversationLog(page);
+  await expect(log.getByText('gpt-long · high · Work key')).toBeVisible();
+
+  // The browser keeps the chosen level.
+  await page.reload();
+  await expect(conversationLog(page).getByText('gpt-long · high · Work key')).toBeVisible();
+  await expect(assistantColumn(page).getByRole('combobox', { name: 'Thinking' })).toHaveText('High');
 });
 
 test('an answer shows its markdown: heading, bold, table, shell command, diff, and Mermaid diagram', async ({
