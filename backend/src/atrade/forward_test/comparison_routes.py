@@ -98,13 +98,20 @@ class ComparedInterruptionResponse(BaseModel):
 
 
 class ForwardTestFillResponse(BaseModel):
+    """A fill, or a stock split adjustment (section 12.16). A split adjustment has no price, the split ratio, and the
+    cash in lieu as `amount_usd`. `side` gives the direction of the share change."""
+
     symbol: str
     exchange: str
     time_utc: datetime
+    kind: Literal["fill", "split_adjustment"]
     side: Literal["BUY", "SELL"]
     quantity_shares: Decimal
-    price_usd: Decimal
+    price_usd: Decimal | None
     commission_usd: Decimal
+    # The quantity times the price of a fill, or the cash in lieu of a split adjustment.
+    amount_usd: Decimal
+    split_ratio: Decimal | None
 
 
 class ForwardTestInstrumentResponse(BaseModel):
@@ -233,14 +240,30 @@ def to_compared_backtest(backtest: BacktestOutcome) -> ComparedBacktestSummaryRe
 
 def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> ForwardTestFillResponse:
     fill = forward_test_fill.trade
+    if forward_test_fill.kind == "split_adjustment":
+        return ForwardTestFillResponse(
+            symbol=forward_test_fill.instrument.symbol,
+            exchange=forward_test_fill.instrument.exchange,
+            time_utc=fill.time_utc,
+            kind="split_adjustment",
+            side=fill.side,
+            quantity_shares=fill.quantity_shares,
+            price_usd=None,
+            commission_usd=Decimal(0),
+            amount_usd=forward_test_fill.cash_in_lieu_usd or Decimal(0),
+            split_ratio=forward_test_fill.split_ratio,
+        )
     return ForwardTestFillResponse(
         symbol=forward_test_fill.instrument.symbol,
         exchange=forward_test_fill.instrument.exchange,
         time_utc=fill.time_utc,
+        kind="fill",
         side=fill.side,
         quantity_shares=fill.quantity_shares,
         price_usd=fill.price_usd,
         commission_usd=fill.commission_usd,
+        amount_usd=fill.quantity_shares * fill.price_usd,
+        split_ratio=None,
     )
 
 
@@ -360,7 +383,7 @@ class ComparisonRoutes:
                 instrument=forward_test_store.read_single_instrument(row),
                 uses_owner_ledger=row.allocated_capital_usd is not None,
             )
-            fills = [forward_test_fill.trade for forward_test_fill in forward_test_fills]
+            fills = forward_test_records.list_trades(forward_test_fills)
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             backtest_ids = await forward_test_records.select_same_period_backtest_ids(connection, forward_test_id)
             members = await forward_test_store.select_universe_members(connection, forward_test_id)
@@ -396,7 +419,7 @@ class ComparisonRoutes:
                 instrument=forward_test_store.read_single_instrument(row),
                 uses_owner_ledger=row.allocated_capital_usd is not None,
             )
-            fills = [forward_test_fill.trade for forward_test_fill in forward_test_fills]
+            fills = forward_test_records.list_trades(forward_test_fills)
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             interruptions = await forward_test_store.select_interruptions(connection, forward_test_id)
         forward_test_metrics = limit_win_rate_to_period(

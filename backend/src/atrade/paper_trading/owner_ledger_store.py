@@ -168,30 +168,36 @@ async def insert_fill(connection: psycopg.AsyncConnection, fill: NewFill) -> Non
 
 @dataclass(frozen=True)
 class LedgerFill:
-    """One fill of an owner. `commission` is in the currency of the instrument, `cash_change` in USD."""
+    """One fill or stock split adjustment of an owner. `commission` is in the currency of the instrument,
+    `cash_change` in USD. A split adjustment has no price, the cash in lieu as `cash_change`, and the split ratio."""
 
+    entry_kind: Literal["fill", "split_adjustment"]
     time_utc: datetime
     symbol: str
     exchange: str
     currency: str
     quantity_change: Decimal
-    price: Decimal
+    price: Decimal | None
     commission: Decimal
     cash_change: Decimal
-    ibkr_execution_id: str
+    ibkr_execution_id: str | None
+    split_ratio: Decimal | None
 
 
 OWNER_FILLS_QUERY = """
-    SELECT time_utc, symbol, exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id
-    FROM owner_ledger_entry
-    WHERE entry_kind = 'fill' AND owner_kind = %(owner_kind)s
-        AND forward_test_id IS NOT DISTINCT FROM %(forward_test_id)s
-    ORDER BY time_utc, id
+    SELECT entry.entry_kind, entry.time_utc, entry.symbol, entry.exchange, entry.currency, entry.quantity_change,
+        CASE WHEN entry.entry_kind = 'fill' THEN entry.price END AS price, entry.commission, entry.cash_change,
+        entry.ibkr_execution_id, stock_split.split_ratio
+    FROM owner_ledger_entry AS entry
+    LEFT JOIN stock_split ON stock_split.id = entry.stock_split_id
+    WHERE entry.entry_kind IN ('fill', 'split_adjustment') AND entry.owner_kind = %(owner_kind)s
+        AND entry.forward_test_id IS NOT DISTINCT FROM %(forward_test_id)s
+    ORDER BY entry.time_utc, entry.id
 """
 
 
 async def select_owner_fills(connection: psycopg.AsyncConnection, owner: Owner) -> list[LedgerFill]:
-    """The fills of the owner in all accounts, oldest first."""
+    """The fills and the split adjustments of the owner in all accounts, oldest first."""
     async with connection.cursor(row_factory=class_row(LedgerFill)) as cursor:
         await cursor.execute(OWNER_FILLS_QUERY, {"owner_kind": owner.kind, "forward_test_id": owner.forward_test_id})
         return await cursor.fetchall()
@@ -297,13 +303,17 @@ def sum_owner_positions(entries: list[LedgerEntry]) -> list[OwnerPosition]:
         key = (entry.owner, Instrument(symbol=entry.symbol, exchange=entry.exchange, currency=entry.currency))
         quantity = quantities.get(key, Decimal(0))
         cost = costs.get(key, Decimal(0))
-        if entry.quantity_change > 0 and entry.price is not None:
+        if entry.entry_kind == "split_adjustment" and entry.price is None:
+            # A stock split keeps the total cost (section 11.11).
+            pass
+        elif entry.quantity_change > 0 and entry.price is not None:
             cost += entry.quantity_change * entry.price
         elif entry.quantity_change < 0 and quantity > 0:
             # A sale keeps the average cost: the cost goes down by the sold part.
             cost -= cost * min(-entry.quantity_change, quantity) / quantity
         quantities[key] = quantity + entry.quantity_change
-        costs[key] = cost
+        # A position of 0 shares has no cost, also after a reverse split with cash in lieu for all shares.
+        costs[key] = cost if quantities[key] != 0 else Decimal(0)
     return [
         OwnerPosition(
             owner=owner,

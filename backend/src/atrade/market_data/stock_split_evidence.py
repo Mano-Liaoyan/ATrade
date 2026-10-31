@@ -171,3 +171,22 @@ async def read_stock_split_candidates(*, database_url: str) -> list[StockSplitCa
         )
         for row in rows
     ]
+
+
+async def record_stock_split_evidence(
+    *,
+    database_url: str,
+    gateway_connection: GatewayConnection,
+    instruments: list[Instrument],
+    recorded_at_utc: datetime,
+) -> None:
+    """Evidence A for the stock split check (forward_test.md section 12.22): reads the last stored daily bar of each
+    instrument from IBKR again and records a candidate when the closes show a stock split. A failed read is logged.
+    Raises GatewayRequestError only when the connection is lost."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        for instrument in instruments:
+            await check_evidence_a(connection, gateway_connection, instrument, recorded_at_utc)
+            await connection.commit()
+            if not gateway_connection.is_connected():
+                message = "The connection to IB Gateway was lost during the stock split evidence read."
+                raise GatewayRequestError(message)

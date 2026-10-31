@@ -120,7 +120,8 @@ async def test_the_list_reads_all_forward_tests_with_a_fixed_number_of_connectio
 
     listed = [(item["symbol"], item["strategy_name"], len(item["interruptions"])) for item in response.json()]
     assert listed == [("MSFT", "Template", 0), ("AAPL", "Bar count", 1)]
-    assert connection_count == 3
+    # The forward tests, the strategy versions, and the "Split check needed" instruments.
+    assert connection_count == 4
 
 
 @pytest.mark.anyio

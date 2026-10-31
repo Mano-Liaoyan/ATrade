@@ -399,10 +399,13 @@ async def test_the_forward_test_page_has_the_records_and_links_each_same_period_
         "symbol": "AAPL",
         "exchange": "NASDAQ",
         "time_utc": "2026-01-02T03:05:02Z",
+        "kind": "fill",
         "side": "BUY",
         "quantity_shares": "10",
         "price_usd": "100.05",
         "commission_usd": "1",
+        "amount_usd": "1000.50",
+        "split_ratio": None,
     }
     # Newest first. The page links to the comparison with each one.
     assert [(item["id"], item["status"]) for item in detail["same_period_backtests"]] == [

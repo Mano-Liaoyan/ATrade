@@ -116,6 +116,7 @@ async def test_pushes_balance_and_positions_after_a_passed_check(database_url: s
                 {"owner": {"kind": "by_hand", "forward_test_id": None}, "quantity": "10", "average_cost": "200"}
             ],
             "unattributed_quantity": "0",
+            "split_check": None,
         }
     ]
 

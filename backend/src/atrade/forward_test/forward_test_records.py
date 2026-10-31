@@ -7,7 +7,8 @@ synchronously. The Web process reads them with an asynchronous connection.
 """
 
 from dataclasses import dataclass
-from typing import Final
+from decimal import Decimal
+from typing import Final, Literal
 
 import psycopg
 from psycopg.rows import class_row
@@ -51,24 +52,39 @@ async def save_equity_points(
 
 @dataclass(frozen=True)
 class ForwardTestFill:
+    """A fill, or a stock split adjustment (section 12.8). The trade of a split adjustment has the price 0 and the cash
+    in lieu as a negative commission, so the equity curve adds the shares and the cash in lieu."""
+
     instrument: Instrument
     trade: BacktestTrade
+    kind: Literal["fill", "split_adjustment"] = "fill"
+    split_ratio: Decimal | None = None
+    cash_in_lieu_usd: Decimal | None = None
 
 
 def convert_ledger_fill(fill: LedgerFill) -> ForwardTestFill:
     """A ledger fill as a trade: the sign of the quantity change gives the side."""
+    is_split = fill.entry_kind == "split_adjustment"
     return ForwardTestFill(
         instrument=Instrument(symbol=fill.symbol, exchange=fill.exchange, currency=fill.currency),
         trade=BacktestTrade(
             time_utc=fill.time_utc,
             side="BUY" if fill.quantity_change > 0 else "SELL",
             quantity_shares=abs(fill.quantity_change),
-            price_usd=fill.price,
-            commission_usd=fill.commission,
+            price_usd=Decimal(0) if fill.price is None else fill.price,
+            commission_usd=-fill.cash_change if is_split else fill.commission,
             symbol=fill.symbol,
             exchange=fill.exchange,
         ),
+        kind=fill.entry_kind,
+        split_ratio=fill.split_ratio,
+        cash_in_lieu_usd=fill.cash_change if is_split else None,
     )
+
+
+def list_trades(fills: list[ForwardTestFill]) -> list[BacktestTrade]:
+    """The trades of the fills, without the split adjustments: the metrics and the comparison count fills only."""
+    return [fill.trade for fill in fills if fill.kind == "fill"]
 
 
 def select_ledger_fills_blocking(connection: psycopg.Connection, forward_test_id: int) -> list[ForwardTestFill]:

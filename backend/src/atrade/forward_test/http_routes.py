@@ -34,7 +34,12 @@ from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.socket_push import ChangedMessageSender, HeartbeatMessage, serve_until_disconnect
-from atrade.paper_trading import ManualOrderLedger, PaperAccountCheckError, PaperAccountMonitor
+from atrade.paper_trading import (
+    ManualOrderLedger,
+    PaperAccountCheckError,
+    PaperAccountMonitor,
+    read_needed_split_checks_with_holders,
+)
 from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
 from atrade.watchlist import read_watchlist_instruments
 
@@ -94,6 +99,13 @@ class InterruptionResponse(BaseModel):
     ended_at_utc: datetime | None
 
 
+class SplitCheckNeededResponse(BaseModel):
+    """An instrument of the forward test in the "Split check needed" state (paper_trading.md section 11.11)."""
+
+    symbol: str
+    exchange: str
+
+
 class ForwardTestResponse(BaseModel):
     id: int
     strategy_version_id: int
@@ -121,6 +133,8 @@ class ForwardTestResponse(BaseModel):
     interruptions: list[InterruptionResponse]
     # None for a forward test of the time before the allocated capital (section 12.18).
     allocated_capital_usd: Decimal | None
+    # The instrument of a single-instrument forward test, or the instruments that the forward test holds.
+    split_checks_needed: list[SplitCheckNeededResponse]
 
 
 class StartRefusedResponse(BaseModel):
@@ -168,13 +182,31 @@ async def to_forward_test_responses(database_url: str, rows: list[ForwardTestRow
     strategy_versions = await read_strategy_versions(
         database_url=database_url, strategy_version_ids=sorted({row.strategy_version_id for row in rows})
     )
-    return [build_forward_test_response(row, strategy_versions, interruptions[row.id]) for row in rows]
+    split_checks = await read_needed_split_checks_with_holders(database_url=database_url)
+    return [
+        build_forward_test_response(
+            row, strategy_versions, interruptions[row.id], find_split_checks_needed(row, split_checks)
+        )
+        for row in rows
+    ]
+
+
+def find_split_checks_needed(
+    row: ForwardTestRow, split_checks: list[tuple[Instrument, list[int]]]
+) -> list[SplitCheckNeededResponse]:
+    single_instrument = forward_test_store.read_single_instrument(row)
+    return [
+        SplitCheckNeededResponse(symbol=instrument.symbol, exchange=instrument.exchange)
+        for instrument, forward_test_ids in split_checks
+        if instrument == single_instrument or row.id in forward_test_ids
+    ]
 
 
 def build_forward_test_response(
     row: ForwardTestRow,
     strategy_versions: dict[int, StrategyVersion],
     interruptions: list[forward_test_store.ForwardTestInterruption],
+    split_checks_needed: list[SplitCheckNeededResponse],
 ) -> ForwardTestResponse:
     strategy_version = strategy_versions.get(row.strategy_version_id)
     if strategy_version is None:
@@ -202,6 +234,7 @@ def build_forward_test_response(
         end_time_utc=row.end_time_utc,
         crash_count=row.crash_count,
         allocated_capital_usd=row.allocated_capital_usd,
+        split_checks_needed=split_checks_needed,
         interruptions=[
             InterruptionResponse(reason=item.reason, started_at_utc=item.started_at_utc, ended_at_utc=item.ended_at_utc)
             for item in interruptions

@@ -44,7 +44,7 @@ def join_members(member_lists: Iterable[Iterable[Instrument]]) -> list[Instrumen
 
 
 class BarFetcher:
-    def __init__(
+    def __init__(  # noqa: PLR0913 readability-exception: one keyword argument per input of the bar fetcher.
         self,
         *,
         database_url: str,
@@ -52,12 +52,15 @@ class BarFetcher:
         open_gateway_connection: Callable[[], GatewayConnection],
         read_member_lists: ReadMemberLists,
         sleep: Sleep = asyncio.sleep,
+        connection_lock: asyncio.Lock | None = None,
     ) -> None:
         self.database_url = database_url
         self.clock = clock
         self.open_gateway_connection = open_gateway_connection
         self.read_member_lists = read_member_lists
         self.sleep = sleep
+        # The stock split check uses the same client ID. The lock keeps one connection at a time (section 12.22).
+        self.connection_lock = connection_lock or asyncio.Lock()
         # The start of the last UTC day of a daily read that reached IB Gateway.
         self.last_read_day_utc: datetime | None = None
         # The members whose warm-up this worker filled, for each forward test. Its child can start (section 12.17).
@@ -157,12 +160,13 @@ class BarFetcher:
         ]
         if not bar_requests:
             return
-        gateway_connection = self.open_gateway_connection()
-        try:
-            await gateway_connection.connect()
-            await self.read_and_save(gateway_connection, bar_requests)
-        finally:
-            gateway_connection.disconnect()
+        async with self.connection_lock:
+            gateway_connection = self.open_gateway_connection()
+            try:
+                await gateway_connection.connect()
+                await self.read_and_save(gateway_connection, bar_requests)
+            finally:
+                gateway_connection.disconnect()
 
     async def read_and_save(self, gateway_connection: GatewayConnection, bar_requests: list[BarRequest]) -> None:
         is_first_request = True
