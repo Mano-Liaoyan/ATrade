@@ -364,8 +364,8 @@ exist, and `403` when the screen has `kept` true or another
 - Not on the AI assistant port: `DELETE /api/screens/{id}`, watchlist
   changes (also "Add to watchlist"), HK instrument list changes, the daily
   bar update, and parameter sweeps.
-- The AI assistant discusses screens only in the AI assistant side column
-  of the strategy page. The screen page has no AI assistant.
+- The AI assistant discusses screens in the AI assistant side column. The
+  screen page has it too (assistant section 25.12).
 
 ## 24.9 Screens as a backtest universe
 

@@ -6,7 +6,8 @@
      key metric row and the equity and drawdown curves with the interruptions in grey) over the
      Fills / Comparison / Logs panel. Comparison links to the comparison with each backtest of the same period. Logs
      shows the current error and the events (start, interruptions, stop). The open forward test reads again every
-     2 seconds. The address #start-forward-test (command palette) opens the New forward test dialog. -->
+     2 seconds. The address #start-forward-test (command palette) opens the New forward test dialog.
+     Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import Compare16 from '@carbon/icons/es/compare/16.js';
@@ -59,6 +60,7 @@
   import { START_FORWARD_TEST_FORM_ID } from '../../palette_commands';
   import ForwardTestList from '../ForwardTestList.svelte';
   import StartForwardTestDialog from '../StartForwardTestDialog.svelte';
+  import AssistantColumn from '../../assistant/AssistantColumn.svelte';
 
   const READ_INTERVAL_MILLISECONDS = 2000;
   const START_FORWARD_TEST_HASH = `#${START_FORWARD_TEST_FORM_ID}`;
@@ -418,6 +420,8 @@
       {/snippet}
     </PanelSplit>
   {/if}
+
+  <AssistantColumn />
 </Workbench>
 
 <StartForwardTestDialog open={isStartDialogOpen} onOpenChange={changeStartDialog} onStarted={openStartedForwardTest} />

@@ -16,9 +16,10 @@
      on the selected tab minimizes it again. A save that the code checks refuse opens Problems; a click on a problem goes
      to its line in the editor. Output lists the events and errors of saves, backtests, forward tests, and the AI
      assistant.
-     Right: the "AI assistant" side column (AssistantColumn, docs/architecture/assistant.md 25.12). A click on a diff
-     card opens a diff tab in the editor panel; Keep opens the new version, Discard keeps the open version. Maximize of
-     the side column hides the center area: it shows only a 32px rail. -->
+     Right: the "AI assistant" side column (AssistantColumn of routes/assistant/, docs/architecture/assistant.md
+     25.12). A click on a diff card opens a diff tab in the editor panel; Keep opens the new version, Discard keeps the
+     open version. A diff card on another page opens this page, and then its diff tab. Maximize of the side column
+     hides the center area: the Workbench shows only a 32px rail. -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import ErrorFilled16 from '@carbon/icons/es/error--filled/16.js';
@@ -81,7 +82,8 @@
   import NewStrategyDialog from './NewStrategyDialog.svelte';
   import StartBacktestDialog from '../backtests/StartBacktestDialog.svelte';
   import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
-  import AssistantColumn from './AssistantColumn.svelte';
+  import AssistantColumn from '../assistant/AssistantColumn.svelte';
+  import { assistantSession } from '../assistant/assistant_session.svelte';
   import { AssistantDiff, DIFF_TAB_VALUE } from './assistant_diff.svelte';
   import StrategyList from './StrategyList.svelte';
   import StrategyOutput from './StrategyOutput.svelte';
@@ -166,7 +168,6 @@
   let replacingCode = $state<string | null>(null);
   // The diff tab of a diff card. fileTab keeps the file tab to go back to.
   const assistantDiff = new AssistantDiff();
-  let isAssistantMaximized = $state(false);
 
   const forwardTestFeed = new ForwardTestsOnInstrumentsFeed();
   $effect(() => forwardTestFeed.start(window.location));
@@ -274,14 +275,18 @@
     problems = [];
     selection = { tab: null, backtestId: null };
     assistantDiff.close();
-    // The AI assistant column leaves the page with the strategy, so it cannot restore the center area itself.
-    isAssistantMaximized = false;
     if (id !== null) {
       // The address gives the first version only. A later version change writes the address (openStrategyVersion).
       void loadStrategy(
         id,
         untrack(() => addressVersionNumber),
-      );
+      ).then(() => {
+        // A diff card on another page opened this strategy for its diff.
+        const diffVersionNumber = assistantSession.takeRequestedDiff(id);
+        if (diffVersionNumber !== null) {
+          void openDiff(diffVersionNumber);
+        }
+      });
     }
   });
 
@@ -586,7 +591,7 @@
     <StrategyList {strategies} errorMessage={listMessage} openStrategyId={activeStrategyId} />
   </SideColumn>
 
-  <div class={['main', isAssistantMaximized && 'main--rail']}>
+  <div class="main">
     {#if strategy !== null}
       {@const shownStrategy = strategy}
       <PanelHeader>
@@ -794,19 +799,13 @@
     {/if}
   </div>
 
-  {#if strategy !== null}
-    <AssistantColumn
-      strategyId={strategy.id}
-      openVersionNumber={openVersion?.version_number ?? null}
-      onOpenDiff={(versionNumber: number) => void openDiff(versionNumber)}
-      onKeep={(versionNumber: number) => void keepVersion(versionNumber)}
-      onDiscarded={(versionNumber: number) => void showDiscardedVersion(versionNumber)}
-      onError={writeOutputError}
-      onMaximizedChange={(isMaximized: boolean) => {
-        isAssistantMaximized = isMaximized;
-      }}
-    />
-  {/if}
+  <AssistantColumn
+    openStrategy={strategy === null ? null : { strategyId: strategy.id, versionNumber: openVersion?.version_number ?? null }}
+    onOpenDiff={(versionNumber: number) => void openDiff(versionNumber)}
+    onKeep={(versionNumber: number) => void keepVersion(versionNumber)}
+    onDiscarded={(versionNumber: number) => void showDiscardedVersion(versionNumber)}
+    onError={writeOutputError}
+  />
 </Workbench>
 
 <NewStrategyDialog
@@ -897,18 +896,6 @@
     flex-direction: column;
     min-inline-size: 0;
     min-block-size: 0;
-  }
-
-  /* Maximize of the AI assistant: the center area is a 32px rail, and its content stays in the page. */
-  .main--rail {
-    flex: none;
-    inline-size: var(--cds-spacing-07);
-    border-inline-end: 1px solid var(--cds-border-subtle-01);
-    overflow: hidden;
-  }
-
-  .main--rail > :global(*) {
-    display: none;
   }
 
   .editor[hidden] {

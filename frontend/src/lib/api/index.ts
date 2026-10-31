@@ -766,7 +766,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Conversations */
+        /**
+         * List Conversations
+         * @description Without strategy_id: all conversations. Each workbench page lists the same conversations (25.12).
+         */
         get: operations["list_conversations_api_assistant_conversations_get"];
         put?: never;
         /**
@@ -1367,7 +1370,7 @@ export interface components {
             /** Id */
             id: number;
             /** Strategy Id */
-            strategy_id: number;
+            strategy_id: number | null;
             /** Title */
             title: string;
             title_state: components["schemas"]["TitleState"];
@@ -1415,7 +1418,7 @@ export interface components {
             /** Id */
             id: number;
             /** Strategy Id */
-            strategy_id: number;
+            strategy_id: number | null;
             /** Title */
             title: string;
             title_state: components["schemas"]["TitleState"];
@@ -1438,7 +1441,7 @@ export interface components {
         /** CreateConversationRequest */
         CreateConversationRequest: {
             /** Strategy Id */
-            strategy_id: number;
+            strategy_id?: number | null;
             /** Version Number */
             version_number?: number | null;
         };
@@ -5172,8 +5175,8 @@ export interface operations {
     };
     list_conversations_api_assistant_conversations_get: {
         parameters: {
-            query: {
-                strategy_id: number;
+            query?: {
+                strategy_id?: number | null;
             };
             header?: never;
             path?: never;

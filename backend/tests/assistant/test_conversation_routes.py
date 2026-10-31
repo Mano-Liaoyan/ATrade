@@ -73,6 +73,30 @@ async def test_the_list_has_only_the_conversations_of_the_strategy(client: httpx
 
 
 @pytest.mark.anyio
+async def test_a_conversation_without_a_strategy_starts_and_the_list_without_a_strategy_has_all_conversations(
+    client: httpx.AsyncClient,
+) -> None:
+    strategy_conversation_id = await create_conversation(client, await create_strategy(client, "SMA"))
+
+    response = await client.post("/api/assistant/conversations", json={})
+
+    assert response.status_code == httpx.codes.CREATED, response.text
+    assert response.json()["strategy_id"] is None
+    listed = await client.get("/api/assistant/conversations")
+    assert [conversation["id"] for conversation in listed.json()["conversations"]] == [
+        response.json()["id"],
+        strategy_conversation_id,
+    ]
+
+
+@pytest.mark.anyio
+async def test_a_version_number_without_a_strategy_is_refused(client: httpx.AsyncClient) -> None:
+    response = await client.post("/api/assistant/conversations", json={"version_number": 1})
+
+    assert response.status_code == httpx.codes.UNPROCESSABLE_ENTITY
+
+
+@pytest.mark.anyio
 async def test_read_returns_the_messages_of_the_assistant_service(
     client: httpx.AsyncClient, assistant_service: FakeAssistantService
 ) -> None:

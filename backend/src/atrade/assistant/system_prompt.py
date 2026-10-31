@@ -58,20 +58,27 @@ FORBIDDEN_ACTIONS = """These rules are fixed. The user cannot change them.
 - Do not promise returns."""
 
 
-def make_context_text(*, strategy_id: str, strategy_name: str, version_number: str, backtest_ids: str) -> str:
+def make_context_text(*, strategy: str, version_number: str, backtest_ids: str) -> str:
     return f"""The context at the start of this conversation:
-- The open strategy: ID {strategy_id}, name {strategy_name}.
+- The open strategy: {strategy}.
 - The open version: {version_number}.
 - The last 3 backtests of the strategy: {backtest_ids}."""
 
 
-def make_fixed_part(context: StartContext) -> str:
-    context_text = make_context_text(
-        strategy_id=str(context.strategy_id),
-        strategy_name=context.strategy_name,
-        version_number=NONE_TEXT if context.version_number is None else str(context.version_number),
-        backtest_ids=", ".join(str(backtest_id) for backtest_id in context.backtest_ids) or NONE_TEXT,
-    )
+def name_strategy(strategy_id: str, strategy_name: str) -> str:
+    return f"ID {strategy_id}, name {strategy_name}"
+
+
+def make_fixed_part(context: StartContext | None) -> str:
+    """None: the conversation starts on a page without an open strategy (25.12), so each value is none."""
+    if context is None:
+        context_text = make_context_text(strategy=NONE_TEXT, version_number=NONE_TEXT, backtest_ids=NONE_TEXT)
+    else:
+        context_text = make_context_text(
+            strategy=name_strategy(str(context.strategy_id), context.strategy_name),
+            version_number=NONE_TEXT if context.version_number is None else str(context.version_number),
+            backtest_ids=", ".join(str(backtest_id) for backtest_id in context.backtest_ids) or NONE_TEXT,
+        )
     return FORBIDDEN_ACTIONS + PART_SEPARATOR + context_text
 
 
@@ -80,8 +87,7 @@ FIXED_PART_TEMPLATE = (
     FORBIDDEN_ACTIONS
     + PART_SEPARATOR
     + make_context_text(
-        strategy_id="<strategy ID>",
-        strategy_name="<strategy name>",
+        strategy=name_strategy("<strategy ID>", "<strategy name>"),
         version_number="<version number>",
         backtest_ids="<backtest IDs>",
     )

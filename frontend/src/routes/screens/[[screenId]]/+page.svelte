@@ -6,7 +6,8 @@
      watchlist", and "Run backtest on this screen result"; batch actions when rows are selected), and the result or the
      excluded table. Each change of a condition runs the changed screen at once (section 24.13). An HK screen shows the
      survivorship bias warning. The backtest buttons open the "New backtest" form with the screen, the screen result,
-     and the selected rows (screen.md section 24.9). -->
+     and the selected rows (screen.md section 24.9).
+     Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -52,6 +53,7 @@
   import StartBacktestDialog from '../../backtests/StartBacktestDialog.svelte';
   import { readLastScreenId, writeLastScreenId } from '../last_screen';
   import ScreenList from '../ScreenList.svelte';
+  import AssistantColumn from '../../assistant/AssistantColumn.svelte';
 
   type ShownTable = 'result' | 'excluded';
   type Definition = Record<string, unknown>;
@@ -582,6 +584,8 @@
       {/if}
     {/if}
   </main>
+
+  <AssistantColumn />
 </Workbench>
 
 <StartBacktestDialog

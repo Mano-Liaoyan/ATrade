@@ -8,7 +8,8 @@
      sources shows the source order and the bar counts. An HK backtest and a US backtest before the Databento history
      show the survivorship bias warning over the key metrics.
      The list reads again while a backtest in it is queued or running; the open backtest reads again until its status
-     is final. The address #start-backtest (command palette) opens the New backtest dialog. -->
+     is final. The address #start-backtest (command palette) opens the New backtest dialog.
+     Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import ConnectionSignal16 from '@carbon/icons/es/connection-signal/16.js';
@@ -49,6 +50,7 @@
   import BacktestList from '../BacktestList.svelte';
   import BarSourceTable from '../BarSourceTable.svelte';
   import StartBacktestDialog from '../StartBacktestDialog.svelte';
+  import AssistantColumn from '../../assistant/AssistantColumn.svelte';
 
   // A backtest of a few years of daily bars ends in seconds. One read each second is enough.
   const STATUS_CHECK_INTERVAL_MILLISECONDS = 1000;
@@ -350,6 +352,8 @@
       {/snippet}
     </PanelSplit>
   {/if}
+
+  <AssistantColumn />
 </Workbench>
 
 <StartBacktestDialog open={isStartDialogOpen} onOpenChange={changeStartDialog} onStarted={openStartedBacktest} />

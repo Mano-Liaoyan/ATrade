@@ -2284,14 +2284,22 @@
     "/api/assistant/conversations": {
       "get": {
         "summary": "List Conversations",
+        "description": "Without strategy_id: all conversations. Each workbench page lists the same conversations (25.12).",
         "operationId": "list_conversations_api_assistant_conversations_get",
         "parameters": [
           {
             "name": "strategy_id",
             "in": "query",
-            "required": true,
+            "required": false,
             "schema": {
-              "type": "integer",
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
               "title": "Strategy Id"
             }
           }
@@ -4471,7 +4479,14 @@
             "title": "Id"
           },
           "strategy_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Strategy Id"
           },
           "title": {
@@ -4632,7 +4647,14 @@
             "title": "Id"
           },
           "strategy_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Strategy Id"
           },
           "title": {
@@ -4707,7 +4729,14 @@
       "CreateConversationRequest": {
         "properties": {
           "strategy_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Strategy Id"
           },
           "version_number": {
@@ -4724,9 +4753,6 @@
           }
         },
         "type": "object",
-        "required": [
-          "strategy_id"
-        ],
         "title": "CreateConversationRequest"
       },
       "CreateScreenRequest": {
