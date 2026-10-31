@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vite-plus/test';
 import { createAssistantTools } from '../src/assistant_tools.ts';
-import { runBacktest, summarizeBacktest, type BacktestWait } from '../src/backtest_tools.ts';
+import { runBacktest, summarizeBacktest, SURVIVORSHIP_BIAS_WARNING, type BacktestWait } from '../src/backtest_tools.ts';
 import { Conversations, type RunEvent } from '../src/conversations.ts';
 import { WebPortClient } from '../src/web_port_client.ts';
 import { createFakeOpenModel } from './fake_model.ts';
@@ -25,6 +25,7 @@ import {
   STRATEGY_LIST,
   versionBody,
   type FakeWebPort,
+  type WebPortRequest,
 } from './fake_web_port.ts';
 
 const SELECTION = { provider: 'fake', model: 'fake-model', credentialId: 'fake-key-1' };
@@ -287,6 +288,104 @@ describe('run_backtest', () => {
 
     expect(readToolResults()).toEqual([`Port 8001 answered 422: ${JSON.stringify(NO_SAVED_BARS)}`]);
     expect(eventsOfType(events, 'tool_step').at(-1)?.status).toBe('failed');
+  });
+});
+
+const SCREEN_BACKTEST_ARGUMENTS = {
+  strategy_version_id: 102,
+  universe_kind: 'screen',
+  screen_id: 5,
+  bar_period: '1-DAY',
+  start_utc: '2018-01-01T00:00:00Z',
+  end_utc: '2026-01-01T00:00:00Z',
+  paper_capital_usd: 100000,
+};
+const LIST_BACKTEST_ARGUMENTS = {
+  strategy_version_id: 102,
+  universe_kind: 'list',
+  screen_result_id: 9,
+  symbols: ['S1', 'S2'],
+  bar_period: '1-DAY',
+  start_utc: '2018-01-01T00:00:00Z',
+  end_utc: '2026-01-01T00:00:00Z',
+  paper_capital_usd: 100000,
+};
+
+function backtestStarts(): WebPortRequest[] {
+  return web.requests.filter((request) => request.method === 'POST' && request.path === '/api/backtests');
+}
+
+describe('run_backtest with a universe (25.4.2)', () => {
+  test('starts a screen backtest with the conversation and each quarter when no period is given', async () => {
+    const conversations = await openConversations([
+      call('run_backtest', SCREEN_BACKTEST_ARGUMENTS),
+      call('run_backtest', { ...SCREEN_BACKTEST_ARGUMENTS, rebalance_period: 'month' }),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    expect(backtestStarts().map((request) => [request.conversationId, request.body])).toEqual([
+      [CONVERSATION_ID, { ...SCREEN_BACKTEST_ARGUMENTS, rebalance_period: 'quarter' }],
+      [CONVERSATION_ID, { ...SCREEN_BACKTEST_ARGUMENTS, rebalance_period: 'month' }],
+    ]);
+    expect(readToolResults()).toEqual([
+      summarizeBacktest(backtestBody(11, 'finished')),
+      summarizeBacktest(backtestBody(12, 'finished')),
+    ]);
+  });
+
+  test('starts a fixed list backtest of a screen result, and each result has the survivorship bias warning', async () => {
+    const conversations = await openConversations([
+      call('run_backtest', LIST_BACKTEST_ARGUMENTS),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    expect(backtestStarts().map((request) => [request.conversationId, request.body])).toEqual([
+      [CONVERSATION_ID, LIST_BACKTEST_ARGUMENTS],
+    ]);
+    expect(readToolResults()).toEqual([
+      { ...summarizeBacktest(backtestBody(11, 'finished')), survivorship_bias_warning: SURVIVORSHIP_BIAS_WARNING },
+    ]);
+    expect(SURVIVORSHIP_BIAS_WARNING).toContain('Write this warning in your answer');
+  });
+
+  test('returns "still running", the backtest ID, and the warning when a fixed list backtest passes the wait', async () => {
+    web.backtestStatuses = ['queued', 'running'];
+    const shortWait: BacktestWait = { limitMilliseconds: 30, pollMilliseconds: 5, now: () => Date.now() };
+    const conversations = await openConversations(
+      [call('run_backtest', LIST_BACKTEST_ARGUMENTS), { text: 'Later.' }],
+      shortWait,
+    );
+
+    await runOnce(conversations);
+
+    expect(readToolResults()).toEqual([
+      'Backtest 11 is still running (status running). Read the result later with read_backtest. ' +
+        SURVIVORSHIP_BIAS_WARNING,
+    ]);
+  });
+
+  test('a multi-instrument backtest counts as 1 of the 5 backtests of a user message', async () => {
+    web.backtestStatuses = ['finished'];
+    const conversations = await openConversations([
+      call('run_backtest', SCREEN_BACKTEST_ARGUMENTS),
+      call('run_backtest', LIST_BACKTEST_ARGUMENTS),
+      call('run_backtest', BACKTEST_ARGUMENTS),
+      call('run_backtest', SCREEN_BACKTEST_ARGUMENTS),
+      call('run_backtest', LIST_BACKTEST_ARGUMENTS),
+      call('run_backtest', SCREEN_BACKTEST_ARGUMENTS),
+      { text: 'I ask the user.' },
+    ]);
+
+    await runOnce(conversations, 'Test the screen.');
+
+    expect(backtestStarts()).toHaveLength(5);
+    expect(readToolResults().at(-1)).toBe(
+      'This user message already started 5 backtests. No backtest started. Ask the user before you start more backtests.',
+    );
   });
 });
 

@@ -17,9 +17,12 @@ from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
 from tests.assistant.assistant_app import create_conversation, create_strategy, open_assistant_client
 from tests.backtest.real_runner import TEST_STRATEGY_FILE, save_test_bars
+from tests.backtest.test_screen_result_list_routes import save_screen_result
+from tests.backtest.universe_data import AAA, CCC, make_universe_request, save_universe_test_data
 from tests.fakes.assistant import FakeAssistantService
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection
+from tests.screen.test_screen_run_routes import create_screen, make_definition
 
 ALLOWED_ROUTES = {
     ("GET", "/api/strategies"),
@@ -223,6 +226,40 @@ async def test_a_backtest_on_port_8001_records_the_conversation(
         assert response.status_code == httpx.codes.CREATED, response.text
         backtest = (await assistant.get(f"/api/backtests/{response.json()['id']}")).json()
     assert backtest["conversation_id"] == conversation_id
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("universe_kind", ["screen", "list"])
+async def test_a_multi_instrument_backtest_on_port_8001_records_the_conversation(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path, universe_kind: str
+) -> None:
+    """docs/architecture/assistant.md 25.3.3: `POST /api/backtests` takes the universe fields (phase 3)."""
+    save_universe_test_data(database_url)
+    async with open_both_clients(database_url, clock, frontend_build_dir) as (browser, assistant):
+        strategy_id = await create_strategy(browser, "Bar count")
+        conversation_id = await create_conversation(browser, strategy_id)
+        headers = {CONVERSATION_HEADER: str(conversation_id)}
+        saved = await assistant.post(
+            f"/api/strategies/{strategy_id}/versions", json={"code": TEST_STRATEGY_FILE.read_text()}, headers=headers
+        )
+        if universe_kind == "screen":
+            universe: dict[str, object] = {
+                "screen_id": await create_screen(browser, make_definition(start="quarter_universe")),
+                "rebalance_period": "month",
+            }
+        else:
+            universe = {"screen_result_id": save_screen_result(database_url, [AAA, CCC]), "symbols": ["CCC"]}
+
+        response = await assistant.post(
+            "/api/backtests",
+            json=make_universe_request(saved.json()["id"], universe_kind=universe_kind, **universe),
+            headers=headers,
+        )
+
+        assert response.status_code == httpx.codes.CREATED, response.text
+        backtest = (await assistant.get(f"/api/backtests/{response.json()['id']}")).json()
+    assert (backtest["universe_kind"], backtest["conversation_id"]) == (universe_kind, conversation_id)
+    assert backtest["survivorship_bias"] is (universe_kind == "list")
 
 
 @pytest.mark.anyio

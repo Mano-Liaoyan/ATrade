@@ -160,7 +160,7 @@ The screen paths come from #150. Decided (#205): they are the final paths
 | `GET /api/strategies/{strategy_id}/versions/{version_number}` | `read_strategy_version` | 2 | None. |
 | `POST /api/strategies` | `create_strategy` | 2 | None. |
 | `POST /api/strategies/{strategy_id}/versions` | `save_strategy_version` | 2 | The version records the source "AI assistant" and the conversation ID (25.5). |
-| `POST /api/backtests` | `run_backtest` | 2 (single instrument), 3 (universe fields) | The backtest records the conversation ID. |
+| `POST /api/backtests` | `run_backtest` | 2 (single instrument), 3 (universe fields `screen` and `list`, done in #211) | The backtest records the conversation ID. |
 | `GET /api/backtests` | `list_backtests` | 2 | None. |
 | `GET /api/backtests/{backtest_id}` | `read_backtest`, `run_backtest` (wait) | 2 | None. |
 | `GET /api/backtests/{first_id}/comparison/{second_id}` | `compare_backtests` | 2 | None. |
@@ -274,6 +274,26 @@ prompt does not list the tools.
   assistant must write this warning in its answer.
 - One multi-instrument backtest counts as 1 of the 5 backtests of a user
   message. The 15 minute wait is the same.
+- Done (#211): `run_backtest` has the optional parameters `universe_kind`
+  (`single`, the default, `screen`, or `list`), `screen_id`,
+  `rebalance_period` (`quarter` or `month`), `screen_result_id`, and
+  `symbols`. `symbol`, `exchange`, and `currency` are optional, because only
+  `single` uses them. The tool sends the fields to `POST /api/backtests`
+  with no other change, so port 8001 makes the universe checks of backtest
+  section 10.10.6 and its `422` goes to the model. A `422` does not count.
+- Decided (#211): for `screen` without `rebalance_period`, the tool sends
+  `rebalance_period: "quarter"`.
+- Decided (#211): the warning of `list` is the constant
+  `SURVIVORSHIP_BIAS_WARNING` (`assistant/src/backtest_tools.ts`). It ends
+  with "Write this warning in your answer." After a final status, the tool
+  result is the `read_backtest` content with the field
+  `survivorship_bias_warning`. The "still running" text ends with the
+  warning.
+- Decided (#211): `run_backtest` does not take `rule` and the watchlist
+  (backtest section 10.10.8). The AI assistant backtests a screen.
+- Tests: `assistant/tests/assistant_tools.test.ts` ("run_backtest with a
+  universe") and `backend/tests/app/test_assistant_port.py`
+  (`test_a_multi_instrument_backtest_on_port_8001_records_the_conversation`).
 
 ### 25.4.3 Screen tools (phase 3)
 
