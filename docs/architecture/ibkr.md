@@ -164,9 +164,16 @@ make sure that the `ib-gateway` service runs and is logged in.
   `ATRADE_IBKR_PASSWORD`. Only `ib-gateway` gets these values.
 - IBC restarts the Gateway each day at `AUTO_RESTART_TIME`, in `TIME_ZONE`,
   without a new login. They come from `ATRADE_IBKR_AUTO_RESTART_TIME` (default
-  `11:45 PM`) and `ATRADE_IBKR_TIME_ZONE` (default `America/New_York`). Keep
-  the time before the daily IBKR server reset. Without the restart, the
-  Gateway can log off each day, and forward tests wait for IB Gateway.
+  `11:00 PM`) and `ATRADE_IBKR_TIME_ZONE` (default `America/New_York`). Keep
+  the time before the daily IBKR server reset, which starts at about
+  11:45 PM ET. Without the restart, the Gateway can log off each day, and
+  forward tests wait for IB Gateway.
+- A restart at the start of the reset can get the login dialog and the
+  IBKR message "Unrecognized Username or Password", also when the
+  credentials are correct. IBC does not try again. The Gateway stays logged
+  out, and the API port does not open, until you restart the service:
+  `docker compose --file deploy/compose.yaml --env-file .env restart
+  ib-gateway`. This occurred on 2026-10-29 with the old default `11:45 PM`.
 - The service has no `ports`. The API stays inside the Compose network.
 - The service is in the Compose profile `ibkr`. `./start run` without the
   profile starts `postgres` and `web` only, so the local start does not need

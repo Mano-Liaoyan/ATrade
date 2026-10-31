@@ -40,7 +40,7 @@ services:
       EXISTING_SESSION_DETECTED_ACTION: primary
       # IBC restarts the Gateway each day at this time, without a new login (docs/architecture/ibkr.md 7.4).
       # Format "hh:mm AM" or "hh:mm PM", in TIME_ZONE.
-      AUTO_RESTART_TIME: ${ATRADE_IBKR_AUTO_RESTART_TIME:-11:45 PM}
+      AUTO_RESTART_TIME: ${ATRADE_IBKR_AUTO_RESTART_TIME:-11:00 PM}
       TIME_ZONE: ${ATRADE_IBKR_TIME_ZONE:-America/New_York}
     # No "ports": the API (ib-gateway:4004 for paper, through socat) stays inside the Compose network.
     pids_limit: 2048

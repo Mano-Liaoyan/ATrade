@@ -201,7 +201,7 @@ reachable". To connect:
    IBKR paper account. Set `ATRADE_IBKR_ACCOUNT_ID` to the paper account
    number (it starts with `DU`). IBC restarts the Gateway each day at
    `ATRADE_IBKR_AUTO_RESTART_TIME` in `ATRADE_IBKR_TIME_ZONE` (default
-   `11:45 PM`, `America/New_York`).
+   `11:00 PM`, `America/New_York`).
 3. Run `./start run`. The header shows "IB Gateway connected." after the
    Gateway has logged in. The Paper tag in the header shows the paper
    account (for example `DU****567`) when the paper account check passes.
