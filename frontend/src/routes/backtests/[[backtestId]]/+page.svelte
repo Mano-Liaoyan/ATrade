@@ -6,7 +6,8 @@
      Trades / Orders / Logs / Metrics / Bar sources panel. The API has no orders, so Orders is an empty state. Logs
      shows the strategy error. Metrics shows the metric table (docs/architecture/backtest.md section 10.9.6). Bar
      sources shows the source order and the bar counts. An HK backtest and a US backtest before the Databento history
-     show the survivorship bias warning over the key metrics.
+     show the survivorship bias warning over the key metrics. A backtest that used instruments that waited for the IBKR
+     stock split check shows its warning there too.
      The list reads again after each backtest change that /ws/backtests pushes; the open backtest reads again when its
      list row changes. The address #start-backtest (command palette) opens the New backtest dialog.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
@@ -45,7 +46,7 @@
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { isLiveBarPeriod, startForwardTest } from '#lib/forward_test';
-  import { SurvivorshipBiasWarning } from '#lib/market_data';
+  import { SplitCheckWarning, SurvivorshipBiasWarning } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_BACKTEST_FORM_ID } from '../../palette_commands';
@@ -308,6 +309,9 @@
             {/if}
             {#if detail.survivorship_bias}
               <SurvivorshipBiasWarning />
+            {/if}
+            {#if detail.has_split_check_pending}
+              <SplitCheckWarning />
             {/if}
             {#if detail.metrics !== null}
               <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} />

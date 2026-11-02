@@ -371,7 +371,7 @@ Changes of later phases:
 | 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. Done (#180): each backtest of `GET /api/backtests` and `GET /api/backtests/{backtest_id}` has `conversation_id` (null for a backtest of the user). The route of port 8000 never sets it. The public entry exports `start_backtest(*, database_url, exchange_rate_reader, request, created_at_utc, universe_periods, conversation_id)`: it makes the checks of `POST /api/backtests` and returns the ID of the queued backtest or a `BacktestRefusal` (`detail`). Port 8001 calls it with the conversation ID (#181). |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6, done in #199 for `single`, `rule`, and `list`) and can contain `source_order` (section 10.12, done in #197): a list of `BarSource` values, only for this backtest. Without it, the route saves the global source order. `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source; then no row is added. The saved-bar check of the start route reads through this source order. |
 | 3 | `GET /api/backtests` | Without the query `sweep_id`, the list has no sweep runs. With `sweep_id`, it has only the runs of that sweep. Done in #203: the list has no sweep runs. The query `sweep_id` is not there yet; `GET /api/sweeps/{sweep_id}` lists the runs. |
-| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. Done in #204: `sweep_id` and `parameters` (null for a backtest that is not a sweep run), also in `GET /api/backtests`. Done in #200: `instruments`, a list of `{"symbol", "exchange", "trade_count", "net_profit_usd", "quarter_count"}`, one item for each universe member by symbol, empty for a single-instrument backtest. `net_profit_usd` is the sum of the round trips that ended, after commissions. `quarter_count` is the number of universe periods of the member. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
+| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), `has_split_check_pending` (boolean, section 10.12, done in #324, also in `GET /api/backtests`), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. Done in #204: `sweep_id` and `parameters` (null for a backtest that is not a sweep run), also in `GET /api/backtests`. Done in #200: `instruments`, a list of `{"symbol", "exchange", "trade_count", "net_profit_usd", "quarter_count"}`, one item for each universe member by symbol, empty for a single-instrument backtest. `net_profit_usd` is the sum of the round trips that ended, after commissions. `quarter_count` is the number of universe periods of the member. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
 | 3 | `/api/sweeps` | New routes, section 10.11.3. |
 
 The JSON names of the Phase 1 and Phase 3 fields are choices of this
@@ -1336,6 +1336,22 @@ Phase 3. Sources: [#141](https://github.com/Mano-Liaoyan/ATrade/issues/141),
   `SurvivorshipBiasWarning` of `frontend/src/lib/market_data/` (a low-contrast
   Carbon warning notification). The screen page and the multi-instrument
   backtest form use the same component.
+- Decided (#324): the backtest page shows the IBKR stock split check
+  warning when an instrument of the backtest waited for the IBKR stock split
+  check (`market_data.md` section 8.8.3.1) when the backtest was created.
+  The bars of such an instrument can have the prices before a stock split.
+  A single-instrument backtest checks its instrument. A multi-instrument
+  backtest checks all instruments of its currency, because its members are
+  known only when it runs. The backend saves the result in the column
+  `backtest.has_split_check_pending` (migration `c4a81e6d2b07`), so a later
+  end of the check does not hide the warning of an earlier backtest. The API
+  gives `has_split_check_pending` next to `survivorship_bias`.
+- Decided (#324): the warning title is "IBKR stock split check not done". It
+  is the shared component `SplitCheckWarning` of
+  `frontend/src/lib/market_data/`, the same Carbon warning as
+  `SurvivorshipBiasWarning`, over the key metric row. Its tooltip says "Some
+  instruments waited for the IBKR stock split check. Their bars before a
+  stock split can have the old prices."
 - Code (#197): `backtest_access.py` (`has_survivorship_bias`,
   `add_global_source_order`), `backtest_run.py`, `backtest_store.py`, and
   `frontend/src/routes/backtests/BarSourceTable.svelte`. Tests:

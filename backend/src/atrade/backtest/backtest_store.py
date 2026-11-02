@@ -12,7 +12,7 @@ from psycopg.types.json import Jsonb
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint, find_split_time
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import BarSource
+from atrade.market_data import BarSource, has_pending_split_check
 
 type BacktestStatus = Literal["queued", "running", "finished", "failed", "timed_out", "cancelled"]
 # The values of the parameters of a parameter sweep run, by parameter name (docs/architecture/backtest.md 10.11).
@@ -143,6 +143,7 @@ class BacktestRow:
     parameters: ParameterValues | None
     universe_screen: dict[str, Any] | None
     universe_rebalance_period: UniverseRebalancePeriod | None
+    has_split_check_pending: bool
 
 
 BACKTEST_COLUMNS: Final = """
@@ -152,7 +153,7 @@ BACKTEST_COLUMNS: Final = """
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
     average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
     out_of_sample_share, split_time_utc, conversation_id, source_order, bar_count_by_source, universe_kind,
-    universe_top_n, sweep_id, parameters, universe_screen, universe_rebalance_period
+    universe_top_n, sweep_id, parameters, universe_screen, universe_rebalance_period, has_split_check_pending
 """
 
 
@@ -235,16 +236,22 @@ async def insert_backtest(  # noqa: PLR0913 readability-exception: the keywords 
     transaction."""
     instrument = request.instrument
     async with connection.transaction(), connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
+        # The warning of docs/architecture/backtest.md section 10.12: the bars of an instrument that waits for the
+        # IBKR stock split check can have the prices before a stock split.
+        has_split_check_pending = await has_pending_split_check(
+            connection, instrument=instrument, currency=request.currency
+        )
         await cursor.execute(
             f"""
             INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
                 paper_capital_usd, out_of_sample_share, split_time_utc, status, created_at_utc, conversation_id,
                 source_order, universe_kind, universe_top_n, sweep_id, parameters, universe_screen,
-                universe_rebalance_period)
+                universe_rebalance_period, has_split_check_pending)
             VALUES (%(strategy_version_id)s, %(symbol)s, %(exchange)s, %(currency)s, %(bar_period)s, %(start_utc)s,
                 %(end_utc)s, %(paper_capital_usd)s, %(out_of_sample_share)s, %(split_time_utc)s, 'queued',
                 %(created_at_utc)s, %(conversation_id)s, %(source_order)s, %(universe_kind)s, %(universe_top_n)s,
-                %(sweep_id)s, %(parameters)s, %(universe_screen)s, %(universe_rebalance_period)s)
+                %(sweep_id)s, %(parameters)s, %(universe_screen)s, %(universe_rebalance_period)s,
+                %(has_split_check_pending)s)
             RETURNING {BACKTEST_COLUMNS}
             """,
             {
@@ -271,6 +278,7 @@ async def insert_backtest(  # noqa: PLR0913 readability-exception: the keywords 
                 if request.universe is None or request.universe.screen is None
                 else Jsonb(asdict(request.universe.screen)),
                 "universe_rebalance_period": None if request.universe is None else request.universe.rebalance_period,
+                "has_split_check_pending": has_split_check_pending,
             },
         )
         inserted_row = await cursor.fetchone()

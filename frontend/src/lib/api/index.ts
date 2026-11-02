@@ -1043,6 +1043,8 @@ export interface components {
             } | null;
             /** Survivorship Bias */
             survivorship_bias: boolean;
+            /** Has Split Check Pending */
+            has_split_check_pending: boolean;
             /** Sweep Id */
             sweep_id: number | null;
             parameters: components["schemas"]["ParameterValues"] | null;
@@ -1171,6 +1173,8 @@ export interface components {
             } | null;
             /** Survivorship Bias */
             survivorship_bias: boolean;
+            /** Has Split Check Pending */
+            has_split_check_pending: boolean;
             /** Sweep Id */
             sweep_id: number | null;
             parameters: components["schemas"]["ParameterValues"] | null;
@@ -1316,6 +1320,8 @@ export interface components {
             } | null;
             /** Survivorship Bias */
             survivorship_bias: boolean;
+            /** Has Split Check Pending */
+            has_split_check_pending: boolean;
             /** Sweep Id */
             sweep_id: number | null;
             parameters: components["schemas"]["ParameterValues"] | null;

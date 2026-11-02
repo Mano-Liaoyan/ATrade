@@ -235,3 +235,41 @@ async def test_look_back_bars_follow_the_source_order_of_the_backtest(
     assert backtest["bar_count_by_source"] == {"databento": 0, "ibkr": 20}
     assert backtest["trades"][0]["time_utc"] == "2026-03-03T00:00:00Z"
     assert backtest["trades"][0]["price_usd"] == "100.00"
+
+
+def insert_split_check(database_url: str, symbol: str, checked_end_utc: datetime | None) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO ibkr_split_check (symbol, exchange, currency, check_end_utc, checked_end_utc)
+            VALUES (%(symbol)s, 'ARCA', 'USD', '2026-04-01', %(checked_end_utc)s)
+            """,
+            {"symbol": symbol, "checked_end_utc": checked_end_utc},
+        )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("symbol", "checked_end_utc", "has_split_check_pending"),
+    [
+        pytest.param("BTEST", None, True, id="the instrument waits for the check"),
+        pytest.param("BTEST", datetime(2026, 4, 1, tzinfo=UTC), False, id="the check of the instrument is done"),
+        pytest.param("OTHER", None, False, id="another instrument waits for the check"),
+    ],
+)
+async def test_a_backtest_of_an_instrument_that_waits_for_the_ibkr_stock_split_check_has_the_warning(
+    web_client: httpx.AsyncClient,
+    database_url: str,
+    symbol: str,
+    checked_end_utc: datetime | None,
+    has_split_check_pending: bool,
+) -> None:
+    save_test_bars(database_url)
+    insert_split_check(database_url, symbol, checked_end_utc)
+    saved = await save_test_strategy_version(web_client)
+
+    response = await web_client.post("/api/backtests", json=make_backtest_request(saved["strategy_version_id"]))
+
+    assert response.status_code == 201
+    detail = (await web_client.get(f"/api/backtests/{response.json()['id']}")).json()
+    assert detail["has_split_check_pending"] is has_split_check_pending
