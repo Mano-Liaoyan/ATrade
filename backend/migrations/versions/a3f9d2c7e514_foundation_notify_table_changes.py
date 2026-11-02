@@ -33,7 +33,6 @@ def upgrade() -> None:
     -- commit and sends equal notifications of one transaction only once.
     CREATE FUNCTION notify_table_change() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
-        PERFORM pg_notify('table_change', TG_TABLE_NAME);
         RETURN NULL;
     END;
     $$;
