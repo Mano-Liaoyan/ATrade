@@ -53,6 +53,13 @@ function describeGatewayRow(status: GatewayStatus): ConnectionRow {
         'Not reachable',
         `Not reachable at ${status.address}. ATrade keeps trying to connect. Make sure that the ib-gateway service runs and is logged in.`,
       );
+    case 'no_ibkr_connection':
+      return createRow(
+        'IB Gateway',
+        'error',
+        'No connection to IBKR',
+        'No connection to IBKR. The ib-gateway service restarts itself after 10 minutes. To restart it now, run "docker compose restart ib-gateway".',
+      );
     case 'unknown':
       return createRow('IB Gateway', 'warning', 'Status not known', 'Status not known.');
     case 'checking':
@@ -77,6 +84,9 @@ export function summarizeConnections(
   if (problems.length === 0) {
     return { label: 'Connections', badge: null, rows };
   }
-  const problemText = problems.map((row) => `${row.name} ${row.stateLabel.toLowerCase()}.`).join(' ');
+  // Only the first letter becomes lower case, so that names like IBKR stay.
+  const problemText = problems
+    .map((row) => `${row.name} ${row.stateLabel.charAt(0).toLowerCase()}${row.stateLabel.slice(1)}.`)
+    .join(' ');
   return { label: `Connections: ${problemText}`, badge: findWorstKind(rows), rows };
 }

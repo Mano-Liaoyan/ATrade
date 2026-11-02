@@ -1,4 +1,5 @@
-"""The real ib_async connection when no IB Gateway listens: it keeps trying and reports "not connected"."""
+"""The real ib_async connection when no IB Gateway listens: it keeps trying and reports "not connected". Also the
+IBKR link: IB Gateway accepts the API connection, but it has no connection to the IBKR servers."""
 
 import logging
 import socket
@@ -10,8 +11,13 @@ import pytest
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayRequestError, IbAsyncGatewayConnection, OrderRequest
+from atrade.ibkr import gateway_connection as gateway_connection_module
 
 LOCAL_HOST = "127.0.0.1"
+AAPL = Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")
+ONE_DAY_RANGE = TimeRange(datetime(2026, 3, 2, tzinfo=UTC), datetime(2026, 3, 3, tzinfo=UTC))
+# The tests make each historical data timeout this short.
+SHORT_TIMEOUT_SECONDS = 0.05
 
 
 def find_closed_local_port() -> int:
@@ -109,3 +115,86 @@ async def test_reports_connected_only_after_the_startup_synchronization(monkeypa
             while not connection.is_connected():
                 await anyio.sleep(0.01)
         assert connection.read_connection_number() == 1
+
+
+class HistoricalDataGateway:
+    """Replaces reqHistoricalDataAsync. `answers` false: each request waits for its timeout, then ib_async returns an
+    empty list, like IB Gateway without a connection to IBKR."""
+
+    def __init__(self) -> None:
+        self.answers = True
+        self.request_count = 0
+
+    async def request(self, *_args: object, timeout: float, **_kwargs: object) -> list[object]:
+        self.request_count += 1
+        if not self.answers:
+            await anyio.sleep(timeout)
+        return []
+
+
+def make_connected_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[IbAsyncGatewayConnection, HistoricalDataGateway]:
+    monkeypatch.setattr(gateway_connection_module, "HISTORICAL_DATA_TIMEOUT_SECONDS", SHORT_TIMEOUT_SECONDS)
+    monkeypatch.setattr(gateway_connection_module, "IBKR_LINK_CHECK_TIMEOUT_SECONDS", SHORT_TIMEOUT_SECONDS)
+    connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=4004, client_id=1)
+    historical_data_gateway = HistoricalDataGateway()
+    monkeypatch.setattr(connection.ib, "isConnected", lambda: True)
+    monkeypatch.setattr(connection.ib, "reqHistoricalDataAsync", historical_data_gateway.request)
+    connection.synchronized = True
+    return connection, historical_data_gateway
+
+
+def test_reports_no_ibkr_connection_between_the_lost_and_the_restored_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    connection, _ = make_connected_connection(monkeypatch)
+    assert connection.read_status() == "connected"
+
+    connection.receive_error(-1, 1100, "Connectivity between IBKR and Trader Workstation has been lost.", None)
+
+    assert connection.read_status() == "no_ibkr_connection"
+    assert not connection.is_connected()
+
+    connection.receive_error(-1, 1102, "Connectivity between IBKR and Trader Workstation has been restored.", None)
+
+    assert connection.read_status() == "connected"
+
+
+@pytest.mark.anyio
+async def test_fails_at_once_after_a_historical_data_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    connection, historical_data_gateway = make_connected_connection(monkeypatch)
+    historical_data_gateway.answers = False
+
+    with pytest.raises(GatewayRequestError, match="in time"):
+        await connection.read_historical_bars(AAPL, BarPeriod.ONE_DAY, ONE_DAY_RANGE)
+    assert connection.read_status() == "no_ibkr_connection"
+
+    with pytest.raises(GatewayRequestError, match="no connection to IBKR"):
+        await connection.read_historical_bars(AAPL, BarPeriod.ONE_DAY, ONE_DAY_RANGE)
+    assert historical_data_gateway.request_count == 1
+
+
+@pytest.mark.anyio
+async def test_a_request_after_the_retry_wait_finds_the_link_that_came_back(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(gateway_connection_module, "IBKR_LINK_CHECK_WHILE_LOST_SECONDS", 0.0)
+    connection, historical_data_gateway = make_connected_connection(monkeypatch)
+    connection.receive_error(-1, 2110, "Connectivity between Trader Workstation and server is broken.", None)
+
+    await connection.read_historical_bars(AAPL, BarPeriod.ONE_DAY, ONE_DAY_RANGE)
+
+    assert historical_data_gateway.request_count == 1
+    assert connection.read_status() == "connected"
+
+
+@pytest.mark.anyio
+async def test_the_ibkr_link_check_marks_the_link_lost_and_restored(monkeypatch: pytest.MonkeyPatch) -> None:
+    connection, historical_data_gateway = make_connected_connection(monkeypatch)
+    historical_data_gateway.answers = False
+
+    await connection.check_ibkr_link()
+
+    assert connection.read_status() == "no_ibkr_connection"
+
+    historical_data_gateway.answers = True
+    await connection.check_ibkr_link()
+
+    assert connection.read_status() == "connected"

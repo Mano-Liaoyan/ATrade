@@ -5785,15 +5785,18 @@
         ],
         "type": "string"
       },
+      "GatewayStatus": {
+        "type": "string",
+        "enum": [
+          "connected",
+          "unreachable",
+          "no_ibkr_connection"
+        ]
+      },
       "GatewayStatusResponse": {
         "properties": {
           "status": {
-            "type": "string",
-            "enum": [
-              "connected",
-              "unreachable"
-            ],
-            "title": "Status"
+            "$ref": "#/components/schemas/GatewayStatus"
           },
           "host": {
             "type": "string",

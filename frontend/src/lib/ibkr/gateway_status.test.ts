@@ -23,6 +23,14 @@ describe('fetchGatewayStatus', () => {
     expect(gatewayStatus).toEqual({ kind: 'unreachable', address: 'ib-gateway:4004' });
   });
 
+  it('reports no IBKR connection when IB Gateway is not logged in to IBKR', async () => {
+    const fetchStatus = respondWith(200, { status: 'no_ibkr_connection', host: 'ib-gateway', port: 4004 });
+
+    const gatewayStatus = await fetchGatewayStatus(fetchStatus);
+
+    expect(gatewayStatus).toEqual({ kind: 'no_ibkr_connection' });
+  });
+
   it('reports unknown when the backend does not answer', async () => {
     const failingFetch: typeof fetch = () => Promise.reject(new TypeError('Failed to fetch'));
 

@@ -48,8 +48,9 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_exchange_rate(currency, quote_currency)`, `read_daily_exchange_rates(currency, quote_currency, time_range)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_status()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_exchange_rate(currency, quote_currency)`, `read_daily_exchange_rates(currency, quote_currency, time_range)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
 | `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
+| `GatewayStatus` | `connected`, `unreachable` (no API connection), or `no_ibkr_connection` (the API connection is there, but IB Gateway has no connection to the IBKR servers). |
 | `AccountValue` | One account value from IBKR: `account`, `tag` (for example `NetLiquidation`), `value` (text), `currency`. |
 | `PortfolioPosition` | One position of the account: symbol, security type, exchange, currency, quantity, average cost, market price, market value, unrealized P&L. |
 | `OrderRequest` | An order to send: `account`, `instrument`, `side` (`BUY`, `SELL`), `quantity` (whole number), `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`), `order_ref`. |
@@ -65,6 +66,25 @@ The public entry `atrade.ibkr` exports:
   reports the API as ready before its startup synchronization reads the
   managed accounts, the open orders, and the account values. Before that end,
   the connection number and `NetLiquidation` are not there yet.
+- IB Gateway can keep the API port open while it has no connection to the
+  IBKR servers, for example after a failed login during a reconnection
+  (section 7.4). Each request then waits for its timeout. The connection
+  thus keeps an IBKR link state:
+  - Lost: IB Gateway sends code `1100` or `2110`, or a historical data
+    request gets no answer before its timeout.
+  - Restored: IB Gateway sends code `1101` or `1102`, or a historical data
+    request gets an answer. An IBKR API error is also an answer.
+  - A new API connection starts with the link restored.
+- `keep_connected()` also runs the IBKR link check: a request for the daily
+  `MIDPOINT` bars of `EUR.USD`, with a 30 second timeout. It needs no market
+  data subscription. The check runs at once after each connection, then each
+  5 minutes, and each 60 seconds while the link is lost.
+- While the link is lost, `read_status()` returns `no_ibkr_connection` and
+  `is_connected()` is false. So the routes return `503` at once. The order
+  functions, the historical data requests, and the live bar subscription
+  raise `GatewayRequestError` at once. Each 60 seconds, 1 request can try
+  again. So a connection without `keep_connected()` (a forward test child)
+  also finds a link that came back.
 - `read_connection_number()` counts the successful connections. A new
   number tells `paper_trading` to run the paper account check again
   (section 11.5).
@@ -79,7 +99,7 @@ The public entry `atrade.ibkr` exports:
   when the Gateway is not reachable.
 - The hand-written fake `tests/fakes/ibkr.py` (`FakeGatewayConnection`) has
   the same functions. Its data stays in memory. Tests set
-  `is_gateway_reachable`, `connected`, `port`, `managed_accounts`,
+  `is_gateway_reachable`, `connected`, `has_ibkr_connection`, `port`, `managed_accounts`,
   `account_values`, `portfolio`, `instruments`, `search_error_message`,
   `historical_bars_error_message`, `open_orders`, `order_error_message`, `cancel_error_message`, `executions`,
   `exchange_rates`, `exchange_rate_error_message`, and `daily_exchange_rates` (one rate for each
@@ -139,11 +159,13 @@ The public entry `atrade.ibkr` exports:
 
 | Route | Behavior |
 |---|---|
-| `GET /api/ibkr/gateway` | `200` with `{"status": "connected" \| "unreachable", "host": ..., "port": ...}`. `host` and `port` are `settings.ibkr_host` and `settings.ibkr_paper_port`. |
+| `GET /api/ibkr/gateway` | `200` with `{"status": "connected" \| "unreachable" \| "no_ibkr_connection", "host": ..., "port": ...}`. The status is `read_status()` (section 7.2). `host` and `port` are `settings.ibkr_host` and `settings.ibkr_paper_port`. |
 
 The app shell header shows the status and reads it again every 10 seconds.
 When the Gateway is not reachable, it shows the address and asks the user to
-make sure that the `ib-gateway` service runs and is logged in.
+make sure that the `ib-gateway` service runs and is logged in. When the
+Gateway has no connection to IBKR, it tells that the service restarts itself
+after 10 minutes, and gives the restart command.
 
 ## 7.4 The `ib-gateway` Compose service
 
@@ -174,6 +196,20 @@ make sure that the `ib-gateway` service runs and is logged in.
   out, and the API port does not open, until you restart the service:
   `docker compose --file deploy/compose.yaml --env-file .env restart
   ib-gateway`. This occurred on 2026-10-29 with the old default `11:45 PM`.
+- The same message can come when the Gateway connects again after a lost
+  connection to IBKR. Then the API port stays open, but the Gateway has no
+  connection to IBKR, and each historical data request waits for its
+  timeout. This occurred on 2026-11-02 at 06:15 ET.
+- The watchdog `deploy/ib-gateway-watchdog.sh` is the health check of the
+  service. It runs each 60 seconds and finds 2 problems: the paper API port
+  4002 does not listen, or `GET http://web:8000/api/ibkr/gateway` returns
+  `no_ibkr_connection`. When a problem stays for 10 minutes, the watchdog
+  sends `SIGTERM` to `run.sh` (PID 1). The container stops, and
+  `restart: unless-stopped` starts it again with a new login. The daily
+  restart closes the port for some seconds only. After each restart without
+  a recovery, the wait doubles, to a maximum of 2 hours. So a long IBKR
+  outage does not cause a login each 10 minutes. The watchdog writes each
+  restart to the container log (`ATrade watchdog: ...`).
 - The service has no `ports`. The API stays inside the Compose network.
 - The service is in the Compose profile `ibkr`. `./start run` without the
   profile starts `postgres` and `web` only, so the local start does not need

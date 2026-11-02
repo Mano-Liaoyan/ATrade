@@ -37,6 +37,15 @@ describe('summarizeConnections', () => {
     });
   });
 
+  it('shows the error badge and the restart when IB Gateway has no connection to IBKR', () => {
+    const connections = summarizeConnections(BACKEND_OK, { kind: 'no_ibkr_connection' }, '03:04:05 UTC');
+
+    expect(connections.badge).toBe('error');
+    expect(connections.label).toBe('Connections: IB Gateway no connection to IBKR.');
+    expect(connections.rows[1]?.stateLabel).toBe('No connection to IBKR');
+    expect(connections.rows[1]?.detail).toContain('docker compose restart ib-gateway');
+  });
+
   // Without the backend, the IB Gateway status is not known: the backend gives it. A problem row says the problem.
   it('shows the error badge and no server time when the backend is not reachable', () => {
     const connections = summarizeConnections({ kind: 'backend_unreachable' }, { kind: 'unknown' }, null);
