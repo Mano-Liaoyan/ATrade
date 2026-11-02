@@ -425,8 +425,9 @@ document. The implementation can change them.
     Metrics (section 10.9.6, `BacktestMetricTable`, #168). Phase 3 adds the
     tab Instruments and the Symbol column of Trades (section 10.10.7), and
     the tab Bar sources (section 10.12).
-  - The page reads the open backtest each second until its status is final,
-    and the list every 2 seconds while a backtest in it is queued or running.
+  - The page reads the list after each change that `/ws/backtests` pushes
+    (architecture.md section 13 "Live updates"). It reads the open backtest
+    again when its list row changes, until its status is final.
 - The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
   id `start-backtest`). The address `#start-backtest` (command palette) opens
   it. After the start, the page opens the new backtest. The form combines the

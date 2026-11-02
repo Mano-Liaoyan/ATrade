@@ -7,10 +7,11 @@
      shows the strategy error. Metrics shows the metric table (docs/architecture/backtest.md section 10.9.6). Bar
      sources shows the source order and the bar counts. An HK backtest and a US backtest before the Databento history
      show the survivorship bias warning over the key metrics.
-     The list reads again while a backtest in it is queued or running; the open backtest reads again until its status
-     is final. The address #start-backtest (command palette) opens the New backtest dialog.
+     The list reads again after each backtest change that /ws/backtests pushes; the open backtest reads again when its
+     list row changes. The address #start-backtest (command palette) opens the New backtest dialog.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
+  import { untrack } from 'svelte';
   import Add16 from '@carbon/icons/es/add/16.js';
   import ConnectionSignal16 from '@carbon/icons/es/connection-signal/16.js';
   import Settings16 from '@carbon/icons/es/settings/16.js';
@@ -18,6 +19,7 @@
   import { resolve } from '$app/paths';
   import { navigating, page } from '$app/state';
   import {
+    BACKTESTS_SOCKET_PATH,
     BacktestLimitsForm,
     BacktestMetricTable,
     BacktestTradeTable,
@@ -38,7 +40,7 @@
   } from '#lib/backtest';
   import { Dialog, IconButton, InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { startPolling } from '#lib/foundation/polling';
+  import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -52,9 +54,6 @@
   import StartBacktestDialog from '../StartBacktestDialog.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
 
-  // A backtest of a few years of daily bars ends in seconds. One read each second is enough.
-  const STATUS_CHECK_INTERVAL_MILLISECONDS = 1000;
-  const LIST_CHECK_INTERVAL_MILLISECONDS = 2000;
   const START_BACKTEST_HASH = `#${START_BACKTEST_FORM_ID}`;
 
   const PANELS: PanelSpec[] = [
@@ -77,8 +76,6 @@
   let backtests: Backtest[] = $state([]);
   let isListRead = $state(false);
   let listMessage = $state('');
-  // A new value reads the list again, for example after a new backtest starts.
-  let listReadCount = $state(0);
   let backtest = $state<BacktestDetail | null>(null);
   let detailMessage = $state('');
   let selectedTable: BacktestTable = $state('trades');
@@ -91,27 +88,22 @@
   // A forward test runs on live bars: the bar period of the backtest must be a live bar period.
   const hasLiveBarPeriod = $derived(shownBacktest !== null && isLiveBarPeriod(shownBacktest.bar_period));
 
-  $effect(() => {
-    // A new read count runs this effect again: its cleanup stops the old loop.
-    listReadCount satisfies number;
-    return startPolling(
-      () => listBacktests(fetch),
-      (result) => {
+  // /ws/backtests pushes each change of a backtest, also from other tabs, the assistant, and the backtest process.
+  $effect(() =>
+    readOnChange({
+      socketPath: BACKTESTS_SOCKET_PATH,
+      read: () => listBacktests(fetch),
+      onResult: (result) => {
         isListRead = true;
         if (result.kind === 'failed') {
           listMessage = result.message;
-          return true;
+          return;
         }
         listMessage = '';
         backtests = result.value;
-        return result.value.some((item) => !isFinalStatus(item.status));
       },
-      LIST_CHECK_INTERVAL_MILLISECONDS,
-      (message) => {
-        listMessage = message;
-      },
-    );
-  });
+    }),
+  );
 
   // /backtests opens the newest backtest. The same page component stays, so an open dialog stays open. A navigation
   // that runs (for example a click on a header link) wins.
@@ -131,29 +123,41 @@
     }
   });
 
-  // The open backtest reads again until its status is final.
+  // The open backtest reads again when its list row changes (status or metrics): the list comes from /ws/backtests.
+  const openListRowText = $derived(JSON.stringify(backtests.find((item) => item.id === backtestId) ?? null));
+
   $effect(() => {
     if (backtestId === null) {
       return;
     }
+    openListRowText satisfies string;
     const id = backtestId;
+    // A final backtest does not change any more.
+    const shown = untrack(() => backtest);
+    if (shown !== null && shown.id === id && isFinalStatus(shown.status)) {
+      return;
+    }
+    let isActive = true;
+    void readBacktest(fetch, id).then((result) => {
+      if (!isActive) {
+        return;
+      }
+      if (result.kind === 'failed') {
+        detailMessage = result.message;
+        return;
+      }
+      detailMessage = '';
+      backtest = result.value;
+    });
+    return () => {
+      isActive = false;
+    };
+  });
+
+  // A new open backtest has no failed start of a forward test.
+  $effect(() => {
+    backtestId satisfies number | null;
     forwardTestMessage = '';
-    return startPolling(
-      () => readBacktest(fetch, id),
-      (result) => {
-        if (result.kind === 'failed') {
-          detailMessage = result.message;
-          return true;
-        }
-        detailMessage = '';
-        backtest = result.value;
-        return !isFinalStatus(result.value.status);
-      },
-      STATUS_CHECK_INTERVAL_MILLISECONDS,
-      (message) => {
-        detailMessage = message;
-      },
-    );
   });
 
   // The command palette goes to #start-backtest.
@@ -175,14 +179,12 @@
   // A deleted open backtest: /backtests opens the newest backtest that is left.
   function removeDeletedBacktests(deletedIds: number[]): void {
     backtests = backtests.filter((item) => !deletedIds.includes(item.id));
-    listReadCount += 1;
     if (backtestId !== null && deletedIds.includes(backtestId)) {
       void goto(resolve('/backtests/[[backtestId]]', { backtestId: undefined }), { replace: true });
     }
   }
 
   function openStartedBacktest(started: Backtest): void {
-    listReadCount += 1;
     void goto(resolve('/backtests/[[backtestId]]', { backtestId: String(started.id) }));
   }
 

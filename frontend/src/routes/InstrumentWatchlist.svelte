@@ -9,6 +9,7 @@
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
   import { DataTable, IconButton, InlineNotification, type TableColumn } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
+  import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { ChangeText, formatPrice, formatSignedPercent } from '#lib/foundation/value_format';
   import {
@@ -25,6 +26,7 @@
     deleteFromWatchlist,
     formatWatchlistInstrument,
     listWatchlist,
+    WATCHLIST_SOCKET_PATH,
     type WatchlistInstrument,
   } from '#lib/watchlist';
   import { createInstrumentHref } from './instrument_href';
@@ -63,9 +65,16 @@
   // A function, so that the check after each await reads the current value.
   const isReading = (): boolean => isMounted;
 
+  // The instruments whose quote was requested. Each list read after a change asks only for the new ones.
+  const quoteRequestedIds: Record<number, true> = {};
+
   // Each daily bar request can call IBKR and save bars. A few requests at a time keep the backend free for the
   // chart, and the reads stop when the column leaves the page.
-  function readQuotes(waiting: WatchlistInstrument[]): void {
+  function readQuotes(watchlistInstruments: WatchlistInstrument[]): void {
+    const waiting = watchlistInstruments.filter((listed) => !(listed.id in quoteRequestedIds));
+    for (const listed of waiting) {
+      quoteRequestedIds[listed.id] = true;
+    }
     const readNextQuote = async (): Promise<void> => {
       for (let next = waiting.shift(); next !== undefined && isReading(); next = waiting.shift()) {
         const watchlistInstrument = next;
@@ -80,24 +89,25 @@
     }
   }
 
+  // /ws/watchlist pushes each change of the watchlist, also from other tabs and the assistant.
   $effect(() => {
     isMounted = true;
-    void listWatchlist(fetch).then((result) => {
-      if (!isMounted) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        failedMessage = result.message;
-        return;
-      }
-      // Keep an instrument that the user added while the list loaded: the list can be older than the add.
-      const listedIds = new Set(result.value.map((listed) => listed.id));
-      const addedMeanwhile = (instruments ?? []).filter((added) => !listedIds.has(added.id));
-      instruments = [...result.value, ...addedMeanwhile];
-      readQuotes([...result.value]);
+    const stop = readOnChange({
+      socketPath: WATCHLIST_SOCKET_PATH,
+      read: () => listWatchlist(fetch),
+      onResult: (result) => {
+        if (result.kind === 'failed') {
+          failedMessage = result.message;
+          return;
+        }
+        failedMessage = null;
+        instruments = result.value;
+        readQuotes(result.value);
+      },
     });
     return () => {
       isMounted = false;
+      stop();
     };
   });
 

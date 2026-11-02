@@ -34,6 +34,7 @@ export {
   deleteScreen,
   keepScreen,
   listScreenIndicators,
+  SCREENS_SOCKET_PATH,
   listScreens,
   readScreen,
   readScreenResult,

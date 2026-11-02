@@ -3050,16 +3050,17 @@ export interface components {
             /** Backtest Id */
             backtest_id: number;
         };
-        /** ForwardTestsMessage */
-        ForwardTestsMessage: {
+        /**
+         * ChangedMessage
+         * @description A watched table of the socket changed. The page reads its data again.
+         */
+        ChangedMessage: {
             /**
              * Type
-             * @default forward_tests
+             * @default changed
              * @constant
              */
-            type: "forward_tests";
-            /** Forward Tests */
-            forward_tests: components["schemas"]["ForwardTestResponse"][];
+            type: "changed";
         };
         /** HeartbeatMessage */
         HeartbeatMessage: {

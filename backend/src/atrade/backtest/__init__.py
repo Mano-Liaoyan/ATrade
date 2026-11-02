@@ -27,18 +27,20 @@ from atrade.backtest.backtest_run import LookBack, find_look_back, run_backtest
 from atrade.backtest.backtest_runner import BacktestRunner
 from atrade.backtest.backtest_start import BacktestRefusal, start_backtest
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus, BacktestUniverse, UniversePeriod
-from atrade.backtest.http_routes import create_backtest_assistant_router, create_backtest_router
+from atrade.backtest.http_routes import BACKTEST_CHANGE_SOCKET, create_backtest_assistant_router, create_backtest_router
 from atrade.backtest.sharpe_probability import (
     calculate_deflated_sharpe,
     calculate_probabilistic_sharpe,
     find_sharpe_probability_status,
 )
 from atrade.backtest.strategy_engine_run import write_look_back_catalog
-from atrade.backtest.sweep_routes import create_sweep_router
+from atrade.backtest.sweep_routes import SWEEP_CHANGE_SOCKET, create_sweep_router
 from atrade.backtest.universe_instruments import UniverseInstrument, summarize_instruments
 from atrade.backtest.universe_update import UNIVERSE_UPDATE, UniverseUpdate, make_universe_update
 
 __all__ = [
+    "BACKTEST_CHANGE_SOCKET",
+    "SWEEP_CHANGE_SOCKET",
     "UNIVERSE_UPDATE",
     "BacktestMetrics",
     "BacktestOutcome",

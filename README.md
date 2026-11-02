@@ -24,7 +24,11 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   language server WebSocket `/ws/strategy-language-server`, the paper order
   routes under `/api/paper-trading`, the backtest routes under
   `/api/backtests` and `/api/backtest-limits`, the forward test routes under
-  `/api/forward-tests`, `/ws/paper-trading`, and `/ws/forward-tests`.
+  `/api/forward-tests`, `/ws/paper-trading`, and the change sockets
+  `/ws/backtests`, `/ws/sweeps`, `/ws/strategies`, `/ws/screens`,
+  `/ws/watchlist`, and `/ws/forward-tests`. A change of a list shows in each
+  open tab without a reload, also a change from the AI assistant or a
+  backtest process.
 - The app shell header shows the Paper tag of the checked paper account and a
   Connections button (plug icon). The plug icon has a status badge when the
   backend or IB Gateway has a problem. Its popover shows the backend status

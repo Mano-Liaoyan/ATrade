@@ -14,6 +14,8 @@ type WatchlistResponse = components['schemas']['WatchlistResponse'];
 
 export type { RequestResult } from '#lib/foundation/http_request';
 
+// The change socket of the list: a "changed" message after each change (foundation/live_socket readOnChange).
+export const WATCHLIST_SOCKET_PATH = '/ws/watchlist';
 const WATCHLIST_PATH = '/api/watchlist';
 // The backend sends {"detail": "<message>"} for 404, 409, 502, and 503. A proxy sends no JSON.
 const FAILED_ACTION = 'The watchlist request';

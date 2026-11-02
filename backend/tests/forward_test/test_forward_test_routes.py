@@ -89,7 +89,7 @@ async def test_lists_forward_tests_newest_first(web_client: httpx.AsyncClient) -
 async def test_the_list_reads_all_forward_tests_with_a_fixed_number_of_connections(
     web_client: httpx.AsyncClient, database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # /ws/forward-tests reads the list every 2 seconds for each open page. Connections for each row made the first
+    # Each open page reads the list after each forward test change. Connections for each row made the first
     # message of a page late by many seconds under the load of the e2e suite.
     first_version_id = await save_test_strategy_version(web_client)
     template_strategy = (await web_client.post("/api/strategies", json={"name": "Template"})).json()

@@ -32,6 +32,8 @@ export type SaveResult =
 
 export type DeleteResult = { kind: 'deleted' } | { kind: 'failed'; message: string };
 
+// The change socket of the list: a "changed" message after each change (foundation/live_socket readOnChange).
+export const STRATEGIES_SOCKET_PATH = '/ws/strategies';
 const STRATEGIES_PATH = '/api/strategies';
 const RULES_CODE_PATH = '/api/strategy-rules/code';
 const TEMPLATES_PATH = '/api/strategy-templates';

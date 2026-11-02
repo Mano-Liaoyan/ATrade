@@ -30,7 +30,7 @@ from atrade.forward_test.forward_test_worker import (
     StartForwardTestChild,
 )
 from atrade.forward_test.http_routes import (
-    FORWARD_TEST_SOCKET_MESSAGE_MODELS,
+    FORWARD_TEST_CHANGE_SOCKET,
     create_forward_test_router,
 )
 from atrade.forward_test.live_node_run import GatewayWatch, run_live_node
@@ -53,7 +53,7 @@ from atrade.forward_test.universe_live_node import (
 
 __all__ = [
     "BAR_STORE_DATA_CLIENT_NAME",
-    "FORWARD_TEST_SOCKET_MESSAGE_MODELS",
+    "FORWARD_TEST_CHANGE_SOCKET",
     "GATEWAY_UNREACHABLE_EXIT_CODE",
     "MARKETS",
     "OWNER_LEDGER_EXECUTION_CLIENT_NAME",

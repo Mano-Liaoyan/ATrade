@@ -41,6 +41,8 @@ export function readBacktestInstrument(backtest: Backtest): BacktestInstrument |
   return { symbol, exchange, currency };
 }
 
+// The change socket of the list: a "changed" message after each change (foundation/live_socket readOnChange).
+export const BACKTESTS_SOCKET_PATH = '/ws/backtests';
 const BACKTESTS_PATH = '/api/backtests';
 const BACKTEST_LIMITS_PATH = '/api/backtest-limits';
 // A refused request has ErrorResponse {"detail": "<reason>"}. A request that does not validate has HTTPValidationError.

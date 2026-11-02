@@ -5,6 +5,7 @@ export {
   addToWatchlist,
   deleteFromWatchlist,
   formatWatchlistInstrument,
+  WATCHLIST_SOCKET_PATH,
   listWatchlist,
   type InstrumentToAdd,
   type RequestResult,

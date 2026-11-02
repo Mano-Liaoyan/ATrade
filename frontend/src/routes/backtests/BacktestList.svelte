@@ -5,7 +5,8 @@
      When 1 or more rows are checked, the Carbon batch action bar shows. With 2 or more, it has Compare: it opens the
      comparison of 2 backtests of the same strategy, and its text says why Compare is not available (docs/architecture
      section 9.5). Delete opens a danger dialog and then deletes each checked backtest (a true delete); the backend
-     refuses some backtests, and the list shows each reason. -->
+     refuses some backtests, and the list shows each reason. A right-click on a row opens its context menu: "Open in
+     new tab", "Compare with #<open backtest>" (same strategy only), and "Delete backtest". -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -20,11 +21,13 @@
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
   import {
     Checkbox,
+    ContextMenu,
     DataTable,
     Dialog,
     Icon,
     InlineNotification,
     StatusIndicator,
+    type ContextMenuItem,
     type TableColumn,
   } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
@@ -54,6 +57,8 @@
   ];
 
   let checkedIds: number[] = $state([]);
+  // The backtests of the open delete dialog: the checked rows, or the row of the context menu.
+  let deleteIds: number[] = $state([]);
   let isDeleteDialogOpen = $state(false);
   let isDeleting = $state(false);
   // The reasons of the backtests that the backend did not delete, one line each.
@@ -62,7 +67,7 @@
   const showsBatchActions = $derived(checkedIds.length > 0);
   const canCompare = $derived(checkedIds.length >= COMPARED_BACKTEST_COUNT);
   const deleteTitle = $derived(
-    checkedIds.length === 1 ? `Delete backtest #${String(checkedIds[0])}?` : `Delete ${String(checkedIds.length)} backtests?`,
+    deleteIds.length === 1 ? `Delete backtest #${String(deleteIds[0])}?` : `Delete ${String(deleteIds.length)} backtests?`,
   );
   const selectionText = $derived.by(() => {
     if (!canCompare) {
@@ -84,7 +89,7 @@
     isDeleting = true;
     const deletedIds: number[] = [];
     const messages: string[] = [];
-    for (const id of [...checkedIds].sort((first, second) => first - second)) {
+    for (const id of [...deleteIds].sort((first, second) => first - second)) {
       const result = await deleteBacktest(fetch, id);
       if (result.kind === 'deleted') {
         deletedIds.push(id);
@@ -99,6 +104,46 @@
     if (deletedIds.length > 0) {
       onDeleted?.(deletedIds);
     }
+  }
+
+  function openDeleteDialog(ids: number[]): void {
+    deleteIds = ids;
+    isDeleteDialogOpen = true;
+  }
+
+  function readMenuItems(key: string): ContextMenuItem[] {
+    const id = Number(key);
+    const items: ContextMenuItem[] = [
+      {
+        label: 'Open in new tab',
+        onSelect: () => {
+          window.open(backtestHref(id), '_blank', 'noopener');
+        },
+      },
+    ];
+    const openId = openBacktestId;
+    const comparison = openId === null || openId === id ? null : checkComparisonSelection(backtests, [openId, id]);
+    if (comparison?.kind === 'ready') {
+      const href = resolve('/backtests/[backtestId]/comparison/[otherBacktestId]', {
+        backtestId: String(comparison.firstBacktestId),
+        otherBacktestId: String(comparison.secondBacktestId),
+      });
+      items.push({
+        label: `Compare with #${String(openId)}`,
+        onSelect: () => {
+          void goto(href);
+        },
+      });
+    }
+    items.push({
+      label: 'Delete backtest',
+      divider: true,
+      danger: true,
+      onSelect: () => {
+        openDeleteDialog([id]);
+      },
+    });
+    return items;
   }
 
   function backtestHref(id: number): string {
@@ -139,7 +184,7 @@
           type="button"
           class="cds--btn cds--btn--primary cds--btn--sm cds--layout--size-sm"
           onclick={() => {
-            isDeleteDialogOpen = true;
+            openDeleteDialog(checkedIds);
           }}
           >Delete
           <Icon icon={TrashCan16} class="cds--btn__icon" />
@@ -174,7 +219,7 @@
     isDeleteDialogOpen = open;
   }}
   title={deleteTitle}
-  primaryText={checkedIds.length === 1 ? 'Delete backtest' : 'Delete backtests'}
+  primaryText={deleteIds.length === 1 ? 'Delete backtest' : 'Delete backtests'}
   primaryKind="danger"
   busy={isDeleting}
   onPrimary={() => {
@@ -186,62 +231,65 @@
   <InlineNotification kind="error" title="Backtests not read" subtitle={errorMessage} lowContrast />
 {:else}
   <div class="list">
-    <ScrollRegion label="Backtest list" fill>
-      <DataTable columns={COLUMNS} size="sm">
-        {#snippet rows()}
-          {#each backtests as item (item.id)}
-            <tr
-              class={[
-                'backtest-row',
-                (item.id === openBacktestId || comparedBacktestIds.includes(item.id)) && 'cds--data-table--selected',
-              ]}
-              onclick={(event) => {
-                openRow(event, item.id);
-              }}
-            >
-              <td class="cds--table-column-checkbox">
-                <Checkbox
-                  label={`Select backtest #${String(item.id)}`}
-                  hideLabel
-                  checked={checkedIds.includes(item.id)}
-                  onCheckedChange={(isChecked: boolean) => {
-                    toggleChecked(item.id, isChecked);
-                  }}
-                />
-              </td>
-              <th scope="row" align="right">
-                <span class="status-id">
-                  <StatusIndicator
-                    label={describeBacktestStatus(item.status)}
-                    kind={findBacktestStatusKind(item.status)}
-                    align="right"
+    <ContextMenu readLabel={(key: string) => `Backtest #${key}`} readItems={readMenuItems}>
+      <ScrollRegion label="Backtest list" fill>
+        <DataTable columns={COLUMNS} size="sm">
+          {#snippet rows()}
+            {#each backtests as item (item.id)}
+              <tr
+                data-context-key={item.id}
+                class={[
+                  'backtest-row',
+                  (item.id === openBacktestId || comparedBacktestIds.includes(item.id)) && 'cds--data-table--selected',
+                ]}
+                onclick={(event) => {
+                  openRow(event, item.id);
+                }}
+              >
+                <td class="cds--table-column-checkbox">
+                  <Checkbox
+                    label={`Select backtest #${String(item.id)}`}
+                    hideLabel
+                    checked={checkedIds.includes(item.id)}
+                    onCheckedChange={(isChecked: boolean) => {
+                      toggleChecked(item.id, isChecked);
+                    }}
                   />
-                  <a
-                    class="row-link"
-                    href={resolve('/backtests/[[backtestId]]', { backtestId: String(item.id) })}
-                    aria-current={item.id === openBacktestId ? 'page' : undefined}>#{item.id}</a
+                </td>
+                <th scope="row" align="right">
+                  <span class="status-id">
+                    <StatusIndicator
+                      label={describeBacktestStatus(item.status)}
+                      kind={findBacktestStatusKind(item.status)}
+                      align="right"
+                    />
+                    <a
+                      class="row-link"
+                      href={resolve('/backtests/[[backtestId]]', { backtestId: String(item.id) })}
+                      aria-current={item.id === openBacktestId ? 'page' : undefined}>#{item.id}</a
+                    >
+                  </span>
+                </th>
+                <td>
+                  <span class="strategy-name" title={formatVersionLabel(item.strategy_name, item.version_number)}
+                    >{formatVersionLabel(item.strategy_name, item.version_number)}</span
                   >
-                </span>
-              </th>
-              <td>
-                <span class="strategy-name" title={formatVersionLabel(item.strategy_name, item.version_number)}
-                  >{formatVersionLabel(item.strategy_name, item.version_number)}</span
-                >
-              </td>
-              <td>{item.symbol}</td>
-              <td align="right">
-                {#if item.metrics !== null}
-                  <ChangeText
-                    value={Number(item.metrics.total_return_percent)}
-                    text={formatPercent(item.metrics.total_return_percent)}
-                  />
-                {/if}
-              </td>
-            </tr>
-          {/each}
-        {/snippet}
-      </DataTable>
-    </ScrollRegion>
+                </td>
+                <td>{item.symbol}</td>
+                <td align="right">
+                  {#if item.metrics !== null}
+                    <ChangeText
+                      value={Number(item.metrics.total_return_percent)}
+                      text={formatPercent(item.metrics.total_return_percent)}
+                    />
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          {/snippet}
+        </DataTable>
+      </ScrollRegion>
+    </ContextMenu>
   </div>
 {/if}
 

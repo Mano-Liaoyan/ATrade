@@ -1,9 +1,9 @@
-// Calls the forward test routes and reads /ws/forward-tests (backend/src/atrade/forward_test/http_routes.py).
+// Calls the forward test routes (backend/src/atrade/forward_test/http_routes.py). /ws/forward-tests sends a change
+// message after each forward test change.
 // The Web process writes only the desired state. The forward-test worker writes the status (docs/architecture.md 12.3).
 import type { components } from '#lib/api';
 import type { StatusKind } from '#lib/foundation/carbon';
 import { describeErrorBody, readJsonBody, sendRequest } from '#lib/foundation/http_request';
-import { readSocketMessage } from '#lib/foundation/live_socket';
 
 export type ForwardTest = components['schemas']['ForwardTestResponse'];
 export type ForwardTestRequest = components['schemas']['StartForwardTestRequest'];
@@ -16,13 +16,13 @@ export type ForwardTestFill = components['schemas']['ForwardTestFillResponse'];
 export type ForwardTestInstrument = components['schemas']['ForwardTestInstrumentResponse'];
 export type ForwardTestInterruption = components['schemas']['InterruptionResponse'];
 type BarPeriod = components['schemas']['BarPeriod'];
-type ForwardTestsMessage = components['schemas']['ForwardTestsMessage'];
 type SamePeriodBacktestResponse = components['schemas']['SamePeriodBacktestResponse'];
 
 export type StartResult = { kind: 'started'; forwardTest: ForwardTest } | { kind: 'failed'; message: string };
 export type StopResult = { kind: 'stop_requested' } | { kind: 'failed'; message: string };
 export type SamePeriodBacktestResult = { kind: 'started'; backtestId: number } | { kind: 'failed'; message: string };
 export type ComparisonResult = { kind: 'ok'; value: ForwardTestComparison } | { kind: 'failed'; message: string };
+export type ListResult = { kind: 'ok'; value: ForwardTest[] } | { kind: 'failed'; message: string };
 export type DetailResult = { kind: 'ok'; value: ForwardTestDetail } | { kind: 'failed'; message: string };
 
 export const FORWARD_TESTS_SOCKET_PATH = '/ws/forward-tests';
@@ -157,9 +157,6 @@ export function canBacktestSamePeriod(forwardTest: ForwardTest): boolean {
   return readStartCapital(forwardTest) !== null;
 }
 
-export function readForwardTestsMessage(message: unknown): ForwardTest[] | null {
-  return readSocketMessage<ForwardTestsMessage>(message, ['forward_tests'])?.forward_tests ?? null;
-}
 
 type RequestOutcome = { kind: 'ok'; body: unknown } | { kind: 'failed'; message: string };
 
@@ -241,6 +238,17 @@ export async function readForwardTestComparison(
     return outcome;
   }
   return { kind: 'ok', value: outcome.body as ForwardTestComparison };
+}
+
+export async function listForwardTests(fetchFunction: typeof fetch): Promise<ListResult> {
+  const outcome = await sendForwardTestRequest(fetchFunction, FORWARD_TESTS_PATH, undefined, {
+    notReachable: 'Backend not reachable. The forward tests are not available.',
+    failedAction: 'Reading the forward tests',
+  });
+  if (outcome.kind === 'failed') {
+    return outcome;
+  }
+  return { kind: 'ok', value: outcome.body as ForwardTest[] };
 }
 
 export async function readForwardTestDetail(fetchFunction: typeof fetch, forwardTestId: number): Promise<DetailResult> {

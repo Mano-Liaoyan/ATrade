@@ -33,6 +33,7 @@ export {
 } from './sweep_view';
 export { sortSweepRows, SWEEP_STATUS_COLUMN, type SortDirection, type SweepRow } from './sweep_runs';
 export {
+  SWEEPS_SOCKET_PATH,
   listSweeps,
   readSweep,
   readSweepParameters,

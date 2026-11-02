@@ -11,7 +11,6 @@ import {
   isLiveBarPeriod,
   readEndTimeUtc,
   readForwardTestComparison,
-  readForwardTestsMessage,
   readStartCapital,
   startForwardTest,
   startSamePeriodBacktest,
@@ -104,18 +103,6 @@ describe('stopForwardTest', () => {
     const result = await stopForwardTest(() => Promise.reject(new TypeError('offline')), 3);
 
     expect(result.kind).toBe('failed');
-  });
-});
-
-describe('readForwardTestsMessage', () => {
-  it('reads the forward tests message', () => {
-    expect(readForwardTestsMessage({ type: 'forward_tests', forward_tests: [runningForwardTest] })).toEqual([
-      runningForwardTest,
-    ]);
-  });
-
-  it('ignores other messages', () => {
-    expect(readForwardTestsMessage({ type: 'orders', orders: [] })).toBeNull();
   });
 });
 

@@ -13,6 +13,8 @@ export type ScreenCheckResult<T> = RequestResult<T> | { kind: 'check_failed'; pr
 
 export type { RequestResult } from '#lib/foundation/http_request';
 
+// The change socket of the list: a "changed" message after each change (foundation/live_socket readOnChange).
+export const SCREENS_SOCKET_PATH = '/ws/screens';
 const FAILED_ACTION = 'The screen request';
 // The screen page shows all rows of a screen result (at most 500, section 24.4) and sorts them itself.
 const ALL_ROWS_LIMIT = 500;

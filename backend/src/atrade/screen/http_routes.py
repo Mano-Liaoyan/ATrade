@@ -14,11 +14,15 @@ from pydantic import BaseModel, JsonValue
 from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
+from atrade.foundation.table_changes import ChangeSocket
 from atrade.indicator import INDICATOR_CATALOG
 from atrade.screen import screen_store
 from atrade.screen.screen_check import MAX_NAME_LENGTH, ScreenProblem, check_screen
 from atrade.screen.screen_run import name_indicator
 from atrade.screen.screen_running import run_saved_screen
+
+# The screen list and the screen results: /ws/ sends a change message after a change (foundation/table_changes).
+SCREEN_CHANGE_SOCKET = ChangeSocket(path="/ws/screens", tables=frozenset({"screen", "screen_result"}))
 
 DEFAULT_PAGE_SIZE = 50
 MAX_PAGE_SIZE = 500

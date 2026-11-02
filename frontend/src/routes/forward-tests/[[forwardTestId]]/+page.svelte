@@ -32,13 +32,13 @@
     type TableColumn,
   } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
-  import { startPolling } from '#lib/foundation/polling';
+  import { LiveUpdatesNotification, readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { ChangeText, formatAmount, formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import {
+    FORWARD_TESTS_SOCKET_PATH,
     canBacktestSamePeriod,
     canStop,
     describeForwardTestStatus,
@@ -63,7 +63,6 @@
   import StartForwardTestDialog from '../StartForwardTestDialog.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
 
-  const READ_INTERVAL_MILLISECONDS = 2000;
   const START_FORWARD_TEST_HASH = `#${START_FORWARD_TEST_FORM_ID}`;
 
   // The same panels and sizes as the backtest page.
@@ -109,7 +108,7 @@
     })),
   );
 
-  $effect(() => feed.start(window.location));
+  $effect(() => feed.start(fetch, window.location));
 
   // /forward-tests opens the newest forward test. The same page component stays, so an open dialog stays open. A
   // navigation that runs (for example a click on a header link) wins.
@@ -129,7 +128,8 @@
     }
   });
 
-  // The open forward test reads again every 2 seconds: a running forward test gets new records.
+  // The open forward test reads again after each forward test change that /ws/forward-tests pushes: a running forward
+  // test gets new records.
   $effect(() => {
     if (forwardTestId === null) {
       return;
@@ -139,12 +139,13 @@
     const id = forwardTestId;
     actionFailure = null;
     stoppingId = null;
-    return startPolling(
-      () => readForwardTestDetail(fetch, id),
-      (result) => {
+    return readOnChange({
+      socketPath: FORWARD_TESTS_SOCKET_PATH,
+      read: () => readForwardTestDetail(fetch, id),
+      onResult: (result) => {
         if (result.kind === 'failed') {
           detailMessage = result.message;
-          return true;
+          return;
         }
         detailMessage = '';
         const detailText = JSON.stringify(result.value);
@@ -152,13 +153,8 @@
           lastDetailText = detailText;
           detail = result.value;
         }
-        return true;
       },
-      READ_INTERVAL_MILLISECONDS,
-      (message) => {
-        detailMessage = message;
-      },
-    );
+    });
   });
 
   // The command palette goes to #start-forward-test.
@@ -192,6 +188,9 @@
     if (result.kind === 'failed') {
       stoppingId = null;
       actionFailure = { title: 'Forward test not stopped', message: result.message };
+    } else if (forwardTest.id !== forwardTestId) {
+      // A stop from the list context menu: the header line shows only the open forward test.
+      stoppingId = null;
     }
   }
 
@@ -250,7 +249,11 @@
       />
     {/snippet}
     <LiveUpdatesNotification isConnected={feed.isConnected} />
-    <ForwardTestList forwardTests={feed.forwardTests} openForwardTestId={forwardTestId} />
+    <ForwardTestList
+      forwardTests={feed.forwardTests}
+      openForwardTestId={forwardTestId}
+      onStop={(forwardTest: ForwardTest) => void stop(forwardTest)}
+    />
   </SideColumn>
 
   {#if shownDetail === null}

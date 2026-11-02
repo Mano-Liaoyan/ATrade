@@ -183,7 +183,7 @@ counts from `atrade/`.
 | `forward_test/` | Start and stop forward tests. Record forward test results. The ATrade NautilusTrader execution and data clients, the bar fetcher, and the daily stock split check. The worker also runs the quarterly universe update of `market_data`. |
 | `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It calls the `assistant` service over HTTP (`AssistantServiceClient`, section 25.14). It holds no credential. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
-| `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
+| `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `table_changes` (`TableChangeFeed`, `ChangeSocket`, `ChangedMessage`, `create_change_socket_router`: the change sockets of section 13 "Live updates"), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
 | `app/` | Program entry points. They create and connect all dependencies. |
 
 ### 6.2 Dependency direction
@@ -287,7 +287,10 @@ app           -> all modules
   passes dependencies.
 - Each capability has its own WebSocket path, for example `/ws/market-data`,
   `/ws/paper-trading`, `/ws/forward-tests`. There is no general message
-  dispatcher.
+  dispatcher. A capability with a list declares its change socket as a
+  `ChangeSocket` constant (path and watched tables), and `app/web.py` mounts
+  all of them with `create_change_socket_router` (section 13 "Live
+  updates").
 - `app/` creates all dependencies by hand and passes them as arguments. There
   is no dependency injection container. FastAPI `Depends` is only for simple
   values.
@@ -659,6 +662,42 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   connects again at once if the last message is 25 seconds old or more, or
   if it waits for a reconnection. After stop, a message of the closing
   socket is not passed on.
+- Live updates: no page reads on a timer. Each change of a watched table
+  shows in each open tab without a reload, also a change from another tab,
+  from the AI assistant (port 8001), from the backtest child process, and
+  from the forward-test worker. The parts:
+  - A PostgreSQL trigger `notify_table_change` on each watched table sends
+    `pg_notify('table_change', <table name>)` once for each changing
+    statement (migration `foundation_notify_table_changes`). So a writer in
+    any process is seen, and no write path has extra code.
+  - `TableChangeFeed` of `foundation/table_changes` runs in the lifespan of
+    port 8000. It listens on one PostgreSQL connection. It wakes each socket
+    that watches the table. After a lost connection it connects again after
+    1 second and wakes all sockets, because changes in the gap are not known.
+  - The change sockets send `{"type": "changed"}` after a change of one of
+    their tables, and `{"type": "heartbeat"}` after 10 seconds without a
+    change. Changes that come together give one message. The browser sends
+    nothing. The data stays on HTTP: the page reads it again with the
+    existing `GET` route. Writes stay on HTTP too (status codes, OpenAPI
+    types), and the push shows them in all other tabs.
+
+    | Path | Tables | Owner |
+    |---|---|---|
+    | `/ws/backtests` | `backtest` | `backtest` (`BACKTEST_CHANGE_SOCKET`) |
+    | `/ws/sweeps` | `parameter_sweep`, `backtest` | `backtest` (`SWEEP_CHANGE_SOCKET`) |
+    | `/ws/strategies` | `strategy`, `strategy_version` | `strategy` |
+    | `/ws/screens` | `screen`, `screen_result` | `screen` |
+    | `/ws/watchlist` | `watchlist_instrument` | `watchlist` |
+    | `/ws/forward-tests` | `forward_test`, `forward_test_interruption`, `forward_test_equity_point`, `forward_test_fill`, `forward_test_same_period_backtest` | `forward_test` |
+
+  - `readOnChange({ socketPath, read, onResult, onConnectionChange? })` of
+    `foundation/live_socket` reads at once, after each open of the socket,
+    and after each `changed` message. One read runs at a time; changes
+    during a read give one more read. A page calls it in an `$effect` and
+    returns its stop function. A detail that changes with its list row (the
+    open backtest, the open sweep) reads again when its row changes.
+  - `/ws/paper-trading` and `/ws/market-data` push IBKR data, not table
+    changes. They keep their own messages.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution: the TradingView logo in each chart
   (`layout.attributionLogo`, true by default), which links to
@@ -823,7 +862,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   name (the form is "Paper order of <symbol>"). The page reads the paper account with `PaperAccountFeed`
   of `paper_trading` and the running forward tests with
   `ForwardTestsOnInstrumentsFeed` of `forward_test` (the one
-  `/ws/forward-tests` feed: `forwardTests`, `onInstruments`, `isConnected`;
+  forward test list, read again after each `/ws/forward-tests` change: `forwardTests`, `onInstruments`, `isConnected`;
   the forward test page uses it for its list and the strategy page for
   its Stop forward test button; the home page uses the
   same paper account feed). While a socket is not connected, the panel and
@@ -930,11 +969,20 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     without a full stop, for example "No trades". A read error shows an
     `InlineNotification` "<Thing> not read" where the data would be, also
     when no panel exists (strategy page).
-  - A page that reads again while a test is queued or running uses
-    `startPolling(read, onResult, intervalMilliseconds, onFailure)` of
-    `foundation/polling` in an `$effect` and returns its stop function. A
-    failed read shows its message (`onFailure`, or the failed result in
-    `onResult`), and the loop reads again after the interval.
+  - A list reads with `readOnChange` of `foundation/live_socket` ("Live
+    updates" above). A failed read shows its message, and the next change or
+    reconnection reads again.
+  - A right-click on a list row (backtests, strategies, screens, parameter
+    sweeps, forward tests) opens its context menu: `ContextMenu` of
+    `foundation/carbon`, the Carbon v11 Menu (`cds--menu`, `cds--menu-item`,
+    `cds--menu-item--danger`, `cds--menu-item-divider`) on Bits UI
+    ContextMenu. The row has `data-context-key`; without a row or without
+    items, no menu opens. Each list has "Open in new tab". A delete item is
+    the last item, with a divider and the danger color, and opens the same
+    danger dialog as the other delete controls. Backtests: "Compare with
+    #<open backtest>" for a backtest of the same strategy, "Delete backtest".
+    Strategies: "Delete strategy". Screens: "Delete screen". Forward tests:
+    "Stop forward test" while it can stop.
   - Table column names stay on one line. The instrument page has a narrow
     order panel, so its `PositionTable` and `OpenOrderList` have `compact`:
     no Currency and Market price columns, and no Type and Filled columns. The

@@ -36,12 +36,12 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
-  import { isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
+  import { BACKTESTS_SOCKET_PATH, isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
   import { Dialog, Icon, IconButton, InlineNotification, Select, Toggle } from '#lib/foundation/carbon';
   import { CodeDiff, CodeEditor } from '#lib/foundation/code_editor';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
-  import { startPolling } from '#lib/foundation/polling';
+  import { readOnChange } from '#lib/foundation/live_socket';
   import {
     Panel,
     PanelHeader,
@@ -63,6 +63,7 @@
     formatVersionLabel,
     generateRulesCode,
     listStrategies,
+    STRATEGIES_SOCKET_PATH,
     readDraft,
     readStrategy,
     readRulesDraft,
@@ -127,7 +128,6 @@
     versionNumber: addressVersionNumber = null,
   }: { strategyId: number | null; versionNumber?: number | null } = $props();
 
-  const LIST_CHECK_INTERVAL_MILLISECONDS = 2000;
   const FILE_TABS = [
     { value: 'rules', label: 'Rules' },
     { value: 'strategy', label: 'strategy.py' },
@@ -138,8 +138,6 @@
   let listMessage = $state('');
   // The read error of the open strategy. No panel shows it (the panels need the strategy), so the main area does.
   let strategyMessage = $state('');
-  // A new value reads the strategy list again, for example after a save.
-  let listReadCount = $state(0);
   let strategy = $state<StrategyDetail | null>(null);
   let openVersion = $state<StrategyVersion | null>(null);
   // "Show discarded versions": the version Select hides the discarded versions until the user turns it on.
@@ -158,14 +156,14 @@
   let codeEditor: { revealLine: (line: number) => void } | undefined = $state();
   let isSaving = $state(false);
   let backtests: Backtest[] = $state([]);
-  // A new value reads the backtest list again, for example after a new backtest starts.
-  let backtestReadCount = $state(0);
   let selection = $state<ResultSelection>({ tab: null, backtestId: null });
   let paneOrder = $state<PaneOrder>(readPaneOrder(readStoredLayout(PANE_ORDER_STORAGE_KEY)));
   // The closed backtest tabs of each strategy. A closed tab is only hidden on this page; the backtest stays.
   const closedTabs = new ClosedBacktestTabsState();
   let isStoppingForwardTest = $state(false);
   let isNewStrategyDialogOpen = $state(false);
+  // The strategy of the delete dialog: the open strategy, or the row of the list context menu.
+  let deleteTarget = $state<{ id: number; name: string } | null>(null);
   let isDeleteDialogOpen = $state(false);
   let isDeleting = $state(false);
   let isBacktestDialogOpen = $state(false);
@@ -176,7 +174,7 @@
   const assistantDiff = new AssistantDiff();
 
   const forwardTestFeed = new ForwardTestsOnInstrumentsFeed();
-  $effect(() => forwardTestFeed.start(window.location));
+  $effect(() => forwardTestFeed.start(fetch, window.location));
 
   // Code completion and live type errors. Type errors do not block the save.
   const languageServer = connectStrategyLanguageServer(window.location);
@@ -223,42 +221,38 @@
       replacingCode !== null,
   );
 
-  $effect(() => {
-    const readNumber = listReadCount;
-    void listStrategies(fetch).then((result) => {
-      if (readNumber !== listReadCount) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        listMessage = result.message;
-        return;
-      }
-      listMessage = '';
-      strategies = result.value;
-    });
-  });
-
-  // The backtest list reads again while a backtest in it is queued or running. A backtest of this strategy that ends
-  // opens in its tab.
-  $effect(() => {
-    // A new read count runs this effect again: its cleanup stops the old loop.
-    backtestReadCount satisfies number;
-    // A failed read writes one Output line (not again for each retry), and the list reads again. It does not open the
-    // panel: a reload aborts the read, and an open panel would be stored in the layout of the next page.
-    let failureText = '';
-    function showFailure(message: string): void {
-      const text = `Backtests not read: ${message}`;
-      if (text !== failureText) {
-        failureText = text;
-        writeOutput(text);
-      }
-    }
-    return startPolling(
-      () => listBacktests(fetch),
-      (result) => {
+  // /ws/strategies pushes each change of a strategy or a version, also from the assistant and other tabs.
+  $effect(() =>
+    readOnChange({
+      socketPath: STRATEGIES_SOCKET_PATH,
+      read: () => listStrategies(fetch),
+      onResult: (result) => {
         if (result.kind === 'failed') {
-          showFailure(result.message);
-          return true;
+          listMessage = result.message;
+          return;
+        }
+        listMessage = '';
+        strategies = result.value;
+      },
+    }),
+  );
+
+  // /ws/backtests pushes each backtest change. A backtest of this strategy that ends opens in its tab.
+  $effect(() => {
+    // A failed read writes one Output line (not again for each later failure). It does not open the panel: a reload
+    // aborts the read, and an open panel would be stored in the layout of the next page.
+    let failureText = '';
+    return readOnChange({
+      socketPath: BACKTESTS_SOCKET_PATH,
+      read: () => listBacktests(fetch),
+      onResult: (result) => {
+        if (result.kind === 'failed') {
+          const text = `Backtests not read: ${result.message}`;
+          if (text !== failureText) {
+            failureText = text;
+            writeOutput(text);
+          }
+          return;
         }
         failureText = '';
         const finished = findFinishedBacktest(backtests, result.value, activeStrategyId);
@@ -267,11 +261,8 @@
           writeOutput(describeBacktestEvent(finished));
         }
         backtests = result.value;
-        return result.value.some((item) => !isFinalStatus(item.status));
       },
-      LIST_CHECK_INTERVAL_MILLISECONDS,
-      showFailure,
-    );
+    });
   });
 
   $effect(() => {
@@ -434,7 +425,6 @@
     }
     const label = formatVersionLabel(name, result.version.version_number);
     await loadStrategy(id, result.version.version_number);
-    listReadCount += 1;
     writeOutput(result.isNewVersion ? `Saved as ${label}.` : `Saved. The code is the same as ${label}.`);
   }
 
@@ -581,24 +571,31 @@
 
   async function openCreatedStrategy(created: StrategyDetail): Promise<void> {
     isNewStrategyDialogOpen = false;
-    listReadCount += 1;
     await goto(resolve('/strategies/[strategyId]', { strategyId: String(created.id) }));
   }
 
+  function requestDelete(target: { id: number; name: string }): void {
+    deleteTarget = { id: target.id, name: target.name };
+    isDeleteDialogOpen = true;
+  }
+
   async function removeStrategy(): Promise<void> {
-    if (strategy === null) {
+    if (deleteTarget === null) {
       return;
     }
+    const deletedId = deleteTarget.id;
     isDeleting = true;
-    const result = await deleteStrategy(fetch, strategy.id);
+    const result = await deleteStrategy(fetch, deletedId);
     isDeleting = false;
     isDeleteDialogOpen = false;
     if (result.kind === 'failed') {
       writeOutputError(`Strategy not deleted: ${result.message}`);
       return;
     }
-    listReadCount += 1;
-    await goto(resolve('/strategies'));
+    // The list reads again after the change that /ws/strategies pushes. Only the open strategy leaves the page.
+    if (deletedId === activeStrategyId) {
+      await goto(resolve('/strategies'));
+    }
   }
 </script>
 
@@ -623,7 +620,7 @@
     {#snippet actions()}
       <IconButton label="New strategy" icon={Add16} onclick={openNewStrategyDialog} />
     {/snippet}
-    <StrategyList {strategies} errorMessage={listMessage} openStrategyId={activeStrategyId} />
+    <StrategyList {strategies} errorMessage={listMessage} openStrategyId={activeStrategyId} onDeleteRequest={requestDelete} />
   </SideColumn>
 
   <div class="main">
@@ -658,7 +655,9 @@
             icon={TrashCan16}
             tone="neutral"
             onclick={() => {
-              isDeleteDialogOpen = true;
+              if (strategy !== null) {
+                requestDelete(strategy);
+              }
             }}
           />
           <IconButton
@@ -861,13 +860,13 @@
   }}
 />
 
-{#if strategy !== null}
+{#if deleteTarget !== null}
   <Dialog
     open={isDeleteDialogOpen}
     onOpenChange={(open: boolean) => {
       isDeleteDialogOpen = open;
     }}
-    title="Delete {strategy.name}"
+    title="Delete {deleteTarget.name}"
     primaryText="Delete strategy"
     primaryKind="danger"
     busy={isDeleting}
@@ -914,7 +913,6 @@
   onStarted={(started: Backtest) => {
     // The new backtest opens in its tab at once; it shows its status until it ends.
     showBacktest(started.id);
-    backtestReadCount += 1;
     writeOutput(describeBacktestEvent(started));
   }}
 />
