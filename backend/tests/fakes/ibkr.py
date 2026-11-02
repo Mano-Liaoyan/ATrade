@@ -124,6 +124,9 @@ class FakeGatewayConnection:
         self.next_order_id = FIRST_ORDER_ID
         # When it is set, read_historical_bars fails with this message.
         self.historical_bars_error_message: str | None = None
+        # Each call of read_historical_bars takes the first message, if any, and fails with it, like a pacing violation
+        # of IBKR that ends after a wait.
+        self.next_historical_bars_errors: list[str] = []
         # The bars of these instruments replace the sample bars. An empty list is an instrument without bars.
         self.historical_bars: dict[Instrument, list[Bar]] = {}
         # Each call of read_historical_bars, in order. Tests assert that only missing ranges reach IBKR.
@@ -277,6 +280,8 @@ class FakeGatewayConnection:
             message = "Not connected"
             raise GatewayRequestError(message)
         self.historical_bar_requests.append(HistoricalBarRequest(instrument, bar_period, time_range))
+        if self.next_historical_bars_errors:
+            raise GatewayRequestError(self.next_historical_bars_errors.pop(0))
         if self.historical_bars_error_message is not None:
             raise GatewayRequestError(self.historical_bars_error_message)
         if instrument in self.historical_bars:

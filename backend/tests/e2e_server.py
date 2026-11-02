@@ -81,7 +81,10 @@ E2E_SURVIVORSHIP_STRATEGY_CODE = "# The strategy version of the e2e survivorship
 E2E_SURVIVORSHIP_INSTRUMENTS = [
     Instrument(symbol="700", exchange="SEHK", currency="HKD"),
     Instrument(symbol="SBUS", exchange="ARCA", currency="USD"),
+    Instrument(symbol="SCHK", exchange="ARCA", currency="USD"),
 ]
+# The backtest of this instrument used bars that waited for the IBKR stock split check (backtest.md section 10.12).
+E2E_SPLIT_CHECK_SYMBOL = "SCHK"
 # The US universe of the quarter of the fixed clock: enough members to overflow the Instruments tab of a top N forward
 # test (docs/architecture/forward_test.md section 12.16). The stored quarter start is before the fixed clock.
 E2E_UNIVERSE_QUARTER_START_UTC = datetime(2026, 1, 2, tzinfo=UTC)
@@ -471,12 +474,15 @@ def add_survivorship_bias_backtests(database_url: str) -> None:
             connection.execute(
                 """
                 INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
-                    paper_capital_usd, status, error_message, created_at_utc, ended_at_utc, source_order)
+                    paper_capital_usd, status, error_message, created_at_utc, ended_at_utc, source_order,
+                    has_split_check_pending)
                 VALUES (%(version_id)s, %(symbol)s, %(exchange)s, %(currency)s, '1-DAY', %(start_utc)s, %(end_utc)s,
-                    10000, 'failed', 'E2E backtest without a run.', %(now)s, %(now)s, '["ibkr", "databento"]')
+                    10000, 'failed', 'E2E backtest without a run.', %(now)s, %(now)s, '["ibkr", "databento"]',
+                    %(has_split_check_pending)s)
                 """,
                 {
                     "version_id": version_id,
+                    "has_split_check_pending": instrument.symbol == E2E_SPLIT_CHECK_SYMBOL,
                     "symbol": instrument.symbol,
                     "exchange": instrument.exchange,
                     "currency": instrument.currency,

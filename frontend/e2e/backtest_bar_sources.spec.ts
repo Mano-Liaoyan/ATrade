@@ -1,12 +1,14 @@
 // Bar sources of a backtest (#197): the New backtest form changes the source order of one backtest, the Bar sources
 // tab shows the source order and the bar count of each bar source, and an HK backtest shows the survivorship bias
 // warning. The bar chart saves the AAPL bars in ibkr_bar: Databento has no bars in the e2e database.
-// backend/tests/e2e_server.py adds a failed HK backtest (700) and a failed US backtest of 2026 (SBUS).
+// backend/tests/e2e_server.py adds a failed HK backtest (700), a failed US backtest of 2026 (SBUS), and a failed US
+// backtest that used bars that waited for the IBKR stock split check (SCHK).
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
 const WARNING_TEXT = 'Survivorship bias';
+const SPLIT_CHECK_WARNING_TEXT = 'IBKR stock split check not done';
 
 async function createStrategy(page: Page, strategyName: string): Promise<void> {
   await page.goto('/strategies');
@@ -91,4 +93,26 @@ test('shows the survivorship bias warning on an HK backtest only', async ({ page
   const usPanel = page.getByRole('region', { name: `Backtest #${String(usBacktestId)}` });
   await expect(usPanel.getByRole('heading', { level: 1 })).toContainText('SBUS');
   await expect(usPanel.getByText(WARNING_TEXT, { exact: true })).toHaveCount(0);
+});
+
+test('shows the IBKR stock split check warning on a backtest that used instruments that waited for the check', async ({
+  page,
+  request,
+}) => {
+  const checkBacktestId = await findBacktestId(request, 'SCHK');
+  await page.goto(`/backtests/${String(checkBacktestId)}`);
+  const checkPanel = page.getByRole('region', { name: `Backtest #${String(checkBacktestId)}` });
+  const warning = checkPanel.getByRole('alert').filter({ hasText: SPLIT_CHECK_WARNING_TEXT });
+  await expect(warning).toBeVisible();
+  await expect(warning.locator('svg').first()).toBeVisible();
+  await warning.hover();
+  await expect(page.getByRole('tooltip')).toHaveText(
+    'Some instruments waited for the IBKR stock split check. Their bars before a stock split can have the old prices.',
+  );
+
+  const usBacktestId = await findBacktestId(request, 'SBUS');
+  await page.goto(`/backtests/${String(usBacktestId)}`);
+  const usPanel = page.getByRole('region', { name: `Backtest #${String(usBacktestId)}` });
+  await expect(usPanel.getByRole('heading', { level: 1 })).toContainText('SBUS');
+  await expect(usPanel.getByText(SPLIT_CHECK_WARNING_TEXT, { exact: true })).toHaveCount(0);
 });

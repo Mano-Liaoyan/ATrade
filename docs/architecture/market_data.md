@@ -404,8 +404,10 @@ Phase 3. Sources:
 - IBKR gives the recent and the current bars. ATrade does not use IBKR to
   fill historical hourly bars.
 - Databento has only US stocks. Databento US data starts on 2018-05-01.
-- Databento has only prices that are not adjusted. The import adjusts them
-  for stock splits before it saves them (section 8.8.3).
+- Databento has only prices that are not adjusted. The import adjusts the
+  instruments that stopped trading for stock splits before it saves them.
+  The IBKR stock split check program adjusts the instruments that still
+  trade after the import (section 8.8.3).
 - Code (#190): `market_data/databento_client.py` (`DatabentoClient`, it
   downloads a bought batch job), `market_data/databento_import.py`
   (`import_databento_files`), and the program `app/databento_import.py`
@@ -505,44 +507,108 @@ Hourly bars:
 - A day without a Databento daily bar has no official open. The import saves
   no hourly bar of that day and names the symbol in its log.
 
-### 8.8.3 Stock split adjustment at save time
+### 8.8.3 Stock split adjustment
 
-The import saves Databento bars in the IBKR `TRADES` form. For each bar
-before the ex-date of a stock split, it divides the prices by the split
-ratio and multiplies the volume by the split ratio.
+ATrade saves Databento bars in the IBKR `TRADES` form. For each bar before
+the ex-date of a stock split, it divides the prices by the split ratio and
+multiplies the volume by the split ratio.
 
-| Instruments | How the import finds the stock splits |
-|---|---|
-| Still trading | The ratio of the IBKR daily close to the Databento daily close on each day of the overlap. A constant ratio means no stock split. A step in the ratio gives the ex-date and the split ratio. |
-| Stopped trading | The detection rule. The ratio of the close of one day to the open of the next day is near a common split ratio, for example 2, 3, 3/2, 1/2, or 1/10. The volume changes in the opposite direction. |
+Source: [#324](https://github.com/Mano-Liaoyan/ATrade/issues/324). The import
+sends no request to IBKR. A one-time program, the IBKR stock split check,
+reads the IBKR closes after the import. Thus an IBKR pacing violation or a
+lost IB Gateway connection only makes the check slower. It does not stop or
+undo the import.
 
-- The import writes each stock split that it finds to `stock_split`
-  (section 8.13.1).
-- The user checks all detected stock splits of instruments that stopped
-  trading one time.
+| Instruments | Who finds the stock splits | How |
+|---|---|---|
+| Still trading | The IBKR stock split check program, after the import | The ratio of the IBKR daily close to the stored Databento daily close on each day of the overlap. A constant ratio means no stock split. A step in the ratio gives the ex-date and the split ratio. |
+| Stopped trading | The import | The detection rule. The ratio of the close of one day to the open of the next day is near a common split ratio, for example 2, 3, 3/2, 1/2, or 1/10. The volume changes in the opposite direction. |
+
 - An instrument still trades when it has a bar on the last day of the
-  import. The import reads its IBKR daily bars for the days of its
-  Databento bars. A ratio step is a change of more than 3% from one day to
-  the next. The split ratio is the nearest fraction with a small
-  denominator (2 for 2.004, 11/10 for 1.098). When IBKR has no bars of the
-  instrument, the detection rule finds its stock splits.
+  import.
+- The import writes each stock split of the detection rule to
+  `stock_split` (section 8.13.1). The user checks it one time.
+- The import does not adjust an instrument that still trades. It writes the
+  instrument to `ibkr_split_check` with `check_end_utc`, the day after the
+  last day of the import. A second import with a later last day moves
+  `check_end_utc`. A second import of the same days changes nothing.
+- The universe (section 8.9) and the hourly bar purchase do not wait for the
+  check. A stock split does not change the trading value (close × volume).
+- A ratio step is a change of more than 3% from one day to the next. The
+  split ratio is the nearest fraction with a small denominator (2 for 2.004,
+  11/10 for 1.098).
 - The detection rule accepts the split ratios 3/2, 2, 3, 4, 5, 10, 1/2,
   1/3, 1/4, 1/5, 1/10, and 1/20, each with a tolerance of 3%. A forward
   split needs a higher volume on the ex-date, a reverse split a lower
   volume.
-- A stock split from the IBKR closes has the confirmation `bar_evidence`.
-  The import adjusts the bars at once. A stock split of the detection rule
-  has no confirmation: it waits for the user check, and the bars do not
-  change until the user confirms it (section 8.14).
+- A stock split of the detection rule has no confirmation: it waits for the
+  user check, and the bars do not change until the user confirms it
+  (section 8.14).
 - A second import adjusts its bars with all confirmed stock splits of the
-  instrument. A stock split that is in `stock_split` keeps its row and its
-  confirmation.
+  instrument, also the stock splits of the IBKR stock split check. A stock
+  split that is in `stock_split` keeps its row and its confirmation.
 - Code (#191): `market_data/stock_split_detection.py` (the 2 rules),
   `market_data/databento_import_adjustment.py` (links and adjustment in
   the import), `market_data/import_check.py` (the user check), and the
   program `app/databento_check.py`. Tests:
   `tests/market_data/test_stock_split_import.py` and
   `tests/app/test_databento_check_program.py`.
+
+#### 8.8.3.1 IBKR stock split check
+
+Table `ibkr_split_check` (migration `b7e2d4f19a63`): one row for each
+Databento instrument that still trades.
+
+| Column | Meaning |
+|---|---|
+| `symbol`, `exchange`, `currency` | The instrument. Primary key. |
+| `check_end_utc` | The end of the days to check: the day after the last day of the import. |
+| `checked_end_utc` | The end of the checked days. Empty before the first check. |
+| `checked_at_utc` | The time of the last check. |
+
+- An instrument waits for the check when `checked_end_utc` is empty or
+  earlier than `check_end_utc`.
+- The program `app/ibkr_split_check.py` checks the waiting instruments one
+  at a time, in the order of the symbol. It connects to IB Gateway with its
+  own client ID (`--ibkr-client-id`, default `30`). It runs in a temporary
+  container of the `web` image (README.md), not in `forward-test`. It stops
+  when no instrument waits.
+- For each instrument, one transaction:
+  1. Read the stored Databento daily bars from the first stored day, or from
+     10 days before `checked_end_utc` after an earlier check, to
+     `check_end_utc`.
+  2. Read the IBKR `TRADES` daily bars of the same days, with 1 request at a
+     time (section 7).
+  3. IBKR has bars: find the steps of the close ratio. Write each new stock
+     split to `stock_split` with the source `databento_import` and the
+     confirmation `bar_evidence`. Divide the stored `databento_bar` bars of
+     all bar periods before the ex-date, and update the daily bar summary.
+     The `ibkr_bar` bars do not change: IBKR adjusted them.
+  4. IBKR has no bars, or IBKR does not know the contract: the detection
+     rule finds the stock splits. They wait for the user check.
+  5. Set `checked_end_utc` to `check_end_utc`, and `checked_at_utc`.
+- A new stock split only: a stock split that is in `stock_split` already
+  keeps its row and changes no bar.
+- The import and the check take the same PostgreSQL advisory lock: the
+  import for its whole transaction, the check for 1 instrument. Thus an
+  import at the same time cannot adjust a bar 2 times or miss a stock split.
+- IBKR pacing violation: the check waits 1 minute, and doubles the wait
+  after each further violation, up to 30 minutes. The first check without a
+  violation sets the wait back to 1 minute.
+- No connection to IB Gateway or to IBKR: the check waits 1 minute,
+  connects again, and checks the same instrument again.
+- The check waits 0.5 seconds after each instrument. It logs its progress
+  each 100 instruments.
+- A backtest that is created while one of its instruments waits gets the
+  IBKR stock split check warning (`backtest.md` section 10.12).
+- Code (#324): `market_data/ibkr_split_check.py` (`run_ibkr_split_check`,
+  `has_pending_split_check`, `record_split_checks`) and the program
+  `app/ibkr_split_check.py`. Tests:
+  `tests/market_data/test_ibkr_split_check.py` and
+  `tests/app/test_ibkr_split_check_program.py`.
+- The quarterly universe update (section 8.9) also imports Databento files.
+  It uses the detection rule for all instruments and writes no
+  `ibkr_split_check` row, because no program checks its instruments.
 
 ### 8.8.4 Symbol change links
 
@@ -803,8 +869,8 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 | `symbol`, `exchange`, `currency` | The instrument. |
 | `ex_date_utc` | 00:00 UTC of the ex-date. |
 | `split_ratio` | `numeric`, above 0. New shares for 1 old share. |
-| `source` | How ATrade found it: `ibkr_evidence` (section 8.13.2), or `databento_import` (section 8.8.3). |
-| `confirmation` | How it was confirmed: `both_evidences` (both IBKR evidences), `bar_evidence` (the bar evidence only: no owner holds the instrument, or the IBKR closes of the Databento import), `user_apply` (the user, "Apply split"), or `import_check` (the user check of the import). `import_rejected`: the user rejected a detection of the import. Empty: the stock split waits for the user check. |
+| `source` | How ATrade found it: `ibkr_evidence` (section 8.13.2), or `databento_import` (the import or the IBKR stock split check, section 8.8.3). |
+| `confirmation` | How it was confirmed: `both_evidences` (both IBKR evidences), `bar_evidence` (the bar evidence only: no owner holds the instrument, or the IBKR closes of the IBKR stock split check), `user_apply` (the user, "Apply split"), or `import_check` (the user check of the import). `import_rejected`: the user rejected a detection of the import. Empty: the stock split waits for the user check. |
 | `recorded_at_utc` | |
 
 - One instrument has at most one stock split on one ex-date:
@@ -882,9 +948,10 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   `--reject-split <ID>` (with `--accept`) rejects one stock split: its row
   stays with `import_rejected`, so the next import does not find it again,
   and the bars do not change.
-- Decided (#191): the import saves the bars before the check. It applies
-  the symbol links and the stock splits from the IBKR closes at once. The
-  stock splits of the detection rule change the bars only after the check.
+- Decided (#191, changed by #324): the import saves the bars before the
+  check. It applies the symbol links at once. The stock splits of the IBKR
+  stock split check change the bars when the check finds them. The stock
+  splits of the detection rule change the bars only after the user check.
 - Not done (#191): a command that undoes a wrong symbol link. The import
   log and the check list show each link.
 - Decided (#191): symbol reuse (a different company uses the symbol later)

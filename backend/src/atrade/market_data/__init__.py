@@ -1,6 +1,6 @@
 """Public entry of the market_data capability: instrument search, the instrument lookup, bars, bar sources and the
 source order, saved bars, received bars to save, the daily bars of many instruments, the daily
-bar summary and the daily bar update, the Databento import and its user check, the hourly bar purchase list, the
+bar summary and the daily bar update, the Databento import, its user check, and the IBKR stock split check, the hourly bar purchase list, the
 quarterly US universe, live bars, and daily exchange rates in USD."""
 
 from atrade.market_data.bar_reading import (
@@ -29,9 +29,8 @@ from atrade.market_data.databento_import import (
     DatabentoImportError,
     DatabentoImportReport,
     import_databento_files,
-    import_databento_files_with_ibkr,
 )
-from atrade.market_data.databento_import_adjustment import DetectedSplit, SymbolLink
+from atrade.market_data.databento_import_adjustment import DetectedSplit, StillTradingSplitRule, SymbolLink
 from atrade.market_data.exchange_rate_reading import (
     ExchangeRateReader,
     ExchangeRatesNotReadError,
@@ -40,6 +39,7 @@ from atrade.market_data.exchange_rate_reading import (
 from atrade.market_data.exchange_rate_store import SavedExchangeRate
 from atrade.market_data.hk_instrument_list_store import read_hk_instrument_list
 from atrade.market_data.http_routes import create_market_data_router
+from atrade.market_data.ibkr_split_check import IbkrSplitCheckReport, has_pending_split_check, run_ibkr_split_check
 from atrade.market_data.import_check import (
     ImportCheckError,
     ImportDetections,
@@ -94,6 +94,7 @@ __all__ = [
     "ExchangeRatesNotReadError",
     "GatewayNotReachableError",
     "HourlyPurchase",
+    "IbkrSplitCheckReport",
     "ImportCheckError",
     "ImportDetections",
     "InstrumentLookup",
@@ -103,6 +104,7 @@ __all__ = [
     "SavedBars",
     "SavedExchangeRate",
     "SplitConfirmation",
+    "StillTradingSplitRule",
     "StockSplitCandidate",
     "StockSplitChange",
     "StockSplitConfirmedError",
@@ -120,9 +122,9 @@ __all__ = [
     "create_market_data_router",
     "find_first_trading_day_of_quarter",
     "find_previous_trading_day",
+    "has_pending_split_check",
     "has_saved_bars",
     "import_databento_files",
-    "import_databento_files_with_ibkr",
     "is_us_trading_day",
     "list_hourly_purchases",
     "read_daily_bar_summaries",
@@ -140,6 +142,7 @@ __all__ = [
     "read_us_universe_members",
     "read_us_universe_quarter_starts",
     "record_stock_split_evidence",
+    "run_ibkr_split_check",
     "save_received_bars",
     "save_received_bars_blocking",
     "save_us_universe",

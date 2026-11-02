@@ -181,6 +181,8 @@ class BacktestResponse(BaseModel):
     source_order: list[BarSource] | None
     bar_count_by_source: dict[BarSource, int] | None
     survivorship_bias: bool
+    # True when an instrument waited for the IBKR stock split check when the backtest was created (section 10.12).
+    has_split_check_pending: bool
     # The parameter sweep of a sweep run and its parameter values (section 10.11). Null for another backtest.
     sweep_id: int | None
     parameters: ParameterValues | None
@@ -376,6 +378,7 @@ def make_backtest_response(row: BacktestRow, strategy_version: StrategyVersion |
         if row.bar_count_by_source is None
         else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
         survivorship_bias=has_survivorship_bias(request),
+        has_split_check_pending=row.has_split_check_pending,
         sweep_id=row.sweep_id,
         parameters=row.parameters,
     )
