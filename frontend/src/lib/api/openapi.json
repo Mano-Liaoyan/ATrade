@@ -3968,7 +3968,7 @@
         ]
       },
       "BarPeriod": {
-        "description": "The bar periods that the chart offers. The values use the NautilusTrader bar specification format.",
+        "type": "string",
         "enum": [
           "1-MINUTE",
           "5-MINUTE",
@@ -3978,7 +3978,7 @@
           "1-DAY"
         ],
         "title": "BarPeriod",
-        "type": "string"
+        "description": "The bar periods that the chart offers. The values use the NautilusTrader bar specification format."
       },
       "BarResponse": {
         "description": "`time` is the bar start as UNIX seconds (UTC). The chart uses UNIX timestamps, not date strings.",
@@ -5129,11 +5129,11 @@
         "type": "object"
       },
       "DesiredState": {
+        "type": "string",
         "enum": [
           "running",
           "stopped"
-        ],
-        "type": "string"
+        ]
       },
       "EquityPointResponse": {
         "properties": {
@@ -5578,24 +5578,24 @@
       "ForwardTestResponse": {
         "properties": {
           "id": {
-            "title": "Id",
-            "type": "integer"
+            "type": "integer",
+            "title": "Id"
           },
           "strategy_version_id": {
-            "title": "Strategy Version Id",
-            "type": "integer"
+            "type": "integer",
+            "title": "Strategy Version Id"
           },
           "strategy_id": {
-            "title": "Strategy Id",
-            "type": "integer"
+            "type": "integer",
+            "title": "Strategy Id"
           },
           "strategy_name": {
-            "title": "Strategy Name",
-            "type": "string"
+            "type": "string",
+            "title": "Strategy Name"
           },
           "version_number": {
-            "title": "Version Number",
-            "type": "integer"
+            "type": "integer",
+            "title": "Version Number"
           },
           "symbol": {
             "anyOf": [
@@ -5687,15 +5687,15 @@
             "title": "Error Message"
           },
           "created_at_utc": {
+            "type": "string",
             "format": "date-time",
-            "title": "Created At Utc",
-            "type": "string"
+            "title": "Created At Utc"
           },
           "stopped_at_utc": {
             "anyOf": [
               {
-                "format": "date-time",
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -5706,8 +5706,8 @@
           "end_time_utc": {
             "anyOf": [
               {
-                "format": "date-time",
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -5716,15 +5716,15 @@
             "title": "End Time Utc"
           },
           "crash_count": {
-            "title": "Crash Count",
-            "type": "integer"
+            "type": "integer",
+            "title": "Crash Count"
           },
           "interruptions": {
             "items": {
               "$ref": "#/components/schemas/InterruptionResponse"
             },
-            "title": "Interruptions",
-            "type": "array"
+            "type": "array",
+            "title": "Interruptions"
           },
           "allocated_capital_usd": {
             "anyOf": [
@@ -5741,10 +5741,11 @@
             "items": {
               "$ref": "#/components/schemas/SplitCheckNeededResponse"
             },
-            "title": "Split Checks Needed",
-            "type": "array"
+            "type": "array",
+            "title": "Split Checks Needed"
           }
         },
+        "type": "object",
         "required": [
           "id",
           "strategy_version_id",
@@ -5770,10 +5771,10 @@
           "allocated_capital_usd",
           "split_checks_needed"
         ],
-        "title": "ForwardTestResponse",
-        "type": "object"
+        "title": "ForwardTestResponse"
       },
       "ForwardTestStatus": {
+        "type": "string",
         "enum": [
           "starting",
           "running",
@@ -5782,8 +5783,7 @@
           "stopped",
           "stop_failed",
           "failed"
-        ],
-        "type": "string"
+        ]
       },
       "GatewayStatusResponse": {
         "properties": {
@@ -6120,12 +6120,12 @@
         "title": "InstrumentSearchResponse"
       },
       "InterruptionReason": {
+        "type": "string",
         "enum": [
           "crash",
           "gateway",
           "worker_restart"
-        ],
-        "type": "string"
+        ]
       },
       "InterruptionResponse": {
         "properties": {
@@ -6133,15 +6133,15 @@
             "$ref": "#/components/schemas/InterruptionReason"
           },
           "started_at_utc": {
+            "type": "string",
             "format": "date-time",
-            "title": "Started At Utc",
-            "type": "string"
+            "title": "Started At Utc"
           },
           "ended_at_utc": {
             "anyOf": [
               {
-                "format": "date-time",
-                "type": "string"
+                "type": "string",
+                "format": "date-time"
               },
               {
                 "type": "null"
@@ -6150,13 +6150,13 @@
             "title": "Ended At Utc"
           }
         },
+        "type": "object",
         "required": [
           "reason",
           "started_at_utc",
           "ended_at_utc"
         ],
-        "title": "InterruptionResponse",
-        "type": "object"
+        "title": "InterruptionResponse"
       },
       "JsonValue": {},
       "LedgerRule": {
@@ -7904,23 +7904,23 @@
         "description": "The global source order: the first bar source that saved a time range gives all bars of the range."
       },
       "SplitCheckNeededResponse": {
-        "description": "An instrument of the forward test in the \"Split check needed\" state (paper_trading.md section 11.11).",
         "properties": {
           "symbol": {
-            "title": "Symbol",
-            "type": "string"
+            "type": "string",
+            "title": "Symbol"
           },
           "exchange": {
-            "title": "Exchange",
-            "type": "string"
+            "type": "string",
+            "title": "Exchange"
           }
         },
+        "type": "object",
         "required": [
           "symbol",
           "exchange"
         ],
         "title": "SplitCheckNeededResponse",
-        "type": "object"
+        "description": "An instrument of the forward test in the \"Split check needed\" state (paper_trading.md section 11.11)."
       },
       "SplitCheckResolvedResponse": {
         "properties": {
@@ -9174,12 +9174,12 @@
         "title": "UniverseInstrumentResponse"
       },
       "UniverseKind": {
+        "type": "string",
         "enum": [
           "single",
           "rule",
           "list"
-        ],
-        "type": "string"
+        ]
       },
       "UniverseRebalancePeriod": {
         "type": "string",
@@ -9445,26 +9445,17 @@
         "title": "BacktestFinishedMessage",
         "type": "object"
       },
-      "ForwardTestsMessage": {
+      "ChangedMessage": {
+        "description": "A watched table of the socket changed. The page reads its data again.",
         "properties": {
           "type": {
-            "const": "forward_tests",
-            "default": "forward_tests",
+            "const": "changed",
+            "default": "changed",
             "title": "Type",
             "type": "string"
-          },
-          "forward_tests": {
-            "items": {
-              "$ref": "#/components/schemas/ForwardTestResponse"
-            },
-            "title": "Forward Tests",
-            "type": "array"
           }
         },
-        "required": [
-          "forward_tests"
-        ],
-        "title": "ForwardTestsMessage",
+        "title": "ChangedMessage",
         "type": "object"
       },
       "HeartbeatMessage": {

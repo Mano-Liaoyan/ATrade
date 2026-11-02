@@ -33,8 +33,12 @@ from atrade.backtest.parameter_sweep import (
     select_sweeps,
 )
 from atrade.foundation.clock import Clock
+from atrade.foundation.table_changes import ChangeSocket
 from atrade.market_data import ExchangeRateReader
 from atrade.strategy import StrategyParameter, StrategyVersion, read_strategy_parameters, read_strategy_version
+
+# A sweep and the status of its runs: /ws/ sends a change message after a change (foundation/table_changes).
+SWEEP_CHANGE_SOCKET = ChangeSocket(path="/ws/sweeps", tables=frozenset({"backtest", "parameter_sweep"}))
 
 SWEEP_NOT_FOUND = "Parameter sweep not found."
 

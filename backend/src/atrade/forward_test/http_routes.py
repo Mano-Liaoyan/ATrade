@@ -1,16 +1,17 @@
-"""HTTP routes of forward_test: start, stop, and list forward tests, and /ws/forward-tests with their actual state.
+"""HTTP routes of forward_test: start, stop, and list forward tests, and the tables of /ws/forward-tests.
 
 The Web process writes only `desired_state` after the start. The forward-test worker writes the actual state
-(docs/architecture.md section 12.3). The socket reads the table every 2 seconds and sends the list after a change.
+(docs/architecture.md section 12.3). /ws/forward-tests sends a change message after each change of the forward test
+tables, and the page reads the list again.
 """
 
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
-from typing import Annotated, Literal
+from typing import Annotated
 
 import psycopg
-from fastapi import APIRouter, HTTPException, WebSocket, status
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
 from pydantic import AwareDatetime, BaseModel, Field, StringConstraints, field_validator
 
@@ -33,7 +34,7 @@ from atrade.forward_test.forward_test_universe import (
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
-from atrade.foundation.socket_push import ChangedMessageSender, HeartbeatMessage, serve_until_disconnect
+from atrade.foundation.table_changes import ChangeSocket
 from atrade.paper_trading import (
     ManualOrderLedger,
     PaperAccountCheckError,
@@ -43,12 +44,26 @@ from atrade.paper_trading import (
 from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
 from atrade.watchlist import read_watchlist_instruments
 
+# The forward test list and the records of each forward test: /ws/ sends a change message after a change
+# (foundation/table_changes).
+FORWARD_TEST_CHANGE_SOCKET = ChangeSocket(
+    path="/ws/forward-tests",
+    tables=frozenset(
+        {
+            "forward_test",
+            "forward_test_equity_point",
+            "forward_test_fill",
+            "forward_test_interruption",
+            "forward_test_same_period_backtest",
+        }
+    ),
+)
+
 MAX_INSTRUMENT_FIELD_LENGTH = 32
 # The largest top N of a rule universe (section 12.17).
 MAX_UNIVERSE_TOP_N = 500
 # A multi-instrument forward test uses daily bars only (section 12.17).
 MULTI_INSTRUMENT_BAR_PERIOD = BarPeriod.ONE_DAY
-STATE_READ_INTERVAL_SECONDS = 2.0
 
 # The bar periods of IB live bars (section 12.1). Every period that ATrade offers (BarPeriod) is in the list.
 # https://interactivebrokers.github.io/tws-api/historical_bars.html#hd_barsize
@@ -155,15 +170,6 @@ class ForwardTestCapitalResponse(BaseModel):
     unallocated_usd: Decimal | None
 
 
-class ForwardTestsMessage(BaseModel):
-    type: Literal["forward_tests"] = "forward_tests"
-    forward_tests: list[ForwardTestResponse]
-
-
-# The messages of /ws/forward-tests. The OpenAPI document adds their JSON Schema for the frontend types.
-FORWARD_TEST_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [ForwardTestsMessage, HeartbeatMessage]
-
-
 async def to_forward_test_response(database_url: str, row: ForwardTestRow) -> ForwardTestResponse:
     [response] = await to_forward_test_responses(database_url, [row])
     return response
@@ -172,8 +178,8 @@ async def to_forward_test_response(database_url: str, row: ForwardTestRow) -> Fo
 async def to_forward_test_responses(database_url: str, rows: list[ForwardTestRow]) -> list[ForwardTestResponse]:
     """Reads the interruptions and the strategy versions of all rows with 2 connections, not 2 for each row.
 
-    /ws/forward-tests reads the list every 2 seconds for each open page, so the connections of each row slowed the
-    first message of a page by many seconds while other pages and backtest children used the database.
+    Each open page reads the list after each change of a forward test, so the connections of each row slowed the
+    first list of a page by many seconds while other pages and backtest children used the database.
     """
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         interruptions = await forward_test_store.select_interruptions_of_forward_tests(
@@ -423,13 +429,6 @@ class ForwardTestRoutes:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Forward test not found.")
 
 
-async def push_forward_test_changes(websocket: WebSocket, database_url: str) -> None:
-    sender = ChangedMessageSender(websocket)
-    while True:
-        await sender.send_if_changed(ForwardTestsMessage(forward_tests=await list_forward_tests(database_url)))
-        await sender.wait(STATE_READ_INTERVAL_SECONDS)
-
-
 def create_forward_test_router(
     *, database_url: str, clock: Clock, client_ids: range, paper_account_monitor: PaperAccountMonitor
 ) -> APIRouter:
@@ -455,9 +454,5 @@ def create_forward_test_router(
         status_code=status.HTTP_202_ACCEPTED,
         response_model=None,
     )
-
-    @router.websocket("/ws/forward-tests")
-    async def stream_forward_tests(websocket: WebSocket) -> None:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.
-        await serve_until_disconnect(websocket, lambda: push_forward_test_changes(websocket, database_url))
 
     return router

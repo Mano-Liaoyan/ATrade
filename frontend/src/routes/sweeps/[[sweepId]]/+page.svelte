@@ -5,8 +5,9 @@
      the status in its tooltip, then the count), the "Metric" select (and the
      select of the third parameter value), and the chart: points for 1 parameter, a heatmap for 2 or 3. Each heatmap
      cell shows its value on a Carbon sequential color. Bottom panel "Runs": the parameter values, the status icon, and
-     the key metrics of each run. Each column sorts the rows, and a click on a row opens its backtest. The page reads the
-     sweep and the list again while a run is queued or running.
+     the key metrics of each run. Each column sorts the rows, and a click on a row opens its backtest. A right-click on
+     a sweep row opens its context menu ("Open in new tab"). The page reads the
+     list again after each change that /ws/sweeps pushes, and the open sweep when its list row changes.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
@@ -15,6 +16,7 @@
   import { navigating, page } from '$app/state';
   import { describeBacktestStatus, findBacktestStatusKind } from '#lib/backtest';
   import {
+    ContextMenu,
     DataTable,
     IconButton,
     InlineNotification,
@@ -22,15 +24,17 @@
     Select,
     SortHeader,
     StatusIndicator,
+    type ContextMenuItem,
     type TableColumn,
   } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { startPolling } from '#lib/foundation/polling';
+  import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { formatVersionLabel } from '#lib/strategy';
   import {
     DEFAULT_SWEEP_METRIC,
+    SWEEPS_SOCKET_PATH,
     formatSweepMetric,
     listSweeps,
     readParameterNames,
@@ -51,7 +55,6 @@
   import SweepPointChart from '../SweepPointChart.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
 
-  const CHECK_INTERVAL_MILLISECONDS = 2000;
   const PANELS: PanelSpec[] = [
     { id: 'overview', minPixels: 160 },
     { id: 'runs', minPixels: 96, defaultPixels: 280, splitterLabel: 'Resize the overview and the runs' },
@@ -69,7 +72,6 @@
   let sweeps = $state<Sweep[]>([]);
   let isListRead = $state(false);
   let listMessage = $state('');
-  let listReadCount = $state(0);
   let sweep = $state<SweepDetail | null>(null);
   let detailMessage = $state('');
   let metric = $state<SweepMetricKey>(DEFAULT_SWEEP_METRIC);
@@ -86,30 +88,22 @@
     shownSweep === null ? [] : sortSweepRows(readSweepRows(shownSweep), sortColumn, sortDirection),
   );
 
-  function isRunning(statusCounts: Record<string, number>): boolean {
-    return (statusCounts['queued'] ?? 0) + (statusCounts['running'] ?? 0) > 0;
-  }
-
-  $effect(() => {
-    listReadCount satisfies number;
-    return startPolling(
-      () => listSweeps(fetch),
-      (result) => {
+  // /ws/sweeps pushes each change of a sweep or of one of its runs.
+  $effect(() =>
+    readOnChange({
+      socketPath: SWEEPS_SOCKET_PATH,
+      read: () => listSweeps(fetch),
+      onResult: (result) => {
         isListRead = true;
         if (result.kind === 'failed') {
           listMessage = result.message;
-          return true;
+          return;
         }
         listMessage = '';
         sweeps = result.value;
-        return result.value.some((item) => isRunning(item.status_counts));
       },
-      CHECK_INTERVAL_MILLISECONDS,
-      (message) => {
-        listMessage = message;
-      },
-    );
-  });
+    }),
+  );
 
   // /sweeps opens the newest sweep, like /backtests.
   $effect(() => {
@@ -119,27 +113,30 @@
     }
   });
 
+  // The open sweep reads again when its list row changes (the run counts): the list comes from /ws/sweeps.
+  const openListRowText = $derived(JSON.stringify(sweeps.find((item) => item.id === sweepId) ?? null));
+
   $effect(() => {
     if (sweepId === null) {
       return;
     }
+    openListRowText satisfies string;
     const id = sweepId;
-    return startPolling(
-      () => readSweep(fetch, id),
-      (result) => {
-        if (result.kind === 'failed') {
-          detailMessage = result.message;
-          return true;
-        }
-        detailMessage = '';
-        sweep = result.value;
-        return isRunning(result.value.status_counts);
-      },
-      CHECK_INTERVAL_MILLISECONDS,
-      (message) => {
-        detailMessage = message;
-      },
-    );
+    let isActive = true;
+    void readSweep(fetch, id).then((result) => {
+      if (!isActive) {
+        return;
+      }
+      if (result.kind === 'failed') {
+        detailMessage = result.message;
+        return;
+      }
+      detailMessage = '';
+      sweep = result.value;
+    });
+    return () => {
+      isActive = false;
+    };
   });
 
   function sortBy(column: string): void {
@@ -163,8 +160,19 @@
     void goto(backtestHref(backtestId));
   }
 
+  function readMenuItems(key: string): ContextMenuItem[] {
+    const href = resolve('/sweeps/[[sweepId]]', { sweepId: key });
+    return [
+      {
+        label: 'Open in new tab',
+        onSelect: () => {
+          window.open(href, '_blank', 'noopener');
+        },
+      },
+    ];
+  }
+
   function openStartedSweep(started: SweepDetail): void {
-    listReadCount += 1;
     void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(started.id) }));
   }
 </script>
@@ -184,40 +192,43 @@
       <InlineNotification kind="error" title="Parameter sweeps not read" subtitle={listMessage} lowContrast />
     {:else}
       <div class="table-region sweep-list">
-        <ScrollRegion label="Parameter sweep list" fill>
-          <DataTable columns={LIST_COLUMNS} size="sm">
-            {#snippet rows()}
-              {#each sweeps as item (item.id)}
-                {@const status = readSweepStatus(item.status_counts)}
-                <tr
-                  class={['link-row', item.id === sweepId && 'cds--data-table--selected']}
-                  onclick={(event) => {
-                    if (!(event.target instanceof Element && event.target.closest('a') !== null)) {
-                      void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) }));
-                    }
-                  }}
-                >
-                  <th scope="row" align="right">
-                    <span class="status-id">
-                      <StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} align="right" />
-                      <a
-                        class="row-link"
-                        href={resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) })}
-                        aria-current={item.id === sweepId ? 'page' : undefined}>#{item.id}</a
+        <ContextMenu readLabel={(key: string) => `Parameter sweep #${key}`} readItems={readMenuItems}>
+          <ScrollRegion label="Parameter sweep list" fill>
+            <DataTable columns={LIST_COLUMNS} size="sm">
+              {#snippet rows()}
+                {#each sweeps as item (item.id)}
+                  {@const status = readSweepStatus(item.status_counts)}
+                  <tr
+                    data-context-key={item.id}
+                    class={['link-row', item.id === sweepId && 'cds--data-table--selected']}
+                    onclick={(event) => {
+                      if (!(event.target instanceof Element && event.target.closest('a') !== null)) {
+                        void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) }));
+                      }
+                    }}
+                  >
+                    <th scope="row" align="right">
+                      <span class="status-id">
+                        <StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} align="right" />
+                        <a
+                          class="row-link"
+                          href={resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) })}
+                          aria-current={item.id === sweepId ? 'page' : undefined}>#{item.id}</a
+                        >
+                      </span>
+                    </th>
+                    <td>
+                      <span class="ellipsis" title={formatVersionLabel(item.strategy_name, item.version_number)}
+                        >{formatVersionLabel(item.strategy_name, item.version_number)}</span
                       >
-                    </span>
-                  </th>
-                  <td>
-                    <span class="ellipsis" title={formatVersionLabel(item.strategy_name, item.version_number)}
-                      >{formatVersionLabel(item.strategy_name, item.version_number)}</span
-                    >
-                  </td>
-                  <td align="right">{item.status_counts['finished'] ?? 0} / {item.run_count}</td>
-                </tr>
-              {/each}
-            {/snippet}
-          </DataTable>
-        </ScrollRegion>
+                    </td>
+                    <td align="right">{item.status_counts['finished'] ?? 0} / {item.run_count}</td>
+                  </tr>
+                {/each}
+              {/snippet}
+            </DataTable>
+          </ScrollRegion>
+        </ContextMenu>
       </div>
     {/if}
   </SideColumn>

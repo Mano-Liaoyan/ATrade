@@ -473,8 +473,8 @@ Phase 3 changes (#146, #149):
     backtest reads only saved bars: without saved bars of the period it
     fails with the message of section 10.
   - The comparison page `/forward-tests/{id}/comparison/{backtest_id}` reads
-    `GET /api/forward-tests/{id}/comparison/{backtest_id}` every 2 seconds
-    until the backtest has a final status. It is a workbench (spec #99,
+    `GET /api/forward-tests/{id}/comparison/{backtest_id}` again after each
+    change that `/ws/backtests` pushes. It is a workbench (spec #99,
     #109): the "Forward tests" side column, the comparison panel (header
     line with the backtest status, `ComparedKeyMetrics` and
     `EquityDrawdownChart` of `#lib/backtest`; no code diff: the same strategy
@@ -525,13 +525,13 @@ The public entry `atrade.forward_test` exports:
 
 | Name | Purpose |
 |---|---|
-| `create_forward_test_router(*, database_url, clock, client_ids, paper_account_monitor)` | The routes of section 12.13 and `/ws/forward-tests`. `client_ids` is the range from `settings`. `paper_account_monitor` gives the checked account and its `NetLiquidation` (#215). |
+| `create_forward_test_router(*, database_url, clock, client_ids, paper_account_monitor)` | The routes of section 12.13. `client_ids` is the range from `settings`. `paper_account_monitor` gives the checked account and its `NetLiquidation` (#215). |
 | `ForwardTestWorker(*, database_url, clock, start_child)` | The worker loop of section 12.14. `compare_states()` is one comparison. `keep_comparing()` runs it every 2 seconds. |
 | `ChildMode`, `ForwardTestChild`, `StartForwardTestChild` | The child modes `run` and `cancel_orders`, the child protocol (`read_exit_code()`, `request_stop()`), and the start function type `(forward_test_id, mode) -> child`. Tests and the e2e server pass a fake. |
 | `run_forward_test_child(*, settings, forward_test_id, mode, ibkr_access, stop_requested)` | The body of the child process (section 12.15). Returns the exit code. |
 | `IbkrAccess`, `LiveNodeInput`, `LiveNodeEnd`, `run_live_node`, `GatewayWatch` | `IbkrAccess` holds `open_gateway_connection(client_id)`, `run_live_node(input, stop_requested)`, `clock` (default the system clock), and `gateway_retry_seconds` (default 30). `run_live_node` is the real LiveNode run. It takes an optional `gateway_watch` (`GatewayWatch(check_interval_seconds=30, lost_after_seconds=300)`). |
 | `PAPER_CHECK_FAILED_EXIT_CODE`, `GATEWAY_UNREACHABLE_EXIT_CODE` | `3`: the paper account check failed. `4`: IB Gateway was lost for more than 5 minutes (section 12.7). |
-| `FORWARD_TEST_SOCKET_MESSAGE_MODELS` | The models of `/ws/forward-tests` for the OpenAPI document. |
+| `FORWARD_TEST_CHANGE_SOCKET` | The change socket `/ws/forward-tests` and its tables (architecture.md section 13 "Live updates"). `app/web.py` mounts it. |
 | `create_forward_test_comparison_router(*, database_url, clock)` | The two comparison routes of section 12.13 (#78). `app/web.py` adds it after `create_forward_test_router`. |
 | `ForwardTestRecorder`, `RecorderInput` | The records DataActor of section 12.8 (#78). `RecorderInput` has `database_url`, `forward_test_id`, `instrument` (the key of the saved bars), `instrument_id`, `bar_type`, `bar_period`, and `start_balance_usd`. `LiveNodeInput` has `database_url` and `start_balance_usd` for it. |
 
@@ -657,7 +657,7 @@ Phase 3 table changes (#146). The column names are choices of this document.
 | `POST /api/forward-tests/{id}/stop` | `202`. Writes `desired_state = stopped`. `404` for an unknown ID. |
 | `POST /api/forward-tests/{id}/same-period-backtests` | `201` with `{"backtest_id"}`: a queued backtest of the same period (section 12.10). `404` for an unknown ID. `422` without a start balance (`"The forward test has no start balance yet. The backtest uses it as the paper capital."`), for a currency that is not USD, or for an empty period. |
 | `GET /api/forward-tests/{id}/comparison/{backtest_id}` | `200` with `ForwardTestComparisonResponse`: `forward_test`, `backtest` (`id`, `status`, `error_message`, `start_utc`, `end_utc`, `paper_capital_usd`, `metrics` or null), `forward_test_metrics` (null without a start balance; the fields of section 12.10, with the win rate in the backtest period, #170), `forward_test_equity_curve`, `backtest_equity_curve`, `fills` (`bar_end_utc`, `side`, quantity and price of each side or null, `price_difference_usd` or null), and `interruptions` (`start_utc`, `end_utc`). `404` for an unknown forward test or backtest. `422` when the backtest has another strategy version, instrument, or bar period. |
-| `/ws/forward-tests` | `{"type": "forward_tests", "forward_tests": [...]}` at once and after each change. The server reads the table every 2 seconds, with a fixed number of database connections for the full list (not connections for each row). `{"type": "heartbeat"}` after 10 seconds without a change. The browser sends nothing. |
+| `/ws/forward-tests` | The change socket of architecture.md section 13 "Live updates": `{"type": "changed"}` after each change of `forward_test`, `forward_test_interruption`, `forward_test_equity_point`, `forward_test_fill`, or `forward_test_same_period_backtest`, and `{"type": "heartbeat"}` after 10 seconds without a change. The page then reads `GET /api/forward-tests`, which reads the full list with a fixed number of database connections (not connections for each row). The browser sends nothing. |
 
 Phase 3 route changes (#146, #149). The field names, the new route path,
 and the status codes of the new refusals are choices of this document.
@@ -822,8 +822,8 @@ than the worker clock.
 
 ## 12.16 Frontend and tests
 
-- `#lib/forward_test`: the HTTP calls, `readForwardTestsMessage()`,
-  `ForwardTestsOnInstrumentsFeed` (the one `/ws/forward-tests` feed of a page:
+- `#lib/forward_test`: the HTTP calls (`listForwardTests()` and the others),
+  `ForwardTestsOnInstrumentsFeed` (the one forward test list of a page, read again after each `/ws/forward-tests` change:
   `forwardTests`, `onInstruments`, `isConnected`), and
   `listForwardTestEvents()` (the events of the Logs tab).
   `routes/forward-tests/ForwardTestList.svelte` (`ScrollRegion` "Forward test
@@ -840,7 +840,8 @@ than the worker clock.
   shows no backtest result (UI rule: no text that the user does not need to
   act). A refused start shows the `detail` text. A started
   forward test opens at once.
-- The page reads `GET /api/forward-tests/{id}` every 2 seconds. The header
+- The page reads `GET /api/forward-tests/{id}` again after each change that
+  `/ws/forward-tests` pushes. The header
   line shows the number, the strategy version (link to that version on the strategy page),
   the symbol (link to the instrument page), the bar period, the status, the
   crash count when it is not 0 and the status is not `stopped`, the red

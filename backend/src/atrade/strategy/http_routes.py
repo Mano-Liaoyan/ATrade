@@ -11,6 +11,7 @@ from pydantic import BaseModel, StringConstraints, model_validator
 from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
+from atrade.foundation.table_changes import ChangeSocket
 from atrade.strategy import strategy_store
 from atrade.strategy.code_checks import CodeProblem
 from atrade.strategy.rules_code import make_rules_code
@@ -24,6 +25,9 @@ from atrade.strategy.strategy_templates import (
     find_start_rules,
 )
 from atrade.strategy.version_saving import save_ai_assistant_version, save_checked_version
+
+# The strategy list and the strategy versions: /ws/ sends a change message after a change (foundation/table_changes).
+STRATEGY_CHANGE_SOCKET = ChangeSocket(path="/ws/strategies", tables=frozenset({"strategy", "strategy_version"}))
 
 MAX_STRATEGY_NAME_LENGTH = 100
 FIRST_VERSION_NUMBER = 1

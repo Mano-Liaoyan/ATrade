@@ -1,10 +1,11 @@
 <!-- The strategy list of the strategy workbench (the body of the "Strategies" side column): 32px rows with the strategy
      name and its latest version. The open strategy has the Carbon selected row color, like the backtest list. A click
-     on a row opens its strategy. -->
+     on a row opens its strategy. A right-click on a row opens its context menu: "Open in new tab" and "Delete
+     strategy". -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { DataTable, InlineNotification, type TableColumn } from '#lib/foundation/carbon';
+  import { ContextMenu, DataTable, InlineNotification, type ContextMenuItem, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import type { StrategyListItem } from '#lib/strategy';
 
@@ -13,14 +14,39 @@
     /** The read error of the list, or an empty text. */
     errorMessage: string;
     openStrategyId: number | null;
+    /** "Delete strategy" of the context menu: the page asks before the delete. */
+    onDeleteRequest: (strategy: StrategyListItem) => void;
   }
 
-  const { strategies, errorMessage, openStrategyId }: Props = $props();
+  const { strategies, errorMessage, openStrategyId, onDeleteRequest }: Props = $props();
 
   const COLUMNS: TableColumn[] = [{ header: 'Strategy' }, { header: 'Version', align: 'right' }];
 
   function strategyHref(id: number): string {
     return resolve('/strategies/[strategyId]', { strategyId: String(id) });
+  }
+
+  function readMenuItems(key: string): ContextMenuItem[] {
+    const strategy = strategies.find((item) => item.id === Number(key));
+    if (strategy === undefined) {
+      return [];
+    }
+    return [
+      {
+        label: 'Open in new tab',
+        onSelect: () => {
+          window.open(strategyHref(strategy.id), '_blank', 'noopener');
+        },
+      },
+      {
+        label: 'Delete strategy',
+        divider: true,
+        danger: true,
+        onSelect: () => {
+          onDeleteRequest(strategy);
+        },
+      },
+    ];
   }
 
   function openRow(event: MouseEvent, id: number): void {
@@ -37,30 +63,33 @@
   <InlineNotification kind="error" title="Strategies not read" subtitle={errorMessage} lowContrast />
 {:else}
   <div class="list">
-    <ScrollRegion label="Strategy list" fill>
-      <DataTable columns={COLUMNS} size="sm">
-        {#snippet rows()}
-          {#each strategies as item (item.id)}
-            <tr
-              class={['strategy-row', item.id === openStrategyId && 'cds--data-table--selected']}
-              onclick={(event) => {
-                openRow(event, item.id);
-              }}
-            >
-              <th scope="row">
-                <a
-                  class="row-link"
-                  href={resolve('/strategies/[strategyId]', { strategyId: String(item.id) })}
-                  title={item.name}
-                  aria-current={item.id === openStrategyId ? 'page' : undefined}>{item.name}</a
-                >
-              </th>
-              <td align="right">v{item.latest_version_number}</td>
-            </tr>
-          {/each}
-        {/snippet}
-      </DataTable>
-    </ScrollRegion>
+    <ContextMenu readLabel={(key: string) => strategies.find((item) => item.id === Number(key))?.name ?? ''} readItems={readMenuItems}>
+      <ScrollRegion label="Strategy list" fill>
+        <DataTable columns={COLUMNS} size="sm">
+          {#snippet rows()}
+            {#each strategies as item (item.id)}
+              <tr
+                data-context-key={item.id}
+                class={['strategy-row', item.id === openStrategyId && 'cds--data-table--selected']}
+                onclick={(event) => {
+                  openRow(event, item.id);
+                }}
+              >
+                <th scope="row">
+                  <a
+                    class="row-link"
+                    href={resolve('/strategies/[strategyId]', { strategyId: String(item.id) })}
+                    title={item.name}
+                    aria-current={item.id === openStrategyId ? 'page' : undefined}>{item.name}</a
+                  >
+                </th>
+                <td align="right">v{item.latest_version_number}</td>
+              </tr>
+            {/each}
+          {/snippet}
+        </DataTable>
+      </ScrollRegion>
+    </ContextMenu>
   </div>
 {/if}
 

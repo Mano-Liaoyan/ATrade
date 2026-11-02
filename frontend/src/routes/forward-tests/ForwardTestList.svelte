@@ -1,13 +1,15 @@
 <!-- The forward test list of the forward test workbench (the body of the "Forward tests" side column): 32px rows with
      the actual status icon from /ws/forward-tests before the number (the tooltip names the status), the strategy
      version, and the instrument symbol. The open forward test has the Carbon selected row color. A click on a row opens its forward
-     test. Stop and "Backtest the same period" are in the header line of the open forward test. -->
+     test. Stop and "Backtest the same period" are in the header line of the open forward test. A right-click on a row
+     opens its context menu: "Open in new tab", and "Stop forward test" while it can stop. -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { DataTable, StatusIndicator, type TableColumn } from '#lib/foundation/carbon';
+  import { ContextMenu, DataTable, StatusIndicator, type ContextMenuItem, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
+    canStop,
     describeForwardTestStatus,
     describeForwardTestUniverse,
     findForwardTestStatusKind,
@@ -18,9 +20,11 @@
   interface Props {
     forwardTests: ForwardTest[];
     openForwardTestId: number | null;
+    /** "Stop forward test" of the context menu. Without it, the menu has no Stop. */
+    onStop?: (forwardTest: ForwardTest) => void;
   }
 
-  const { forwardTests, openForwardTestId }: Props = $props();
+  const { forwardTests, openForwardTestId, onStop }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
     { header: '#', align: 'right' },
@@ -30,6 +34,32 @@
 
   function forwardTestHref(id: number): string {
     return resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(id) });
+  }
+
+  function readMenuItems(key: string): ContextMenuItem[] {
+    const forwardTest = forwardTests.find((item) => item.id === Number(key));
+    if (forwardTest === undefined) {
+      return [];
+    }
+    const items: ContextMenuItem[] = [
+      {
+        label: 'Open in new tab',
+        onSelect: () => {
+          window.open(forwardTestHref(forwardTest.id), '_blank', 'noopener');
+        },
+      },
+    ];
+    if (onStop !== undefined && canStop(forwardTest)) {
+      items.push({
+        label: 'Stop forward test',
+        divider: true,
+        danger: true,
+        onSelect: () => {
+          onStop(forwardTest);
+        },
+      });
+    }
+    return items;
   }
 
   function openRow(event: MouseEvent, id: number): void {
@@ -43,38 +73,41 @@
 </script>
 
 <div class="list">
-  <ScrollRegion label="Forward test list" fill>
-    <DataTable columns={COLUMNS} size="sm">
-      {#snippet rows()}
-        {#each forwardTests as forwardTest (forwardTest.id)}
-          {@const versionLabel = formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}
-          <tr
-            class={['forward-test-row', forwardTest.id === openForwardTestId && 'cds--data-table--selected']}
-            onclick={(event) => {
-              openRow(event, forwardTest.id);
-            }}
-          >
-            <th scope="row" align="right">
-              <span class="status-id">
-                <StatusIndicator
-                  kind={findForwardTestStatusKind(forwardTest.status)}
-                  label={describeForwardTestStatus(forwardTest.status)}
-                  align="right"
-                />
-                <a
-                  class="row-link"
-                  href={resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(forwardTest.id) })}
-                  aria-current={forwardTest.id === openForwardTestId ? 'page' : undefined}>#{forwardTest.id}</a
-                >
-              </span>
-            </th>
-            <td><span class="strategy-name" title={versionLabel}>{versionLabel}</span></td>
-            <td>{forwardTest.symbol ?? describeForwardTestUniverse(forwardTest)}</td>
-          </tr>
-        {/each}
-      {/snippet}
-    </DataTable>
-  </ScrollRegion>
+  <ContextMenu readLabel={(key: string) => `Forward test #${key}`} readItems={readMenuItems}>
+    <ScrollRegion label="Forward test list" fill>
+      <DataTable columns={COLUMNS} size="sm">
+        {#snippet rows()}
+          {#each forwardTests as forwardTest (forwardTest.id)}
+            {@const versionLabel = formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}
+            <tr
+              data-context-key={forwardTest.id}
+              class={['forward-test-row', forwardTest.id === openForwardTestId && 'cds--data-table--selected']}
+              onclick={(event) => {
+                openRow(event, forwardTest.id);
+              }}
+            >
+              <th scope="row" align="right">
+                <span class="status-id">
+                  <StatusIndicator
+                    kind={findForwardTestStatusKind(forwardTest.status)}
+                    label={describeForwardTestStatus(forwardTest.status)}
+                    align="right"
+                  />
+                  <a
+                    class="row-link"
+                    href={resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(forwardTest.id) })}
+                    aria-current={forwardTest.id === openForwardTestId ? 'page' : undefined}>#{forwardTest.id}</a
+                  >
+                </span>
+              </th>
+              <td><span class="strategy-name" title={versionLabel}>{versionLabel}</span></td>
+              <td>{forwardTest.symbol ?? describeForwardTestUniverse(forwardTest)}</td>
+            </tr>
+          {/each}
+        {/snippet}
+      </DataTable>
+    </ScrollRegion>
+  </ContextMenu>
 </div>
 
 <style>

@@ -164,18 +164,23 @@ test('runs a backtest from the toolbar and opens its result in a new tab', async
 });
 
 // The e2e server allows 4 running forward tests (client IDs 10-13), and forward_test.spec.ts uses them in all browser
-// projects. So this test fakes the forward test routes and the /ws/forward-tests socket: it checks the toolbar button,
+// projects. So this test fakes the forward test routes and the /ws/forward-tests change socket: it checks the toolbar button,
 // the dialog, and the requests, not the worker.
 test('starts a forward test from the toolbar and stops it with the same button', async ({ page }, currentTest) => {
   const name = createUniqueName(currentTest, 'Signal');
   const startRequests: unknown[] = [];
-  let sendForwardTests: (forwardTests: unknown[]) => void = () => {};
+  // GET /api/forward-tests returns this list. A change sends "changed", and the page reads the list again.
+  let listedForwardTests: unknown[] = [];
+  let sendChanged: () => void = () => {};
   await page.routeWebSocket(/\/ws\/forward-tests$/, (socket) => {
-    sendForwardTests = (forwardTests) => {
-      socket.send(JSON.stringify({ type: 'forward_tests', forward_tests: forwardTests }));
+    sendChanged = () => {
+      socket.send(JSON.stringify({ type: 'changed' }));
     };
-    sendForwardTests([]);
   });
+  function sendForwardTests(forwardTests: unknown[]): void {
+    listedForwardTests = forwardTests;
+    sendChanged();
+  }
   await createStrategy(page, name);
   const strategyId = Number(page.url().split('/').at(-1));
   const forwardTest = {
@@ -202,7 +207,7 @@ test('starts a forward test from the toolbar and stops it with the same button',
   };
   await page.route('**/api/forward-tests', async (route) => {
     if (route.request().method() !== 'POST') {
-      await route.continue();
+      await route.fulfill({ json: listedForwardTests });
       return;
     }
     startRequests.push(route.request().postDataJSON());

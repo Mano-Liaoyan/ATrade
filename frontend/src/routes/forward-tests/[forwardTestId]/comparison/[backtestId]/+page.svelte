@@ -9,18 +9,18 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import {
+    BACKTESTS_SOCKET_PATH,
     ComparedKeyMetrics,
     describeBacktestStatus,
     EquityDrawdownChart,
     findBacktestStatusKind,
-    isFinalStatus,
     type ComparedTest,
     type DrawdownCurve,
   } from '#lib/backtest';
   import { InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
-  import { startPolling } from '#lib/foundation/polling';
+  import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -38,7 +38,6 @@
   import { createInstrumentHref } from '../../../../instrument_href';
   import ForwardTestList from '../../../ForwardTestList.svelte';
 
-  const READ_INTERVAL_MILLISECONDS = 2000;
   // The panels of the forward test page. The chart panel has a higher minimum: the header line, the 2 metric rows (they
   // scroll when they do not fit), and the chart.
   const PANELS: PanelSpec[] = [
@@ -93,27 +92,24 @@
         })),
   );
 
-  $effect(() => feed.start(window.location));
+  $effect(() => feed.start(fetch, window.location));
 
+  // The comparison reads again after each backtest change (the same-period backtest runs) that /ws/backtests pushes.
   $effect(() => {
     const currentForwardTestId = forwardTestId;
     const currentBacktestId = backtestId;
-    return startPolling(
-      () => readForwardTestComparison(fetch, currentForwardTestId, currentBacktestId),
-      (result) => {
+    return readOnChange({
+      socketPath: BACKTESTS_SOCKET_PATH,
+      read: () => readForwardTestComparison(fetch, currentForwardTestId, currentBacktestId),
+      onResult: (result) => {
         if (result.kind === 'failed') {
           errorMessage = result.message;
-          return true;
+          return;
         }
         errorMessage = '';
         comparison = result.value;
-        return !isFinalStatus(result.value.backtest.status);
       },
-      READ_INTERVAL_MILLISECONDS,
-      (message) => {
-        errorMessage = message;
-      },
-    );
+    });
   });
 </script>
 

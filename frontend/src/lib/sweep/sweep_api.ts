@@ -11,6 +11,8 @@ export type SweepDetail = components['schemas']['SweepDetailResponse'];
 export type SweepRun = components['schemas']['SweepRunResponse'];
 export type SweepParameters = components['schemas']['ParametersResponse'];
 
+// The change socket of the list: a "changed" message after each change (foundation/live_socket readOnChange).
+export const SWEEPS_SOCKET_PATH = '/ws/sweeps';
 const SWEEPS_PATH = '/api/sweeps';
 const FAILED_ACTION = 'The parameter sweep request';
 

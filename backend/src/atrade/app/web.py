@@ -28,24 +28,34 @@ from atrade.assistant import (
     StartContextReader,
     create_assistant_router,
 )
-from atrade.backtest import BacktestRunner, create_backtest_router, create_sweep_router, read_last_backtest_ids
+from atrade.backtest import (
+    BACKTEST_CHANGE_SOCKET,
+    SWEEP_CHANGE_SOCKET,
+    BacktestRunner,
+    create_backtest_router,
+    create_sweep_router,
+    read_last_backtest_ids,
+)
 from atrade.forward_test import (
+    FORWARD_TEST_CHANGE_SOCKET,
     create_forward_test_comparison_router,
     create_forward_test_router,
 )
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.settings import Settings
+from atrade.foundation.table_changes import TableChangeFeed, create_change_socket_router
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
 from atrade.market_data import DailyBarUpdate, ExchangeRateReader, InstrumentLookup, create_market_data_router
 from atrade.paper_trading import PaperAccountMonitor, create_paper_trading_router
-from atrade.screen import create_screen_router
+from atrade.screen import SCREEN_CHANGE_SOCKET, create_screen_router
 from atrade.strategy import (
+    STRATEGY_CHANGE_SOCKET,
     STRATEGY_TEMPLATE,
     create_strategy_language_server_router,
     create_strategy_router,
     read_strategy_outline,
 )
-from atrade.watchlist import create_watchlist_router, read_watchlist_instruments
+from atrade.watchlist import WATCHLIST_CHANGE_SOCKET, create_watchlist_router, read_watchlist_instruments
 
 # The container must accept connections from the Compose network.
 LISTEN_HOST = "0.0.0.0"
@@ -102,6 +112,7 @@ def create_web_app(
         # market_data does not import watchlist (docs/architecture.md section 6.2), so app/ connects them.
         read_watchlist_instruments=lambda: read_watchlist_instruments(database_url=settings.database_url),
     )
+    table_change_feed = TableChangeFeed(settings.database_url)
 
     @asynccontextmanager
     async def keep_gateway_connected(_app: FastAPI) -> AsyncGenerator[None]:
@@ -111,8 +122,9 @@ def create_web_app(
         check_task = asyncio.create_task(paper_account_monitor.keep_checking())
         backtest_task = asyncio.create_task(backtest_runner.keep_running())
         daily_bar_task = asyncio.create_task(daily_bar_update.keep_updating())
+        table_change_task = asyncio.create_task(table_change_feed.keep_listening())
         yield
-        for task in (daily_bar_task, backtest_task, check_task, connection_task):
+        for task in (table_change_task, daily_bar_task, backtest_task, check_task, connection_task):
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
@@ -180,6 +192,19 @@ def create_web_app(
             assistant_service=assistant_service or AssistantServiceClient(),
             read_start_context=create_start_context_reader(settings.database_url),
             strategy_template=STRATEGY_TEMPLATE,
+        )
+    )
+    app.include_router(
+        create_change_socket_router(
+            table_change_feed,
+            [
+                BACKTEST_CHANGE_SOCKET,
+                SWEEP_CHANGE_SOCKET,
+                STRATEGY_CHANGE_SOCKET,
+                SCREEN_CHANGE_SOCKET,
+                WATCHLIST_CHANGE_SOCKET,
+                FORWARD_TEST_CHANGE_SOCKET,
+            ],
         )
     )
     # The frontend router matches every path, so it is mounted last.

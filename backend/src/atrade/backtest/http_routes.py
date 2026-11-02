@@ -59,9 +59,13 @@ from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALID_RESPONSE
 from atrade.foundation.instrument import Instrument
+from atrade.foundation.table_changes import ChangeSocket
 from atrade.market_data import BarSource, ExchangeRateReader, read_us_universe_quarter_starts
 from atrade.screen import MARKET_CURRENCIES, read_saved_screen, read_screen_result_members
 from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
+
+# The backtest list and the open backtest: /ws/ sends a change message after a change (foundation/table_changes).
+BACKTEST_CHANGE_SOCKET = ChangeSocket(path="/ws/backtests", tables=frozenset({"backtest"}))
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
 DEFAULT_OUT_OF_SAMPLE_SHARE = 30

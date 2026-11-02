@@ -10,6 +10,7 @@ from pydantic import BaseModel, StringConstraints
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
+from atrade.foundation.table_changes import ChangeSocket
 from atrade.market_data import (
     BarSource,
     GatewayNotReachableError,
@@ -18,6 +19,9 @@ from atrade.market_data import (
     read_saved_bar_coverage,
 )
 from atrade.watchlist import watchlist_store
+
+# The watchlist: /ws/ sends a change message after a change (foundation/table_changes).
+WATCHLIST_CHANGE_SOCKET = ChangeSocket(path="/ws/watchlist", tables=frozenset({"watchlist_instrument"}))
 
 # The same limits as the CHECK constraints of the watchlist_instrument table.
 MAX_SYMBOL_LENGTH = 32

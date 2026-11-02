@@ -16,9 +16,9 @@ from pydantic.json_schema import models_json_schema
 
 from atrade.app.web import create_web_app
 from atrade.assistant import ASSISTANT_SOCKET_MESSAGE_MODELS
-from atrade.forward_test import FORWARD_TEST_SOCKET_MESSAGE_MODELS
 from atrade.foundation.clock import SystemClock
 from atrade.foundation.settings import Settings
+from atrade.foundation.table_changes import CHANGE_SOCKET_MESSAGE_MODELS
 from atrade.ibkr import IbAsyncGatewayConnection
 from atrade.market_data import MARKET_DATA_SOCKET_MESSAGE_MODELS
 from atrade.paper_trading import PAPER_TRADING_SOCKET_MESSAGE_MODELS
@@ -32,7 +32,7 @@ SCHEMA_REF_TEMPLATE = "#/components/schemas/{model}"
 # One list per /ws/ route. Each list has HeartbeatMessage; add_socket_message_schemas adds it once.
 SOCKET_MESSAGE_MODEL_LISTS: list[list[type[BaseModel]]] = [
     MARKET_DATA_SOCKET_MESSAGE_MODELS,
-    FORWARD_TEST_SOCKET_MESSAGE_MODELS,
+    CHANGE_SOCKET_MESSAGE_MODELS,
     PAPER_TRADING_SOCKET_MESSAGE_MODELS,
     ASSISTANT_SOCKET_MESSAGE_MODELS,
 ]

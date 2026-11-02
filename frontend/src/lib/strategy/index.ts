@@ -3,6 +3,7 @@
 export {
   createStrategy,
   deleteStrategy,
+  STRATEGIES_SOCKET_PATH,
   listStrategies,
   listStrategyTemplates,
   readStrategy,

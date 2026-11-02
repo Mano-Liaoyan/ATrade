@@ -16,6 +16,7 @@ export {
   changeBacktestLimits,
   compareBacktests,
   deleteBacktest,
+  BACKTESTS_SOCKET_PATH,
   listBacktests,
   readBacktestLimits,
   readBacktest,

@@ -8,10 +8,10 @@
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
   import {
+    BACKTESTS_SOCKET_PATH,
     compareBacktests,
     ComparedKeyMetrics,
     EquityDrawdownChart,
-    isFinalStatus,
     listBacktests,
     readBacktestInstrument,
     type Backtest,
@@ -23,7 +23,7 @@
   import { Button, InlineNotification } from '#lib/foundation/carbon';
   import { CodeDiff } from '#lib/foundation/code_editor';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { startPolling } from '#lib/foundation/polling';
+  import { readOnChange } from '#lib/foundation/live_socket';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { isSameInstrument } from '#lib/market_data';
@@ -31,7 +31,6 @@
   import { createInstrumentHref } from '../../../../instrument_href';
   import BacktestList from '../../../BacktestList.svelte';
 
-  const LIST_CHECK_INTERVAL_MILLISECONDS = 2000;
   // The panels of the backtest page. The chart panel has a higher minimum: the header line, the 2 metric rows (they
   // scroll when they do not fit), and the chart.
   const PANELS: PanelSpec[] = [
@@ -66,24 +65,20 @@
         })),
   );
 
-  // The list reads again while a backtest in it is queued or running, like on the backtest page.
+  // The list reads again after each backtest change that /ws/backtests pushes, like on the backtest page.
   $effect(() =>
-    startPolling(
-      () => listBacktests(fetch),
-      (result) => {
+    readOnChange({
+      socketPath: BACKTESTS_SOCKET_PATH,
+      read: () => listBacktests(fetch),
+      onResult: (result) => {
         if (result.kind === 'failed') {
           listMessage = result.message;
-          return true;
+          return;
         }
         listMessage = '';
         backtests = result.value;
-        return result.value.some((item) => !isFinalStatus(item.status));
       },
-      LIST_CHECK_INTERVAL_MILLISECONDS,
-      (message) => {
-        listMessage = message;
-      },
-    ),
+    }),
   );
 
   $effect(() => {

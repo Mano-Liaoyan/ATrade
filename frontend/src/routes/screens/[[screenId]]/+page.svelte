@@ -15,6 +15,7 @@
   import { navigating, page } from '$app/state';
   import { ContentSwitcher, IconButton, InlineNotification, Popover } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
+  import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { SideColumn, Workbench } from '#lib/foundation/workbench';
   import { SurvivorshipBiasWarning } from '#lib/market_data';
@@ -27,6 +28,7 @@
     isDraftChanged,
     listScreenIndicators,
     listScreens,
+    SCREENS_SOCKET_PATH,
     nameDefinitionIndicators,
     newCondition,
     newScreen,
@@ -110,17 +112,22 @@
       : null,
   );
 
-  $effect(() => {
-    void listScreens(fetch).then((result) => {
-      isListRead = true;
-      if (result.kind === 'failed') {
-        listMessage = result.message;
-        return;
-      }
-      listMessage = '';
-      screens = result.value;
-    });
-  });
+  // /ws/screens pushes each change of a screen or a screen result, also from the assistant and other tabs.
+  $effect(() =>
+    readOnChange({
+      socketPath: SCREENS_SOCKET_PATH,
+      read: () => listScreens(fetch),
+      onResult: (result) => {
+        isListRead = true;
+        if (result.kind === 'failed') {
+          listMessage = result.message;
+          return;
+        }
+        listMessage = '';
+        screens = result.value;
+      },
+    }),
+  );
 
   $effect(() => {
     void listScreenIndicators(fetch).then((result) => {
