@@ -1,6 +1,6 @@
 """Databento import: stock split adjustment at save time and symbol change links.
 
-Real PostgreSQL, hand-made DBN files of the Databento fake, and the IBKR fake
+Real PostgreSQL, hand-made DBN files of the Databento fake, and the IBKR fake for the IBKR stock split check
 (docs/architecture/market_data.md sections 8.8.3, 8.8.4, and 8.13.1).
 """
 
@@ -21,9 +21,9 @@ from atrade.market_data import (
     DatabentoImportReport,
     ImportCheckError,
     check_import_detections,
-    import_databento_files_with_ibkr,
     read_saved_bars,
 )
+from tests.databento_import_runs import import_and_check_splits
 from tests.fakes.databento import (
     CLOSE_PRICE,
     DAILY_SCHEMA,
@@ -119,9 +119,7 @@ async def gateway() -> FakeGatewayConnection:
 async def run_import(
     database_url: str, tmp_path: Path, gateway: FakeGatewayConnection, files: list[DbnFile]
 ) -> DatabentoImportReport:
-    return await import_databento_files_with_ibkr(
-        database_url=database_url, file_paths=write_dbn_files(tmp_path, files), gateway=gateway
-    )
+    return await import_and_check_splits(database_url, write_dbn_files(tmp_path, files), gateway)
 
 
 async def read_bars(database_url: str, symbol: str, exchange: str = "NASDAQ") -> list[Bar]:

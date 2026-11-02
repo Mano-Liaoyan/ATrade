@@ -290,14 +290,43 @@ With `DATABENTO_API_KEY` in `.env`, the `forward-test` service updates the
 universe at 06:00 ET on the first trading day of each quarter (about 1.3 USD
 each quarter). With an empty key, the update does not run.
 
-The import reads the IBKR daily closes of the instruments that still trade
-to find their stock splits, so IB Gateway must run (`ibkr` profile). The
-import connects with client ID 30. Use `--ibkr-client-id <ID>` for another
-free client ID. The import also links symbol changes (for example `SQ` to
-`XYZ`) and writes the stock splits and links that it found to its log
-(`docs/architecture/market_data.md` sections 8.8.3 and 8.8.4).
+The import does not need IB Gateway. It sends no request to IBKR. It finds
+the stock splits of the instruments that stopped trading with the detection
+rule, and it links symbol changes (for example `SQ` to `XYZ`). It does not
+adjust the instruments that still trade. It records them for the IBKR stock
+split check (`docs/architecture/market_data.md` sections 8.8.3 and 8.8.4).
+The universe and the hourly bar purchase below do not wait for that check:
+a stock split does not change the trading value (close × volume).
 
-Check the detections one time after the import:
+### Run the IBKR stock split check
+
+The check compares the stored Databento daily closes of each instrument that
+still trades with the IBKR daily closes, one instrument at a time. It adjusts
+the stored Databento bars for each stock split that it finds. With some
+thousand instruments, it can run for many hours. It needs IB Gateway (`ibkr`
+profile) and connects with client ID 30. Use `--ibkr-client-id <ID>` for
+another free client ID. Start it in a temporary container in the background,
+and read its log:
+
+```sh
+docker compose --file deploy/compose.yaml --env-file .env run --rm --detach --name atrade-ibkr-split-check web \
+  python -m atrade.app.ibkr_split_check
+docker logs --follow atrade-ibkr-split-check
+```
+
+- After an IBKR pacing violation, the check waits 1 minute, then 2, 4, and
+  more minutes, up to 30 minutes, and continues.
+- Without IB Gateway or without the IBKR connection, for example during the
+  daily restart of `ib-gateway`, it tries again each minute.
+- It saves the result of each instrument at once. After a stop, start it
+  again: it checks only the instruments that still wait. It stops when no
+  instrument waits.
+- A backtest that uses an instrument that waits for the check shows the
+  warning "IBKR stock split check not done".
+
+Check the detections one time after the import and after the IBKR stock split
+check (the check finds the stock splits of instruments without IBKR bars with
+the detection rule):
 
 ```sh
 # List the stock splits that wait for the check and the symbol links that are not checked.
@@ -311,10 +340,10 @@ docker compose --file deploy/compose.yaml --env-file .env run --rm web \
 A confirmed stock split changes the stored bars before its ex-date. A
 rejected stock split changes nothing, and the next import keeps it rejected.
 
-Buy the hourly bars after the first import and the check
-(`docs/architecture/market_data.md` section 8.8.1). First print the purchase
-list and its cost. This reads `metadata.get_cost` (free, needs
-`DATABENTO_API_KEY`) and buys nothing:
+Buy the hourly bars after the first import
+(`docs/architecture/market_data.md` section 8.8.1). They do not wait for the
+IBKR stock split check. First print the purchase list and its cost. This
+reads `metadata.get_cost` (free, needs `DATABENTO_API_KEY`) and buys nothing:
 
 ```sh
 docker compose --file deploy/compose.yaml --env-file .env run --rm web \
@@ -325,7 +354,9 @@ The log has one line for each quarter: the time range, the symbols, and the
 cost. Buy XNAS.ITCH `ohlcv-1h` with these symbols and time ranges as batch
 jobs in DBN format, then import them with the same commands as above. The
 import keeps the 7 regular-hours bars of each day, and only in the quarters
-in which the instrument is in the universe.
+in which the instrument is in the universe. When the directory also holds the
+daily files, the import saves them again with the same values. The IBKR stock
+split check then has no new days to read.
 
 ### Old data
 

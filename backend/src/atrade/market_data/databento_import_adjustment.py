@@ -5,31 +5,27 @@ Both steps change the bars of the import in the temporary table `databento_impor
 in databento_bar.
 """
 
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from itertools import groupby
+from typing import Literal
 
 import psycopg
 
-from atrade.foundation.bar import Bar, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import databento_import_sql
-from atrade.market_data.stock_split_detection import (
-    DailyPrices,
-    FoundSplit,
-    find_splits_by_detection_rule,
-    find_splits_from_ibkr_closes,
-)
+from atrade.market_data.ibkr_split_check import record_split_checks
+from atrade.market_data.stock_split_detection import DailyPrices, FoundSplit, find_splits_by_detection_rule
 
-# Reads the IBKR TRADES daily bars of an instrument in a time range. An empty list: IBKR has no bars of it.
-type IbkrDailyBarReader = Callable[[Instrument, TimeRange], list[Bar]]
-
-# The confirmation of a stock split that the IBKR closes show. The detection rule gives no confirmation: the stock
-# split waits for the user check (section 8.13.1).
-BAR_EVIDENCE = "bar_evidence"
 IMPORT_PRICES_CURSOR = "databento_import_prices"
+
+# How the import finds the stock splits of the instruments that still trade (section 8.8.3). `ibkr_check`: the import
+# does not look for them. It records each such instrument for the IBKR stock split check program. `detection_rule`:
+# the detection rule finds them, like the stock splits of the instruments that stopped trading. The quarterly
+# universe update uses it, because no program checks its instruments.
+type StillTradingSplitRule = Literal["ibkr_check", "detection_rule"]
 
 
 @dataclass(frozen=True)
@@ -85,35 +81,30 @@ def to_utc_day(day: date) -> datetime:
     return datetime(day.year, day.month, day.day, tzinfo=UTC)
 
 
-def find_instrument_splits(
-    instrument: Instrument, prices: list[DailyPrices], last_day: date, read_ibkr_daily_bars: IbkrDailyBarReader | None
-) -> list[DetectedSplit]:
-    """An instrument with a bar on the last day of the import still trades: the IBKR closes show its stock splits.
-    The detection rule finds the stock splits of the other instruments, and of instruments that IBKR does not have."""
-    if read_ibkr_daily_bars is not None and prices[-1].day == last_day:
-        time_range = TimeRange(to_utc_day(prices[0].day), to_utc_day(last_day + timedelta(days=1)))
-        ibkr_bars = read_ibkr_daily_bars(instrument, time_range)
-        if ibkr_bars:
-            ibkr_closes = {bar.start_utc.date(): bar.close for bar in ibkr_bars}
-            return to_detected(instrument, find_splits_from_ibkr_closes(prices, ibkr_closes), BAR_EVIDENCE)
-    return to_detected(instrument, find_splits_by_detection_rule(prices), None)
-
-
 def to_detected(instrument: Instrument, splits: list[FoundSplit], confirmation: str | None) -> list[DetectedSplit]:
     return [DetectedSplit(instrument, split.ex_date, split.split_ratio, confirmation) for split in splits]
 
 
+@dataclass(frozen=True)
+class FoundImportSplits:
+    """The stock splits of the detection rule, and the instruments that wait for the IBKR stock split check."""
+
+    splits: list[DetectedSplit]
+    still_trading_instruments: list[Instrument]
+
+
 def detect_stock_splits(
-    connection: psycopg.Connection, read_ibkr_daily_bars: IbkrDailyBarReader | None
-) -> list[DetectedSplit]:
-    last_row = connection.execute(databento_import_sql.SELECT_LAST_IMPORT_DAY).fetchone()
-    if last_row is None or last_row[0] is None:
-        return []
-    last_day: date = last_row[0].date()
+    connection: psycopg.Connection, still_trading_rule: StillTradingSplitRule, last_day: date
+) -> FoundImportSplits:
+    """An instrument still trades when it has a bar on the last day of the import."""
     splits: list[DetectedSplit] = []
+    still_trading_instruments: list[Instrument] = []
     for instrument, prices in read_instrument_prices(connection):
-        splits += find_instrument_splits(instrument, prices, last_day, read_ibkr_daily_bars)
-    return splits
+        if still_trading_rule == "ibkr_check" and prices[-1].day == last_day:
+            still_trading_instruments.append(instrument)
+        else:
+            splits += to_detected(instrument, find_splits_by_detection_rule(prices), None)
+    return FoundImportSplits(splits=splits, still_trading_instruments=still_trading_instruments)
 
 
 def record_stock_splits(connection: psycopg.Connection, splits: list[DetectedSplit]) -> None:
@@ -153,10 +144,17 @@ def adjust_import_bars(connection: psycopg.Connection) -> None:
 
 
 def link_and_detect_splits(
-    connection: psycopg.Connection, read_ibkr_daily_bars: IbkrDailyBarReader | None
-) -> tuple[list[SymbolLink], list[DetectedSplit]]:
-    """Links the symbols and records the stock splits of the daily bars. `adjust_import_bars` then changes the bars."""
+    connection: psycopg.Connection, still_trading_rule: StillTradingSplitRule
+) -> tuple[list[SymbolLink], FoundImportSplits]:
+    """Links the symbols, records the stock splits of the daily bars, and records the instruments for the IBKR stock
+    split check. `adjust_import_bars` then changes the bars with the confirmed stock splits."""
     links = link_symbols(connection)
-    splits = detect_stock_splits(connection, read_ibkr_daily_bars)
-    record_stock_splits(connection, splits)
-    return links, splits
+    last_row = connection.execute(databento_import_sql.SELECT_LAST_IMPORT_DAY).fetchone()
+    if last_row is None or last_row[0] is None:
+        return links, FoundImportSplits(splits=[], still_trading_instruments=[])
+    last_day: date = last_row[0].date()
+    found_splits = detect_stock_splits(connection, still_trading_rule, last_day)
+    record_stock_splits(connection, found_splits.splits)
+    check_end_utc = to_utc_day(last_day + timedelta(days=1))
+    record_split_checks(connection, found_splits.still_trading_instruments, check_end_utc)
+    return links, found_splits

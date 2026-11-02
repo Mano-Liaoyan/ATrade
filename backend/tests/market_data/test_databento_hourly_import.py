@@ -1,6 +1,6 @@
 """Databento import of the XNAS.ITCH hourly bars: the 7 regular-hours bars of the universe quarters.
 
-Real PostgreSQL, hand-made DBN files of the Databento fake, and the IBKR fake
+Real PostgreSQL, hand-made DBN files of the Databento fake, and the IBKR fake for the IBKR stock split check
 (docs/architecture/market_data.md sections 8.8.2 and 8.14).
 """
 
@@ -22,9 +22,9 @@ from atrade.market_data import (
     BarRequest,
     BarSource,
     DatabentoImportReport,
-    import_databento_files_with_ibkr,
     read_saved_bars,
 )
+from tests.databento_import_runs import import_and_check_splits
 from tests.fakes.clock import FixedClock
 from tests.fakes.databento import (
     CLOSE_PRICE,
@@ -125,9 +125,7 @@ async def gateway() -> FakeGatewayConnection:
 async def run_import(
     database_url: str, directory: Path, gateway: FakeGatewayConnection, files: list[DbnFile]
 ) -> DatabentoImportReport:
-    return await import_databento_files_with_ibkr(
-        database_url=database_url, file_paths=write_dbn_files(directory, files), gateway=gateway
-    )
+    return await import_and_check_splits(database_url, write_dbn_files(directory, files), gateway)
 
 
 async def import_apple_day(database_url: str, tmp_path: Path, gateway: FakeGatewayConnection) -> None:

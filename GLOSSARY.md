@@ -279,6 +279,13 @@ split, for example 4 for a 4-for-1 split and 0.1 for a 1-for-10 reverse split.
 In Chinese, write 拆股比例.
 _Avoid_: split factor, adjustment factor
 
+**IBKR stock split check**:
+The one-time comparison of the stored Databento daily closes of each
+instrument that still trades with the IBKR daily closes, after the Databento
+import. A step in the ratio of the closes is a stock split. A program runs it
+one instrument at a time. In Chinese, write IBKR 拆股检查.
+_Avoid_: split check (alone), corporate action check
+
 **Cash in lieu**:
 The cash that an owner gets for the part of a new share below 1 after a stock
 split. In Chinese, write 碎股现金.
