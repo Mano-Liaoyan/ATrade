@@ -125,6 +125,29 @@ New columns of `strategy_version`:
   the longest indicator of the rules needs (#164), and the generated code
   asks for them (section 9.8.3).
 - A new strategy starts from a start point as version 1 (section 9.9.1).
+- Chart indicators (#323): the code can have a top-level `CHART_INDICATORS`.
+  The bar chart of a backtest or a forward test of the version shows these
+  indicators ([`indicator.md`](indicator.md) section 23.9.8). It has no
+  effect on the run. Example:
+
+  ```python
+  CHART_INDICATORS = [
+      {"indicator": "sma", "parameters": {"period": "sma_period"}},
+      {"indicator": "rsi", "parameters": {"period": 14}},
+  ]
+  ```
+
+  - The value is a list literal of dict literals with the keys `indicator`
+    (a catalog key, [`indicator.md`](indicator.md) section 23.2) and
+    `parameters`.
+  - A parameter value is an `int` or `float` literal, or a string. A string
+    is the name of a configuration field with an `int` or `float` default.
+    So a parameter sweep run shows the indicator with the parameters of the
+    run.
+  - Without `CHART_INDICATORS`, the chart starts without indicators.
+  - The "Blank code" start point, the code templates, and the rule builder
+    code have `CHART_INDICATORS`. The AI assistant reads the "Blank code"
+    start point in its system prompt, so it writes `CHART_INDICATORS` too.
 - The "Blank code" start point is the code in
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
   cross strategy: buy 10 shares when the close goes above SMA(20), sell when
@@ -152,6 +175,7 @@ The checks run in the Web process. They do not import the user code.
 | `ast.parse` fails | Yes |
 | Not exactly 1 `Strategy` subclass and 1 `StrategyConfig` subclass (AST check) | Yes |
 | ruff `F` rule errors | Yes |
+| `CHART_INDICATORS` (section 9.2) is not a literal of the format, names an indicator or a parameter that is not in the catalog, has a value out of range, or names a configuration field that does not exist or has no `int` or `float` default | Yes |
 | basedpyright type errors | No. The editor shows them live. |
 
 - The AST check counts the top-level classes. A class counts when one of its
@@ -495,6 +519,9 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
   [#142](https://github.com/Mano-Liaoyan/ATrade/issues/142)).
 - The code gets its indicators from `atrade.indicator` (ADR 0001) and
   registers them with `register_indicator_for_bars`.
+- The code has `CHART_INDICATORS` (section 9.2): each indicator object 1 time,
+  in the order of first use. Each parameter is the name of its configuration
+  field, for example `{"period": "rsi_1_period"}`.
 - When the rules hold a template ID, the first line of the code is the
   template docstring (section 9.9.2). The function writes it each time that
   it makes the code.

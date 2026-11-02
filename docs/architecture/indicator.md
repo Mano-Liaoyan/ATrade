@@ -319,8 +319,9 @@ user).
   with only `time`). The legend shows "No value" for it.
 - One chart indicator set is in PostgreSQL. All market data charts use it
   (today: the bar chart of the instrument page). A change saves at once.
-- The backtest and forward test charts show the indicators that the
-  strategy version registers (section 23.9.6), not the chart indicator set.
+- The backtest and forward test charts show the indicators in
+  `CHART_INDICATORS` of the strategy version code (section 23.9.8), not the
+  chart indicator set.
   The user can add, change, and remove indicators there. These changes are
   not saved.
 - No indicator templates and no set for each instrument in the first
@@ -564,16 +565,16 @@ section 6.2).
 - Strategy indicators: `GET /api/backtests/{backtest_id}` and
   `GET /api/forward-tests/{id}` (in `forward_test`) get
   `strategy_indicators` (`[{"indicator", "parameters"}, ...]`).
-  - A strategy version with `rules` has the indicators of its rules: each
-    different indicator and parameters 1 time, in the order of first use
-    (`CodeParts.indicators` of `strategy/rules_code.py`). The public entry
-    of `strategy` exports `list_rule_indicators(rules, parameters)`.
-  - A parameter sweep run changes the parameters with its `parameters`
-    (the configuration field names of the rules code, for example
-    `sma_1_period`).
-  - A version without `rules` (code written by hand, "Blank code") has an
-    empty list. Its code can register any object, and ATrade does not run
-    the code to find them. So its chart starts without indicators.
+  - The list comes from `CHART_INDICATORS` in the code of the strategy
+    version (strategy section 9.2). All versions use this one source: code
+    written by hand, code from the rule builder, and the code templates.
+  - The public entry of `strategy` exports
+    `list_chart_indicators(code, parameters)`. It reads `CHART_INDICATORS`
+    with `ast` and does not run the code. It replaces each configuration
+    field name with the value of the field: the value in `parameters` (a
+    parameter sweep run), else the default value of the field.
+  - A version without `CHART_INDICATORS` has an empty list. Its chart starts
+    without indicators.
 - The chart puts the strategy indicators as section 23.9.3 says, with the
   colors of a new indicator. "Add indicator", the legend buttons, and the
   settings work as on the instrument page. No change is saved, except the
@@ -621,12 +622,15 @@ section 6.2).
 - Backend: `indicator_catalog.py` (the 2 fields),
   `market_data/indicator_series.py` (the series route and the warm-up),
   `market_data/chart_indicator_set.py` (table and routes),
-  `strategy/rules_code.py` (`list_rule_indicators`), and the round trip
-  field in `backtest` and `forward_test`.
+  `strategy/chart_indicators.py` (`list_chart_indicators` and the save
+  check), `CHART_INDICATORS` in `strategy/rules_code.py`, the "Blank code"
+  start point, and the code templates, and the round trip field in
+  `backtest` and `forward_test`.
 - Backend tests: the series route gives
   the same values as the screen path for the same bars, the warm-up, the
-  `422` problems, the set routes, and `list_rule_indicators` with a
-  parameter sweep run.
+  `422` problems, the set routes, the `CHART_INDICATORS` save check, and
+  `list_chart_indicators` with field names, defaults, and a parameter sweep
+  run. Each start point and rule template passes the check.
 - Frontend: `#lib/market_data` holds `BarChart` with panes, legend,
   settings popover, add dialog, `chart_indicators.ts` (pure functions for
   add, remove, move, and placement), `chart_indicator_styles.ts` (palette,
