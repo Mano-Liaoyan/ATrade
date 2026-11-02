@@ -144,7 +144,8 @@ of #130 (A is the strongest, D is practitioner use only).
   NautilusTrader bar type.
 - `indicator` reads no database and calls no IBKR. The caller reads the bars
   and gives them to the class.
-- `indicator` has no table, no HTTP route, and no WebSocket path.
+- `indicator` has no table, no HTTP route, and no WebSocket path. The
+  chart routes of section 23.9 are in `market_data`.
 - Callers:
   - `screen` (section 24) gives saved daily bars (`foundation/bar.py` `Bar`)
     to the classes.
@@ -296,7 +297,350 @@ indicator reference in JSON:
 | Use of the classes in the rule builder and the strategy templates | Phase 1 |
 | Use of the classes in screens (section 24) | Phase 3 |
 | Financial-data indicators (section 23.2.1) | After a decision on a financial data source. Not in a phase yet. |
+| Indicators on bar charts (section 23.9) | After phase 1. It uses the classes and the catalog of phase 1. Not in a phase of map #129. |
 
 ## 23.8 Left to the implementation
 
 No open points.
+
+## 23.9 Indicators on bar charts
+
+Source: [Indicators on bar charts](https://github.com/Mano-Liaoyan/ATrade/issues/323)
+(research, prototype, and the choices A1, B1, C1 with mark style M3 of the
+user).
+
+### 23.9.1 Decisions
+
+- The backend calculates each indicator value on a chart with the classes of
+  this section. The frontend does not calculate indicators. So a chart, a
+  screen, and a strategy give the same value for the same indicator, the
+  same parameters, and the same bars.
+- A bar without a value is whitespace data of `lightweight-charts` (a point
+  with only `time`). The legend shows "No value" for it.
+- One chart indicator set is in PostgreSQL. All market data charts use it
+  (today: the bar chart of the instrument page). A change saves at once.
+- The backtest and forward test charts show the indicators that the
+  strategy version registers (section 23.9.6), not the chart indicator set.
+  The user can add, change, and remove indicators there. These changes are
+  not saved.
+- No indicator templates and no set for each instrument in the first
+  version.
+- No limit on the indicator count. A chart has the price pane and at most 3
+  own panes (section 23.9.3).
+- In code and in this document, a part of a chart with its own price scale
+  is a pane. User copy does not use the word (GLOSSARY "Panel").
+
+### 23.9.2 Catalog fields for charts
+
+Each `IndicatorDefinition` (section 23.3) gets 2 fields:
+
+| Key | `short_name` | `chart_placement` |
+|---|---|---|
+| `sma` | `SMA` | `price` |
+| `ema` | `EMA` | `price` |
+| `bollinger_bands` | `BB` | `price` |
+| `donchian_channel` | `DC` | `price` |
+| `rsi` | `RSI` | `own` |
+| `macd` | `MACD` | `own` |
+| `atr` | `ATR` | `own` |
+| `realized_volatility` | `RV` | `own` |
+| `momentum_12_1` | `MOM 12-1` | `own` |
+| `distance_to_52_week_high` | `52W HIGH` | `own` |
+| `average_trading_value` | `ATV` | `own` |
+
+- `price`: the indicator draws on the price pane. `own`: it draws in an own
+  pane.
+- The legend name is `short_name` and the values of the parameters with
+  `is_in_name`, with one space between them, for example `SMA 50`,
+  `BB 20 2`, `MACD 12 26 9`. A `float` shows without a trailing zero.
+
+### 23.9.3 Panes and lines
+
+- The price pane is always the first pane. It holds the candlesticks and
+  the `price` indicators.
+- Each new `own` indicator gets a new pane under the others. When the chart
+  has 3 own panes, a new `own` indicator goes into the last pane. Thus a
+  pane can hold more than one indicator.
+- When the last indicator of an own pane goes away, the pane goes away.
+- The user drags the line between 2 panes to change their heights
+  (`layout.panes.enableResize`). The heights are not saved.
+- Lines of each indicator (`lightweight-charts` 5.2.1):
+
+  | Indicator | Series |
+  |---|---|
+  | SMA, EMA, ATR, realized volatility, 12-1 momentum, distance to 52-week high | 1 `LineSeries` |
+  | Bollinger Bands, Donchian channel | 3 `LineSeries` (`upper`, `middle`, `lower`). The first version has no fill between the bands. |
+  | RSI | 1 `LineSeries`, and 2 price lines at 30 and 70 (`createPriceLine`, dashed, `--cds-border-strong-01`, no axis label) |
+  | MACD | 2 `LineSeries` (`value`, `signal`) and 1 `HistogramSeries` (`histogram`) |
+  | Average trading value | 1 `HistogramSeries` |
+
+- Number formats of the price scale and the legend:
+
+  | Indicator | Format |
+  |---|---|
+  | SMA, EMA, Bollinger Bands, Donchian channel, ATR, MACD | `CHART_PRICE_FORMAT` ("11,000.00") |
+  | RSI | 2 decimals ("75.86") |
+  | 12-1 momentum, distance to 52-week high, realized volatility | The value × 100 with 2 decimals and " %" ("-3.20 %"). Distance to 52-week high shows "96.80 %" for 0.968. |
+  | Average trading value | A short amount with 2 decimals ("12.35 B", "820.10 M") |
+
+- Line style. Each line has `color`, `style`, and `width`:
+  - `color` is an index from 1 to 14 in the Carbon data visualization
+    categorical palette (14 colors). The light themes use the light palette
+    (purple 70, cyan 50, teal 70, magenta 70, red 50, red 90, green 60,
+    blue 80, magenta 50, yellow 50, teal 50, cyan 90, orange 70,
+    purple 50). The dark theme uses the dark palette (purple 60, cyan 40,
+    teal 60, magenta 40, red 50, red 10, green 30, blue 50, magenta 60,
+    yellow 40, teal 40, cyan 20, orange 60, purple 30). A theme change
+    applies the other palette (`watchColorScheme`).
+  - `style` is `solid`, `dashed`, or `dotted`.
+  - `width` is 1 to 4 pixels.
+  - A new indicator gets the first palette colors that no line of the chart
+    uses, one color for each line, in palette order. Its lines are `solid`
+    with width 2. A histogram has a color only.
+
+### 23.9.4 Legend
+
+- Each pane has its legend at its top left, over the chart (an HTML layer
+  over the canvas). Text: IBM Plex Mono, tabular numbers, Carbon
+  `label-01`.
+- The first row of the price pane: `O 297.31  H 301.54  L 294.82  C 300.40`.
+  The letters are `--cds-text-secondary`. The values are
+  `--cds-text-primary`.
+- One row for each indicator: the legend name (section 23.9.2) in
+  `--cds-text-secondary`, then one value for each line in the line color,
+  for example `BB 20 2  191.20  185.10  179.00`. No labels.
+- The values are the values at the bar of the crosshair. When the crosshair
+  leaves the chart, the legend shows the values at the last bar that has
+  indicator data (section 23.9.6). A line without a value shows
+  "No value".
+- When the pointer is on a row, or the focus is in it, the row shows 3 ghost
+  icon buttons. Each has a Bits UI `Tooltip`:
+  - "Hide <legend name>" (`View`) or "Show <legend name>" (`ViewOff`). A
+    hidden indicator keeps its row. The name is `--cds-text-disabled`, the
+    row has no values, and the Show button stays visible.
+  - "Settings for <legend name>" (`Settings`). It opens the settings
+    (section 23.9.5). A click on the legend name also opens them.
+  - "Remove <legend name>" (`Close`).
+- Each own pane has a ghost icon button "Options for <legend name of its
+  first row>" (`OverflowMenuHorizontal`) at its top right. It opens a
+  Bits UI `DropdownMenu` (`foundation/carbon` `OverflowMenu`):
+  - "Move up" (not on the first own pane), "Move down" (not on the last own
+    pane). They change the order of the own panes.
+  - "Maximize" gives the pane all the chart height (the other panes get
+    height 0). Then the item is "Restore", which gives back the heights from
+    before. Not saved.
+  - "Remove indicators" removes the pane and all its indicators.
+- The price pane has the same button with "Maximize" or "Restore" only.
+- A legend that is higher than its pane scrolls in itself with a visible
+  track (`ScrollRegion`, section 13.1).
+
+### 23.9.5 Add indicator and settings
+
+- The chart panel header line has the ghost icon button "Add indicator"
+  (`ChartLineData`, Bits UI `Tooltip` "Add indicator (/)"), after the bar
+  period switcher. The key `/` opens the same dialog when the focus is not
+  in a text field, a number field, or the code editor.
+- The dialog is a Bits UI `Command` in a Carbon modal ("Add indicator"),
+  in `src/lib/foundation/`. It has a search field and one list:
+  - One row for each catalog indicator: the catalog `name`, and the
+    `short_name` at the end in IBM Plex Mono when it is different.
+  - A star icon button at the end of each row: "Add <name> to favorites"
+    (`Star`) or "Remove <name> from favorites" (`StarFilled`).
+  - The favorites come first, then the others, each in catalog order. No
+    groups.
+  - The search matches the name, the short name, and the key.
+  - Enter or a click on a row adds the indicator with the catalog defaults
+    and closes the dialog. A click on the star does not add.
+- The favorites are saved in the chart indicator set (section 23.9.7), also
+  from a backtest or forward test chart.
+- Settings (B1): a Bits UI `Popover` at the legend row. Heading: the catalog
+  `name`. Content, from top to bottom:
+  - One Carbon `NumberInput` for each parameter (also the parameters
+    without `is_in_name`, for example `bars_per_year`). The label is the
+    parameter label of the screen editor (`parameterLabel`). The range and
+    the default come from the catalog route. A value out of its range, or a
+    parameter order rule of section 23.6, shows the Carbon invalid text.
+  - For each line, a group with the output label ("Upper", "MACD line",
+    "Histogram"). The group has 3 fields:
+    - the 14 palette colors as a radio group. The accessible name of each
+      color is its name, for example "Purple 70".
+    - "Line style": Solid, Dashed, Dotted.
+    - "Width": 1 to 4.
+
+    A histogram has the colors only.
+  - "Reset to defaults" (ghost button): the catalog defaults of the
+    parameters, `solid`, and width 2. The colors do not change.
+  - "Apply" (primary button). It is disabled while a field is invalid. It
+    applies the changes and closes the popover. Escape closes the popover
+    without a change.
+- A market data chart saves each change at once with
+  `PUT /api/market-data/chart-indicators`. A failed save shows an
+  `InlineNotification` with the `detail` text over the chart, and the chart
+  keeps the change.
+
+### 23.9.6 HTTP routes
+
+All routes are in `market_data`. `market_data` imports the public entry of
+`indicator` for them (new arrow `market_data -> indicator`, architecture.md
+section 6.2).
+
+| Route | Behavior |
+|---|---|
+| `GET /api/market-data/indicators` | `200` with the catalog in its order: the body of `GET /api/screen-indicators` (screen.md section 24.7), and `short_name` and `chart_placement` for each indicator. `GET /api/screen-indicators` gets the 2 fields too. |
+| `POST /api/market-data/indicator-series` | Body `{"symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "source_order", "indicators": [{"indicator", "parameters"}, ...]}`. `source_order` is optional: without it, the route uses the global source order. The route reads only, and changes no data. `200` with `{"times": [...], "series": [{"indicator", "parameters", "outputs": {"<output>": [...]}}, ...]}`. |
+| | `times` holds the start (UNIX seconds) of each saved bar of the range, oldest first, the same as `GET /api/market-data/bars` gives for the range. Each output list has one value for each time: a number, or `null` for "no value". `parameters` holds all parameters, with the defaults. |
+| | `422` for the time and range problems of the bars route and for an unknown bar period. `422` for a source order that `PUT /api/market-data/source-order` refuses. `422` for each problem of `check_indicator_reference`. Its location starts with `indicators` and the index. |
+| `GET /api/market-data/chart-indicators` | `200` with the chart indicator set (section 23.9.7). |
+| `PUT /api/market-data/chart-indicators` | Body: the chart indicator set. `200` with the saved set. `422` for each problem of section 23.9.7. |
+
+- The series route never calls IBKR. It reads saved bars with
+  `read_saved_bars`. The chart first reads its bars with the bars route,
+  which saves them, then it asks for the series.
+- Warm-up: for each indicator, the route also reads the last N saved bars
+  before `start_utc`. N is `screen_look_back_bars(parameters)`
+  (section 23.4). It reads them as a backtest reads the look-back bars of a
+  rule builder version (backtest.md section 10.3.1). The read length is
+  N × bar period × 2 for 1-day bars, and × 6 for intraday bars. It is at
+  least 7 days. The route calculates
+  over all bars with `update(bar)` and returns only the values of the range.
+  So a chart value is equal to the screen value at the same daily bar. For
+  a recursive average (EMA, RSI, ATR, MACD), a strategy value can be
+  different by less than 0.005 (section 23.4).
+- The bars route and the series route get the optional query and body field
+  `source_order`. A backtest chart gives the `source_order` of its backtest.
+- Live bars (`/ws/market-data`) have no indicator value. The indicator
+  lines end at the last saved bar of the chart request. A new chart request
+  (a bar period change, a page load) reads the series again.
+
+### 23.9.7 Chart indicator set
+
+- Table `chart_indicator_set` (owner `market_data`), one row like
+  `source_order`: `single_row` (primary key, always true), `panes`
+  (`jsonb`), `favorites` (`jsonb`), `changed_at_utc`. The migration writes
+  `{"panes": [{"indicators": []}], "favorites": []}`.
+- JSON of the set:
+
+  ```json
+  {
+    "panes": [
+      {"indicators": [
+        {"indicator": "sma", "parameters": {"period": 50}, "hidden": false,
+         "lines": [{"output": "value", "color": 1, "style": "solid", "width": 2}]}
+      ]},
+      {"indicators": [
+        {"indicator": "rsi", "parameters": {"period": 14}, "hidden": false,
+         "lines": [{"output": "value", "color": 5, "style": "solid", "width": 2}]}
+      ]}
+    ],
+    "favorites": ["sma", "rsi"]
+  }
+  ```
+
+- The first pane is the price pane. The order of the other panes is the
+  order on the chart.
+- The `PUT` route refuses (`422`, the location of the problem):
+  - no pane, or more than 4 panes,
+  - an own pane without an indicator,
+  - an indicator with `chart_placement` `own` in the first pane, or with
+    `price` in another pane,
+  - a problem of `check_indicator_reference` (without `output`),
+  - `lines` that do not have each output of the indicator exactly 1 time,
+  - a `color` that is not 1 to 14, a `style` that is not `solid`,
+    `dashed`, or `dotted`, a `width` that is not 1 to 4,
+  - a `favorites` value that is not a catalog key, or a key 2 times.
+- The last `PUT` wins. Two browser tabs do not merge their changes.
+
+### 23.9.8 Bar charts of backtests and forward tests
+
+- The backtest panel header line and the forward test panel header line get
+  a Carbon `sm` content switcher with "Equity" and "Bars". It has the size
+  of the bar period switcher of the instrument page. "Equity" shows the
+  `EquityDrawdownChart` (the default). "Bars" shows the bar chart. The page
+  address keeps the choice (`?chart=bars`). Only a single-instrument
+  backtest or forward test has the switcher.
+- The bar chart of a backtest shows the bars of its instrument, bar period,
+  and range, read with its `source_order`. The bar chart of a forward test
+  shows the bars from `created_at_utc` to `stopped_at_utc`, or to now.
+- Strategy indicators: `GET /api/backtests/{backtest_id}` and
+  `GET /api/forward-tests/{id}` (in `forward_test`) get
+  `strategy_indicators` (`[{"indicator", "parameters"}, ...]`).
+  - A strategy version with `rules` has the indicators of its rules: each
+    different indicator and parameters 1 time, in the order of first use
+    (`CodeParts.indicators` of `strategy/rules_code.py`). The public entry
+    of `strategy` exports `list_rule_indicators(rules, parameters)`.
+  - A parameter sweep run changes the parameters with its `parameters`
+    (the configuration field names of the rules code, for example
+    `sma_1_period`).
+  - A version without `rules` (code written by hand, "Blank code") has an
+    empty list. Its code can register any object, and ATrade does not run
+    the code to find them. So its chart starts without indicators.
+- The chart puts the strategy indicators as section 23.9.3 says, with the
+  colors of a new indicator. "Add indicator", the legend buttons, and the
+  settings work as on the instrument page. No change is saved, except the
+  favorites.
+
+### 23.9.9 Trade marks
+
+- The bar chart of a backtest or a forward test shows each trade (GLOSSARY
+  "Trade") as a mark on the price pane. A forward test split adjustment has
+  no mark. The marks have no lines between trades.
+- A `lightweight-charts` series primitive (`attachPrimitive` on the
+  candlestick series) draws the marks. Do not use `createSeriesMarkers`.
+- A trade goes on the bar with start < `time_utc` ≤ start + bar period. (A
+  backtest records the fill at the bar end, `ts_event`.)
+- Mark (style M3):
+  - A 16 × 16 px square, `--cds-background-inverse`, with "B" (buy) or "S"
+    (sell) in IBM Plex Mono semibold 11px, `--cds-text-inverse`.
+  - A 4px pointer on the square points at the bar. The "B" mark is 4px
+    below the bar low. The "S" mark is 4px above the bar high.
+- One mark for each bar and side. When the bar spacing is less than 16px,
+  marks of the same side that touch become one mark at the first bar.
+- When the pointer is on a mark, the mark gets a 2px `--cds-focus` ring.
+  A tooltip shows one line for each trade of the mark, in IBM Plex Mono
+  with tabular numbers:
+  - "Buy 50 @ 182.35"
+  - "Sell 50 @ 190.10  +387.50". The signed number is the net profit of the
+    round trip that the trade ends, after commissions, in
+    `--cds-support-success` or `--cds-support-error`. A trade that ends no
+    round trip has no number.
+- Each trade of `GET /api/backtests/{backtest_id}` and each fill of
+  `GET /api/forward-tests/{id}` gets `round_trip_net_profit_usd` (decimal
+  text, or null). The backend calculates it with the round trip rule of the
+  Instruments tab (`summarize_instruments()` of `backtest`).
+- Link with the table (the backtest Trades tab, the forward test Fills
+  tab):
+  - A pointer on a row, or the focus on a row, gives the mark of its trade
+    the `--cds-focus` ring.
+  - A click on a row (or Enter) selects the row and shows "Bars". The
+    chart scrolls so that the bar of the trade is in the center
+    (`timeScale().setVisibleRange`). The mark keeps the ring while its row
+    stays selected.
+
+### 23.9.10 Code and tests
+
+- Backend: `indicator_catalog.py` (the 2 fields),
+  `market_data/indicator_series.py` (the series route and the warm-up),
+  `market_data/chart_indicator_set.py` (table and routes),
+  `strategy/rules_code.py` (`list_rule_indicators`), and the round trip
+  field in `backtest` and `forward_test`.
+- Backend tests: the series route gives
+  the same values as the screen path for the same bars, the warm-up, the
+  `422` problems, the set routes, and `list_rule_indicators` with a
+  parameter sweep run.
+- Frontend: `#lib/market_data` holds `BarChart` with panes, legend,
+  settings popover, add dialog, `chart_indicators.ts` (pure functions for
+  add, remove, move, and placement), `chart_indicator_styles.ts` (palette,
+  number formats), and `trade_marks.ts` (the series primitive).
+  `foundation/carbon` gets `NumberInput`. `foundation` gets the `Command`
+  dialog.
+- Playwright: the 4 projects (chromium, firefox, webkit, msedge) for each
+  UI slice.
+
+### 23.9.11 Left to the implementation
+
+- The Carbon categorical palette names of section 23.9.3 come from the
+  Carbon data visualization guidelines. Check them against `@carbon/colors`
+  before the first chart slice.
+- Check that `pane.setHeight` (or `setStretchFactor`) with height 0 hides
+  a pane in `lightweight-charts` 5.2.1. If not, "Maximize" gives the other
+  panes their minimum height.

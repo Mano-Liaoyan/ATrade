@@ -228,6 +228,12 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   (internal paging test, the allowed exception of section 17), the contract
   test (section 7.5), and `e2e/bar_chart.spec.ts`.
 - Live bars: section 8.5.
+- Indicators on the bar chart: [`indicator.md`](indicator.md) section 23.9.
+  It adds the optional `source_order` query to the bars route, the routes
+  `GET /api/market-data/indicators`,
+  `POST /api/market-data/indicator-series`, and
+  `GET`/`PUT /api/market-data/chart-indicators`, and the table
+  `chart_indicator_set`.
 
 ## 8.5 Live bars
 

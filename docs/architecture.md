@@ -192,7 +192,7 @@ An arrow means "imports the public entry of". import-linter checks these
 rules.
 
 ```
-market_data   -> ibkr
+market_data   -> ibkr, indicator
 watchlist     -> market_data
 strategy      -> indicator
 indicator     -> (foundation only)
@@ -229,6 +229,9 @@ app           -> all modules
   the stored bars at a stock split (`read_stock_split_candidates()` and
   `apply_stock_split()`, `docs/architecture/market_data.md` section 8.13).
 - `market_data` holds the Databento client. `ibkr` stays IBKR only.
+- `market_data -> indicator` is for the indicator series route and the
+  check of the chart indicator set
+  (`docs/architecture/indicator.md` section 23.9.6).
 - `backtest -> screen` is only for the point-in-time screen runs of a
   backtest universe (`docs/architecture/screen.md` section 24.9).
 - `backtest -> strategy` also reads the sweep parameters of a strategy
@@ -722,7 +725,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - The bar chart reads only Carbon tokens: `--cds-layer-01` (background),
   `--cds-text-secondary` (text), `--cds-border-subtle-01` (grid and scale
   borders), `--cds-support-success` (up bars), and `--cds-support-error`
-  (down bars).
+  (down bars). Its indicators (panes, legend, "Add indicator", settings)
+  and the trade marks of backtests and forward tests are in
+  `docs/architecture/indicator.md` section 23.9. The indicator lines use
+  the Carbon categorical palette (section 23.9.3), and the trade marks use
+  `--cds-background-inverse`, `--cds-text-inverse`, and `--cds-focus`.
 - Workbench pages (spec [#99](https://github.com/Mano-Liaoyan/ATrade/issues/99),
   [#102](https://github.com/Mano-Liaoyan/ATrade/issues/102)) fill the window
   below the header and do not scroll as a page. Each region that can overflow
@@ -2297,7 +2304,10 @@ option and records it in this document.
 Section 23 is in [`docs/architecture/indicator.md`](architecture/indicator.md).
 It holds the indicator decisions (one definition for screens and strategies,
 the time rule, no value), the first 11 indicators, the `indicator` module and
-its catalog, the look-back bars of a screen, and the consistency tests.
+its catalog, the look-back bars of a screen, the consistency tests, and
+the indicators on bar charts (section 23.9: panes, legend, settings, the
+chart indicator set, the series route, and the trade marks of backtests and
+forward tests).
 
 ## 24. Screens
 
