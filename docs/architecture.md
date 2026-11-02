@@ -1169,7 +1169,7 @@ One Docker Compose project on the user's own server runs all services:
 | Service | Content |
 |---|---|
 | `postgres` | PostgreSQL. All ATrade data. |
-| `ib-gateway` | `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest, `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`. |
+| `ib-gateway` | `atrade-ib-gateway:local` from `deploy/ib-gateway.Dockerfile` (`ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest, and the watchdog), `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`. |
 | `web` | `app/web.py`, backtest child processes, basedpyright processes. Memory limit, read-only root file system, writable `/tmp`. |
 | `forward-test` | `app/forward_test_worker.py` and the forward test child processes. |
 | `assistant` | The Node.js process with the pi SDK (section 25). Image from `deploy/assistant.Dockerfile`. Read-only root file system, writable `/tmp`, `mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT}` (default `1g`), volume `atrade-assistant-pi` on `/data`, networks `atrade-assistant-internal` and `atrade-assistant-egress`. No published port, no `env_file`, no `DATABASE_URL`, and no IBKR settings. |
