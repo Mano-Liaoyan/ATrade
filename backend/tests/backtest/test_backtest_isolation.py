@@ -25,6 +25,7 @@ from tests.backtest.real_runner import (
 from tests.fakes.clock import FixedClock
 
 PROCESS_FACTS_STRATEGY_FILE = TEST_DIRECTORY / "strategies" / "write_process_facts.py"
+LOOPING_BACKTEST_TIMEOUT_SECONDS = 10
 IBKR_TEST_VARIABLES = {
     "ATRADE_IBKR_USERNAME": "test-user",
     "ATRADE_IBKR_PASSWORD": "test-password",
@@ -64,7 +65,9 @@ async def test_backtest_longer_than_the_timeout_is_timed_out_and_its_child_proce
         web_client, make_process_facts_code(process_facts_file, loop_forever_in_on_bar=True)
     )
 
-    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=2):
+    # The child runs with nice 10. On a loaded CI runner it needed more than 2 seconds to reach on_bar and write the
+    # process facts, so the timeout gives it time to start; on_bar then loops until the timeout.
+    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=LOOPING_BACKTEST_TIMEOUT_SECONDS):
         backtest = await wait_for_final_status(web_client, backtest_id)
 
     assert backtest["status"] == "timed_out"
