@@ -713,6 +713,10 @@ and the status codes of the new refusals are choices of this document.
   live bar periods. `LIVE_BAR_PERIODS` in `http_routes.py` and
   `isLiveBarPeriod()` in the frontend hold the rule of section 12.1.
 
+- Indicators on bar charts ([`indicator.md`](indicator.md) section 23.9):
+  `ForwardTestResponse` of `GET /api/forward-tests/{id}` gets
+  `strategy_indicators`, and each fill gets `round_trip_net_profit_usd`.
+
 ## 12.14 Worker comparison
 
 Each comparison reads the rows that are not done. A row is done when it is
@@ -858,6 +862,10 @@ than the worker clock.
   same period with its number (a link with the name "Compare with backtest
   #N"), status, period, and return; the current error and the events (start, interruptions and
   their ends, stop, or the planned stop at the end time) in UTC.
+- Indicators on bar charts ([`indicator.md`](indicator.md) section 23.9.8):
+  the forward test panel header line gets the "Equity" / "Bars" switcher.
+  "Bars" shows the bar chart with the strategy indicators and the trade
+  marks. A click on a Fills row scrolls the chart to the fill.
 - Tables show a bar period as "1 min" or "1 day", an amount with thousands
   separators ("98,765.40"), and a UTC time as "2026-01-02 03:04:05 UTC"
   (`#lib/foundation/value_format`, `#lib/foundation/time_format`). A column

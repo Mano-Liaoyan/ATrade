@@ -377,6 +377,10 @@ Changes of later phases:
 The JSON names of the Phase 1 and Phase 3 fields are choices of this
 document. The implementation can change them.
 
+- Indicators on bar charts ([`indicator.md`](indicator.md) section 23.9):
+  `GET /api/backtests/{backtest_id}` gets `strategy_indicators`, and each
+  trade gets `round_trip_net_profit_usd`.
+
 ## 10.6 Frontend
 
 - `frontend/src/lib/backtest/` holds the HTTP client (`startBacktest`,
@@ -428,6 +432,10 @@ document. The implementation can change them.
   - The page reads the list after each change that `/ws/backtests` pushes
     (architecture.md section 13 "Live updates"). It reads the open backtest
     again when its list row changes, until its status is final.
+- Indicators on bar charts ([`indicator.md`](indicator.md) section 23.9.8):
+  the backtest panel header line gets the "Equity" / "Bars" switcher. "Bars"
+  shows the bar chart with the strategy indicators and the trade marks. A
+  click on a Trades row scrolls the chart to the trade.
 - The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
   id `start-backtest`). The address `#start-backtest` (command palette) opens
   it. After the start, the page opens the new backtest. The form combines the
