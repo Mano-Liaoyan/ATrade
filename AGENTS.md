@@ -81,3 +81,7 @@ Apply these rules to every UI change in `frontend/`.
 - Live order placement is not part of ATrade. `trading_mode=live` must stop the start.
 - Frontend desktop browser behavior is a major product guardrail: latest stable Safari, Firefox, Chrome, and Edge must behave the same. When page scrolling is off, each region that can overflow (rails, panels, tables, lists) must have its own visible scroll track and thumb. All content must stay reachable. Safari can hide native scrollbars, so use styled tracks where reachability matters. Mobile layout is out of scope.
 - Changes to HTTP or WebSocket interfaces, settings and `.env.example`, module boundaries, terms, or start and run commands must update the documents in the same change (`docs/architecture.md` section 18).
+- Branch cleanup: after a pull request merges, remove each local worktree
+  and local branch that you made for it (implementer, review, and merge
+  branches). GitHub removes the remote head branch at merge
+  (`delete_branch_on_merge`).
