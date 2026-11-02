@@ -263,6 +263,12 @@ enter the API keys again in the "Credentials" dialog.
 
 ### Import the Databento history
 
+On the server, `./scripts/databento-history-wizard.sh` walks through all
+steps of this section and the next one (issue #324): the API key, the
+purchase, the imports, the IBKR stock split check, and the user check. It
+saves the job IDs in `data/databento/<daily|hourly>/jobs.txt`, so a second
+run does not buy a job again.
+
 The user buys the Databento daily bars and `statistics` one time
 (`docs/architecture/market_data.md` section 8.8.1). Then the import program
 saves them in `databento_bar`. It runs in the `web` image. Keep the files in
