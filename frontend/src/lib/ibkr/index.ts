@@ -7,6 +7,7 @@ type GatewayStatusResponse = components['schemas']['GatewayStatusResponse'];
 export type GatewayStatus =
   | { kind: 'connected' }
   | { kind: 'unreachable'; address: string }
+  | { kind: 'no_ibkr_connection' }
   | { kind: 'unknown' }
   | { kind: 'checking' };
 
@@ -27,6 +28,9 @@ export async function fetchGatewayStatus(fetchFunction: typeof fetch): Promise<G
   const gatewayStatus = (await response.json()) as GatewayStatusResponse;
   if (gatewayStatus.status === 'connected') {
     return { kind: 'connected' };
+  }
+  if (gatewayStatus.status === 'no_ibkr_connection') {
+    return { kind: 'no_ibkr_connection' };
   }
   return { kind: 'unreachable', address: `${gatewayStatus.host}:${String(gatewayStatus.port)}` };
 }

@@ -1756,13 +1756,11 @@ export interface components {
         };
         /** @enum {string} */
         ForwardTestStatus: "starting" | "running" | "waiting_for_gateway" | "stopping" | "stopped" | "stop_failed" | "failed";
+        /** @enum {string} */
+        GatewayStatus: "connected" | "unreachable" | "no_ibkr_connection";
         /** GatewayStatusResponse */
         GatewayStatusResponse: {
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "connected" | "unreachable";
+            status: components["schemas"]["GatewayStatus"];
             /** Host */
             host: string;
             /** Port */

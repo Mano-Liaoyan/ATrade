@@ -39,3 +39,15 @@ async def test_reports_unreachable_gateway_with_its_address(clock: FixedClock, f
 
     assert response.status_code == 200
     assert response.json() == {"status": "unreachable", "host": "ib-gateway", "port": 4004}
+
+
+@pytest.mark.anyio
+async def test_reports_a_gateway_without_a_connection_to_ibkr(clock: FixedClock, frontend_build_dir: Path) -> None:
+    gateway_connection = FakeGatewayConnection(managed_accounts=["DU1234567"])
+    gateway_connection.connected = True
+    gateway_connection.has_ibkr_connection = False
+
+    response = await read_gateway_status(gateway_connection, clock, frontend_build_dir)
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "no_ibkr_connection", "host": "ib-gateway", "port": 4004}

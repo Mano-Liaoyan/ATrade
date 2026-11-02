@@ -6,10 +6,11 @@ event loop of the caller, for example the uvicorn loop.
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from decimal import Decimal
-from typing import Protocol
+from typing import Literal, Protocol
 
 from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Forex, Order, RequestError, Trade
 
@@ -58,6 +59,18 @@ EXCHANGE_RATE_DURATION = "1 W"
 EXCHANGE_RATE_BAR_SIZE = "1 hour"
 # While no live bar update comes, the live bar stream checks the connection this often.
 LIVE_BAR_CONNECTION_CHECK_SECONDS = 1.0
+# IB Gateway sends these codes when its connection to the IBKR servers is lost (1100, 2110) or comes back (1101, 1102).
+# https://interactivebrokers.github.io/tws-api/message_codes.html
+IBKR_LINK_LOST_CODES = frozenset({1100, 2110})
+IBKR_LINK_RESTORED_CODES = frozenset({1101, 1102})
+# The IBKR link check: a small historical data request. IB Gateway answers it only with a connection to IBKR.
+# EUR.USD MIDPOINT needs no market data subscription. An answer without bars (error 162) also proves the link.
+IBKR_LINK_CHECK_SECONDS = 300.0
+IBKR_LINK_CHECK_WHILE_LOST_SECONDS = 60.0
+IBKR_LINK_CHECK_TIMEOUT_SECONDS = 30.0
+IBKR_LINK_CHECK_PAIR = "EURUSD"
+
+type GatewayStatus = Literal["connected", "unreachable", "no_ibkr_connection"]
 
 logger = logging.getLogger("atrade.ibkr")
 
@@ -71,7 +84,14 @@ class GatewayConnection(Protocol):
 
     async def keep_connected(self) -> None: ...
 
-    def is_connected(self) -> bool: ...
+    def is_connected(self) -> bool:
+        """True when the API connection is there and IB Gateway is connected to the IBKR servers."""
+        ...
+
+    def read_status(self) -> GatewayStatus:
+        """`unreachable`: no API connection. `no_ibkr_connection`: the API connection is there, but IB Gateway is not
+        connected to the IBKR servers, for example after a failed login (section 7.4)."""
+        ...
 
     def read_port(self) -> int:
         """The Gateway API port that this connection uses."""
@@ -180,16 +200,74 @@ class IbAsyncGatewayConnection:
         self.open_orders_lock = asyncio.Lock()
         # Without this, ib_async ends a failed request with an empty result, the same as "no bars in the range".
         self.ib.RaiseRequestErrors = True
+        # IB Gateway can keep the API port open while it has no connection to the IBKR servers. Then each request
+        # waits for its timeout. Requests that need IBKR fail at once while the link is lost.
+        self.ibkr_link_lost = False
+        # While the link is lost, 1 request can try again after this monotonic time. A connection without
+        # keep_connected (a forward test child) thus also finds a link that came back.
+        self.ibkr_link_retry_at = 0.0
+        self.next_ibkr_link_check_at = 0.0
+        self.ib.errorEvent += self.receive_error
 
     async def keep_connected(self) -> None:
         """Connects, and connects again after each lost connection. Runs until the caller cancels it."""
         while True:
             if not self.ib.isConnected():
                 await self.try_to_connect()
+            elif self.synchronized and time.monotonic() >= self.next_ibkr_link_check_at:
+                await self.check_ibkr_link()
+                interval = IBKR_LINK_CHECK_WHILE_LOST_SECONDS if self.ibkr_link_lost else IBKR_LINK_CHECK_SECONDS
+                self.next_ibkr_link_check_at = time.monotonic() + interval
             await asyncio.sleep(self.retry_seconds)
+
+    def receive_error(self, _request_id: int, error_code: int, error_text: str, _contract: Contract | None) -> None:
+        if error_code in IBKR_LINK_LOST_CODES:
+            self.mark_ibkr_link_lost(error_text)
+        elif error_code in IBKR_LINK_RESTORED_CODES:
+            self.mark_ibkr_link_restored()
+
+    def mark_ibkr_link_lost(self, reason: str) -> None:
+        if not self.ibkr_link_lost:
+            logger.warning("IB Gateway at %s:%s has no connection to IBKR: %s", self.host, self.port, reason)
+        self.ibkr_link_lost = True
+        self.ibkr_link_retry_at = time.monotonic() + IBKR_LINK_CHECK_WHILE_LOST_SECONDS
+        self.next_ibkr_link_check_at = min(self.next_ibkr_link_check_at, self.ibkr_link_retry_at)
+
+    def mark_ibkr_link_restored(self) -> None:
+        if self.ibkr_link_lost:
+            logger.info("IB Gateway at %s:%s is connected to IBKR again.", self.host, self.port)
+        self.ibkr_link_lost = False
+
+    async def check_ibkr_link(self) -> None:
+        """Sends the IBKR link check. An answer, also an API error, proves the link. A timeout marks it as lost."""
+        loop = asyncio.get_running_loop()
+        started_at = loop.time()
+        try:
+            await self.ib.reqHistoricalDataAsync(
+                Forex(IBKR_LINK_CHECK_PAIR),
+                endDateTime="",
+                durationStr=EXCHANGE_RATE_DURATION,
+                barSizeSetting=BAR_SIZE_SETTINGS[BarPeriod.ONE_DAY],
+                whatToShow="MIDPOINT",
+                useRTH=False,
+                formatDate=UTC_FORMAT_DATE,
+                timeout=IBKR_LINK_CHECK_TIMEOUT_SECONDS,
+            )
+        except RequestError:
+            self.mark_ibkr_link_restored()
+            return
+        except ConnectionError:
+            return
+        if loop.time() - started_at >= IBKR_LINK_CHECK_TIMEOUT_SECONDS:
+            self.mark_ibkr_link_lost("the IBKR link check got no answer in time")
+        else:
+            self.mark_ibkr_link_restored()
 
     async def try_to_connect(self) -> None:
         self.synchronized = False
+        # A new connection does not get the messages of the old one. The link check runs again at once.
+        self.ibkr_link_lost = False
+        self.next_ibkr_link_check_at = 0.0
         try:
             await self.ib.connectAsync(self.host, self.port, clientId=self.client_id, timeout=CONNECT_TIMEOUT_SECONDS)
         except (OSError, TimeoutError) as error:
@@ -206,7 +284,14 @@ class IbAsyncGatewayConnection:
         logger.info("Connected to IB Gateway at %s:%s with client ID %s.", self.host, self.port, self.client_id)
 
     def is_connected(self) -> bool:
-        return self.synchronized and self.ib.isConnected()
+        return self.read_status() == "connected"
+
+    def read_status(self) -> GatewayStatus:
+        if not (self.synchronized and self.ib.isConnected()):
+            return "unreachable"
+        if self.ibkr_link_lost:
+            return "no_ibkr_connection"
+        return "connected"
 
     def read_port(self) -> int:
         return self.port
@@ -322,6 +407,18 @@ class IbAsyncGatewayConnection:
         if not self.ib.isConnected():
             message = f"ATrade is not connected to IB Gateway at {self.host}:{self.port}."
             raise GatewayRequestError(message)
+        self.require_ibkr_link()
+
+    def require_ibkr_link(self) -> None:
+        if not self.ibkr_link_lost:
+            return
+        now = time.monotonic()
+        if now >= self.ibkr_link_retry_at:
+            # This request tries again. The requests at the same time still fail at once.
+            self.ibkr_link_retry_at = now + IBKR_LINK_CHECK_WHILE_LOST_SECONDS
+        else:
+            message = f"IB Gateway at {self.host}:{self.port} has no connection to IBKR."
+            raise GatewayRequestError(message)
 
     async def place_order(self, request: OrderRequest) -> int:
         self.require_connection()
@@ -413,6 +510,7 @@ class IbAsyncGatewayConnection:
         bar_period: BarPeriod,
         kind: HistoricalDataKind = STOCK_TRADES,
     ) -> list[BarData]:
+        self.require_ibkr_link()
         loop = asyncio.get_running_loop()
         started_at = loop.time()
         try:
@@ -427,6 +525,7 @@ class IbAsyncGatewayConnection:
                 timeout=HISTORICAL_DATA_TIMEOUT_SECONDS,
             )
         except RequestError as error:
+            self.mark_ibkr_link_restored()
             if NO_DATA_MESSAGE in error.message:
                 return []
             raise GatewayRequestError(str(error)) from error
@@ -434,8 +533,11 @@ class IbAsyncGatewayConnection:
             raise GatewayRequestError(str(error)) from error
         # After a timeout, ib_async cancels the request and returns an empty list. Do not save that as "no bars".
         if not bars_data and loop.time() - started_at >= HISTORICAL_DATA_TIMEOUT_SECONDS:
+            # The other requests then fail at once, until the IBKR link check gets an answer.
+            self.mark_ibkr_link_lost("a historical data request got no answer in time")
             message = "IB Gateway did not answer the historical data request in time."
             raise GatewayRequestError(message)
+        self.mark_ibkr_link_restored()
         return list(bars_data)
 
     async def stream_live_bars(self, instrument: Instrument, bar_period: BarPeriod) -> AsyncGenerator[Bar]:
@@ -472,6 +574,7 @@ class IbAsyncGatewayConnection:
                 self.ib.cancelHistoricalData(bars_data)
 
     async def subscribe_to_live_bars(self, contract: Contract, bar_period: BarPeriod) -> BarDataList:
+        self.require_ibkr_link()
         try:
             # keepUpToDate needs an empty end time: the bars go up to now.
             return await self.ib.reqHistoricalDataAsync(

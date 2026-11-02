@@ -1,6 +1,6 @@
 """IBKR fake: the same functions as the GatewayConnection of the `ibkr` public entry. Data stays in memory.
 
-Tests set `is_gateway_reachable`, `connected`, `port`, `managed_accounts`, `account_values`, `portfolio`,
+Tests set `is_gateway_reachable`, `connected`, `has_ibkr_connection`, `port`, `managed_accounts`, `account_values`, `portfolio`,
 `instruments`, `search_error_message`, `historical_bars`, `historical_bars_error_message`, `open_orders`, `order_error_message`,
 `cancel_error_message`, `executions`, `exchange_rates`, `exchange_rate_error_message`, `daily_exchange_rates`,
 `live_bars_error_message`, `live_bar_now_utc`, and `live_bar_interval_seconds` directly, and read
@@ -23,6 +23,7 @@ from atrade.ibkr import (
     DailyExchangeRate,
     Execution,
     GatewayRequestError,
+    GatewayStatus,
     OpenOrder,
     OrderRequest,
     PortfolioPosition,
@@ -147,6 +148,9 @@ class FakeGatewayConnection:
         self.daily_exchange_rate_requests: list[DailyExchangeRateRequest] = []
         self.connection_number = 0
         self._connected = False
+        # False: the API connection is there, but IB Gateway has no connection to IBKR (read_status
+        # "no_ibkr_connection"). is_connected() is then false.
+        self.has_ibkr_connection = True
 
     @property
     def connected(self) -> bool:
@@ -165,7 +169,14 @@ class FakeGatewayConnection:
             await anyio.sleep(CHECK_INTERVAL_SECONDS)
 
     def is_connected(self) -> bool:
-        return self.connected
+        return self.read_status() == "connected"
+
+    def read_status(self) -> GatewayStatus:
+        if not self.connected:
+            return "unreachable"
+        if not self.has_ibkr_connection:
+            return "no_ibkr_connection"
+        return "connected"
 
     def read_port(self) -> int:
         return self.port
