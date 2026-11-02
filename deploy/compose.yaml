@@ -26,8 +26,11 @@ services:
   # It is in the profile "ibkr", so ./start run works without IBKR credentials.
   # Set COMPOSE_PROFILES=ibkr in .env to start it.
   ib-gateway:
-    # ghcr.io/gnzsnz/ib-gateway:stable (IB Gateway 10.50.1f), pinned by digest.
-    image: ghcr.io/gnzsnz/ib-gateway:stable@sha256:1e2236804ac949b789197c225a048c0c891c9958f948c87166226e5b647ff581
+    # The pinned gnzsnz image with the watchdog script (deploy/ib-gateway.Dockerfile).
+    build:
+      context: .
+      dockerfile: ib-gateway.Dockerfile
+    image: atrade-ib-gateway:local
     profiles: ["ibkr"]
     environment:
       TWS_USERID: ${ATRADE_IBKR_USERNAME:-}
@@ -43,14 +46,14 @@ services:
       AUTO_RESTART_TIME: ${ATRADE_IBKR_AUTO_RESTART_TIME:-11:00 PM}
       TIME_ZONE: ${ATRADE_IBKR_TIME_ZONE:-America/New_York}
     # No "ports": the API (ib-gateway:4004 for paper, through socat) stays inside the Compose network.
-    volumes:
-      - ./ib-gateway-watchdog.sh:/home/ibgateway/atrade-watchdog.sh:ro
     # The watchdog restarts the container when IB Gateway stays logged out (docs/architecture/ibkr.md 7.4).
-    # The restart policy below starts the container again.
+    # The restart policy below starts the container again. During start_period, a failed check does not make the
+    # service unhealthy, so the login has time before `./start run --wait` of a deployment reads the health.
     healthcheck:
       test: ["CMD", "bash", "/home/ibgateway/atrade-watchdog.sh"]
       interval: 60s
       timeout: 15s
+      start_period: 3m
     pids_limit: 2048
     restart: unless-stopped
 

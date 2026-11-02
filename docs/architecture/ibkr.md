@@ -169,8 +169,12 @@ after 10 minutes, and gives the restart command.
 
 ## 7.4 The `ib-gateway` Compose service
 
-- Image: `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by the digest of the
-  multi-platform index (IB Gateway 10.50.1f on 2026-10-27).
+- Image: `atrade-ib-gateway:local`, built from `deploy/ib-gateway.Dockerfile`:
+  `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by the digest of the
+  multi-platform index (IB Gateway 10.50.1f on 2026-10-27), and the watchdog
+  script. `COPY --chmod=755` sets the mode of the script. A bind mount keeps
+  the mode of the server checkout, and with a strict umask the container user
+  cannot read it (2026-11-02, health check exit code 126).
 - `TRADING_MODE=paper`, `EXISTING_SESSION_DETECTED_ACTION: primary`,
   `READ_ONLY_API: "no"`. Without `READ_ONLY_API`, IBC keeps the Gateway
   default, a read-only API. Then IBKR refuses each order with warning 321
@@ -201,7 +205,9 @@ after 10 minutes, and gives the restart command.
   connection to IBKR, and each historical data request waits for its
   timeout. This occurred on 2026-11-02 at 06:15 ET.
 - The watchdog `deploy/ib-gateway-watchdog.sh` is the health check of the
-  service. It runs each 60 seconds and finds 2 problems: the paper API port
+  service. The first 3 minutes are the start period: a failed check then does
+  not make the service unhealthy, so the login has time before `./start run
+  --detach --wait` of a deployment reads the health. It runs each 60 seconds and finds 2 problems: the paper API port
   4002 does not listen, or `GET http://web:8000/api/ibkr/gateway` returns
   `no_ibkr_connection`. When a problem stays for 10 minutes, the watchdog
   sends `SIGTERM` to `run.sh` (PID 1). The container stops, and
