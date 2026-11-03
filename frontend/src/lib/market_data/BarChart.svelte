@@ -6,7 +6,8 @@
      is the price pane with the candlesticks; each own pane has its own price scale. The indicators draw as line and
      histogram series with the values of `indicatorSeries` (a bar without a value is whitespace data). Each pane has
      a legend at its top left (the price pane also the OHLC row), with the values at the crosshair bar, or at the last
-     bar when the crosshair is not on the chart, and an options menu at its top right. With `onPanesChange`, each legend
+     bar when the crosshair is not on the chart, and an options menu at its top right. Each indicator series shows the
+     same value as a label in its color on the price axis of its pane, and the crosshair puts a dot on each line. With `onPanesChange`, each legend
      row has Hide or Show, Settings (a popover), and Remove. A theme change gives the lines the other palette and does
      not create the chart again. The backend calculates all values; the chart calculates none.
      With `trades`, the price pane shows a trade mark for each bar and side (section 23.9.9, `trade_marks.ts`). The
@@ -23,6 +24,7 @@
     type CandlestickStyleOptions,
     type DeepPartial,
     type IChartApi,
+    type IPriceLine,
     type ISeriesApi,
     type LineData,
     type LineWidth,
@@ -136,6 +138,8 @@
   // The place of each trade mark after the last redraw, and the mark under the pointer ("<bar index>:<side>").
   let markBoxes: TradeMarkBox[] = $state([]);
   let hoveredMarkKey: string | null = $state(null);
+  // One price axis label for each drawn indicator series, with the values of the series (section 23.9.4).
+  let axisLabels: { priceLine: IPriceLine; values: readonly (number | null)[] }[] = [];
 
   function toCandlestick(bar: Bar): CandlestickData<UTCTimestamp> {
     return { time: bar.time as UTCTimestamp, open: bar.open, high: bar.high, low: bar.low, close: bar.close };
@@ -324,6 +328,7 @@
     });
     const guideColor = readChartColor(chartContainer, '--cds-border-strong-01');
     const drawn: ISeriesApi<'Line' | 'Histogram'>[] = [];
+    axisLabels = [];
     panes.forEach((pane, paneIndex) => {
       for (const indicator of pane.indicators) {
         if (!indicator.hidden) {
@@ -331,7 +336,9 @@
         }
       }
     });
+    showAxisLabels(untrack(() => legendIndex));
     return () => {
+      axisLabels = [];
       for (const series of drawn) {
         currentChart.removeSeries(series);
       }
@@ -368,10 +375,16 @@
     const priceFormat = readIndicatorPriceFormat(indicator.indicator);
     return indicator.lines.map((line) => {
       const color = readPaletteColor(line.color, isDark);
-      const points = toSeriesPoints(times, series?.outputs[line.output] ?? []);
+      const values = series?.outputs[line.output] ?? [];
+      const points = toSeriesPoints(times, values);
+      const addAxisLabel = (drawnSeries: ISeriesApi<'Line' | 'Histogram'>): void => {
+        const priceLine = drawnSeries.createPriceLine({ price: 0, color, lineVisible: false, axisLabelVisible: false, title: '' });
+        axisLabels.push({ priceLine, values });
+      };
       if (isHistogramLine(indicator.indicator, line.output)) {
         const histogram = currentChart.addSeries(HistogramSeries, { color, priceFormat, priceLineVisible: false, lastValueVisible: false }, paneIndex);
         histogram.setData(points);
+        addAxisLabel(histogram);
         return histogram;
       }
       const lineSeries = currentChart.addSeries(
@@ -383,11 +396,11 @@
           priceFormat,
           priceLineVisible: false,
           lastValueVisible: false,
-          crosshairMarkerVisible: false,
         },
         paneIndex,
       );
       lineSeries.setData(points);
+      addAxisLabel(lineSeries);
       if (indicator.indicator === 'rsi') {
         for (const price of RSI_GUIDE_LEVELS) {
           lineSeries.createPriceLine({ price, color: guideColor, lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: false, title: '' });
@@ -544,6 +557,18 @@
   const settingsDefinition = $derived(catalog.find((definition) => definition.key === settingsIndicator?.indicator));
 
   const legendIndex = $derived(findLegendIndex(indicatorSeries?.times ?? [], crosshairTime));
+  // The label of each series shows its value at the legend bar; a bar without a value shows no label.
+  function showAxisLabels(index: number | null): void {
+    for (const { priceLine, values } of axisLabels) {
+      const value = index === null ? null : (values[index] ?? null);
+      priceLine.applyOptions(value === null ? { axisLabelVisible: false } : { price: value, axisLabelVisible: true });
+    }
+  }
+
+  $effect(() => {
+    showAxisLabels(legendIndex);
+  });
+
   const paneLegends = $derived(
     indicatorPanes.map((pane) => buildLegendRows(pane.indicators, catalog, indicatorSeries, legendIndex, isDark)),
   );

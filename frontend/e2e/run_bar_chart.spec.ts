@@ -113,3 +113,14 @@ test('the forward test bar chart shows the strategy indicators and keeps "Bars" 
 
   await expectBarsWithStrategyIndicators(page);
 });
+
+test('the strategy page "Bars" view shows the strategy indicator in the legend', async ({ page, request }, currentTest) => {
+  const backtestId = await startBacktest(request, `Strategy bar chart ${currentTest.project.name} ${String(Date.now())}`);
+  const backtest = (await (await request.get(`/api/backtests/${String(backtestId)}`)).json()) as { strategy_id: number };
+
+  await page.goto(`/strategies/${String(backtest.strategy_id)}`);
+  await page.getByRole('tablist', { name: 'Chart' }).getByRole('tab', { name: 'Bars' }).click();
+
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText(BAR_COUNT_TEXT);
+  await expect(legendRow(page, STRATEGY_INDICATOR_NAME).locator('.legend-value')).toHaveText([NUMBER_PATTERN]);
+});

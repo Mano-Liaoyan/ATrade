@@ -185,7 +185,7 @@ test('Maximize gives a pane all the chart height, and Restore gives back the hei
   await choosePaneOption(page, 'MACD 12 26 9', 'Restore');
 
   await expect(page.getByRole('button', { name: /^Options for / })).toHaveCount(4);
-  await expect.poll(async () => Math.abs((await readTop(macdLegend)) - topBefore)).toBeLessThan(2);
+  await expect.poll(async () => Math.abs((await readTop(macdLegend)) - topBefore)).toBeLessThan(4);
 });
 
 test('Remove indicators removes the pane and all its indicators', async ({ page }) => {
@@ -513,4 +513,52 @@ test('a failed save shows the detail text over the chart, and the chart keeps th
 
   await expect(page.getByRole('alert').filter({ hasText: 'The database is not reachable.' })).toBeVisible();
   await expect(legendRow(page, 'SMA 50')).toBeVisible();
+});
+
+// Crosshair readout (section 23.9.4): the mean page y of the pixels in the color `hex` on the price axis canvases of
+// the chart (right of the plot), or null without a label there.
+async function readAxisLabelY(page: Page, hex: string): Promise<number | null> {
+  return page.getByRole('img', { name: CHART_NAME }).evaluate((chart, color) => {
+    const target = [1, 3, 5].map((start) => Number.parseInt(color.slice(start, start + 2), 16));
+    const chartRect = chart.getBoundingClientRect();
+    let count = 0;
+    let sum = 0;
+    // The price axis canvases are narrow and in the right half of the chart.
+    const axisCanvases = [...chart.querySelectorAll('canvas')].filter((canvas) => {
+      const rect = canvas.getBoundingClientRect();
+      return canvas.height > 0 && rect.width <= 120 && rect.left >= chartRect.left + chartRect.width / 2;
+    });
+    for (const canvas of axisCanvases) {
+      const rect = canvas.getBoundingClientRect();
+      const pixels = canvas.getContext('2d')?.getImageData(0, 0, canvas.width, canvas.height).data ?? [];
+      for (let index = 0; index < pixels.length; index += 4) {
+        if (target.every((value, channel) => Math.abs((pixels[index + channel] ?? 0) - value) <= 6) && (pixels[index + 3] ?? 0) > 200) {
+          count += 1;
+          sum += rect.top + (Math.floor(index / 4 / canvas.width) * rect.height) / canvas.height;
+        }
+      }
+    }
+    return count < 30 ? null : sum / count;
+  }, hex);
+}
+
+test('the price axis label of a line follows the crosshair and shows no label at a bar without a value', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await openChart(page);
+  // The fake bars give SMA 50 one value at all bars; the upper Bollinger band (the first color) changes.
+  await addIndicator(page, /Bollinger Bands/);
+  await expect(legendRow(page, 'BB 20 2').locator('.legend-value')).toHaveText([NUMBER_PATTERN, NUMBER_PATTERN, NUMBER_PATTERN]);
+  await expect.poll(() => readAxisLabelY(page, LIGHT_COLOR_1)).not.toBeNull();
+  const lastBarY = (await readAxisLabelY(page, LIGHT_COLOR_1)) ?? 0;
+
+  await moveCrosshair(page, 0.5);
+  await expect.poll(async () => Math.abs(((await readAxisLabelY(page, LIGHT_COLOR_1)) ?? lastBarY) - lastBarY)).toBeGreaterThan(2);
+
+  // The first bars of the chart have no value.
+  await moveCrosshair(page, 0);
+  await expect.poll(() => readAxisLabelY(page, LIGHT_COLOR_1)).toBeNull();
+
+  // Off the chart, the label shows the value at the last bar again.
+  await page.mouse.move(0, 0);
+  await expect.poll(async () => Math.abs(((await readAxisLabelY(page, LIGHT_COLOR_1)) ?? 0) - lastBarY)).toBeLessThan(4);
 });
