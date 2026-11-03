@@ -30,6 +30,29 @@ describe('readBars', () => {
     expect(requestedUrls).toEqual(['/api/market-data/bars?symbol=BRK+B&exchange=NYSE&currency=USD&bar_period=1-DAY']);
   });
 
+  it('sends the range and the source order of a backtest chart', async () => {
+    const requestedUrls: string[] = [];
+    const recordingFetch: typeof fetch = (input) => {
+      if (typeof input === 'string') {
+        requestedUrls.push(input);
+      }
+      return Promise.resolve(new Response(JSON.stringify({ bars: [] }), { status: 200 }));
+    };
+
+    await readBars(recordingFetch, TENCENT, '1-DAY', {
+      startUtc: '2026-03-01T00:00:00Z',
+      endUtc: '2026-04-01T00:00:00Z',
+      sourceOrder: ['databento', 'ibkr'],
+    });
+    await readBars(recordingFetch, TENCENT, '1-DAY', { startUtc: '2026-03-01T00:00:00Z', sourceOrder: null });
+
+    expect(requestedUrls).toEqual([
+      '/api/market-data/bars?symbol=700&exchange=SEHK&currency=HKD&bar_period=1-DAY&start_utc=2026-03-01T00%3A00%3A00Z' +
+        '&end_utc=2026-04-01T00%3A00%3A00Z&source_order=databento&source_order=ibkr',
+      '/api/market-data/bars?symbol=700&exchange=SEHK&currency=HKD&bar_period=1-DAY&start_utc=2026-03-01T00%3A00%3A00Z',
+    ]);
+  });
+
   it('shows the backend message when IB Gateway is not reachable', async () => {
     const detail = 'IB Gateway is not reachable at ib-gateway:4004. Bars that are not saved need IB Gateway.';
 

@@ -639,8 +639,9 @@ section 6.2).
     sends one `PUT` after the other, each with the set at that time, so the
     last change is the last saved set. A change before the read answer
     keeps the changed part, and the read gives the other part.
-  - A favorite change sends the saved panes back unchanged, so a backtest
-    or forward test chart can save favorites with its own store. When the
+  - A favorite change sends the saved panes back unchanged. The backtest
+    and forward test pages each have their own store for the favorites only
+    (no notification for a failed favorite save). When the
     read of the set failed, a favorite change is not saved (it would save
     the empty panes over the saved panes). A pane change is saved also
     then.
@@ -652,8 +653,8 @@ section 6.2).
     item action, an `IconButton` with a floating tooltip). A click on it
     calls `onAction` and does not select the item.
   - Playwright tests of the instrument page chart replace the 2 routes with
-    a set in the browser context (`e2e/local_chart_indicator_set.ts`): the
-    set is one global row, and the 4 projects and other specs use one
+    a set in the browser context (`e2e/local_chart_indicator_set.ts`), and
+    `run_bar_chart.spec.ts` does the same: the set is one global row, and the 4 projects and other specs use one
     database at the same time.
 
 ### 23.9.8 Bar charts of backtests and forward tests
@@ -684,6 +685,23 @@ section 6.2).
   colors of a new indicator. "Add indicator", the legend buttons, and the
   settings work as on the instrument page. No change is saved, except the
   favorites.
+- Decided (#331):
+  - `GET /api/backtests/{backtest_id}` has `strategy_indicators` in
+    `BacktestDetailResponse` (so the comparison route has it too). The
+    forward test has it in `forward_test` of
+    `GET /api/forward-tests/{id}` only (`ForwardTestWithIndicatorsResponse`),
+    not in the list. A forward test has no sweep parameters: it uses the
+    field defaults.
+  - The switcher shows for each status of a single-instrument backtest. A
+    queued or failed backtest also shows its bars.
+  - The bars route gets `start_utc`, `end_utc`, and the `source_order` of
+    the backtest. A forward test sends no `end_utc` while it runs, so the
+    range ends now. The bars and the indicator values are read one time for
+    each run; a running forward test does not read new bars.
+  - The changes of the user belong to the open run in the page
+    (`RunChartIndicators`). Another run, or a page load, starts again with
+    the strategy indicators. "Equity" and "Bars" keep the changes while the
+    run stays open.
 
 ### 23.9.9 Trade marks
 
@@ -773,6 +791,16 @@ section 6.2).
   `applySettingsDraft`, `replaceChartIndicator`, `formatParameterLabel`,
   `formatLineLabel`), and `foundation/carbon` `NumberInput`. `LegendRow`
   gets `indicatorIndex` and `hidden`.
+- Done in #331: `strategy_indicators` of the 2 detail routes,
+  `readBars` with an optional range and source order, `RunBarChart` (the
+  bar chart of a run range), `RunChartIndicators` (the panes of a run chart),
+  `strategy_indicators.ts` (`placeStrategyIndicators`), and in
+  `#lib/backtest` `ChartViewSwitcher` and `chart_view.ts` (`readChartView`,
+  `formatChartViewSearch`). Tests: `test_strategy_indicators.py`,
+  `e2e/run_bar_chart.spec.ts` (the e2e server has a stopped forward test of
+  "E2E chart indicators" on 45 saved FTBAR bars). `RunBarChart` passes
+  `onPanesChange`, so the legend buttons and the settings of #329 work on
+  these charts.
 - Playwright: the 4 projects (chromium, firefox, webkit, msedge) for each
   UI slice.
 

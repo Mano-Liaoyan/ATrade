@@ -1114,6 +1114,8 @@ export interface components {
             instruments: components["schemas"]["UniverseInstrumentResponse"][];
             split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
+            /** Strategy Indicators */
+            strategy_indicators: components["schemas"]["ChartIndicator"][];
         };
         /**
          * BacktestLimitsBody
@@ -1304,6 +1306,18 @@ export interface components {
             definition: components["schemas"]["JsonValue"];
         };
         /**
+         * ChartIndicator
+         * @description A whole indicator of the chart with its parameter values, as `{"indicator", "parameters"}` JSON.
+         */
+        ChartIndicator: {
+            /** Indicator */
+            indicator: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: components["schemas"]["ParameterNumber"];
+            };
+        };
+        /**
          * ChartIndicatorSet
          * @description The first pane is the price pane. The other panes are own panes, in the order on the chart.
          */
@@ -1401,6 +1415,8 @@ export interface components {
             instruments: components["schemas"]["UniverseInstrumentResponse"][];
             split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
+            /** Strategy Indicators */
+            strategy_indicators: components["schemas"]["ChartIndicator"][];
             /** Code */
             code: string;
         };
@@ -1717,7 +1733,7 @@ export interface components {
          *     newest first.
          */
         ForwardTestDetailResponse: {
-            forward_test: components["schemas"]["ForwardTestResponse"];
+            forward_test: components["schemas"]["ForwardTestWithIndicatorsResponse"];
             metrics: components["schemas"]["ComparedMetricsResponse"] | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
@@ -1830,6 +1846,59 @@ export interface components {
         };
         /** @enum {string} */
         ForwardTestStatus: "starting" | "running" | "waiting_for_gateway" | "stopping" | "stopped" | "stop_failed" | "failed";
+        /**
+         * ForwardTestWithIndicatorsResponse
+         * @description The forward test of the detail: also `CHART_INDICATORS` of the version code (indicator.md section 23.9.8).
+         */
+        ForwardTestWithIndicatorsResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
+            /** Symbol */
+            symbol: string | null;
+            /** Exchange */
+            exchange: string | null;
+            /** Currency */
+            currency: string | null;
+            universe_kind: components["schemas"]["UniverseKind"];
+            /** Universe Top N */
+            universe_top_n: number | null;
+            bar_period: components["schemas"]["BarPeriod"];
+            desired_state: components["schemas"]["DesiredState"];
+            status: components["schemas"]["ForwardTestStatus"];
+            /** Client Id */
+            client_id: number | null;
+            /** Start Balance Usd */
+            start_balance_usd: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Stopped At Utc */
+            stopped_at_utc: string | null;
+            /** End Time Utc */
+            end_time_utc: string | null;
+            /** Crash Count */
+            crash_count: number;
+            /** Interruptions */
+            interruptions: components["schemas"]["InterruptionResponse"][];
+            /** Allocated Capital Usd */
+            allocated_capital_usd: string | null;
+            /** Split Checks Needed */
+            split_checks_needed: components["schemas"]["SplitCheckNeededResponse"][];
+            /** Strategy Indicators */
+            strategy_indicators: components["schemas"]["ChartIndicator"][];
+        };
         /** @enum {string} */
         GatewayStatus: "connected" | "unreachable" | "no_ibkr_connection";
         /** GatewayStatusResponse */
@@ -2260,6 +2329,7 @@ export interface components {
             /** Paper Capital Usd */
             paper_capital_usd: string;
         };
+        ParameterNumber: number;
         /** ParameterResponse */
         ParameterResponse: {
             /** Name */

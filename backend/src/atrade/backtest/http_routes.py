@@ -62,7 +62,13 @@ from atrade.foundation.instrument import Instrument
 from atrade.foundation.table_changes import ChangeSocket
 from atrade.market_data import BarSource, ExchangeRateReader, read_us_universe_quarter_starts
 from atrade.screen import MARKET_CURRENCIES, read_saved_screen, read_screen_result_members
-from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
+from atrade.strategy import (
+    ChartIndicator,
+    StrategyVersion,
+    list_chart_indicators,
+    read_strategy_version,
+    read_strategy_versions,
+)
 
 # The backtest list and the open backtest: /ws/ sends a change message after a change (foundation/table_changes).
 BACKTEST_CHANGE_SOCKET = ChangeSocket(path="/ws/backtests", tables=frozenset({"backtest"}))
@@ -246,6 +252,8 @@ class BacktestDetailResponse(BacktestResponse):
     instruments: list[UniverseInstrumentResponse]
     split_metrics: SplitMetricsResponse | None
     robustness: BacktestRobustnessResponse
+    # `CHART_INDICATORS` of the version code, with the parameters of a sweep run (indicator.md section 23.9.8).
+    strategy_indicators: list[ChartIndicator]
 
 
 class ComparedBacktestResponse(BacktestDetailResponse):
@@ -564,13 +572,19 @@ class BacktestRoutes:
             trades = await backtest_store.select_trades(connection, backtest_id)
             quarter_counts = await backtest_store.count_member_periods(connection, backtest_id)
             out_of_sample_use_count = await self.count_out_of_sample_uses(connection, row)
-        backtest = await self.to_backtest_response(row)
+        strategy_version = await read_strategy_version(
+            database_url=self.database_url, strategy_version_id=row.strategy_version_id
+        )
+        backtest = make_backtest_response(row, strategy_version)
         split_metrics = calculate_finished_split_metrics(row, equity_curve, trades)
         robustness = await read_robustness(
             database_url=self.database_url, row=row, strategy_id=backtest.strategy_id, equity_curve=equity_curve
         )
         return BacktestDetailResponse(
             **backtest.model_dump(),
+            strategy_indicators=list_chart_indicators(
+                "" if strategy_version is None else strategy_version.code, row.parameters or {}
+            ),
             robustness=BacktestRobustnessResponse(
                 trial_count=robustness.trial_count,
                 sharpe_probability_percent=robustness.sharpe_probability_percent,
