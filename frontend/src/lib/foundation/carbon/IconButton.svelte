@@ -31,6 +31,10 @@
     /** The icon turns. Use it with `disabled` and a label that says what runs. */
     busy?: boolean;
     kind?: 'ghost' | 'primary' | 'danger';
+    /** "xs" (24px) fits a dense line, for example a chart legend row. */
+    size?: 'sm' | 'xs';
+    /** The tooltip goes under <body>, for a button in a parent that clips, for example a scroll region. */
+    floatingTooltip?: boolean;
     /** The ID of a visible text that says more, for example why the button is disabled. */
     describedBy?: string;
     onclick: () => void;
@@ -46,6 +50,8 @@
     marked = false,
     busy = false,
     kind = 'ghost',
+    size = 'sm',
+    floatingTooltip = false,
     describedBy,
     onclick,
   }: Props = $props();
@@ -53,13 +59,13 @@
   const tooltipText = $derived(shortcut === undefined ? label : `${label} (${shortcut})`);
 </script>
 
-<Tooltip text={tooltipText} {align}>
+<Tooltip text={tooltipText} {align} floating={floatingTooltip}>
   {#snippet trigger({ props })}
     <button
       {...props}
       type="button"
       class={[
-        `cds--btn cds--btn--${kind} cds--btn--sm cds--layout--size-sm cds--btn--icon-only atrade-icon-button`,
+        `cds--btn cds--btn--${kind} cds--btn--${size} cds--layout--size-${size} cds--btn--icon-only atrade-icon-button`,
         disabled && !busy && 'cds--btn--disabled',
         busy && 'atrade-icon-button--busy',
         tone !== undefined && `atrade-icon-button--${tone}`,

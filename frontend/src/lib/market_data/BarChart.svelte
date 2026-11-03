@@ -6,8 +6,9 @@
      is the price pane with the candlesticks; each own pane has its own price scale. The indicators draw as line and
      histogram series with the values of `indicatorSeries` (a bar without a value is whitespace data). Each pane has
      a legend at its top left (the price pane also the OHLC row), with the values at the crosshair bar, or at the last
-     bar when the crosshair is not on the chart, and an options menu at its top right. The backend calculates all
-     values; the chart calculates none. -->
+     bar when the crosshair is not on the chart, and an options menu at its top right. With `onPanesChange`, each legend
+     row has Hide or Show, Settings (a popover), and Remove. A theme change gives the lines the other palette and does
+     not create the chart again. The backend calculates all values; the chart calculates none. -->
 <script lang="ts">
   import {
     CandlestickSeries,
@@ -40,16 +41,21 @@
     findMaximizedStretchFactors,
     listPaneActions,
     moveOwnPane,
+    removeChartIndicator,
     removeOwnPane,
     type ChartIndicator,
     type ChartIndicatorDefinition,
     type ChartLineStyle,
     type ChartPane,
     type LegendBar,
+    type LegendRow,
+    type LegendRowActions,
     type PaneAction,
     type PaneBox,
   } from './chart_indicators';
   import ChartPaneOverlay from './ChartPaneOverlay.svelte';
+  import IndicatorSettings from './IndicatorSettings.svelte';
+  import { replaceChartIndicator } from './indicator_settings';
   import type { IndicatorSeriesResult } from './indicator_series';
   import { canDrawLiveBar } from './live_bars';
 
@@ -64,7 +70,7 @@
     indicatorSeries?: IndicatorSeriesResult | null;
     /** The indicator catalog, for the legend names. */
     catalog?: ChartIndicatorDefinition[];
-    /** Gets the new panes after "Move up", "Move down", or "Remove indicators" of a pane options menu. */
+    /** Gets the new panes after a change in a pane options menu or a legend row (Hide, Show, Settings, Remove). */
     onPanesChange?: (panes: ChartPane[]) => void;
   }
 
@@ -97,6 +103,8 @@
   let paneBoxes: PaneBox[] = $state([]);
   // The maximized pane and the stretch factors of all panes from before "Maximize".
   let maximized: { paneIndex: number; factors: number[] } | null = $state(null);
+  // The indicator whose settings popover is open, and the legend row that the popover is at.
+  let settings = $state<{ paneIndex: number; indicatorIndex: number; anchor: HTMLElement } | null>(null);
 
   function toCandlestick(bar: Bar): CandlestickData<UTCTimestamp> {
     return { time: bar.time as UTCTimestamp, open: bar.open, high: bar.high, low: bar.low, close: bar.close };
@@ -386,6 +394,30 @@
     return { open: formatPrice(bar.open), high: formatPrice(bar.high), low: formatPrice(bar.low), close: formatPrice(bar.close) };
   });
 
+  function makeRowActions(paneIndex: number): LegendRowActions | undefined {
+    const changePanes = onPanesChange;
+    if (changePanes === undefined) {
+      return undefined;
+    }
+    return {
+      onToggleHidden: (row: LegendRow) => {
+        const indicator = indicatorPanes[paneIndex]?.indicators[row.indicatorIndex];
+        if (indicator !== undefined) {
+          changePanes(replaceChartIndicator(indicatorPanes, paneIndex, row.indicatorIndex, { ...indicator, hidden: !indicator.hidden }));
+        }
+      },
+      onOpenSettings: (row: LegendRow, anchor: HTMLElement) => {
+        settings = { paneIndex, indicatorIndex: row.indicatorIndex, anchor };
+      },
+      onRemove: (row: LegendRow) => {
+        changePanes(removeChartIndicator(indicatorPanes, paneIndex, row.indicatorIndex));
+      },
+    };
+  }
+
+  const settingsIndicator = $derived(settings === null ? undefined : indicatorPanes[settings.paneIndex]?.indicators[settings.indicatorIndex]);
+  const settingsDefinition = $derived(catalog.find((definition) => definition.key === settingsIndicator?.indicator));
+
   const legendIndex = $derived(findLegendIndex(indicatorSeries?.times ?? [], crosshairTime));
   const paneLegends = $derived(
     indicatorPanes.map((pane) => buildLegendRows(pane.indicators, catalog, indicatorSeries, legendIndex, isDark)),
@@ -404,8 +436,28 @@
           {rows}
           name={paneIndex === 0 ? 'bars' : (rows[0]?.name ?? 'indicators')}
           menuItems={makeMenuItems(paneIndex)}
+          actions={makeRowActions(paneIndex)}
         />
       {/if}
     {/each}
   {/snippet}
 </ChartFrame>
+
+{#if settings !== null && settingsIndicator !== undefined && settingsDefinition !== undefined}
+  {@const open = settings}
+  {#key open}
+    <IndicatorSettings
+      anchor={open.anchor}
+      definition={settingsDefinition}
+      indicator={settingsIndicator}
+      dark={isDark}
+      onApply={(indicator: ChartIndicator) => {
+        onPanesChange?.(replaceChartIndicator(indicatorPanes, open.paneIndex, open.indicatorIndex, indicator));
+        settings = null;
+      }}
+      onClose={() => {
+        settings = null;
+      }}
+    />
+  {/key}
+{/if}

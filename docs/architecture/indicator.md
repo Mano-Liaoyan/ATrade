@@ -507,6 +507,28 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
   - "Apply" (primary button). It is disabled while a field is invalid. It
     applies the changes and closes the popover. Escape closes the popover
     without a change.
+- Decided (#329):
+  - A chart without `onPanesChange` has no row buttons (as the pane
+    options menu has only Maximize and Restore then).
+  - The row buttons are in the tab order also while they are not shown:
+    the focus in the row shows them. The legend name is a button out of the
+    tab order; the Settings button gives its action to the keyboard. A row
+    with buttons takes pointer events, so the crosshair does not follow the
+    pointer over that row.
+  - The tooltips of the row buttons go under `<body>` (`IconButton`
+    `floatingTooltip`), so the legend `ScrollRegion` does not clip them. The
+    popover is at the legend row. Its fields scroll between the heading and
+    the buttons in a `ScrollRegion` ("Settings of <name>").
+  - The line group headings: "Line" (or "Histogram") for an indicator with
+    one line, "MACD line" and "Signal line" for MACD, else the output label
+    ("Upper", "Histogram").
+  - The invalid texts: "Enter a number.", "Enter a whole number.", "Enter a
+    value from <minimum> to <maximum>.", and for an order rule "Fast period
+    must be less than slow period (26)." on the smaller parameter. The
+    catalog route does not give the order rules, so `indicator_settings.ts`
+    holds them.
+  - A hidden indicator stays in the series request, so "Show" draws the
+    line again at once.
 - A market data chart saves each change at once with
   `PUT /api/market-data/chart-indicators`. A failed save shows an
   `InlineNotification` with the `detail` text over the chart, and the chart
@@ -709,6 +731,12 @@ section 6.2).
   `findMaximizedStretchFactors`), `chart_indicator_styles.ts`
   (`isHistogramLine`, `RSI_GUIDE_LEVELS`), and the `horizontal` icon of
   `OverflowMenu`. `BarChart` gets `onPanesChange` for the menu changes.
+- Done in #329: the legend row buttons (`ChartLegend` `actions`) and the
+  settings popover (`IndicatorSettings`), `indicator_settings.ts`
+  (`createSettingsDraft`, `checkSettingsDraft`, `resetSettingsDraft`,
+  `applySettingsDraft`, `replaceChartIndicator`, `formatParameterLabel`,
+  `formatLineLabel`), and `foundation/carbon` `NumberInput`. `LegendRow`
+  gets `indicatorIndex` and `hidden`.
 - Playwright: the 4 projects (chromium, firefox, webkit, msedge) for each
   UI slice.
 

@@ -827,7 +827,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `--cds-icon-secondary`, `--cds-icon-interactive`, or the support color),
   `marked` (a `--cds-icon-interactive` dot on the icon), and `busy` (the
   icon turns; use it with `disabled`). The icon shape changes with each
-  state, so the color is never the only sign. `Select` takes `size` (`sm`)
+  state, so the color is never the only sign. `size` `xs` (24px) fits a dense
+  line, for example a chart legend row, and `floatingTooltip` puts the
+  tooltip under `<body>` (Bits UI `Tooltip.Portal`, no caret), so a scroll
+  region cannot clip it (`Tooltip` `floating`). `NumberInput` (`label`,
+  `value` text, `onValueChange`, `min`, `max`, `step`, `invalidText`,
+  `size`) is the Carbon number input with its step buttons (#329). `Select` takes `size` (`sm`)
   and `hideLabel`. `Tabs` (and `Panel` `tabs`) take `itemLabel`, a snippet
   that renders the text of a tab. `SideColumn` takes an `actions` snippet: icon buttons in its
   header line before the Minimize button. `Tabs` takes `size` (`sm` gives the 32px
