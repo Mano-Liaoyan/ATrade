@@ -58,6 +58,16 @@ E2E_COMPARED_FILL_COUNT = 40
 # An interruption over these bars: no equity points, and the chart marks them grey.
 E2E_COMPARED_INTERRUPTED_BAR_NUMBERS = range(20, 23)
 E2E_COMPARED_INTERRUPTION_OFFSET = timedelta(hours=1)
+# A stopped forward test on the compared bars, of a version with CHART_INDICATORS (indicator.md section 23.9.8).
+# Its bars are before the fixed clock: the bars route cuts each range at now.
+E2E_CHART_INDICATORS_STRATEGY_NAME = "E2E chart indicators"
+E2E_CHART_SYMBOL = "FTBAR"
+E2E_CHART_FIRST_BAR_START_UTC = datetime(2025, 11, 3, tzinfo=UTC)
+# The trade marks (indicator.md section 23.9.9): the fills of the chart forward test (bar number, side), each 1 second
+# after the bar end, and a finished backtest on the same bars with trades at the bar ends (bar number, side, quantity).
+E2E_CHART_FILLS = [(8, "BUY"), (15, "SELL")]
+E2E_TRADE_MARKS_STRATEGY_NAME = "E2E trade marks"
+E2E_TRADE_MARKS_TRADES = [(5, "BUY", 10), (12, "SELL", 10), (30, "BUY", 10), (38, "SELL", 5), (38, "SELL", 5)]
 # A stopped watchlist forward test with an allocated capital, for the comparison with a backtest of the same period of
 # its recorded members (forward_test.md 12.10): FTUA and FTUB in the first quarter, FTUA and FTUC from 2026-04-01.
 E2E_UNIVERSE_COMPARED_STRATEGY_NAME = "E2E universe compared forward test"
@@ -268,6 +278,123 @@ def add_compared_forward_test(database_url: str) -> None:
         ).fetchone()
         assert forward_test_row is not None
         add_compared_records(connection, int(forward_test_row[0]))
+
+
+def add_chart_bars(connection: psycopg.Connection) -> None:
+    """Saved daily bars of the chart forward test and of the backtests of run_bar_chart.spec.ts."""
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            VALUES (%(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(close)s, %(high)s, %(low)s, %(close)s, 1000)
+            ON CONFLICT DO NOTHING
+            """,
+            [
+                {
+                    "symbol": E2E_CHART_SYMBOL,
+                    "start_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=bar_number - 1),
+                    "close": make_compared_close_usd(bar_number),
+                    "high": make_compared_close_usd(bar_number) + 1,
+                    "low": make_compared_close_usd(bar_number) - 1,
+                }
+                for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
+            ],
+        )
+        save_ibkr_saved_range(
+            connection,
+            Instrument(symbol=E2E_CHART_SYMBOL, exchange="ARCA", currency="USD"),
+            "1-DAY",
+            E2E_CHART_FIRST_BAR_START_UTC,
+            E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+        )
+
+
+def add_chart_indicator_forward_test(database_url: str) -> None:
+    """A stopped forward test of a version with CHART_INDICATORS (the strategy template: SMA of average_period) on
+    saved daily bars (docs/architecture/indicator.md section 23.9.8)."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_id = insert_strategy_version(
+            connection, name=E2E_CHART_INDICATORS_STRATEGY_NAME, code=STRATEGY_TEMPLATE
+        )
+        if version_id is None:
+            return
+        add_chart_bars(connection)
+        connection.execute(
+            """
+            INSERT INTO forward_test (strategy_version_id, symbol, exchange, currency, bar_period, desired_state,
+                status, start_balance_usd, created_at_utc, stopped_at_utc)
+            VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', 'stopped', 'stopped', 10000, %(start_utc)s,
+                %(stopped_utc)s)
+            """,
+            {
+                "version_id": version_id,
+                "symbol": E2E_CHART_SYMBOL,
+                "start_utc": E2E_CHART_FIRST_BAR_START_UTC,
+                "stopped_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+            },
+        )
+        connection.cursor().executemany(
+            """
+            INSERT INTO forward_test_fill (forward_test_id, trade_id, time_utc, side, quantity_shares, price_usd,
+                commission_usd)
+            SELECT id, %(trade_id)s, %(time_utc)s, %(side)s, 1, %(price_usd)s, 0
+            FROM forward_test WHERE strategy_version_id = %(version_id)s
+            """,
+            [
+                {
+                    "version_id": version_id,
+                    "trade_id": f"E2E-CHART-{bar_number}",
+                    "time_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=bar_number, seconds=1),
+                    "side": side,
+                    "price_usd": make_compared_close_usd(bar_number) + Decimal("0.01"),
+                }
+                for bar_number, side in E2E_CHART_FILLS
+            ],
+        )
+
+
+def add_trade_marks_backtest(database_url: str) -> None:
+    """A finished backtest on the chart bars (add_chart_indicator_forward_test saves them) with trades at the bar
+    ends, 1 USD commission each."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_id = insert_strategy_version(connection, name=E2E_TRADE_MARKS_STRATEGY_NAME, code=STRATEGY_TEMPLATE)
+        if version_id is None:
+            return
+        row = connection.execute(
+            """
+            INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
+                paper_capital_usd, status, created_at_utc, started_at_utc, ended_at_utc, final_equity_usd,
+                total_return_percent, max_drawdown_percent, trade_count)
+            VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(end_utc)s, 10000, 'finished',
+                %(now)s, %(now)s, %(now)s, 9985, -0.15, 0.5, %(trade_count)s)
+            RETURNING id
+            """,
+            {
+                "version_id": version_id,
+                "symbol": E2E_CHART_SYMBOL,
+                "start_utc": E2E_CHART_FIRST_BAR_START_UTC,
+                "end_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+                "now": FIXED_NOW_UTC,
+                "trade_count": len(E2E_TRADE_MARKS_TRADES),
+            },
+        ).fetchone()
+        assert row is not None
+        connection.cursor().executemany(
+            """
+            INSERT INTO backtest_trade (backtest_id, time_utc, side, quantity_shares, price_usd, commission_usd)
+            VALUES (%(backtest_id)s, %(time_utc)s, %(side)s, %(quantity)s, %(price_usd)s, 1)
+            """,
+            [
+                {
+                    "backtest_id": row[0],
+                    "time_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=bar_number),
+                    "side": side,
+                    "quantity": quantity,
+                    "price_usd": make_compared_close_usd(bar_number),
+                }
+                for bar_number, side, quantity in E2E_TRADE_MARKS_TRADES
+            ],
+        )
 
 
 def add_universe_compared_bars(connection: psycopg.Connection) -> None:
@@ -561,6 +688,8 @@ def main() -> None:
     upgrade_database(database_url)
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
+    add_chart_indicator_forward_test(database_url)
+    add_trade_marks_backtest(database_url)
     add_universe_compared_forward_test(database_url)
     add_discarded_version(database_url)
     add_owner_ledger_start(database_url)

@@ -1,12 +1,14 @@
 """Reads strategy versions for the capabilities that run them (backtest, forward test), and the outline of a
 strategy for the start context of an AI assistant conversation (app/)."""
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
 import psycopg
 from psycopg.rows import class_row, dict_row
 
+from atrade.strategy.chart_indicators import ChartIndicator, list_chart_indicators
 from atrade.strategy.rules_code import find_warm_up_bar_count
 from atrade.strategy.strategy_rules import StrategyRules
 
@@ -23,6 +25,14 @@ class StrategyVersion:
     # The bars that the longest indicator of the rules needs (#164). None for a version without rules or without
     # an indicator: the backtest and the forward test then use the default look-back length.
     warm_up_bar_count: int | None = None
+
+
+def list_version_chart_indicators(
+    version: StrategyVersion | None, parameters: Mapping[str, object]
+) -> list[ChartIndicator]:
+    """The `CHART_INDICATORS` of the version code (`list_chart_indicators`). No version (it was deleted) gives an empty
+    list."""
+    return [] if version is None else list_chart_indicators(version.code, parameters)
 
 
 def to_strategy_version(row: dict[str, Any]) -> StrategyVersion:

@@ -24,6 +24,7 @@ from atrade.backtest import (
     calculate_metrics,
     calculate_round_trip_metrics,
     check_backtest_request,
+    find_round_trip_net_profits,
     find_round_trips,
     queue_backtest,
     read_backtest_outcome,
@@ -37,6 +38,7 @@ from atrade.forward_test.http_routes import ForwardTestResponse, to_forward_test
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
+from atrade.strategy import ChartIndicator, list_version_chart_indicators, read_strategy_version
 
 
 class SamePeriodBacktestResponse(BaseModel):
@@ -116,6 +118,9 @@ class ForwardTestFillResponse(BaseModel):
     # The quantity times the price of a fill, or the cash in lieu of a split adjustment.
     amount_usd: Decimal
     split_ratio: Decimal | None
+    # The net profit after commissions of the round trip that the fill ends, else null. Null for a split adjustment
+    # (indicator.md section 23.9.9).
+    round_trip_net_profit_usd: Decimal | None
 
 
 class ForwardTestInstrumentResponse(BaseModel):
@@ -128,11 +133,17 @@ class ForwardTestInstrumentResponse(BaseModel):
     quarter_count: int
 
 
+class ForwardTestWithIndicatorsResponse(ForwardTestResponse):
+    """The forward test of the detail: also `CHART_INDICATORS` of the version code (indicator.md section 23.9.8)."""
+
+    strategy_indicators: list[ChartIndicator]
+
+
 class ForwardTestDetailResponse(BaseModel):
     """The forward test page: the forward test, its records, and the backtests that "Backtest the same period" started,
     newest first."""
 
-    forward_test: ForwardTestResponse
+    forward_test: ForwardTestWithIndicatorsResponse
     # None until the forward test has a start balance.
     metrics: ComparedMetricsResponse | None
     equity_curve: list[ComparedEquityPointResponse]
@@ -244,7 +255,18 @@ def to_compared_backtest(backtest: BacktestOutcome) -> ComparedBacktestSummaryRe
     )
 
 
-def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> ForwardTestFillResponse:
+def to_forward_test_fill_responses(forward_test_fills: list[ForwardTestFill]) -> list[ForwardTestFillResponse]:
+    """The fills with the round trip rule of the Instruments tab: the split adjustments are not in it."""
+    fills = [fill for fill in forward_test_fills if fill.kind == "fill"]
+    net_profits = dict(
+        zip((id(fill) for fill in fills), find_round_trip_net_profits([fill.trade for fill in fills]), strict=True)
+    )
+    return [to_forward_test_fill_response(fill, net_profits.get(id(fill))) for fill in forward_test_fills]
+
+
+def to_forward_test_fill_response(
+    forward_test_fill: ForwardTestFill, round_trip_net_profit_usd: Decimal | None
+) -> ForwardTestFillResponse:
     fill = forward_test_fill.trade
     if forward_test_fill.kind == "split_adjustment":
         return ForwardTestFillResponse(
@@ -258,6 +280,7 @@ def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> Forward
             commission_usd=Decimal(0),
             amount_usd=forward_test_fill.cash_in_lieu_usd or Decimal(0),
             split_ratio=forward_test_fill.split_ratio,
+            round_trip_net_profit_usd=None,
         )
     return ForwardTestFillResponse(
         symbol=forward_test_fill.instrument.symbol,
@@ -270,6 +293,7 @@ def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> Forward
         commission_usd=fill.commission_usd,
         amount_usd=fill.quantity_shares * fill.price_usd,
         split_ratio=None,
+        round_trip_net_profit_usd=round_trip_net_profit_usd,
     )
 
 
@@ -444,13 +468,20 @@ class ComparisonRoutes:
             await read_backtest_outcome(database_url=self.database_url, backtest_id=backtest_id)
             for backtest_id in backtest_ids
         ]
+        strategy_version = await read_strategy_version(
+            database_url=self.database_url, strategy_version_id=row.strategy_version_id
+        )
+        forward_test = await to_forward_test_response(self.database_url, row)
         return ForwardTestDetailResponse(
-            forward_test=await to_forward_test_response(self.database_url, row),
+            forward_test=ForwardTestWithIndicatorsResponse(
+                **forward_test.model_dump(),
+                strategy_indicators=list_version_chart_indicators(strategy_version, {}),
+            ),
             metrics=to_forward_test_metrics_response(
                 calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())
             ),
             equity_curve=to_equity_curve_response(equity_curve),
-            fills=[to_forward_test_fill_response(fill) for fill in forward_test_fills],
+            fills=to_forward_test_fill_responses(forward_test_fills),
             instruments=to_instrument_responses(fills, members),
             same_period_backtests=[to_compared_backtest(backtest) for backtest in backtests if backtest is not None],
         )

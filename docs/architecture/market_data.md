@@ -201,9 +201,10 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
 
 | Route | Behavior |
 |---|---|
-| `GET /api/market-data/bars?symbol=&exchange=&currency=&bar_period=&start_utc=&end_utc=` | `200` with `{"bars": [{"time", "open", "high", "low", "close", "volume"}, ...]}`, oldest first. `time` is the bar start in UNIX seconds. |
+| `GET /api/market-data/bars?symbol=&exchange=&currency=&bar_period=&start_utc=&end_utc=&source_order=` | `200` with `{"bars": [{"time", "open", "high", "low", "close", "volume"}, ...]}`, oldest first. `time` is the bar start in UNIX seconds. |
 | | Without `end_utc`, the range ends now (the clock of `foundation`). Without `start_utc`, it starts a default length before the end: 3 days (1 minute), 10 days (5 minutes), 30 days (15 minutes), 60 days (30 minutes), 90 days (1 hour), 1096 days (1 day). |
-| | `422` when a time has no time zone, the bar period is unknown, the start is not before the end, or the range has more than 20000 bars. |
+| | `source_order` is optional and can repeat (`source_order=databento&source_order=ibkr`). Without it, the route reads through the global source order. With it, the route reads and finds the missing parts through this order (a backtest chart gives the source order of its backtest, indicator.md section 23.9.6, #327). |
+| | `422` when a time has no time zone, the bar period is unknown, the start is not before the end, the range has more than 20000 bars, or `source_order` is a source order that `PUT /api/market-data/source-order` refuses. |
 | | `503` with `{"detail": "IB Gateway is not reachable at <host>:<port>. Bars that are not saved need IB Gateway."}` when a part is missing and the Web process is not connected. |
 | | `502` with `{"detail": "Reading bars from IB Gateway failed: <reason>"}` when IB Gateway answers with an error or does not answer. |
 
@@ -211,6 +212,13 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   `formatChartSearch`, `BAR_PERIODS`, and the `BarChart` component.
   `BarChart` uses `createChart` and `addSeries(CandlestickSeries)` of
   `lightweight-charts` 5.2.1 with `autoSize`. The times are UNIX timestamps.
+- Indicators on the bar chart (#327): `POST /api/market-data/indicator-series`
+  and `GET /api/market-data/indicators` are in
+  `market_data/indicator_series.py`. `GET`/`PUT
+  /api/market-data/chart-indicators` and the table `chart_indicator_set`
+  are in `market_data/chart_indicator_set.py` (#330). The routes, the
+  warm-up, and the frontend parts are in `docs/architecture/indicator.md`
+  section 23.9.
 - The instrument page `/instruments/<exchange>/<symbol>?currency=<currency>&bar_period=<bar period>`
   shows the chart. Without `bar_period`, it shows daily bars. The bar period
   list changes `bar_period` in the page address. The page shows the bar

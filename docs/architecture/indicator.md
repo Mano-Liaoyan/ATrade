@@ -180,8 +180,10 @@ uses it for its condition lists.
 
 Decided (#163): the catalog is `INDICATOR_CATALOG`
 (`indicator/indicator_catalog.py`), a mapping from the key to an
-`IndicatorDefinition` (`key`, `name`, `parameters`, `outputs`,
-`display_name(parameters)`, `screen_look_back_bars(parameters)`). Each
+`IndicatorDefinition` (`key`, `name`, `short_name`, `chart_placement`,
+`parameters`, `outputs`, `display_name(parameters)`,
+`screen_look_back_bars(parameters)`). `short_name` and `chart_placement`
+are the fields for charts of section 23.9.2 (#327). Each
 `IndicatorParameter` has `name`, `value_type` (`int` or `float`), `default`,
 `minimum`, and `maximum`. The range includes both ends.
 
@@ -285,6 +287,10 @@ indicator reference in JSON:
     `look_back`, MACD `fast_period` less than `slow_period`,
   - a multi-line indicator without `output`, or an unknown `output`.
 - A single-line indicator without `output` uses `value`.
+- `check_indicator_reference(reference, has_output=False)` and
+  `create_indicator(reference, has_output=False)` check a reference of a
+  whole indicator, as a bar chart uses it (section 23.9): `output` is then an
+  unknown field, and a multi-line indicator needs no `output` (#327).
 - `create_indicator(reference)` makes the class with the defaults for the
   missing parameters. It raises `ValueError` when the reference has
   problems.
@@ -392,12 +398,18 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
     purple 50). The dark theme uses the dark palette (purple 60, cyan 40,
     teal 60, magenta 40, red 50, red 10, green 30, blue 50, magenta 60,
     yellow 40, teal 40, cyan 20, orange 60, purple 30). A theme change
-    applies the other palette (`watchColorScheme`).
+    applies the other palette (`watchColorScheme`). Checked against
+    `@carbon/colors` 11.61.0 (#327): each name is a color of the package, and
+    the light hex values are the Carbon categorical palette (`#6929c4`,
+    `#1192e8`, ...). `chart_indicator_styles.ts` imports the colors from the
+    package.
   - `style` is `solid`, `dashed`, or `dotted`.
   - `width` is 1 to 4 pixels.
   - A new indicator gets the first palette colors that no line of the chart
     uses, one color for each line, in palette order. Its lines are `solid`
-    with width 2. A histogram has a color only.
+    with width 2. A histogram has a color only. When all 14 colors are in
+    use, the palette starts again with the colors that the fewest lines use
+    (#327).
 
 ### 23.9.4 Legend
 
@@ -434,6 +446,23 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
 - The price pane has the same button with "Maximize" or "Restore" only.
 - A legend that is higher than its pane scrolls in itself with a visible
   track (`ScrollRegion`, section 13.1).
+- Decided (#328):
+  - `lightweight-charts` 5.2.1 does not hide a pane with height 0:
+    `pane.setHeight(0)` gives the minimum height of 30 pixels, and a stretch
+    factor of 0 gives 2 pixels (the layout minimum). So "Maximize" sets the
+    stretch factors: the pane gets all the height but 2 pixels for each
+    other pane (`findMaximizedStretchFactors`). A pane of 2 pixels shows no
+    legend and no options button.
+  - The options button of the price pane is "Options for bars".
+  - "Move up" and "Move down" move the pane height with the pane. "Move
+    up", "Move down", "Remove indicators", and a new or removed pane first
+    do "Restore".
+  - The own panes stay in the chart while their series are drawn again
+    (`setPreserveEmptyPane`), so a new value list keeps the heights that the
+    user dragged. An own pane with only hidden indicators stays.
+  - The legend layer takes no pointer events (the crosshair follows the
+    pointer over it). The options button and the legend scroll track take
+    them. The mouse wheel over a legend moves the chart, not the legend.
 
 ### 23.9.5 Add indicator and settings
 
@@ -445,15 +474,18 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
   in `src/lib/foundation/`. It has a search field and one list:
   - One row for each catalog indicator: the catalog `name`, and the
     `short_name` at the end in IBM Plex Mono when it is different.
-  - A star icon button at the end of each row: "Add <name> to favorites"
-    (`Star`) or "Remove <name> from favorites" (`StarFilled`).
-  - The favorites come first, then the others, each in catalog order. No
+  - A star icon button at the end of each row: "Add <name> to favorite
+    indicators" (`Star`) or "Remove <name> from favorite indicators"
+    (`StarFilled`). GLOSSARY: "Favorite indicator".
+  - The favorite indicators come first, then the others, each in catalog order. No
     groups.
   - The search matches the name, the short name, and the key.
   - Enter or a click on a row adds the indicator with the catalog defaults
     and closes the dialog. A click on the star does not add.
 - The favorites are saved in the chart indicator set (section 23.9.7), also
   from a backtest or forward test chart.
+- The instrument page reads the chart indicator set when it opens. The
+  indicators stay when the bar period or the instrument changes (#330).
 - Settings (B1): a Bits UI `Popover` at the legend row. Heading: the catalog
   `name`. Content, from top to bottom:
   - One Carbon `NumberInput` for each parameter (also the parameters
@@ -471,9 +503,33 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
     A histogram has the colors only.
   - "Reset to defaults" (ghost button): the catalog defaults of the
     parameters, `solid`, and width 2. The colors do not change.
-  - "Apply" (primary button). It is disabled while a field is invalid. It
-    applies the changes and closes the popover. Escape closes the popover
+  - "Apply" (primary button). It is disabled while a field is invalid,
+    and a helper text line below it says why ("Fix Fast period to apply.",
+    the first invalid field). It applies the changes and closes the
+    popover. Escape closes the popover
     without a change.
+- Decided (#329):
+  - A chart without `onPanesChange` has no row buttons (as the pane
+    options menu has only Maximize and Restore then).
+  - The row buttons are in the tab order also while they are not shown:
+    the focus in the row shows them. The legend name is a button out of the
+    tab order; the Settings button gives its action to the keyboard. A row
+    with buttons takes pointer events, so the crosshair does not follow the
+    pointer over that row.
+  - The tooltips of the row buttons go under `<body>` (`IconButton`
+    `floatingTooltip`), so the legend `ScrollRegion` does not clip them. The
+    popover is at the legend row. Its fields scroll between the heading and
+    the buttons in a `ScrollRegion` ("Settings of <name>").
+  - The line group headings: "Line" (or "Histogram") for an indicator with
+    one line, "MACD line" and "Signal line" for MACD, else the output label
+    ("Upper", "Histogram").
+  - The invalid texts: "Enter a number.", "Enter a whole number.", "Enter a
+    value from <minimum> to <maximum>.", and for an order rule "Fast period
+    must be less than slow period (26)." on the smaller parameter. The
+    catalog route does not give the order rules, so `indicator_settings.ts`
+    holds them.
+  - A hidden indicator stays in the series request, so "Show" draws the
+    line again at once.
 - A market data chart saves each change at once with
   `PUT /api/market-data/chart-indicators`. A failed save shows an
   `InlineNotification` with the `detail` text over the chart, and the chart
@@ -512,6 +568,20 @@ section 6.2).
 - Live bars (`/ws/market-data`) have no indicator value. The indicator
   lines end at the last saved bar of the chart request. A new chart request
   (a bar period change, a page load) reads the series again.
+- Decided (#327):
+  - `start_utc` and `end_utc` are required. The route widens the range as
+    the bars route does (whole bar periods, cut at the start of the current
+    bar). The chart sends the start of its first bar and 1 second after the
+    start of its last bar.
+  - The `422` answers of the bars route (time, range, source order) have
+    `{"detail"}`. An unknown bar period is the FastAPI `422`. The problems
+    of `check_indicator_reference(reference, has_output=False)` give
+    `{"problems": [{"location", "message"}]}`, for example
+    `{"location": ["indicators", 0, "parameters", "period"], ...}`.
+  - The route reads the warm-up bars with one read for the largest N of the
+    request. Each indicator then gets the last N bars of its own count.
+  - The indicators of one request each get their own class, so the same
+    indicator 2 times gives the same values 2 times.
 
 ### 23.9.7 Chart indicator set
 
@@ -550,6 +620,47 @@ section 6.2).
     `dashed`, or `dotted`, a `width` that is not 1 to 4,
   - a `favorites` value that is not a catalog key, or a key 2 times.
 - The last `PUT` wins. Two browser tabs do not merge their changes.
+- Decided (#330):
+  - The `422` answer has `{"problems": [{"location", "message"}]}`, as the
+    series route. The location is the path in the body, for example
+    `["panes", 1, "indicators", 0, "lines", 0, "color"]`, `["panes"]` for
+    the pane count, `["panes", 1, "indicators"]` for an own pane without an
+    indicator, `[..., "indicator"]` for a wrong placement, `[..., "lines"]`
+    for a missing output, `[..., "lines", 3, "output"]` for an unknown output
+    or an output 2 times, and `["favorites", 1]` for a favorite problem. A
+    body of a wrong JSON type (for example a text `color`) is the FastAPI
+    `422`. Unknown fields are ignored.
+  - The OpenAPI schemas are `ChartIndicatorSet`, `SavedChartPane`,
+    `SavedChartIndicator`, and `SavedChartLine` (`style` is a string: the
+    route checks it, so a wrong style is a problem with its location).
+  - Without a row (only an emptied test database), `GET` gives the set of
+    the migration.
+  - Frontend: `chart_indicator_set.ts` (`readChartIndicatorSet`,
+    `saveChartIndicatorSet`, `toggleFavorite`, `orderByFavorites`) and the
+    class `ChartIndicatorSetStore` (`chart_indicator_set_store.svelte.ts`).
+    The page that owns the store saves; `BarChart` does not save. The store
+    sends one `PUT` after the other, each with the set at that time, so the
+    last change is the last saved set. A change before the read answer
+    keeps the changed part, and the read gives the other part.
+  - A favorite change sends the saved panes back unchanged. The backtest
+    and forward test pages each have their own store for the favorites only
+    (no notification for a failed favorite save). When the
+    read of the set failed, no change is saved: the `PUT` would save the
+    part that did not load (the empty panes or the empty favorites) over
+    the saved part. The page keeps the change and shows the read problem.
+    The next change reads the set again and, after a good read, saves all
+    changes.
+  - The failed save `InlineNotification` shows the message of the first
+    problem, else the `detail` text. It has a close button, because it is
+    over the price pane legend. The next good save removes it.
+  - `AddIndicatorButton` has the star buttons only with `onToggleFavorite`.
+    `CommandDialog` items have an optional `action` (Carbon contained list
+    item action, an `IconButton` with a floating tooltip). A click on it
+    calls `onAction` and does not select the item.
+  - Playwright tests of the instrument page chart replace the 2 routes with
+    a set in the browser context (`e2e/local_chart_indicator_set.ts`), and
+    `run_bar_chart.spec.ts` does the same: the set is one global row, and
+    the 4 projects and other specs use one database at the same time.
 
 ### 23.9.8 Bar charts of backtests and forward tests
 
@@ -573,12 +684,44 @@ section 6.2).
     with `ast` and does not run the code. It replaces each configuration
     field name with the value of the field: the value in `parameters` (a
     parameter sweep run), else the default value of the field.
+    `list_version_chart_indicators(version, parameters)` reads the code of
+    a strategy version (an empty list without the version). The backtest
+    route and the forward test route use it.
   - A version without `CHART_INDICATORS` has an empty list. Its chart starts
     without indicators.
 - The chart puts the strategy indicators as section 23.9.3 says, with the
   colors of a new indicator. "Add indicator", the legend buttons, and the
   settings work as on the instrument page. No change is saved, except the
   favorites.
+- Decided (#331):
+  - `GET /api/backtests/{backtest_id}` has `strategy_indicators` in
+    `BacktestDetailResponse` (so the comparison route has it too). The
+    forward test has it in `forward_test` of
+    `GET /api/forward-tests/{id}` only (`ForwardTestWithIndicatorsResponse`),
+    not in the list. A forward test has no sweep parameters: it uses the
+    field defaults.
+  - The switcher shows for each status of a single-instrument backtest. A
+    queued or failed backtest also shows its bars.
+  - The bars route gets `start_utc`, `end_utc`, and the `source_order` of
+    the backtest. A forward test sends no `end_utc` while it runs, so the
+    range ends now. The bars and the indicator values are read one time for
+    each run; a running forward test does not read new bars.
+  - The bars route and the series route refuse a range of more than
+    20000 bar lengths (`MAX_BARS_PER_REQUEST`), for example a 1-minute
+    backtest of more than about 13 days. So the chart reads a longer run
+    range in consecutive windows of at most 20000 bar lengths, one after
+    the other, and joins the answers (`readRunBars` and
+    `readRunIndicatorSeries` in `run_bars.ts`). A bar at a window border
+    comes only 1 time. Each series window reads its own warm-up bars
+    (section 23.9.6), so the first values of a window have a value. A failed window shows its
+    message; the chart then shows no bars.
+  - The changes of the user belong to the open run in the page
+    (`RunChartIndicators`). Both pages use one `RunChart`
+    (`run_chart.svelte.ts`: the run indicators, the favorite indicators,
+    and the pointed and the selected table row), `RunAddIndicatorButton`,
+    and `RunBarChart`. Another run, or a page load, starts again with
+    the strategy indicators. "Equity" and "Bars" keep the changes while the
+    run stays open.
 
 ### 23.9.9 Trade marks
 
@@ -595,7 +738,9 @@ section 6.2).
   - A 4px pointer on the square points at the bar. The "B" mark is 4px
     below the bar low. The "S" mark is 4px above the bar high.
 - One mark for each bar and side. When the bar spacing is less than 16px,
-  marks of the same side that touch become one mark at the first bar.
+  marks of the same side that touch become one mark at the first bar. A
+  mark touches when its bar is less than 16px from the bar of the mark
+  before it on that side (the first bar of a merged mark).
 - When the pointer is on a mark, the mark gets a 2px `--cds-focus` ring.
   A tooltip shows one line for each trade of the mark, in IBM Plex Mono
   with tabular numbers:
@@ -604,6 +749,9 @@ section 6.2).
     round trip that the trade ends, after commissions, in
     `--cds-support-success` or `--cds-support-error`. A trade that ends no
     round trip has no number.
+  - The tooltip is a Carbon popover (no high contrast, so the support
+    colors keep their contrast), below a "B" mark and above an "S" mark.
+  - A legend row over a mark takes the pointer first.
 - Each trade of `GET /api/backtests/{backtest_id}` and each fill of
   `GET /api/forward-tests/{id}` gets `round_trip_net_profit_usd` (decimal
   text, or null). The backend calculates it with the round trip rule of the
@@ -614,8 +762,20 @@ section 6.2).
     the `--cds-focus` ring.
   - A click on a row (or Enter) selects the row and shows "Bars". The
     chart scrolls so that the bar of the trade is in the center
-    (`timeScale().setVisibleRange`). The mark keeps the ring while its row
-    stays selected.
+    (`timeScale().setVisibleLogicalRange`, with the width of the visible
+    range). The chart cannot scroll the first bar to the right
+    of the left edge, so for a bar near the first bar the range is
+    narrower: as many bars on each side as there are before the bar, but at
+    least 10. The mark keeps the ring while its row stays selected.
+  - Only a single-instrument run has "Bars", so only its rows link. A split
+    adjustment row has no mark and no link.
+  - The row itself takes the focus (`tabindex="0"`) and shows the Carbon
+    focus (a 2px `--cds-focus` inset border, drawn on the cells). The
+    selected row has `aria-current="true"` and the Carbon selected row
+    color (`SelectableTableRow` in `foundation/carbon`).
+- For screen readers and tests, the chart has a hidden "Trade marks" list:
+  one item for each mark with the tooltip text, the mark center in chart
+  pixels (`data-x`, `data-y`), and `data-ring`.
 
 ### 23.9.10 Code and tests
 
@@ -637,14 +797,63 @@ section 6.2).
   number formats), and `trade_marks.ts` (the series primitive).
   `foundation/carbon` gets `NumberInput`. `foundation` gets the `Command`
   dialog.
+- Done in #327:
+  - `market_data/indicator_series.py`: `list_indicator_catalog()` (also the
+    body of `GET /api/screen-indicators`), the series route, and the
+    warm-up.
+  - `foundation/command_dialog`: `CommandDialog` (Carbon modal, Bits UI
+    Command, one list, an optional action button on each item).
+  - `#lib/market_data`: `AddIndicatorButton` (the header button, the `/`
+    key, and the dialog), `ChartLegend` (one pane legend: the OHLC row and
+    the indicator rows), `chart_indicators.ts` (`formatLegendName`,
+    `addChartIndicator`, `findFreeColors`, `findLegendIndex`,
+    `findIndicatorSeries`, `buildLegendRows`, `isAddIndicatorShortcut`),
+    `chart_indicator_styles.ts` (`readPaletteColor`, `readPaletteColorName`,
+    `formatIndicatorValue`, `readIndicatorPriceFormat`), and
+    `indicator_series.ts` (`listChartIndicatorCatalog`,
+    `readIndicatorSeries`, `listSeriesIndicators`). `BarChart` draws the
+    price pane indicators and its legend. `ChartFrame` gets an `overlay`
+    snippet for HTML over the canvas.
+- Done in #328: `BarChart` draws one chart pane for each pane of the
+  indicators (line series, histogram series, the RSI price lines),
+  `ChartPaneOverlay` (the legend in a `ScrollRegion` and the options menu
+  of one pane), `chart_indicators.ts` (`removeChartIndicator`,
+  `moveOwnPane`, `removeOwnPane`, `listPaneActions`,
+  `findMaximizedStretchFactors`), `chart_indicator_styles.ts`
+  (`isHistogramLine`, `RSI_GUIDE_LEVELS`), and the `horizontal` icon of
+  `OverflowMenu`. `BarChart` gets `onPanesChange` for the menu changes.
+- Done in #329: the legend row buttons (`ChartLegend` `actions`) and the
+  settings popover (`IndicatorSettings`), `indicator_settings.ts`
+  (`createSettingsDraft`, `checkSettingsDraft`, `resetSettingsDraft`,
+  `applySettingsDraft`, `replaceChartIndicator`, `formatParameterLabel`,
+  `formatLineLabel`), and `foundation/carbon` `NumberInput`. `LegendRow`
+  gets `indicatorIndex` and `hidden`.
+- Done in #331: `strategy_indicators` of the 2 detail routes,
+  `readBars` with an optional range and source order, `RunBarChart` (the
+  bar chart of a run range), `RunChartIndicators` (the panes of a run chart),
+  `strategy_indicators.ts` (`placeStrategyIndicators`), and in
+  `#lib/backtest` `ChartViewSwitcher` and `chart_view.ts` (`readChartView`,
+  `formatChartViewSearch`). Tests: `test_strategy_indicators.py`,
+  `e2e/run_bar_chart.spec.ts` (the e2e server has a stopped forward test of
+  "E2E chart indicators" on 45 saved FTBAR bars). `RunBarChart` passes
+  `onPanesChange`, so the legend buttons and the settings of #329 work on
+  these charts.
+- Done in #332: `round_trip_net_profit_usd` (`find_round_trip_net_profits`
+  in `backtest/universe_instruments.py`), `trade_marks.ts`
+  (`TradeMarksPrimitive`, `findTradeBarIndex`, `groupTradeMarks`,
+  `mergeTouchingMarks`, `layoutTradeMarks`, `findMarkAt`,
+  `formatTradeLine`, `readCenteredRange`, `listChartTrades`),
+  `TradeMarkLayer` (the tooltip and the "Trade marks" list), the `trades`,
+  `barPeriod`, `ringTrades`, and `centerTrade` props of `BarChart` and
+  `RunBarChart`, and `foundation/carbon` `SelectableTableRow` (the linked
+  rows of `BacktestTradeTable` and `ForwardTestFillTable`). Tests:
+  `test_round_trip_net_profit.py`, `trade_marks.test.ts`, and
+  `e2e/trade_marks.spec.ts` (the e2e server has the finished backtest of
+  "E2E trade marks" with 5 trades and 2 fills on the forward test of "E2E
+  chart indicators").
 - Playwright: the 4 projects (chromium, firefox, webkit, msedge) for each
   UI slice.
 
 ### 23.9.11 Left to the implementation
 
-- The Carbon categorical palette names of section 23.9.3 come from the
-  Carbon data visualization guidelines. Check them against `@carbon/colors`
-  before the first chart slice.
-- Check that `pane.setHeight` (or `setStretchFactor`) with height 0 hides
-  a pane in `lightweight-charts` 5.2.1. If not, "Maximize" gives the other
-  panes their minimum height.
+Nothing now. The height 0 check is in section 23.9.4 (#328).

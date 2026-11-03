@@ -1,6 +1,7 @@
 """Public entry of the strategy capability: strategies, strategy versions, the checks before save, code completion,
-and the save of the AI assistant."""
+the chart indicators of the code, and the save of the AI assistant."""
 
+from atrade.strategy.chart_indicators import ChartIndicator, list_chart_indicators
 from atrade.strategy.code_checks import CodeProblem
 from atrade.strategy.http_routes import STRATEGY_CHANGE_SOCKET, create_strategy_assistant_router, create_strategy_router
 from atrade.strategy.language_server import STRATEGY_LANGUAGE_SERVER_PATH, create_strategy_language_server_router
@@ -11,6 +12,7 @@ from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from atrade.strategy.version_reading import (
     StrategyOutline,
     StrategyVersion,
+    list_version_chart_indicators,
     read_strategy_outline,
     read_strategy_version,
     read_strategy_versions,
@@ -21,6 +23,7 @@ __all__ = [
     "STRATEGY_CHANGE_SOCKET",
     "STRATEGY_LANGUAGE_SERVER_PATH",
     "STRATEGY_TEMPLATE",
+    "ChartIndicator",
     "CodeProblem",
     "SavedVersion",
     "StrategyFileError",
@@ -31,6 +34,8 @@ __all__ = [
     "create_strategy_assistant_router",
     "create_strategy_language_server_router",
     "create_strategy_router",
+    "list_chart_indicators",
+    "list_version_chart_indicators",
     "load_strategy_classes",
     "read_strategy_outline",
     "read_strategy_parameters",

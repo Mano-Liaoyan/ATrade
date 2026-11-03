@@ -49,6 +49,10 @@ VOLATILITY_BARS = 126
 WARM_UP_LENGTH = timedelta(days=400)
 # Cash that stays free, because a market order fills at the open of the next bar.
 CASH_RESERVE = 0.02
+# The bar chart of a backtest or a forward test shows the score indicator. It has no effect on the run.
+CHART_INDICATORS = [
+    __CHART_INDICATOR__,
+]
 
 
 __SCORE__
@@ -204,7 +208,19 @@ class RankedUniverseStrategy(Strategy):
 '''
 
 
+# The catalog indicator (docs/architecture/indicator.md section 23.2) of each score, for CHART_INDICATORS.
+SCORE_CHART_INDICATORS = {
+    MOMENTUM_SCORE: '{"indicator": "momentum_12_1", "parameters": {"look_back": 252, "skip": 21}}',
+    LOW_VOLATILITY_SCORE: '{"indicator": "realized_volatility", "parameters": {"period": 252}}',
+    HIGH_52_WEEK_SCORE: '{"indicator": "distance_to_52_week_high", "parameters": {"period": 252}}',
+}
+
+
 def make_code_template(docstring: str, score: str, target_volatility: float | None = None) -> str:
     """The code of 1 code template: the template docstring, then the shared body with the score of the template."""
-    body = BODY.replace("__TARGET_VOLATILITY__", repr(target_volatility)).replace("__SCORE__", score.rstrip("\n"))
+    body = (
+        BODY.replace("__TARGET_VOLATILITY__", repr(target_volatility))
+        .replace("__CHART_INDICATOR__", SCORE_CHART_INDICATORS[score])
+        .replace("__SCORE__", score.rstrip("\n"))
+    )
     return f'"""{docstring}\n"""\n' + body

@@ -191,7 +191,12 @@ def find_round_trips(trades: list[BacktestTrade]) -> list[RoundTrip]:
 
 def find_instrument_round_trips(trades: list[BacktestTrade]) -> list[RoundTrip]:
     """The round trips of the trades of one instrument."""
-    round_trips: list[RoundTrip] = []
+    return [round_trip for _, round_trip in walk_instrument_round_trips(trades) if round_trip is not None]
+
+
+def walk_instrument_round_trips(trades: list[BacktestTrade]) -> list[tuple[BacktestTrade, RoundTrip | None]]:
+    """Each trade of one instrument by time, with the round trip that it ends, else None."""
+    walked: list[tuple[BacktestTrade, RoundTrip | None]] = []
     position_shares = Decimal(0)
     cash_usd = Decimal(0)
     entry_amount_usd = Decimal(0)
@@ -206,19 +211,24 @@ def find_instrument_round_trips(trades: list[BacktestTrade]) -> list[RoundTrip]:
             entry_amount_usd += amount_usd
         cash_usd += (-amount_usd if trade.side == "BUY" else amount_usd) - trade.commission_usd
         position_shares += trade.quantity_shares if trade.side == "BUY" else -trade.quantity_shares
-        if position_shares == 0:
-            round_trips.append(
+        if position_shares != 0:
+            walked.append((trade, None))
+            continue
+        walked.append(
+            (
+                trade,
                 RoundTrip(
                     start_utc=start_utc,
                     end_utc=trade.time_utc,
                     profit_usd=cash_usd,
                     entry_amount_usd=entry_amount_usd,
-                )
+                ),
             )
-            cash_usd = Decimal(0)
-            entry_amount_usd = Decimal(0)
-            start_utc = None
-    return round_trips
+        )
+        cash_usd = Decimal(0)
+        entry_amount_usd = Decimal(0)
+        start_utc = None
+    return walked
 
 
 def calculate_max_drawdown_percent(*, paper_capital_usd: Decimal, equity_curve: list[EquityPoint]) -> Decimal:

@@ -173,7 +173,7 @@ counts from `atrade/`.
 
 | Module | Responsibility |
 |---|---|
-| `market_data/` | Search instruments. Read bars and daily exchange rates from IBKR and save them in PostgreSQL. Import Databento history bars. Keep the bar tables of each bar source, the source order, the quarterly US universe, the HK instrument list, the daily bar summary, and the stock splits of the stored bars. Push live market data. |
+| `market_data/` | Search instruments. Read bars and daily exchange rates from IBKR and save them in PostgreSQL. Import Databento history bars. Keep the bar tables of each bar source, the source order, the quarterly US universe, the HK instrument list, the daily bar summary, and the stock splits of the stored bars. Push live market data. Calculate the indicator series of bar charts (`POST /api/market-data/indicator-series`) and save the chart indicator set (`GET`/`PUT /api/market-data/chart-indicators`, indicator.md section 23.9). |
 | `watchlist/` | Add, delete, and list watchlist instruments. |
 | `strategy/` | Save, check, and compare strategies and strategy versions. Make strategy code from rule builder rules. Hold the strategy template list. |
 | `indicator/` | The indicators of screens and strategies (section 23). One class for each indicator. It reads no database and has no table. |
@@ -439,8 +439,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   cell has `align="right"` and tabular numbers.
 - `foundation/carbon` `OverflowMenu` is the Carbon overflow menu on Bits UI
   DropdownMenu: `label` (the trigger name), `items` (`label`, `disabled`,
-  `danger`, `onSelect`), and `size`. The menu goes under `<body>`, so a
-  scroll region does not clip it.
+  `danger`, `onSelect`), `size`, and `horizontal` (the
+  `OverflowMenuHorizontal` icon instead of the vertical one). The menu goes
+  under `<body>`, so a scroll region does not clip it.
 - `foundation/carbon` `MenuButton` is a ghost button with a text that opens
   a menu with the Carbon overflow menu options, on Bits UI DropdownMenu:
   `label`, `items` (`label`, `divider`, `onSelect(trigger)`).
@@ -609,6 +610,14 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   opens. While the read runs, the command list has `aria-busy="true"` (prop
   `busy`). New commands make Bits UI Command move the highlight to the first
   command, so the e2e tests wait until `aria-busy` is `false`.
+- `foundation/command_dialog` has `CommandDialog` (#327): a Carbon modal
+  with a title, a large Carbon search field, and one Carbon contained list
+  without groups, on Bits UI Dialog and Command. The search field has the
+  focus when it opens. The text filters the items (label and keywords).
+  Enter or a click selects the highlighted item and closes the dialog. An
+  item can be disabled with a text that says why. The "Add indicator" dialog
+  of the bar chart uses it (`docs/architecture/indicator.md` section
+  23.9.5).
 - `foundation/carbon` has `Combobox` (Carbon combo box on Bits UI
   Combobox). The page gives the candidates as `items` (`value`, `label`,
   `disabled`). The list is a Bits UI `ContentStatic` in the
@@ -818,7 +827,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `--cds-icon-secondary`, `--cds-icon-interactive`, or the support color),
   `marked` (a `--cds-icon-interactive` dot on the icon), and `busy` (the
   icon turns; use it with `disabled`). The icon shape changes with each
-  state, so the color is never the only sign. `Select` takes `size` (`sm`)
+  state, so the color is never the only sign. `size` `xs` (24px) fits a dense
+  line, for example a chart legend row, and `floatingTooltip` puts the
+  tooltip under `<body>` (Bits UI `Tooltip.Portal`, no caret), so a scroll
+  region cannot clip it (`Tooltip` `floating`). `NumberInput` (`label`,
+  `value` text, `onValueChange`, `min`, `max`, `step`, `invalidText`,
+  `size`) is the Carbon number input with its step buttons (#329). `Select` takes `size` (`sm`)
   and `hideLabel`. `Tabs` (and `Panel` `tabs`) take `itemLabel`, a snippet
   that renders the text of a tab. `SideColumn` takes an `actions` snippet: icon buttons in its
   header line before the Minimize button. `Tabs` takes `size` (`sm` gives the 32px

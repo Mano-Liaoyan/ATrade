@@ -1,6 +1,7 @@
 """The Instruments of a multi-instrument backtest and the first and last day with US universe data
 (docs/architecture/backtest.md sections 10.10.6 and 10.10.7)."""
 
+import dataclasses
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
@@ -9,7 +10,7 @@ import httpx
 import pytest
 
 from atrade.backtest.backtest_metrics import BacktestTrade
-from atrade.backtest.universe_instruments import summarize_instruments
+from atrade.backtest.universe_instruments import find_round_trip_net_profits, summarize_instruments
 from tests.backtest.test_backtest_routes import save_test_strategy_version
 from tests.backtest.universe_data import (
     FIRST_QUARTER_START_UTC,
@@ -86,3 +87,27 @@ async def test_the_universe_range_is_null_without_universe_data(web_client: http
     response = await web_client.get("/api/us-universe/range")
 
     assert response.json() == {"first_day_utc": None, "last_day_utc": None}
+
+
+def test_only_a_trade_that_ends_a_round_trip_has_its_net_profit_after_commissions() -> None:
+    trades = [
+        make_trade(2, "BUY", "10", "AAA", "NASDAQ"),
+        make_trade(3, "BUY", "20", "BBB", "NYSE"),
+        make_trade(4, "SELL", "12", "AAA", "NASDAQ"),
+        make_trade(5, "SELL", "15", "AAA", "NASDAQ"),
+        make_trade(6, "BUY", "11", "AAA", "NASDAQ"),
+    ]
+    trades[2] = dataclasses.replace(trades[2], commission_usd=Decimal("1.5"))
+
+    # AAA: 10 bought at 10, sold at 12 with 1.5 commission = +18.5. The short sale at 15 ends at the buy at 11 = +40.
+    # BBB: still open.
+    assert find_round_trip_net_profits(trades) == [None, None, Decimal("18.5"), None, Decimal(40)]
+
+
+def test_a_trade_without_a_symbol_is_on_the_one_instrument_of_the_test() -> None:
+    trades = [
+        dataclasses.replace(make_trade(3, "SELL", "12", "AAA", "NASDAQ"), symbol=None, exchange=None),
+        dataclasses.replace(make_trade(2, "BUY", "10", "AAA", "NASDAQ"), symbol=None, exchange=None),
+    ]
+
+    assert find_round_trip_net_profits(trades) == [Decimal(20), None]

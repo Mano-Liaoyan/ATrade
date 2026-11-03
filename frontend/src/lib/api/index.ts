@@ -213,6 +213,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market-data/indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Indicators */
+        get: operations["list_indicators_api_market_data_indicators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market-data/indicator-series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read Indicator Series
+         * @description Reads only saved bars. A `422` for an indicator has the problem list. Other `422` answers have `detail`.
+         */
+        post: operations["read_indicator_series_api_market_data_indicator_series_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market-data/chart-indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Chart Indicator Set */
+        get: operations["read_chart_indicator_set_api_market_data_chart_indicators_get"];
+        /**
+         * Save Chart Indicator Set
+         * @description A `422` of section 23.9.7 has the problem list. A body of a wrong JSON type is the FastAPI `422`.
+         */
+        put: operations["save_chart_indicator_set_api_market_data_chart_indicators_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market-data/hk-instrument-list": {
         parameters: {
             query?: never;
@@ -768,10 +826,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Screen Indicators
-         * @description The indicator catalog in its own order (section 24.7).
+         * List Indicator Catalog
+         * @description The indicator catalog in its own order. The screen page and the bar charts read it.
          */
-        get: operations["list_screen_indicators_api_screen_indicators_get"];
+        get: operations["list_indicator_catalog_api_screen_indicators_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1056,6 +1114,8 @@ export interface components {
             instruments: components["schemas"]["UniverseInstrumentResponse"][];
             split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
+            /** Strategy Indicators */
+            strategy_indicators: components["schemas"]["ChartIndicator"][];
         };
         /**
          * BacktestLimitsBody
@@ -1245,6 +1305,28 @@ export interface components {
             name: string;
             definition: components["schemas"]["JsonValue"];
         };
+        /**
+         * ChartIndicator
+         * @description A whole indicator of the chart with its parameter values, as `{"indicator", "parameters"}` JSON.
+         */
+        ChartIndicator: {
+            /** Indicator */
+            indicator: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: components["schemas"]["ParameterNumber"];
+            };
+        };
+        /**
+         * ChartIndicatorSet
+         * @description The first pane is the price pane. The other panes are own panes, in the order on the chart.
+         */
+        ChartIndicatorSet: {
+            /** Panes */
+            panes: components["schemas"]["SavedChartPane"][];
+            /** Favorites */
+            favorites: string[];
+        };
         /** CodeCheckFailedResponse */
         CodeCheckFailedResponse: {
             /** Problems */
@@ -1333,6 +1415,8 @@ export interface components {
             instruments: components["schemas"]["UniverseInstrumentResponse"][];
             split_metrics: components["schemas"]["SplitMetricsResponse"] | null;
             robustness: components["schemas"]["BacktestRobustnessResponse"];
+            /** Strategy Indicators */
+            strategy_indicators: components["schemas"]["ChartIndicator"][];
             /** Code */
             code: string;
         };
@@ -1649,7 +1733,7 @@ export interface components {
          *     newest first.
          */
         ForwardTestDetailResponse: {
-            forward_test: components["schemas"]["ForwardTestResponse"];
+            forward_test: components["schemas"]["ForwardTestWithIndicatorsResponse"];
             metrics: components["schemas"]["ComparedMetricsResponse"] | null;
             /** Equity Curve */
             equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
@@ -1695,6 +1779,8 @@ export interface components {
             amount_usd: string;
             /** Split Ratio */
             split_ratio: string | null;
+            /** Round Trip Net Profit Usd */
+            round_trip_net_profit_usd: string | null;
         };
         /**
          * ForwardTestInstrumentResponse
@@ -1762,6 +1848,59 @@ export interface components {
         };
         /** @enum {string} */
         ForwardTestStatus: "starting" | "running" | "waiting_for_gateway" | "stopping" | "stopped" | "stop_failed" | "failed";
+        /**
+         * ForwardTestWithIndicatorsResponse
+         * @description The forward test of the detail: also `CHART_INDICATORS` of the version code (indicator.md section 23.9.8).
+         */
+        ForwardTestWithIndicatorsResponse: {
+            /** Id */
+            id: number;
+            /** Strategy Version Id */
+            strategy_version_id: number;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Strategy Name */
+            strategy_name: string;
+            /** Version Number */
+            version_number: number;
+            /** Symbol */
+            symbol: string | null;
+            /** Exchange */
+            exchange: string | null;
+            /** Currency */
+            currency: string | null;
+            universe_kind: components["schemas"]["UniverseKind"];
+            /** Universe Top N */
+            universe_top_n: number | null;
+            bar_period: components["schemas"]["BarPeriod"];
+            desired_state: components["schemas"]["DesiredState"];
+            status: components["schemas"]["ForwardTestStatus"];
+            /** Client Id */
+            client_id: number | null;
+            /** Start Balance Usd */
+            start_balance_usd: string | null;
+            /** Error Message */
+            error_message: string | null;
+            /**
+             * Created At Utc
+             * Format: date-time
+             */
+            created_at_utc: string;
+            /** Stopped At Utc */
+            stopped_at_utc: string | null;
+            /** End Time Utc */
+            end_time_utc: string | null;
+            /** Crash Count */
+            crash_count: number;
+            /** Interruptions */
+            interruptions: components["schemas"]["InterruptionResponse"][];
+            /** Allocated Capital Usd */
+            allocated_capital_usd: string | null;
+            /** Split Checks Needed */
+            split_checks_needed: components["schemas"]["SplitCheckNeededResponse"][];
+            /** Strategy Indicators */
+            strategy_indicators: components["schemas"]["ChartIndicator"][];
+        };
         /** @enum {string} */
         GatewayStatus: "connected" | "unreachable" | "no_ibkr_connection";
         /** GatewayStatusResponse */
@@ -1838,6 +1977,11 @@ export interface components {
              */
             added_at_utc: string;
         };
+        /** IndicatorCheckFailedResponse */
+        IndicatorCheckFailedResponse: {
+            /** Problems */
+            problems: components["schemas"]["IndicatorProblemResponse"][];
+        };
         /**
          * IndicatorOperand
          * @description A stored indicator reference. A single-line indicator without `output` uses `value`.
@@ -1856,6 +2000,96 @@ export interface components {
             };
             /** Output */
             output?: string | null;
+        };
+        /** IndicatorParameterResponse */
+        IndicatorParameterResponse: {
+            /** Name */
+            name: string;
+            /**
+             * Value Type
+             * @enum {string}
+             */
+            value_type: "int" | "float";
+            /** Default */
+            default: number;
+            /** Minimum */
+            minimum: number;
+            /** Maximum */
+            maximum: number;
+            /** Is In Name */
+            is_in_name: boolean;
+        };
+        /** IndicatorProblemResponse */
+        IndicatorProblemResponse: {
+            /** Location */
+            location: (string | number)[];
+            /** Message */
+            message: string;
+        };
+        /**
+         * IndicatorResponse
+         * @description One indicator of the catalog (indicator.md sections 23.3 and 23.9.2).
+         */
+        IndicatorResponse: {
+            /** Key */
+            key: string;
+            /** Name */
+            name: string;
+            /** Short Name */
+            short_name: string;
+            /**
+             * Chart Placement
+             * @enum {string}
+             */
+            chart_placement: "price" | "own";
+            /** Parameters */
+            parameters: components["schemas"]["IndicatorParameterResponse"][];
+            /** Outputs */
+            outputs: string[];
+        };
+        /** IndicatorSeries */
+        IndicatorSeries: {
+            /** Indicator */
+            indicator: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: number;
+            };
+            /** Outputs */
+            outputs: {
+                [key: string]: (number | null)[];
+            };
+        };
+        /** IndicatorSeriesBody */
+        IndicatorSeriesBody: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            bar_period: components["schemas"]["BarPeriod"];
+            /**
+             * Start Utc
+             * Format: date-time
+             */
+            start_utc: string;
+            /**
+             * End Utc
+             * Format: date-time
+             */
+            end_utc: string;
+            /** Source Order */
+            source_order?: components["schemas"]["BarSource"][] | null;
+            /** Indicators */
+            indicators: components["schemas"]["JsonValue"][];
+        };
+        /** IndicatorSeriesResponse */
+        IndicatorSeriesResponse: {
+            /** Times */
+            times: number[];
+            /** Series */
+            series: components["schemas"]["IndicatorSeries"][];
         };
         /**
          * InnerRuleGroup
@@ -2097,6 +2331,7 @@ export interface components {
             /** Paper Capital Usd */
             paper_capital_usd: string;
         };
+        ParameterNumber: number;
         /** ParameterResponse */
         ParameterResponse: {
             /** Name */
@@ -2299,6 +2534,35 @@ export interface components {
              */
             last_start_utc: string;
         };
+        /** SavedChartIndicator */
+        SavedChartIndicator: {
+            /** Indicator */
+            indicator: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: number;
+            };
+            /** Hidden */
+            hidden: boolean;
+            /** Lines */
+            lines: components["schemas"]["SavedChartLine"][];
+        };
+        /** SavedChartLine */
+        SavedChartLine: {
+            /** Output */
+            output: string;
+            /** Color */
+            color: number;
+            /** Style */
+            style: string;
+            /** Width */
+            width: number;
+        };
+        /** SavedChartPane */
+        SavedChartPane: {
+            /** Indicators */
+            indicators: components["schemas"]["SavedChartIndicator"][];
+        };
         /** ScreenCheckFailedResponse */
         ScreenCheckFailedResponse: {
             /** Problems */
@@ -2313,38 +2577,6 @@ export interface components {
             indicator_conditions: string[];
             /** Order */
             order: string;
-        };
-        /** ScreenIndicatorParameterResponse */
-        ScreenIndicatorParameterResponse: {
-            /** Name */
-            name: string;
-            /**
-             * Value Type
-             * @enum {string}
-             */
-            value_type: "int" | "float";
-            /** Default */
-            default: number;
-            /** Minimum */
-            minimum: number;
-            /** Maximum */
-            maximum: number;
-            /** Is In Name */
-            is_in_name: boolean;
-        };
-        /**
-         * ScreenIndicatorResponse
-         * @description One indicator of the catalog (indicator.md section 23.3), for the edit popover of the screen page.
-         */
-        ScreenIndicatorResponse: {
-            /** Key */
-            key: string;
-            /** Name */
-            name: string;
-            /** Parameters */
-            parameters: components["schemas"]["ScreenIndicatorParameterResponse"][];
-            /** Outputs */
-            outputs: string[];
         };
         /** ScreenListItemResponse */
         ScreenListItemResponse: {
@@ -2901,6 +3133,8 @@ export interface components {
             symbol: string | null;
             /** Exchange */
             exchange: string | null;
+            /** Round Trip Net Profit Usd */
+            round_trip_net_profit_usd: string | null;
         };
         /**
          * UniverseBody
@@ -3931,6 +4165,7 @@ export interface operations {
                 bar_period: components["schemas"]["BarPeriod"];
                 start_utc?: string | null;
                 end_utc?: string | null;
+                source_order?: components["schemas"]["BarSource"][] | null;
             };
             header?: never;
             path?: never;
@@ -4025,6 +4260,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_indicators_api_market_data_indicators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorResponse"][];
+                };
+            };
+        };
+    };
+    read_indicator_series_api_market_data_indicator_series_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IndicatorSeriesBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorSeriesResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    read_chart_indicator_set_api_market_data_chart_indicators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChartIndicatorSet"];
+                };
+            };
+        };
+    };
+    save_chart_indicator_set_api_market_data_chart_indicators_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChartIndicatorSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChartIndicatorSet"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorCheckFailedResponse"];
                 };
             };
         };
@@ -5420,7 +5761,7 @@ export interface operations {
             };
         };
     };
-    list_screen_indicators_api_screen_indicators_get: {
+    list_indicator_catalog_api_screen_indicators_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -5435,7 +5776,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ScreenIndicatorResponse"][];
+                    "application/json": components["schemas"]["IndicatorResponse"][];
                 };
             };
         };

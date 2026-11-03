@@ -10,6 +10,10 @@
      stock split check shows its warning there too.
      The list reads again after each backtest change that /ws/backtests pushes; the open backtest reads again when its
      list row changes. The address #start-backtest (command palette) opens the New backtest dialog.
+     A single-instrument backtest has the "Equity" / "Bars" switcher (?chart=bars): "Bars" shows the bar chart of the
+     backtest range with the strategy indicators (docs/architecture/indicator.md section 23.9.8) and a mark for each
+     trade (section 23.9.9). Then the pointer or the focus on a Trades row gives its mark the focus ring, and a click
+     on a row selects it, shows "Bars", and scrolls the chart to the bar of the trade.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -21,6 +25,10 @@
   import { navigating, page } from '$app/state';
   import {
     BACKTESTS_SOCKET_PATH,
+    ChartViewSwitcher,
+    formatChartViewSearch,
+    readChartView,
+    type ChartView,
     BacktestLimitsForm,
     BacktestMetricTable,
     BacktestTradeTable,
@@ -46,7 +54,14 @@
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { isLiveBarPeriod, startForwardTest } from '#lib/forward_test';
-  import { SplitCheckWarning, SurvivorshipBiasWarning } from '#lib/market_data';
+  import {
+    formatInstrument,
+    RunAddIndicatorButton,
+    RunBarChart,
+    RunChart,
+    SplitCheckWarning,
+    SurvivorshipBiasWarning,
+  } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_BACKTEST_FORM_ID } from '../../palette_commands';
@@ -88,6 +103,28 @@
   const shownBacktest = $derived(backtest !== null && backtest.id === backtestId ? backtest : null);
   // A forward test runs on live bars: the bar period of the backtest must be a live bar period.
   const hasLiveBarPeriod = $derived(shownBacktest !== null && isLiveBarPeriod(shownBacktest.bar_period));
+
+  const chartView = $derived(readChartView(page.url.searchParams));
+  // The bar chart: the run indicators, the favorite indicators, and the link with the Trades rows (section 23.9.9).
+  const runChart = new RunChart();
+  $effect(() => {
+    runChart.load(fetch);
+  });
+
+  function selectTradeRow(row: number): void {
+    if (backtestId === null) {
+      return;
+    }
+    runChart.selectRow(String(backtestId), row);
+    if (chartView !== 'bars') {
+      changeChartView('bars');
+    }
+  }
+
+  function changeChartView(view: ChartView): void {
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- the current path with a new search.
+    void goto(page.url.pathname + formatChartViewSearch(page.url.searchParams, view), { replace: true, reset: false });
+  }
 
   // /ws/backtests pushes each change of a backtest, also from other tabs, the assistant, and the backtest process.
   $effect(() =>
@@ -256,6 +293,7 @@
     {@const detail = shownBacktest}
     {@const instrument = readBacktestInstrument(detail)}
     {@const universeLabel = formatUniverseLabel(detail, detail.instruments.length)}
+    {@const chartKey = String(detail.id)}
     <PanelSplit storageKey="atrade.backtest-page.panel-split" panels={PANELS}>
       {#snippet panel(id, state)}
         {#if id === 'chart'}
@@ -283,6 +321,12 @@
                 {/if}
               </h1>
               <span class="run-actions">
+                {#if instrument !== undefined}
+                  <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
+                {/if}
+                {#if chartView === 'bars' && instrument !== undefined}
+                  <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={detail.strategy_indicators} />
+                {/if}
                 <IconButton
                   label={describeForwardTestButton(detail, instrument)}
                   icon={ConnectionSignal16}
@@ -315,6 +359,21 @@
             {/if}
             {#if detail.metrics !== null}
               <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} />
+            {/if}
+            {#if chartView === 'bars' && instrument !== undefined}
+              <div class="chart">
+                <RunBarChart
+                  {instrument}
+                  barPeriod={detail.bar_period}
+                  range={{ startUtc: detail.start_utc, endUtc: detail.end_utc, sourceOrder: detail.source_order }}
+                  label="Bar chart of {formatInstrument(instrument)}, {detail.bar_period} bars"
+                  chart={runChart}
+                  runKey={chartKey}
+                  strategyIndicators={detail.strategy_indicators}
+                  records={detail.trades}
+                />
+              </div>
+            {:else if detail.metrics !== null}
               <div class="chart">
                 <EquityDrawdownChart
                   curves={[{ name: 'Equity', points: detail.equity_curve, startCapitalUsd: detail.paper_capital_usd }]}
@@ -338,7 +397,18 @@
             }}
           >
             {#if selectedTable === 'trades'}
-              <BacktestTradeTable trades={detail.trades} />
+              {#if instrument === undefined}
+                <BacktestTradeTable trades={detail.trades} />
+              {:else}
+                <BacktestTradeTable
+                  trades={detail.trades}
+                  selectedIndex={runChart.readSelectedRow(chartKey)}
+                  onRowPoint={(row: number | null) => {
+                    runChart.pointedRow = row;
+                  }}
+                  onRowSelect={selectTradeRow}
+                />
+              {/if}
             {:else if selectedTable === 'instruments'}
               <UniverseInstrumentTable instruments={detail.instruments} periodHeader={formatPeriodCountHeader(detail)} />
             {:else if selectedTable === 'orders'}
@@ -416,6 +486,8 @@
   .run-actions {
     display: flex;
     flex: none;
+    gap: var(--cds-spacing-02);
+    align-items: center;
     margin-inline-start: auto;
   }
 

@@ -148,8 +148,9 @@ class BarReader:
         # one IBKR request, not two. A slow fill of one instrument does not hold the bars of other instruments.
         self.fill_locks: defaultdict[tuple[Instrument, BarPeriod], asyncio.Lock] = defaultdict(asyncio.Lock)
 
-    async def read_bars(self, bar_request: BarRequest) -> list[Bar]:
-        """Reads through the global source order. A part is missing only when no bar source saved it; the missing
+    async def read_bars(self, bar_request: BarRequest, source_order: list[BarSource] | None = None) -> list[Bar]:
+        """Reads through `source_order`, or the global source order without it (a backtest chart gives the source
+        order of its backtest, indicator.md section 23.9.6). A part is missing only when no bar source saved it; the missing
         parts come from IBKR and go to ibkr_bar. A read from IBKR also reads the last stored daily bar again (evidence A
         of a stock split, section 8.13.2).
 
@@ -162,7 +163,8 @@ class BarReader:
         bar_period = bar_request.bar_period
         complete_request = BarRequest(instrument=instrument, bar_period=bar_period, time_range=complete_range)
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            source_order = await select_source_order(connection)
+            if source_order is None:
+                source_order = await select_source_order(connection)
             async with self.fill_locks[instrument, bar_period]:
                 missing_ranges = await select_unsaved_ranges(connection, source_order, complete_request)
                 if missing_ranges and not self.gateway_connection.is_connected():

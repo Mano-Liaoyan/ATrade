@@ -379,7 +379,15 @@ document. The implementation can change them.
 
 - Indicators on bar charts ([`indicator.md`](indicator.md) section 23.9):
   `GET /api/backtests/{backtest_id}` gets `strategy_indicators`, and each
-  trade gets `round_trip_net_profit_usd`.
+  trade gets `round_trip_net_profit_usd`. Done in #331:
+  `strategy_indicators` (`[{"indicator", "parameters"}]`, from
+  `list_chart_indicators(code, parameters)` with the `parameters` of a sweep
+  run). The comparison route has it too. Done in #332:
+  `round_trip_net_profit_usd` (decimal text, or null) of each trade, from
+  `find_round_trip_net_profits(trades)` in `universe_instruments.py`. It
+  uses `walk_instrument_round_trips` of `backtest_metrics.py`, the rule of
+  `find_round_trips` and of the Instruments tab. Only the trade that ends a
+  round trip has a value (`test_round_trip_net_profit.py`).
 
 ## 10.6 Frontend
 
@@ -435,7 +443,10 @@ document. The implementation can change them.
 - Indicators on bar charts ([`indicator.md`](indicator.md) section 23.9.8):
   the backtest panel header line gets the "Equity" / "Bars" switcher. "Bars"
   shows the bar chart with the strategy indicators and the trade marks. A
-  click on a Trades row scrolls the chart to the trade.
+  click on a Trades row scrolls the chart to the trade. Done in #331: the
+  switcher (`ChartViewSwitcher`, `?chart=bars`), "Add indicator" in the
+  header line while "Bars" shows, and `RunBarChart` with the strategy
+  indicators. The trade marks come with #332.
 - The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
   id `start-backtest`). The address `#start-backtest` (command palette) opens
   it. After the start, the page opens the new backtest. The form combines the

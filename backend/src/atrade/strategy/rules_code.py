@@ -240,6 +240,27 @@ def write_warm_up_constants(parts: CodeParts) -> list[str]:
     ]
 
 
+def write_chart_indicators(parts: CodeParts) -> list[str]:
+    """`CHART_INDICATORS` (section 9.2): each indicator object 1 time, in the order of first use, with the names of
+    its configuration fields as parameters."""
+    if not parts.indicators:
+        return ["CHART_INDICATORS = []", "", ""]
+    items = [
+        f'    {{"indicator": "{indicator.definition.key}", "parameters": {{'
+        + ", ".join(f'"{name}": "{indicator.name}_{name}"' for name in indicator.parameters)
+        + "}},"
+        for indicator in parts.indicators
+    ]
+    return [
+        "# The bar chart of a backtest or a forward test shows these indicators. It has no effect on the run.",
+        "CHART_INDICATORS = [",
+        *items,
+        "]",
+        "",
+        "",
+    ]
+
+
 def write_strategy(parts: CodeParts, entry: str, exit_checks: list[str], buy: list[str]) -> list[str]:
     indicators = [
         f"        self.{indicator.name} = atrade.indicator.{type_name(indicator)}("
@@ -327,6 +348,7 @@ def make_rules_code(rules: StrategyRules) -> str:
         "",
         "",
         *write_warm_up_constants(parts),
+        *write_chart_indicators(parts),
         *write_config(parts),
         "",
         "",
@@ -583,6 +605,7 @@ def make_universe_code(rules: StrategyRules, universe: UniverseSettings) -> str:
         "MAX_REBALANCE_WAIT = 5",
         "",
         *write_warm_up_constants(parts),
+        *write_chart_indicators(parts),
         *write_universe_config(parts),
         "",
         "",

@@ -13,21 +13,30 @@
   import { ChangeText, formatPrice } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import {
+    AddIndicatorButton,
+    addChartIndicator,
     BAR_PERIODS,
     BarChart,
+    ChartIndicatorSetStore,
     describeLiveBar,
     formatChartSearch,
     formatDayChange,
     formatInstrument,
     formatLiveBarsPath,
+    listChartIndicatorCatalog,
+    listSeriesIndicators,
     readBars,
     readChartRequest,
     readDayQuote,
+    readIndicatorSeries,
     readLiveBarMessage,
     type Bar,
     type BarPeriod,
     type BarsResult,
+    type ChartIndicatorDefinition,
+    type ChartPane,
     type DayQuote,
+    type IndicatorSeriesResult,
   } from '#lib/market_data';
   import { FilledManualOrderList, InstrumentOrderPanel, OpenOrderList, PaperAccountFeed, PositionTable } from '#lib/paper_trading';
   import InstrumentWatchlist from '../../../InstrumentWatchlist.svelte';
@@ -68,6 +77,69 @@
       isCurrent = false;
     };
   });
+
+  // Indicators on the chart (docs/architecture/indicator.md section 23.9). The page reads the saved chart indicator
+  // set and saves each change at once (section 23.9.7). The indicators stay when the bar period or the instrument
+  // changes. The pane heights and Maximize are not saved.
+  let indicatorCatalog: ChartIndicatorDefinition[] = $state([]);
+  const chartIndicatorSet = new ChartIndicatorSetStore();
+  const indicatorPanes = $derived(chartIndicatorSet.panes);
+  let loadedSeries: { key: string; result: IndicatorSeriesResult } | undefined = $state();
+  let seriesError: { key: string; message: string } | undefined = $state();
+  const indicatorSeries = $derived(loadedSeries?.key === chartKey ? loadedSeries.result : null);
+  const seriesErrorText = $derived(seriesError?.key === chartKey ? seriesError.message : null);
+
+  $effect(() => {
+    void chartIndicatorSet.load(fetch);
+  });
+
+  $effect(() => {
+    void listChartIndicatorCatalog(fetch).then((result) => {
+      if (result.kind === 'ok') {
+        indicatorCatalog = result.value;
+      }
+    });
+  });
+
+  // The series route reads only saved bars, so it runs after the bars route answered. Live bars get no values.
+  $effect(() => {
+    const indicators = listSeriesIndicators(indicatorPanes);
+    const firstBar = chartBars.at(0);
+    const lastBar = chartBars.at(-1);
+    if (chartRequest === null || chartKey === null || firstBar === undefined || lastBar === undefined || indicators.length === 0) {
+      return;
+    }
+    const key = chartKey;
+    let isCurrent = true;
+    void readIndicatorSeries(fetch, {
+      instrument: chartRequest.instrument,
+      barPeriod: chartRequest.barPeriod,
+      firstBarTime: firstBar.time,
+      lastBarTime: lastBar.time,
+      indicators,
+    }).then((result) => {
+      if (!isCurrent) {
+        return;
+      }
+      if (result.kind === 'ok') {
+        loadedSeries = { key, result: result.value };
+        seriesError = undefined;
+      } else {
+        seriesError = { key, message: result.message };
+      }
+    });
+    return () => {
+      isCurrent = false;
+    };
+  });
+
+  function changeIndicatorPanes(panes: ChartPane[]): void {
+    chartIndicatorSet.changePanes(fetch, panes);
+  }
+
+  function addIndicator(definition: ChartIndicatorDefinition): void {
+    changeIndicatorPanes(addChartIndicator(indicatorPanes, definition));
+  }
 
   let liveBarError: string | null = $state(null);
   let isLiveSocketConnected = $state(false);
@@ -206,13 +278,23 @@
                   label="Change from the previous close"
                 />
               {/if}
-              <div class="bar-periods">
-                <ContentSwitcher
-                  label="Bar period"
-                  size="sm"
-                  items={barPeriodItems}
-                  value={chartRequest.barPeriod}
-                  onValueChange={changeBarPeriod}
+              <div class="chart-tools">
+                <div class="bar-periods">
+                  <ContentSwitcher
+                    label="Bar period"
+                    size="sm"
+                    items={barPeriodItems}
+                    value={chartRequest.barPeriod}
+                    onValueChange={changeBarPeriod}
+                  />
+                </div>
+                <AddIndicatorButton
+                  catalog={indicatorCatalog}
+                  onAdd={addIndicator}
+                  favorites={chartIndicatorSet.favorites}
+                  onToggleFavorite={(key: string) => {
+                    chartIndicatorSet.toggleFavorite(fetch, key);
+                  }}
                 />
               </div>
             {/snippet}
@@ -228,13 +310,30 @@
                 {liveBar}
                 fill
                 label="Bar chart of {instrumentName}, {chartRequest.barPeriod} bars"
+                {indicatorPanes}
+                {indicatorSeries}
+                catalog={indicatorCatalog}
+                onPanesChange={changeIndicatorPanes}
               />
               {#if isLoading}
                 <p class="chart-message" role="status">Loading bars.</p>
               {:else if barsResult?.kind === 'failed'}
                 <div class="chart-message"><InlineNotification kind="error" title={barsResult.message} lowContrast /></div>
+              {:else if chartIndicatorSet.errorText !== null}
+                <div class="chart-message">
+                  <InlineNotification
+                    kind="error"
+                    title={chartIndicatorSet.errorText}
+                    lowContrast
+                    onClose={() => {
+                      chartIndicatorSet.errorText = null;
+                    }}
+                  />
+                </div>
               {:else if liveBarErrorText !== null}
                 <div class="chart-message"><InlineNotification kind="error" title={liveBarErrorText} lowContrast /></div>
+              {:else if seriesErrorText !== null}
+                <div class="chart-message"><InlineNotification kind="error" title={seriesErrorText} lowContrast /></div>
               {/if}
             </div>
           </Panel>
@@ -289,13 +388,20 @@
     white-space: nowrap;
   }
 
-  /* A compact switcher in the 32px header line: 24px high, centered, with space to the line edges and to the panel
-     buttons, so it does not touch the borders of the line. */
+  /* The bar period switcher and the chart buttons at the end of the header line, before the panel buttons. */
+  .chart-tools {
+    display: flex;
+    flex: none;
+    gap: var(--cds-spacing-02);
+    align-items: center;
+    margin-inline-start: auto;
+  }
+
+  /* A compact switcher in the 32px header line: 24px high, centered, so it does not touch the borders of the line. */
   .bar-periods {
     display: flex;
     flex: none;
     align-items: center;
-    margin-inline: auto var(--cds-spacing-03);
   }
 
   /* 6 short bar period names, each wide enough for its name. */

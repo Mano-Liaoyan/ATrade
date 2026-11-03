@@ -1,4 +1,5 @@
-"""HTTP routes of market_data: instrument search, bars, live bars, the source order, and the HK instrument list."""
+"""HTTP routes of market_data: instrument search, bars, indicator series, live bars, the source order, and the HK
+instrument list."""
 
 from datetime import timedelta
 from typing import Annotated
@@ -10,9 +11,18 @@ from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayConnection, GatewayRequestError
-from atrade.market_data.bar_models import NOT_ONLY_SPACES_PATTERN, BarResponse, InstrumentField, to_bar_response
+from atrade.market_data.bar_models import (
+    NOT_ONLY_SPACES_PATTERN,
+    BarResponse,
+    InstrumentField,
+    find_range_problem,
+    to_bar_response,
+)
 from atrade.market_data.bar_reading import BarReader, BarRequest, GatewayNotConnectedError
+from atrade.market_data.bar_source import BarSource, check_source_order
+from atrade.market_data.chart_indicator_set import create_chart_indicator_set_router
 from atrade.market_data.hk_instrument_list_routes import create_hk_instrument_list_router
+from atrade.market_data.indicator_series import create_indicator_series_router
 from atrade.market_data.instrument_lookup import InstrumentLookup
 from atrade.market_data.live_bar_socket import create_live_bar_router
 from atrade.market_data.source_order_routes import create_source_order_router
@@ -31,8 +41,6 @@ class InstrumentSearchResponse(BaseModel):
     instruments: list[InstrumentResponse]
 
 
-# One answer has at most this many bars, for example 13 days of 1 minute bars. This keeps IBKR requests few.
-MAX_BARS_PER_REQUEST = 20_000
 # The chart range when the request has no start. Each default range has at most about 4300 bars.
 DEFAULT_RANGE_LENGTHS = {
     BarPeriod.ONE_MINUTE: timedelta(days=3),
@@ -62,6 +70,8 @@ class BarsQuery(BaseModel):
     # Without end_utc, the range ends now. Without start_utc, it starts DEFAULT_RANGE_LENGTHS before the end.
     start_utc: AwareDatetime | None = None
     end_utc: AwareDatetime | None = None
+    # Without source_order, the route reads through the global source order (indicator.md section 23.9.6).
+    source_order: list[BarSource] | None = None
 
 
 def create_market_data_router(
@@ -108,17 +118,18 @@ def create_market_data_router(
         bar_period = bars_query.bar_period
         end_utc = bars_query.end_utc or clock.read_now_utc()
         start_utc = bars_query.start_utc or end_utc - DEFAULT_RANGE_LENGTHS[bar_period]
-        if start_utc >= end_utc:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail="start_utc must be before end_utc.")
-        if (end_utc - start_utc) / bar_period.length > MAX_BARS_PER_REQUEST:
-            message = f"The range has more than {MAX_BARS_PER_REQUEST} bars of {bar_period.value}. Use a shorter range."
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=message)
+        range_problem = find_range_problem(bar_period, start_utc, end_utc)
+        if range_problem is not None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=range_problem)
+        source_order_problem = None if bars_query.source_order is None else check_source_order(bars_query.source_order)
+        if source_order_problem is not None:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, detail=source_order_problem)
         instrument = Instrument(
             symbol=bars_query.symbol.strip(), exchange=bars_query.exchange.strip(), currency=bars_query.currency.strip()
         )
         bar_request = BarRequest(instrument=instrument, bar_period=bar_period, time_range=TimeRange(start_utc, end_utc))
         try:
-            bars = await bar_reader.read_bars(bar_request)
+            bars = await bar_reader.read_bars(bar_request, bars_query.source_order)
         except GatewayNotConnectedError as error:
             message = f"IB Gateway is not reachable at {host}:{port}. Bars that are not saved need IB Gateway."
             raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=message) from error
@@ -128,6 +139,8 @@ def create_market_data_router(
         return BarsResponse(bars=[to_bar_response(bar) for bar in bars])
 
     router.include_router(create_source_order_router(database_url=database_url, clock=clock))
+    router.include_router(create_indicator_series_router(database_url=database_url, clock=clock))
+    router.include_router(create_chart_indicator_set_router(database_url=database_url, clock=clock))
     router.include_router(create_live_bar_router(gateway_connection=gateway_connection, host=host, port=port))
     instrument_lookup = InstrumentLookup(gateway_connection=gateway_connection, host=host, port=port)
     router.include_router(

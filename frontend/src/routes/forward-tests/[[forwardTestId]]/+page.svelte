@@ -7,6 +7,10 @@
      Fills / Comparison / Logs panel. Comparison links to the comparison with each backtest of the same period. Logs
      shows the current error and the events (start, interruptions, stop). The open forward test reads again every
      2 seconds. The address #start-forward-test (command palette) opens the New forward test dialog.
+     A single-instrument forward test has the "Equity" / "Bars" switcher (?chart=bars): "Bars" shows the bar chart from
+     the start to the stop, or to now, with the strategy indicators (docs/architecture/indicator.md section 23.9.8) and
+     a mark for each fill (section 23.9.9). Then the pointer or the focus on a Fills row gives its mark the focus ring,
+     and a click on a row selects it, shows "Bars", and scrolls the chart to the bar of the fill.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
@@ -16,6 +20,10 @@
   import { resolve } from '$app/paths';
   import { navigating, page } from '$app/state';
   import {
+    ChartViewSwitcher,
+    formatChartViewSearch,
+    readChartView,
+    type ChartView,
     describeBacktestStatus,
     EquityDrawdownChart,
     findBacktestStatusKind,
@@ -56,6 +64,12 @@
     type ForwardTest,
     type ForwardTestDetail,
   } from '#lib/forward_test';
+  import {
+    formatInstrument,
+    RunAddIndicatorButton,
+    RunBarChart,
+    RunChart,
+  } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_FORWARD_TEST_FORM_ID } from '../../palette_commands';
@@ -109,6 +123,28 @@
   );
 
   $effect(() => feed.start(fetch, window.location));
+
+  const chartView = $derived(readChartView(page.url.searchParams));
+  // The bar chart: the run indicators, the favorite indicators, and the link with the Fills rows (section 23.9.9).
+  const runChart = new RunChart();
+  $effect(() => {
+    runChart.load(fetch);
+  });
+
+  function selectFillRow(row: number): void {
+    if (forwardTestId === null) {
+      return;
+    }
+    runChart.selectRow(String(forwardTestId), row);
+    if (chartView !== 'bars') {
+      changeChartView('bars');
+    }
+  }
+
+  function changeChartView(view: ChartView): void {
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- the current path with a new search.
+    void goto(page.url.pathname + formatChartViewSearch(page.url.searchParams, view), { replace: true, reset: false });
+  }
 
   // /forward-tests opens the newest forward test. The same page component stays, so an open dialog stays open. A
   // navigation that runs (for example a click on a header link) wins.
@@ -267,6 +303,8 @@
   {:else}
     {@const forwardTest = shownDetail.forward_test}
     {@const records = shownDetail}
+    {@const chartInstrument = readForwardTestInstrument(forwardTest)}
+    {@const chartKey = String(forwardTest.id)}
     <PanelSplit storageKey="atrade.forward-test-page.panel-split" panels={PANELS}>
       {#snippet panel(id, state)}
         {#if id === 'chart'}
@@ -301,6 +339,12 @@
                 <span class="run-note run-capital">Capital {formatAmount(forwardTest.allocated_capital_usd)} USD</span>
               {/if}
               <span class="run-actions">
+                {#if chartInstrument !== null}
+                  <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
+                {/if}
+                {#if chartView === 'bars' && chartInstrument !== null}
+                  <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={forwardTest.strategy_indicators} />
+                {/if}
                 {#if canStop(forwardTest)}
                   <IconButton
                     label={describeStopButton(forwardTest)}
@@ -332,6 +376,24 @@
             {/if}
             {#if records.metrics !== null}
               <KeyMetricRow metrics={records.metrics} startCapitalUsd={readStartCapital(forwardTest)} />
+            {/if}
+            {#if chartView === 'bars' && chartInstrument !== null}
+              <div class="chart">
+                <RunBarChart
+                  instrument={chartInstrument}
+                  barPeriod={forwardTest.bar_period}
+                  range={{
+                    startUtc: forwardTest.created_at_utc,
+                    ...(forwardTest.stopped_at_utc === null ? {} : { endUtc: forwardTest.stopped_at_utc }),
+                  }}
+                  label="Bar chart of {formatInstrument(chartInstrument)}, {forwardTest.bar_period} bars"
+                  chart={runChart}
+                  runKey={chartKey}
+                  strategyIndicators={forwardTest.strategy_indicators}
+                  records={records.fills}
+                />
+              </div>
+            {:else if records.metrics !== null}
               <div class="chart">
                 <EquityDrawdownChart
                   curves={[{ name: 'Equity', points: records.equity_curve, startCapitalUsd: readStartCapital(forwardTest) }]}
@@ -356,7 +418,18 @@
             }}
           >
             {#if selectedTable === 'fills'}
-              <ForwardTestFillTable fills={records.fills} />
+              {#if chartInstrument === null}
+                <ForwardTestFillTable fills={records.fills} />
+              {:else}
+                <ForwardTestFillTable
+                  fills={records.fills}
+                  selectedIndex={runChart.readSelectedRow(chartKey)}
+                  onRowPoint={(row: number | null) => {
+                    runChart.pointedRow = row;
+                  }}
+                  onRowSelect={selectFillRow}
+                />
+              {/if}
             {:else if selectedTable === 'instruments'}
               <UniverseInstrumentTable instruments={records.instruments} countHeader="Fills" />
             {:else if selectedTable === 'comparison'}
@@ -474,6 +547,8 @@
   .run-actions {
     display: flex;
     flex: none;
+    gap: var(--cds-spacing-02);
+    align-items: center;
     margin-inline-start: auto;
   }
 

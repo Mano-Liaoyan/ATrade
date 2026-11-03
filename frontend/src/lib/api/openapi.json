@@ -577,6 +577,25 @@
               ],
               "title": "End Utc"
             }
+          },
+          {
+            "name": "source_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BarSource"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source Order"
+            }
           }
         ],
         "responses": {
@@ -670,6 +689,122 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market-data/indicators": {
+      "get": {
+        "summary": "List Indicators",
+        "operationId": "list_indicators_api_market_data_indicators_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IndicatorResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Indicators Api Market Data Indicators Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market-data/indicator-series": {
+      "post": {
+        "summary": "Read Indicator Series",
+        "description": "Reads only saved bars. A `422` for an indicator has the problem list. Other `422` answers have `detail`.",
+        "operationId": "read_indicator_series_api_market_data_indicator_series_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IndicatorSeriesBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorSeriesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorCheckFailedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market-data/chart-indicators": {
+      "get": {
+        "summary": "Read Chart Indicator Set",
+        "operationId": "read_chart_indicator_set_api_market_data_chart_indicators_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartIndicatorSet"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Save Chart Indicator Set",
+        "description": "A `422` of section 23.9.7 has the problem list. A body of a wrong JSON type is the FastAPI `422`.",
+        "operationId": "save_chart_indicator_set_api_market_data_chart_indicators_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChartIndicatorSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartIndicatorSet"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorCheckFailedResponse"
                 }
               }
             }
@@ -2362,9 +2497,9 @@
     },
     "/api/screen-indicators": {
       "get": {
-        "summary": "List Screen Indicators",
-        "description": "The indicator catalog in its own order (section 24.7).",
-        "operationId": "list_screen_indicators_api_screen_indicators_get",
+        "summary": "List Indicator Catalog",
+        "description": "The indicator catalog in its own order. The screen page and the bar charts read it.",
+        "operationId": "list_indicator_catalog_api_screen_indicators_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2372,10 +2507,10 @@
               "application/json": {
                 "schema": {
                   "items": {
-                    "$ref": "#/components/schemas/ScreenIndicatorResponse"
+                    "$ref": "#/components/schemas/IndicatorResponse"
                   },
                   "type": "array",
-                  "title": "Response List Screen Indicators Api Screen Indicators Get"
+                  "title": "Response List Indicator Catalog Api Screen Indicators Get"
                 }
               }
             }
@@ -3354,6 +3489,13 @@
           },
           "robustness": {
             "$ref": "#/components/schemas/BacktestRobustnessResponse"
+          },
+          "strategy_indicators": {
+            "items": {
+              "$ref": "#/components/schemas/ChartIndicator"
+            },
+            "type": "array",
+            "title": "Strategy Indicators"
           }
         },
         "type": "object",
@@ -3393,7 +3535,8 @@
           "trades",
           "instruments",
           "split_metrics",
-          "robustness"
+          "robustness",
+          "strategy_indicators"
         ],
         "title": "BacktestDetailResponse"
       },
@@ -4071,6 +4214,53 @@
         ],
         "title": "ChangeScreenRequest"
       },
+      "ChartIndicator": {
+        "properties": {
+          "indicator": {
+            "type": "string",
+            "title": "Indicator"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ParameterNumber"
+            },
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indicator",
+          "parameters"
+        ],
+        "title": "ChartIndicator",
+        "description": "A whole indicator of the chart with its parameter values, as `{\"indicator\", \"parameters\"}` JSON."
+      },
+      "ChartIndicatorSet": {
+        "properties": {
+          "panes": {
+            "items": {
+              "$ref": "#/components/schemas/SavedChartPane"
+            },
+            "type": "array",
+            "title": "Panes"
+          },
+          "favorites": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Favorites"
+          }
+        },
+        "type": "object",
+        "required": [
+          "panes",
+          "favorites"
+        ],
+        "title": "ChartIndicatorSet",
+        "description": "The first pane is the price pane. The other panes are own panes, in the order on the chart."
+      },
       "CodeCheckFailedResponse": {
         "properties": {
           "problems": {
@@ -4385,6 +4575,13 @@
           "robustness": {
             "$ref": "#/components/schemas/BacktestRobustnessResponse"
           },
+          "strategy_indicators": {
+            "items": {
+              "$ref": "#/components/schemas/ChartIndicator"
+            },
+            "type": "array",
+            "title": "Strategy Indicators"
+          },
           "code": {
             "type": "string",
             "title": "Code"
@@ -4428,6 +4625,7 @@
           "instruments",
           "split_metrics",
           "robustness",
+          "strategy_indicators",
           "code"
         ],
         "title": "ComparedBacktestResponse"
@@ -5421,7 +5619,7 @@
       "ForwardTestDetailResponse": {
         "properties": {
           "forward_test": {
-            "$ref": "#/components/schemas/ForwardTestResponse"
+            "$ref": "#/components/schemas/ForwardTestWithIndicatorsResponse"
           },
           "metrics": {
             "anyOf": [
@@ -5538,6 +5736,17 @@
               }
             ],
             "title": "Split Ratio"
+          },
+          "round_trip_net_profit_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Trip Net Profit Usd"
           }
         },
         "type": "object",
@@ -5551,7 +5760,8 @@
           "price_usd",
           "commission_usd",
           "amount_usd",
-          "split_ratio"
+          "split_ratio",
+          "round_trip_net_profit_usd"
         ],
         "title": "ForwardTestFillResponse",
         "description": "A fill, or a stock split adjustment (section 12.16). A split adjustment has no price, the split ratio, and the\ncash in lieu as `amount_usd`. `side` gives the direction of the share change."
@@ -5800,6 +6010,213 @@
           "failed"
         ]
       },
+      "ForwardTestWithIndicatorsResponse": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          },
+          "strategy_id": {
+            "type": "integer",
+            "title": "Strategy Id"
+          },
+          "strategy_name": {
+            "type": "string",
+            "title": "Strategy Name"
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "universe_kind": {
+            "$ref": "#/components/schemas/UniverseKind"
+          },
+          "universe_top_n": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Universe Top N"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "desired_state": {
+            "$ref": "#/components/schemas/DesiredState"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ForwardTestStatus"
+          },
+          "client_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Id"
+          },
+          "start_balance_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Balance Usd"
+          },
+          "error_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Message"
+          },
+          "created_at_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At Utc"
+          },
+          "stopped_at_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped At Utc"
+          },
+          "end_time_utc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time Utc"
+          },
+          "crash_count": {
+            "type": "integer",
+            "title": "Crash Count"
+          },
+          "interruptions": {
+            "items": {
+              "$ref": "#/components/schemas/InterruptionResponse"
+            },
+            "type": "array",
+            "title": "Interruptions"
+          },
+          "allocated_capital_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Allocated Capital Usd"
+          },
+          "split_checks_needed": {
+            "items": {
+              "$ref": "#/components/schemas/SplitCheckNeededResponse"
+            },
+            "type": "array",
+            "title": "Split Checks Needed"
+          },
+          "strategy_indicators": {
+            "items": {
+              "$ref": "#/components/schemas/ChartIndicator"
+            },
+            "type": "array",
+            "title": "Strategy Indicators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "strategy_version_id",
+          "strategy_id",
+          "strategy_name",
+          "version_number",
+          "symbol",
+          "exchange",
+          "currency",
+          "universe_kind",
+          "universe_top_n",
+          "bar_period",
+          "desired_state",
+          "status",
+          "client_id",
+          "start_balance_usd",
+          "error_message",
+          "created_at_utc",
+          "stopped_at_utc",
+          "end_time_utc",
+          "crash_count",
+          "interruptions",
+          "allocated_capital_usd",
+          "split_checks_needed",
+          "strategy_indicators"
+        ],
+        "title": "ForwardTestWithIndicatorsResponse",
+        "description": "The forward test of the detail: also `CHART_INDICATORS` of the version code (indicator.md section 23.9.8)."
+      },
       "GatewayStatus": {
         "type": "string",
         "enum": [
@@ -6002,6 +6419,22 @@
         ],
         "title": "HkInstrumentResponse"
       },
+      "IndicatorCheckFailedResponse": {
+        "properties": {
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problems"
+        ],
+        "title": "IndicatorCheckFailedResponse"
+      },
       "IndicatorOperand": {
         "properties": {
           "type": {
@@ -6040,6 +6473,286 @@
         ],
         "title": "IndicatorOperand",
         "description": "A stored indicator reference. A single-line indicator without `output` uses `value`."
+      },
+      "IndicatorParameterResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value_type": {
+            "type": "string",
+            "enum": [
+              "int",
+              "float"
+            ],
+            "title": "Value Type"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Default"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "is_in_name": {
+            "type": "boolean",
+            "title": "Is In Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "value_type",
+          "default",
+          "minimum",
+          "maximum",
+          "is_in_name"
+        ],
+        "title": "IndicatorParameterResponse"
+      },
+      "IndicatorProblemResponse": {
+        "properties": {
+          "location": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "location",
+          "message"
+        ],
+        "title": "IndicatorProblemResponse"
+      },
+      "IndicatorResponse": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "short_name": {
+            "type": "string",
+            "title": "Short Name"
+          },
+          "chart_placement": {
+            "type": "string",
+            "enum": [
+              "price",
+              "own"
+            ],
+            "title": "Chart Placement"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorParameterResponse"
+            },
+            "type": "array",
+            "title": "Parameters"
+          },
+          "outputs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Outputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "name",
+          "short_name",
+          "chart_placement",
+          "parameters",
+          "outputs"
+        ],
+        "title": "IndicatorResponse",
+        "description": "One indicator of the catalog (indicator.md sections 23.3 and 23.9.2)."
+      },
+      "IndicatorSeries": {
+        "properties": {
+          "indicator": {
+            "type": "string",
+            "title": "Indicator"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "outputs": {
+            "additionalProperties": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Outputs"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indicator",
+          "parameters",
+          "outputs"
+        ],
+        "title": "IndicatorSeries"
+      },
+      "IndicatorSeriesBody": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Symbol"
+          },
+          "exchange": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Exchange"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "pattern": "\\S",
+            "title": "Currency"
+          },
+          "bar_period": {
+            "$ref": "#/components/schemas/BarPeriod"
+          },
+          "start_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Utc"
+          },
+          "end_utc": {
+            "type": "string",
+            "format": "date-time",
+            "title": "End Utc"
+          },
+          "source_order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/BarSource"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Order"
+          },
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "array",
+            "title": "Indicators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "exchange",
+          "currency",
+          "bar_period",
+          "start_utc",
+          "end_utc",
+          "indicators"
+        ],
+        "title": "IndicatorSeriesBody"
+      },
+      "IndicatorSeriesResponse": {
+        "properties": {
+          "times": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Times"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorSeries"
+            },
+            "type": "array",
+            "title": "Series"
+          }
+        },
+        "type": "object",
+        "required": [
+          "times",
+          "series"
+        ],
+        "title": "IndicatorSeriesResponse"
       },
       "InnerRuleGroup": {
         "properties": {
@@ -6715,6 +7428,16 @@
         "title": "PaperCapitalResponse",
         "description": "The default paper capital of the backtest form (docs/architecture.md section 10)."
       },
+      "ParameterNumber": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "number"
+          }
+        ]
+      },
       "ParameterResponse": {
         "properties": {
           "name": {
@@ -7322,6 +8045,91 @@
         "title": "SavedBarsResponse",
         "description": "The saved bars of one bar source and one bar period: the start of the first and of the last saved bar."
       },
+      "SavedChartIndicator": {
+        "properties": {
+          "indicator": {
+            "type": "string",
+            "title": "Indicator"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/SavedChartLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indicator",
+          "parameters",
+          "hidden",
+          "lines"
+        ],
+        "title": "SavedChartIndicator"
+      },
+      "SavedChartLine": {
+        "properties": {
+          "output": {
+            "type": "string",
+            "title": "Output"
+          },
+          "color": {
+            "type": "integer",
+            "title": "Color"
+          },
+          "style": {
+            "type": "string",
+            "title": "Style"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          }
+        },
+        "type": "object",
+        "required": [
+          "output",
+          "color",
+          "style",
+          "width"
+        ],
+        "title": "SavedChartLine"
+      },
+      "SavedChartPane": {
+        "properties": {
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/SavedChartIndicator"
+            },
+            "type": "array",
+            "title": "Indicators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indicators"
+        ],
+        "title": "SavedChartPane"
+      },
       "ScreenCheckFailedResponse": {
         "properties": {
           "problems": {
@@ -7359,104 +8167,6 @@
         ],
         "title": "ScreenIndicatorNamesResponse",
         "description": "The UI names of the indicators of the definition, for example \"RSI(14)\" (screen.md section 24.7)."
-      },
-      "ScreenIndicatorParameterResponse": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "value_type": {
-            "type": "string",
-            "enum": [
-              "int",
-              "float"
-            ],
-            "title": "Value Type"
-          },
-          "default": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              }
-            ],
-            "title": "Default"
-          },
-          "minimum": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              }
-            ],
-            "title": "Minimum"
-          },
-          "maximum": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "number"
-              }
-            ],
-            "title": "Maximum"
-          },
-          "is_in_name": {
-            "type": "boolean",
-            "title": "Is In Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name",
-          "value_type",
-          "default",
-          "minimum",
-          "maximum",
-          "is_in_name"
-        ],
-        "title": "ScreenIndicatorParameterResponse"
-      },
-      "ScreenIndicatorResponse": {
-        "properties": {
-          "key": {
-            "type": "string",
-            "title": "Key"
-          },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "parameters": {
-            "items": {
-              "$ref": "#/components/schemas/ScreenIndicatorParameterResponse"
-            },
-            "type": "array",
-            "title": "Parameters"
-          },
-          "outputs": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Outputs"
-          }
-        },
-        "type": "object",
-        "required": [
-          "key",
-          "name",
-          "parameters",
-          "outputs"
-        ],
-        "title": "ScreenIndicatorResponse",
-        "description": "One indicator of the catalog (indicator.md section 23.3), for the edit popover of the screen page."
       },
       "ScreenListItemResponse": {
         "properties": {
@@ -9079,6 +9789,17 @@
               }
             ],
             "title": "Exchange"
+          },
+          "round_trip_net_profit_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Trip Net Profit Usd"
           }
         },
         "type": "object",
@@ -9089,7 +9810,8 @@
           "price_usd",
           "commission_usd",
           "symbol",
-          "exchange"
+          "exchange",
+          "round_trip_net_profit_usd"
         ],
         "title": "TradeResponse"
       },

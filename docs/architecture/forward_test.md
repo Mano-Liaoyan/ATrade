@@ -716,6 +716,14 @@ and the status codes of the new refusals are choices of this document.
 - Indicators on bar charts ([`indicator.md`](indicator.md) section 23.9):
   `ForwardTestResponse` of `GET /api/forward-tests/{id}` gets
   `strategy_indicators`, and each fill gets `round_trip_net_profit_usd`.
+  Done in #331: `forward_test` of the detail is a
+  `ForwardTestWithIndicatorsResponse` with `strategy_indicators`
+  (`list_chart_indicators(code, {})`). `GET /api/forward-tests` does not have
+  it. The forward test panel has the "Equity" / "Bars" switcher; "Bars" shows
+  the bars from `created_at_utc` to `stopped_at_utc`, or to now. Done in
+  #332: `round_trip_net_profit_usd` of each fill row, from
+  `find_round_trip_net_profits` on the `fill` rows (the rule of the
+  Instruments tab). A split adjustment row has null.
 
 ## 12.14 Worker comparison
 

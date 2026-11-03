@@ -1,5 +1,5 @@
 """Public entry of the market_data capability: instrument search, the instrument lookup, bars, bar sources and the
-source order, saved bars, received bars to save, the daily bars of many instruments, the daily
+source order, saved bars, the indicator catalog and indicator series of bar charts, received bars to save, the daily bars of many instruments, the daily
 bar summary and the daily bar update, the Databento import, its user check, and the IBKR stock split check, the hourly bar purchase list, the
 quarterly US universe, live bars, and daily exchange rates in USD."""
 
@@ -48,6 +48,7 @@ from atrade.market_data.import_check import (
     check_import_detections,
     read_unchecked_import_detections,
 )
+from atrade.market_data.indicator_series import IndicatorResponse, list_indicator_catalog
 from atrade.market_data.instrument_lookup import (
     GatewayNotReachableError,
     InstrumentLookup,
@@ -97,6 +98,7 @@ __all__ = [
     "IbkrSplitCheckReport",
     "ImportCheckError",
     "ImportDetections",
+    "IndicatorResponse",
     "InstrumentLookup",
     "InstrumentLookupError",
     "InstrumentLookupFailedError",
@@ -127,6 +129,7 @@ __all__ = [
     "import_databento_files",
     "is_us_trading_day",
     "list_hourly_purchases",
+    "list_indicator_catalog",
     "read_daily_bar_summaries",
     "read_daily_bar_summaries_before",
     "read_daily_bar_summaries_of_currency",

@@ -30,15 +30,24 @@ const period = (defaultValue: number) => ({
   is_in_name: true,
 });
 const CATALOG: ScreenIndicator[] = [
-  { key: 'sma', name: 'SMA', parameters: [period(50)], outputs: ['value'] },
-  { key: 'rsi', name: 'RSI', parameters: [period(14)], outputs: ['value'] },
+  { key: 'sma', name: 'SMA', short_name: 'SMA', chart_placement: 'price', parameters: [period(50)], outputs: ['value'] },
+  { key: 'rsi', name: 'RSI', short_name: 'RSI', chart_placement: 'own', parameters: [period(14)], outputs: ['value'] },
   {
     key: 'bollinger_bands',
     name: 'Bollinger Bands',
+    short_name: 'BB',
+    chart_placement: 'price',
     parameters: [period(20), { name: 'k', value_type: 'float', default: 2, minimum: 0.1, maximum: 10, is_in_name: true }],
     outputs: ['upper', 'middle', 'lower'],
   },
-  { key: 'donchian_channel', name: 'Donchian channel', parameters: [period(20)], outputs: ['upper', 'middle', 'lower'] },
+  {
+    key: 'donchian_channel',
+    name: 'Donchian channel',
+    short_name: 'DC',
+    chart_placement: 'price',
+    parameters: [period(20)],
+    outputs: ['upper', 'middle', 'lower'],
+  },
 ];
 
 describe('screen draft', () => {

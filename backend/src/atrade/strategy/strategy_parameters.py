@@ -7,7 +7,7 @@ import ast
 from dataclasses import dataclass
 from typing import Literal
 
-from atrade.strategy.code_checks import has_base_class
+from atrade.strategy.code_syntax import has_base_class
 
 type ParameterType = Literal["int", "float", "bool"]
 # The fields that ATrade sets itself. They are not parameters.
@@ -29,6 +29,11 @@ def read_strategy_parameters(code: str) -> list[StrategyParameter]:
     except SyntaxError:
         # readability-exception: ast.parse reports a syntax error only as an exception.
         return []
+    return read_module_parameters(module)
+
+
+def read_module_parameters(module: ast.Module) -> list[StrategyParameter]:
+    """`read_strategy_parameters` of parsed code."""
     for node in module.body:
         if isinstance(node, ast.ClassDef) and has_base_class(node, "StrategyConfig"):
             return read_init_parameters(node)
