@@ -277,6 +277,27 @@ async def test_an_import_of_new_days_reads_only_the_new_days_and_some_checked_da
 
 
 @pytest.mark.anyio
+async def test_after_3_timeouts_of_the_same_instrument_the_check_uses_the_detection_rule_and_continues(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """IBKR gives no answer for 1 instrument. After each timeout, the gateway marks the IBKR link as lost, so the
+    timeout looks like a lost link. The check does not try the instrument again without end."""
+    import_bars(database_url, tmp_path, split_bars())
+    gateway.next_historical_bars_errors = [NO_ANSWER_MESSAGE] * 3
+    gateway.has_ibkr_connection = False
+    recorder = WaitRecorder()
+
+    await run_check(database_url, gateway, recorder)
+
+    assert recorder.read_long_waits() == [60.0, 60.0]
+    assert len(gateway.historical_bar_requests) == 3
+    assert read_table(database_url, STOCK_SPLIT_QUERY) == [
+        ("SPLT", "NASDAQ", "USD", utc_day(TRADING_DAYS[2]), Decimal(2), "databento_import", None)
+    ]
+    assert [row[2] for row in read_table(database_url, SPLIT_CHECK_QUERY)] == [utc_day(TRADING_DAYS[4])]
+
+
+@pytest.mark.anyio
 async def test_without_ibkr_bars_the_detection_rule_finds_the_stock_split_and_it_waits_for_the_user_check(
     database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
 ) -> None:

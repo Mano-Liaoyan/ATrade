@@ -611,6 +611,10 @@ Databento instrument that still trades.
   violation sets the wait back to 1 minute.
 - No connection to IB Gateway or to IBKR: the check waits 1 minute,
   connects again, and checks the same instrument again.
+- IBKR gives no answer in time to the requests of the same instrument 3
+  times in a row (for example ABX on NYSE after the symbol change): the
+  check uses the detection rule for the instrument, as in step 4, and
+  continues with the next instrument.
 - The check waits 0.5 seconds after each instrument. It logs its progress
   each 100 instruments.
 - A backtest that is created while one of its instruments waits gets the
