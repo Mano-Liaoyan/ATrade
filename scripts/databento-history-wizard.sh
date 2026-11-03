@@ -321,6 +321,8 @@ wait_for_jobs() {
 # The container user that can write to a host directory of the current user. Rootless Podman and rootless Docker map
 # the container root to the current user, and another container user to a sub-UID without write access. Rootful
 # Docker needs the same UID and GID as the current user.
+# The mount uses :z. With SELinux on, the host gives a container no access to a home directory, also not as root. :z
+# gives the directory the shared container label. Without SELinux, Docker and Podman ignore :z.
 container_user() {
   if docker info 2>/dev/null | grep -qiE '^[[:space:]]*rootless(: true)?[[:space:]]*$'; then
     printf '0:0'
@@ -341,7 +343,7 @@ import_directory() {
       args+=(--job-id "$job_id")
     fi
   done < <(read_job_ids "$dir/jobs.txt")
-  dc run --rm --user "$(container_user)" -v "$dir:/databento" web \
+  dc run --rm --user "$(container_user)" -v "$dir:/databento:z" web \
     python -m atrade.app.databento_import /databento "${args[@]}"
 }
 
