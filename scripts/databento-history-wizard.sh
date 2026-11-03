@@ -232,7 +232,11 @@ DAILY_JOBS_PY='
 import sys
 import databento
 client = databento.Historical()
-summary_end = client.metadata.get_dataset_range(dataset="EQUS.SUMMARY")["end"]
+# The end of one schema can be earlier than the end of the dataset, for example ohlcv-1d ends at 00:00 UTC of today.
+def schema_end(dataset, schema):
+    dataset_range = client.metadata.get_dataset_range(dataset=dataset)
+    return dataset_range.get("schema", {}).get(schema, {}).get("end") or dataset_range["end"][:10]
+summary_end = schema_end("EQUS.SUMMARY", "ohlcv-1d")
 jobs = [
     ("XNAS.ITCH", "ohlcv-1d", "2018-05-01", "2024-07-01"),
     ("XNYS.PILLAR", "ohlcv-1d", "2018-05-01", "2024-07-01"),
@@ -268,7 +272,9 @@ import databento
 from atrade.foundation.settings import Settings
 from atrade.market_data import list_hourly_purchases
 client = databento.Historical()
-available_end = date.fromisoformat(client.metadata.get_dataset_range(dataset="XNAS.ITCH")["end"][:10])
+dataset_range = client.metadata.get_dataset_range(dataset="XNAS.ITCH")
+hourly_end = dataset_range.get("schema", {}).get("ohlcv-1h", {}).get("end") or dataset_range["end"]
+available_end = date.fromisoformat(hourly_end[:10])
 end_day = min(datetime.now(UTC).date(), available_end)
 purchases = list_hourly_purchases(database_url=Settings().database_url, end_day=end_day)
 done = set(sys.argv[2:])
