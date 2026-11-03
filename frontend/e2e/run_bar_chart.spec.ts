@@ -78,7 +78,7 @@ async function expectBarsWithStrategyIndicators(page: Page): Promise<void> {
 
   await page.getByRole('button', { name: 'Add indicator' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add indicator' });
-  await dialog.getByRole('button', { name: 'Add MACD to favorites' }).click();
+  await dialog.getByRole('button', { name: 'Add MACD to favorite indicators' }).click();
   await expect(dialog.getByRole('option').first()).toHaveText('MACD');
   await dialog.getByRole('option', { name: /^EMA/ }).click();
   await expect(dialog).toBeHidden();

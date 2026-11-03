@@ -65,7 +65,7 @@ from atrade.screen import MARKET_CURRENCIES, read_saved_screen, read_screen_resu
 from atrade.strategy import (
     ChartIndicator,
     StrategyVersion,
-    list_chart_indicators,
+    list_version_chart_indicators,
     read_strategy_version,
     read_strategy_versions,
 )
@@ -584,9 +584,7 @@ class BacktestRoutes:
         )
         return BacktestDetailResponse(
             **backtest.model_dump(),
-            strategy_indicators=list_chart_indicators(
-                "" if strategy_version is None else strategy_version.code, row.parameters or {}
-            ),
+            strategy_indicators=list_version_chart_indicators(strategy_version, row.parameters or {}),
             robustness=BacktestRobustnessResponse(
                 trial_count=robustness.trial_count,
                 sharpe_probability_percent=robustness.sharpe_probability_percent,

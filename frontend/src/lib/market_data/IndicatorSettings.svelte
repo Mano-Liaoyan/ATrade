@@ -1,8 +1,8 @@
 <!-- The settings of one chart indicator (docs/architecture/indicator.md section 23.9.5): a popover at its legend row.
      One number field for each parameter, then one group for each line: the 14 palette colors, "Line style", and
      "Width" (a histogram has the colors only). "Reset to defaults" gives the catalog defaults, solid lines, and
-     width 2, and keeps the colors. "Apply" is disabled while a field is invalid; it applies the draft and closes the
-     popover. Escape closes it without a change. -->
+     width 2, and keeps the colors. "Apply" is disabled while a field is invalid, and a line below it names the first invalid
+     field; it applies the draft and closes the popover. Escape closes it without a change. -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { Button, ContentSwitcher, NumberInput, Popover, type ContentSwitcherItem } from '#lib/foundation/carbon';
@@ -13,6 +13,7 @@
     applySettingsDraft,
     checkSettingsDraft,
     createSettingsDraft,
+    describeApplyBlock,
     formatLineLabel,
     formatParameterLabel,
     hasSettingsProblems,
@@ -34,6 +35,7 @@
   const uid = $props.id();
   let draft = $state(untrack(() => createSettingsDraft(indicator)));
   const problems = $derived(checkSettingsDraft(definition, draft));
+  const applyBlock = $derived(describeApplyBlock(definition, problems));
   // The step buttons of a float parameter, for example Bollinger Bands k.
   const FLOAT_STEP = 0.1;
   const colors = Array.from({ length: CHART_PALETTE_SIZE }, (_, index) => index + 1);
@@ -150,8 +152,13 @@
           draft = resetSettingsDraft(definition, draft);
         }}>Reset to defaults</Button
       >
-      <Button kind="primary" size="sm" type="submit" disabled={hasSettingsProblems(problems)}>Apply</Button>
+      <Button kind="primary" size="sm" type="submit" disabled={applyBlock !== null} aria-describedby={applyBlock === null ? undefined : `${uid}-apply-block`}
+        >Apply</Button
+      >
     </div>
+    {#if applyBlock !== null}
+      <p id={`${uid}-apply-block`} class="cds--form__helper-text apply-block">{applyBlock}</p>
+    {/if}
   </form>
 </Popover>
 
@@ -245,5 +252,11 @@
     display: flex;
     justify-content: flex-end;
     gap: var(--cds-spacing-03);
+  }
+
+  /* The form gap puts it below the buttons; it ends at the Apply button. */
+  .apply-block {
+    margin: 0;
+    text-align: end;
   }
 </style>

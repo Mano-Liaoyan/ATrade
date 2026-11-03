@@ -1,32 +1,44 @@
 <!-- The bar chart of a backtest or a forward test (docs/architecture/indicator.md section 23.9.8): the saved bars of
-     one instrument and bar period in a fixed range, read with the source order of the run, and the indicators of
-     `panes`. The page holds the panes (the strategy indicators and the changes of the user, not saved) and the
-     "Add indicator" button of the header line. `trades` gives the trade marks (section 23.9.9); the page gives the
-     trades of its table row under the pointer or the focus (`ringTrades`) and the selected row (`centerTrade`). -->
+     one instrument and bar period in a fixed range, read with the source order of the run (a long range in windows,
+     `run_bars.ts`), and the run panes of `chart` (the strategy indicators and the changes of the user, not saved).
+     `records` (the trades or the fills of the table) give the trade marks (section 23.9.9). The table row under the
+     pointer or the focus and the selected row (`chart`) ring their marks; the selected row centers its mark. -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { InlineNotification } from '#lib/foundation/carbon';
   import BarChart from './BarChart.svelte';
-  import { readBars, type BarPeriod, type BarsRange, type BarsResult } from './bars';
-  import type { ChartIndicatorDefinition, ChartPane } from './chart_indicators';
-  import { listSeriesIndicators, readIndicatorSeries, type IndicatorSeriesResult } from './indicator_series';
+  import type { BarPeriod, BarsRange, BarsResult } from './bars';
+  import type { ChartPane } from './chart_indicators';
+  import { listSeriesIndicators, type IndicatorSeriesResult } from './indicator_series';
   import type { Instrument } from './instrument_search';
-  import type { ChartTrade } from './trade_marks';
+  import { readRunBars, readRunIndicatorSeries } from './run_bars';
+  import { findRingTrades, findRowTrade, type RunChart } from './run_chart.svelte';
+  import type { StrategyIndicator } from './strategy_indicators';
+  import { listChartTrades, type TradeRecord } from './trade_marks';
 
   interface Props {
     instrument: Instrument;
     barPeriod: BarPeriod;
     range: BarsRange;
     label: string;
-    catalog: ChartIndicatorDefinition[];
-    panes: ChartPane[];
-    onPanesChange: (panes: ChartPane[]) => void;
-    trades?: ChartTrade[];
-    ringTrades?: number[];
-    centerTrade?: number | null;
+    chart: RunChart;
+    /** The run id. */
+    runKey: string;
+    strategyIndicators: readonly StrategyIndicator[];
+    records: readonly TradeRecord[];
   }
 
-  const { instrument, barPeriod, range, label, catalog, panes, onPanesChange, trades = [], ringTrades = [], centerTrade = null }: Props = $props();
+  const { instrument, barPeriod, range, label, chart, runKey, strategyIndicators, records }: Props = $props();
+
+  const panes = $derived(chart.indicators.readPanes(runKey, strategyIndicators));
+  const chartTrades = $derived(listChartTrades(records));
+  const selectedRow = $derived(chart.readSelectedRow(runKey));
+  const ringTrades = $derived(findRingTrades(chartTrades.tradeIndexByRow, chart.pointedRow, selectedRow));
+  const centerTrade = $derived(findRowTrade(chartTrades.tradeIndexByRow, selectedRow));
+
+  function changePanes(nextPanes: ChartPane[]): void {
+    chart.indicators.changePanes(runKey, nextPanes);
+  }
 
   // The bars and the series keep the request that they belong to, so a new run shows no data of the run before.
   const barsKey = $derived(
@@ -41,7 +53,7 @@
     const key = barsKey;
     let isCurrent = true;
     const request = untrack(() => ({ instrument, barPeriod, range }));
-    void readBars(fetch, request.instrument, request.barPeriod, request.range).then((result) => {
+    void readRunBars(fetch, request.instrument, request.barPeriod, request.range).then((result) => {
       if (isCurrent) {
         loadedBars = { key, result };
       }
@@ -67,7 +79,7 @@
     const key = barsKey;
     let isCurrent = true;
     const request = untrack(() => ({ instrument, barPeriod, sourceOrder: range.sourceOrder }));
-    void readIndicatorSeries(fetch, {
+    void readRunIndicatorSeries(fetch, {
       instrument: request.instrument,
       barPeriod: request.barPeriod,
       firstBarTime: firstBar.time,
@@ -96,7 +108,19 @@
     <span role="status" aria-label="Bar count">{bars.length === 1 ? '1 bar' : `${String(bars.length)} bars`}</span>
   {/if}
 </div>
-<BarChart {bars} fill {label} indicatorPanes={panes} {indicatorSeries} {catalog} {onPanesChange} {trades} {barPeriod} {ringTrades} {centerTrade} />
+<BarChart
+  {bars}
+  fill
+  {label}
+  indicatorPanes={panes}
+  {indicatorSeries}
+  catalog={chart.indicators.catalog}
+  onPanesChange={changePanes}
+  trades={chartTrades.trades}
+  {barPeriod}
+  {ringTrades}
+  {centerTrade}
+/>
 {#if barsResult === undefined}
   <p class="chart-message" role="status">Loading bars.</p>
 {:else if barsResult.kind === 'failed'}

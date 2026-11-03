@@ -3,7 +3,7 @@
      split adjustment is a row too (section 12.16): "Split 4:1" in Side, the change of the share count, no price, and
      the cash in lieu as the amount. With `onRowSelect` (the forward test page with the bar chart, docs/architecture/
      indicator.md section 23.9.9), each fill row links to its trade mark: the pointer or the focus on a row gives
-     `onRowPoint` its index, and a click or Enter on the number button selects the row. A split adjustment has no mark. -->
+     `onRowPoint` its index, and a click on a row or Enter selects the row. A split adjustment has no mark. -->
 <script lang="ts">
   import { DataTable, SelectableTableRow, type TableColumn } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
@@ -59,7 +59,6 @@
           {:else}
             <SelectableTableRow
               index={fillIndex}
-              label={`Show fill ${String(fillIndex + 1)} on the bar chart`}
               isSelected={fillIndex === selectedIndex}
               {onRowPoint}
               {onRowSelect}

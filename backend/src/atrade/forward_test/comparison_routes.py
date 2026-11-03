@@ -38,7 +38,7 @@ from atrade.forward_test.http_routes import ForwardTestResponse, to_forward_test
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
-from atrade.strategy import ChartIndicator, list_chart_indicators, read_strategy_version
+from atrade.strategy import ChartIndicator, list_version_chart_indicators, read_strategy_version
 
 
 class SamePeriodBacktestResponse(BaseModel):
@@ -475,9 +475,7 @@ class ComparisonRoutes:
         return ForwardTestDetailResponse(
             forward_test=ForwardTestWithIndicatorsResponse(
                 **forward_test.model_dump(),
-                strategy_indicators=list_chart_indicators(
-                    "" if strategy_version is None else strategy_version.code, {}
-                ),
+                strategy_indicators=list_version_chart_indicators(strategy_version, {}),
             ),
             metrics=to_forward_test_metrics_response(
                 calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())

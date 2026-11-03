@@ -65,14 +65,10 @@
     type ForwardTestDetail,
   } from '#lib/forward_test';
   import {
-    AddIndicatorButton,
-    ChartIndicatorSetStore,
     formatInstrument,
-    listChartTrades,
+    RunAddIndicatorButton,
     RunBarChart,
-    RunChartIndicators,
-    type ChartIndicatorDefinition,
-    type ChartPane,
+    RunChart,
   } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
@@ -129,34 +125,21 @@
   $effect(() => feed.start(fetch, window.location));
 
   const chartView = $derived(readChartView(page.url.searchParams));
-  // The Fills row under the pointer or the focus, and the selected row of the open forward test (section 23.9.9).
-  let pointedFillRow: number | null = $state(null);
-  let selectedFill = $state<{ forwardTestId: number; row: number } | null>(null);
-  const selectedFillRow = $derived(selectedFill?.forwardTestId === forwardTestId ? selectedFill.row : null);
-  const chartTrades = $derived(listChartTrades(shownDetail?.fills ?? []));
-  const ringTrades = $derived(
-    [pointedFillRow, selectedFillRow].flatMap((row) => (row === null ? [] : [chartTrades.tradeIndexByRow[row] ?? null])).filter((index) => index !== null),
-  );
+  // The bar chart: the run indicators, the favorite indicators, and the link with the Fills rows (section 23.9.9).
+  const runChart = new RunChart();
+  $effect(() => {
+    runChart.load(fetch);
+  });
 
   function selectFillRow(row: number): void {
     if (forwardTestId === null) {
       return;
     }
-    selectedFill = { forwardTestId, row };
+    runChart.selectRow(String(forwardTestId), row);
     if (chartView !== 'bars') {
       changeChartView('bars');
     }
   }
-  // The indicators of the bar chart: the strategy indicators, and the changes of the user for the open forward test.
-  const chartIndicators = new RunChartIndicators();
-  $effect(() => {
-    chartIndicators.loadCatalog(fetch);
-  });
-  // Only the favorites of the saved chart indicator set (indicator.md section 23.9.8). The run panes are not saved.
-  const chartIndicatorSet = new ChartIndicatorSetStore();
-  $effect(() => {
-    void chartIndicatorSet.load(fetch);
-  });
 
   function changeChartView(view: ChartView): void {
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- the current path with a new search.
@@ -360,16 +343,7 @@
                   <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
                 {/if}
                 {#if chartView === 'bars' && chartInstrument !== null}
-                  <AddIndicatorButton
-                    catalog={chartIndicators.catalog}
-                    favorites={chartIndicatorSet.favorites}
-                    onToggleFavorite={(key: string) => {
-                      chartIndicatorSet.toggleFavorite(fetch, key);
-                    }}
-                    onAdd={(definition: ChartIndicatorDefinition) => {
-                      chartIndicators.add(chartKey, forwardTest.strategy_indicators, definition);
-                    }}
-                  />
+                  <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={forwardTest.strategy_indicators} />
                 {/if}
                 {#if canStop(forwardTest)}
                   <IconButton
@@ -413,14 +387,10 @@
                     ...(forwardTest.stopped_at_utc === null ? {} : { endUtc: forwardTest.stopped_at_utc }),
                   }}
                   label="Bar chart of {formatInstrument(chartInstrument)}, {forwardTest.bar_period} bars"
-                  catalog={chartIndicators.catalog}
-                  panes={chartIndicators.readPanes(chartKey, forwardTest.strategy_indicators)}
-                  onPanesChange={(panes: ChartPane[]) => {
-                    chartIndicators.changePanes(chartKey, panes);
-                  }}
-                  trades={chartTrades.trades}
-                  {ringTrades}
-                  centerTrade={selectedFillRow === null ? null : (chartTrades.tradeIndexByRow[selectedFillRow] ?? null)}
+                  chart={runChart}
+                  runKey={chartKey}
+                  strategyIndicators={forwardTest.strategy_indicators}
+                  records={records.fills}
                 />
               </div>
             {:else if records.metrics !== null}
@@ -453,9 +423,9 @@
               {:else}
                 <ForwardTestFillTable
                   fills={records.fills}
-                  selectedIndex={selectedFillRow}
+                  selectedIndex={runChart.readSelectedRow(chartKey)}
                   onRowPoint={(row: number | null) => {
-                    pointedFillRow = row;
+                    runChart.pointedRow = row;
                   }}
                   onRowSelect={selectFillRow}
                 />

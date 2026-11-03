@@ -363,6 +363,8 @@ test('Apply is disabled with the reason while a parameter is invalid, and Escape
   await expect(settings.getByText('Fast period must be less than slow period (26).')).toBeVisible();
   await expect(fastPeriod).toHaveAttribute('aria-invalid', 'true');
   await expect(apply).toBeDisabled();
+  await expect(apply).toHaveAccessibleDescription('Fix Fast period to apply.');
+  await expect(settings.getByText('Fix Fast period to apply.')).toBeVisible();
   await fastPeriod.fill('0');
   await expect(settings.getByText(/^Enter a value from 1 to \d+\.$/)).toBeVisible();
   await expect(apply).toBeDisabled();
@@ -370,6 +372,7 @@ test('Apply is disabled with the reason while a parameter is invalid, and Escape
   await settings.getByRole('button', { name: 'Reset to defaults' }).click();
   await expect(fastPeriod).toHaveValue('12');
   await expect(apply).toBeEnabled();
+  await expect(settings.getByText('Fix Fast period to apply.')).toHaveCount(0);
   await fastPeriod.fill('5');
   await page.keyboard.press('Escape');
 
@@ -479,11 +482,11 @@ test('a star puts RSI first in Add indicator without an add, and the favorite st
   const dialog = page.getByRole('dialog', { name: 'Add indicator' });
   await expect(dialog.getByRole('option').first()).toHaveText('SMA');
 
-  await dialog.getByRole('button', { name: 'Add RSI to favorites' }).click();
+  await dialog.getByRole('button', { name: 'Add RSI to favorite indicators' }).click();
 
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('option').first()).toHaveText('RSI');
-  await expect(dialog.getByRole('button', { name: 'Remove RSI from favorites' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Remove RSI from favorite indicators' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('list', { name: 'Legend' }).getByRole('listitem')).toHaveCount(1);
   await expect.poll(() => (chartIndicatorSet.read() as { favorites: string[] }).favorites).toEqual(['rsi']);
@@ -493,7 +496,7 @@ test('a star puts RSI first in Add indicator without an add, and the favorite st
   await page.getByRole('button', { name: 'Add indicator' }).click();
 
   await expect(dialog.getByRole('option').first()).toHaveText('RSI');
-  await expect(dialog.getByRole('button', { name: 'Remove RSI from favorites' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Remove RSI from favorite indicators' })).toBeVisible();
 });
 
 test('a failed save shows the detail text over the chart, and the chart keeps the change', async ({ page }) => {

@@ -12,6 +12,7 @@ from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from atrade.strategy.version_reading import (
     StrategyOutline,
     StrategyVersion,
+    list_version_chart_indicators,
     read_strategy_outline,
     read_strategy_version,
     read_strategy_versions,
@@ -34,6 +35,7 @@ __all__ = [
     "create_strategy_language_server_router",
     "create_strategy_router",
     "list_chart_indicators",
+    "list_version_chart_indicators",
     "load_strategy_classes",
     "read_strategy_outline",
     "read_strategy_parameters",

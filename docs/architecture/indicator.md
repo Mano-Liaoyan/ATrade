@@ -474,9 +474,10 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
   in `src/lib/foundation/`. It has a search field and one list:
   - One row for each catalog indicator: the catalog `name`, and the
     `short_name` at the end in IBM Plex Mono when it is different.
-  - A star icon button at the end of each row: "Add <name> to favorites"
-    (`Star`) or "Remove <name> from favorites" (`StarFilled`).
-  - The favorites come first, then the others, each in catalog order. No
+  - A star icon button at the end of each row: "Add <name> to favorite
+    indicators" (`Star`) or "Remove <name> from favorite indicators"
+    (`StarFilled`). GLOSSARY: "Favorite indicator".
+  - The favorite indicators come first, then the others, each in catalog order. No
     groups.
   - The search matches the name, the short name, and the key.
   - Enter or a click on a row adds the indicator with the catalog defaults
@@ -502,8 +503,10 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
     A histogram has the colors only.
   - "Reset to defaults" (ghost button): the catalog defaults of the
     parameters, `solid`, and width 2. The colors do not change.
-  - "Apply" (primary button). It is disabled while a field is invalid. It
-    applies the changes and closes the popover. Escape closes the popover
+  - "Apply" (primary button). It is disabled while a field is invalid,
+    and a helper text line below it says why ("Fix Fast period to apply.",
+    the first invalid field). It applies the changes and closes the
+    popover. Escape closes the popover
     without a change.
 - Decided (#329):
   - A chart without `onPanesChange` has no row buttons (as the pane
@@ -642,9 +645,11 @@ section 6.2).
   - A favorite change sends the saved panes back unchanged. The backtest
     and forward test pages each have their own store for the favorites only
     (no notification for a failed favorite save). When the
-    read of the set failed, a favorite change is not saved (it would save
-    the empty panes over the saved panes). A pane change is saved also
-    then.
+    read of the set failed, no change is saved: the `PUT` would save the
+    part that did not load (the empty panes or the empty favorites) over
+    the saved part. The page keeps the change and shows the read problem.
+    The next change reads the set again and, after a good read, saves all
+    changes.
   - The failed save `InlineNotification` shows the message of the first
     problem, else the `detail` text. It has a close button, because it is
     over the price pane legend. The next good save removes it.
@@ -679,6 +684,9 @@ section 6.2).
     with `ast` and does not run the code. It replaces each configuration
     field name with the value of the field: the value in `parameters` (a
     parameter sweep run), else the default value of the field.
+    `list_version_chart_indicators(version, parameters)` reads the code of
+    a strategy version (an empty list without the version). The backtest
+    route and the forward test route use it.
   - A version without `CHART_INDICATORS` has an empty list. Its chart starts
     without indicators.
 - The chart puts the strategy indicators as section 23.9.3 says, with the
@@ -698,8 +706,20 @@ section 6.2).
     the backtest. A forward test sends no `end_utc` while it runs, so the
     range ends now. The bars and the indicator values are read one time for
     each run; a running forward test does not read new bars.
+  - The bars route and the series route refuse a range of more than
+    20000 bar lengths (`MAX_BARS_PER_REQUEST`), for example a 1-minute
+    backtest of more than about 13 days. So the chart reads a longer run
+    range in consecutive windows of at most 20000 bar lengths, one after
+    the other, and joins the answers (`readRunBars` and
+    `readRunIndicatorSeries` in `run_bars.ts`). A bar at a window border
+    comes only 1 time. Each series window reads its own warm-up bars
+    (section 23.9.6), so the first values of a window have a value. A failed window shows its
+    message; the chart then shows no bars.
   - The changes of the user belong to the open run in the page
-    (`RunChartIndicators`). Another run, or a page load, starts again with
+    (`RunChartIndicators`). Both pages use one `RunChart`
+    (`run_chart.svelte.ts`: the run indicators, the favorite indicators,
+    and the pointed and the selected table row), `RunAddIndicatorButton`,
+    and `RunBarChart`. Another run, or a page load, starts again with
     the strategy indicators. "Equity" and "Bars" keep the changes while the
     run stays open.
 
@@ -740,18 +760,19 @@ section 6.2).
   tab):
   - A pointer on a row, or the focus on a row, gives the mark of its trade
     the `--cds-focus` ring.
-  - A click on a row (or Enter on the number button of the row) selects the
-    row and shows "Bars". The chart scrolls so that the bar of the trade is
-    in the center (`timeScale().setVisibleLogicalRange`, with the width of
-    the visible range). The chart cannot scroll the first bar to the right
+  - A click on a row (or Enter) selects the row and shows "Bars". The
+    chart scrolls so that the bar of the trade is in the center
+    (`timeScale().setVisibleLogicalRange`, with the width of the visible
+    range). The chart cannot scroll the first bar to the right
     of the left edge, so for a bar near the first bar the range is
     narrower: as many bars on each side as there are before the bar, but at
     least 10. The mark keeps the ring while its row stays selected.
   - Only a single-instrument run has "Bars", so only its rows link. A split
     adjustment row has no mark and no link.
-  - The number button has the name "Show trade 3 on the bar chart" (Fills:
-    "Show fill 3 on the bar chart") and `aria-pressed` for the selected
-    row.
+  - The row itself takes the focus (`tabindex="0"`) and shows the Carbon
+    focus (a 2px `--cds-focus` inset border, drawn on the cells). The
+    selected row has `aria-current="true"` and the Carbon selected row
+    color (`SelectableTableRow` in `foundation/carbon`).
 - For screen readers and tests, the chart has a hidden "Trade marks" list:
   one item for each mark with the tooltip text, the mark center in chart
   pixels (`data-x`, `data-y`), and `data-ring`.
@@ -781,7 +802,7 @@ section 6.2).
     body of `GET /api/screen-indicators`), the series route, and the
     warm-up.
   - `foundation/command_dialog`: `CommandDialog` (Carbon modal, Bits UI
-    Command, one list, disabled items with a reason).
+    Command, one list, an optional action button on each item).
   - `#lib/market_data`: `AddIndicatorButton` (the header button, the `/`
     key, and the dialog), `ChartLegend` (one pane legend: the OHLC row and
     the indicator rows), `chart_indicators.ts` (`formatLegendName`,
