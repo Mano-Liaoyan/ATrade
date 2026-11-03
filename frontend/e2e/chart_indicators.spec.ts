@@ -2,10 +2,17 @@
 // backend with the IBKR fake. The fake daily bars start on 2023-01-02 (the default range of 1096 days), so a 20-bar
 // indicator has no value at the first 19 bars: the series route has no saved warm-up bars before them.
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { useLocalChartIndicatorSet, type LocalChartIndicatorSet } from './local_chart_indicator_set';
 
 const PAGE_PATH = '/instruments/SEHK/700?currency=HKD&bar_period=1-DAY';
 const CHART_NAME = 'Bar chart of 700 / SEHK / HKD, 1-DAY bars';
 const NUMBER_PATTERN = /^\d{1,3}(,\d{3})*\.\d{2}$/;
+
+// Each test starts with an empty chart indicator set of its own.
+let chartIndicatorSet: LocalChartIndicatorSet;
+test.beforeEach(async ({ context }) => {
+  chartIndicatorSet = await useLocalChartIndicatorSet(context);
+});
 
 async function openChart(page: Page): Promise<void> {
   await page.goto(PAGE_PATH);
@@ -406,4 +413,101 @@ test('a theme change gives the lines the other palette without a new chart', asy
   await expect(page.getByRole('img', { name: CHART_NAME }).locator('table[data-test-first-chart]')).toHaveCount(1);
   await expect.poll(() => countColorPixels(page, DARK_COLOR_1)).toBeGreaterThan(LINE_PIXELS);
   expect(await countColorPixels(page, LIGHT_COLOR_1)).toBeLessThan(LINE_PIXELS);
+});
+
+// The saved chart indicator set (section 23.9.7) and the favorites of Add indicator (section 23.9.5).
+
+const OTHER_PAGE_PATH = '/instruments/NASDAQ/AAPL?currency=USD&bar_period=1-DAY';
+// Magenta 70 of the light palette.
+const MAGENTA_70_RGB = 'rgb(159, 24, 83)';
+
+/** The legend names of each pane, from the top pane to the bottom pane. */
+async function readLegendNames(page: Page): Promise<string[][]> {
+  const legends = page.getByRole('list', { name: 'Legend' });
+  await expect(legends.first().getByRole('listitem').first()).toBeVisible();
+  const names: string[][] = [];
+  for (const legend of await legends.all()) {
+    const top = await readTop(legend);
+    names.push([String(top), ...(await legend.locator('.legend-name').allTextContents())]);
+  }
+  return names
+    .toSorted((first, second) => Number(first[0]) - Number(second[0]))
+    .map((paneNames) => paneNames.slice(1));
+}
+
+/** The indicator keys of each saved pane. */
+function readSavedPanes(localSet: LocalChartIndicatorSet): string[][] {
+  const savedSet = localSet.read() as { panes: { indicators: { indicator: string }[] }[] };
+  return savedSet.panes.map((pane) => pane.indicators.map((indicator) => indicator.indicator));
+}
+
+async function expectSavedChart(page: Page): Promise<void> {
+  await expect.poll(() => readLegendNames(page)).toEqual([['SMA 50'], ['MACD 12 26 9'], ['RSI 14']]);
+  await expect(legendRow(page, 'RSI 14').locator('.legend-value')).toHaveCSS('color', MAGENTA_70_RGB);
+}
+
+test('the indicators, the RSI color, and the pane order stay after a page load and on another instrument', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await openChart(page);
+  await addSma(page);
+  await addIndicator(page, /^RSI$/);
+  await addIndicator(page, /^MACD$/);
+  const row = await hoverRow(page, 'RSI 14');
+  await row.getByRole('button', { name: 'Settings for RSI 14' }).click();
+  const settings = page.getByRole('dialog', { name: 'RSI' });
+  await settings.getByRole('group', { name: 'Line' }).getByRole('radio', { name: 'Magenta 70' }).check();
+  await settings.getByRole('button', { name: 'Apply' }).click();
+  await expect(settings).toBeHidden();
+  await choosePaneOption(page, 'MACD 12 26 9', 'Move up');
+  await expectSavedChart(page);
+  await expect.poll(() => readSavedPanes(chartIndicatorSet)).toEqual([['sma'], ['macd'], ['rsi']]);
+
+  await page.reload();
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
+
+  await expectSavedChart(page);
+
+  await page.goto(OTHER_PAGE_PATH);
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText(/^\d+ bars$/);
+
+  await expectSavedChart(page);
+});
+
+test('a star puts RSI first in Add indicator without an add, and the favorite stays after a page load', async ({ page }) => {
+  await openChart(page);
+  await page.getByRole('button', { name: 'Add indicator' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add indicator' });
+  await expect(dialog.getByRole('option').first()).toHaveText('SMA');
+
+  await dialog.getByRole('button', { name: 'Add RSI to favorites' }).click();
+
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('option').first()).toHaveText('RSI');
+  await expect(dialog.getByRole('button', { name: 'Remove RSI from favorites' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('list', { name: 'Legend' }).getByRole('listitem')).toHaveCount(1);
+  await expect.poll(() => (chartIndicatorSet.read() as { favorites: string[] }).favorites).toEqual(['rsi']);
+
+  await page.reload();
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
+  await page.getByRole('button', { name: 'Add indicator' }).click();
+
+  await expect(dialog.getByRole('option').first()).toHaveText('RSI');
+  await expect(dialog.getByRole('button', { name: 'Remove RSI from favorites' })).toBeVisible();
+});
+
+test('a failed save shows the detail text over the chart, and the chart keeps the change', async ({ page }) => {
+  await page.route('**/api/market-data/chart-indicators', async (route) => {
+    if (route.request().method() === 'PUT') {
+      await route.fulfill({ status: 500, json: { detail: 'The database is not reachable.' } });
+    } else {
+      await route.fallback();
+    }
+  });
+  await openChart(page);
+
+  await addSma(page);
+
+  await expect(page.getByRole('alert').filter({ hasText: 'The database is not reachable.' })).toBeVisible();
+  await expect(legendRow(page, 'SMA 50')).toBeVisible();
 });

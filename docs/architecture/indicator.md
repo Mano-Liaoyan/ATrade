@@ -483,10 +483,8 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
     and closes the dialog. A click on the star does not add.
 - The favorites are saved in the chart indicator set (section 23.9.7), also
   from a backtest or forward test chart.
-- Until the chart indicator set
-  comes (#330), the indicators of the instrument page are not saved: a page
-  load starts without indicators. They stay when the bar period changes
-  (#327).
+- The instrument page reads the chart indicator set when it opens. The
+  indicators stay when the bar period or the instrument changes (#330).
 - Settings (B1): a Bits UI `Popover` at the legend row. Heading: the catalog
   `name`. Content, from top to bottom:
   - One Carbon `NumberInput` for each parameter (also the parameters
@@ -619,6 +617,45 @@ section 6.2).
     `dashed`, or `dotted`, a `width` that is not 1 to 4,
   - a `favorites` value that is not a catalog key, or a key 2 times.
 - The last `PUT` wins. Two browser tabs do not merge their changes.
+- Decided (#330):
+  - The `422` answer has `{"problems": [{"location", "message"}]}`, as the
+    series route. The location is the path in the body, for example
+    `["panes", 1, "indicators", 0, "lines", 0, "color"]`, `["panes"]` for
+    the pane count, `["panes", 1, "indicators"]` for an own pane without an
+    indicator, `[..., "indicator"]` for a wrong placement, `[..., "lines"]`
+    for a missing output, `[..., "lines", 3, "output"]` for an unknown output
+    or an output 2 times, and `["favorites", 1]` for a favorite problem. A
+    body of a wrong JSON type (for example a text `color`) is the FastAPI
+    `422`. Unknown fields are ignored.
+  - The OpenAPI schemas are `ChartIndicatorSet`, `SavedChartPane`,
+    `SavedChartIndicator`, and `SavedChartLine` (`style` is a string: the
+    route checks it, so a wrong style is a problem with its location).
+  - Without a row (only an emptied test database), `GET` gives the set of
+    the migration.
+  - Frontend: `chart_indicator_set.ts` (`readChartIndicatorSet`,
+    `saveChartIndicatorSet`, `toggleFavorite`, `orderByFavorites`) and the
+    class `ChartIndicatorSetStore` (`chart_indicator_set_store.svelte.ts`).
+    The page that owns the store saves; `BarChart` does not save. The store
+    sends one `PUT` after the other, each with the set at that time, so the
+    last change is the last saved set. A change before the read answer
+    keeps the changed part, and the read gives the other part.
+  - A favorite change sends the saved panes back unchanged. The backtest
+    and forward test pages each have their own store for the favorites only
+    (no notification for a failed favorite save). When the
+    read of the set failed, a favorite change is not saved (it would save
+    the empty panes over the saved panes). A pane change is saved also
+    then.
+  - The failed save `InlineNotification` shows the message of the first
+    problem, else the `detail` text. It has a close button, because it is
+    over the price pane legend. The next good save removes it.
+  - `AddIndicatorButton` has the star buttons only with `onToggleFavorite`.
+    `CommandDialog` items have an optional `action` (Carbon contained list
+    item action, an `IconButton` with a floating tooltip). A click on it
+    calls `onAction` and does not select the item.
+  - Playwright tests of the instrument page chart replace the 2 routes with
+    a set in the browser context (`e2e/local_chart_indicator_set.ts`), and
+    `run_bar_chart.spec.ts` does the same: the set is one global row, and
+    the 4 projects and other specs use one database at the same time.
 
 ### 23.9.8 Bar charts of backtests and forward tests
 

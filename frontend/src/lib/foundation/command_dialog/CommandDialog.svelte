@@ -1,12 +1,13 @@
 <!-- A Carbon modal with a title, a large Carbon search field, and one Carbon contained list, on Bits UI Dialog and
      Command. The text filters the items (the label and the keywords), Arrow Up and Arrow Down move the highlight, and
      Enter or a click selects the highlighted item and closes the dialog. Escape closes it without a choice. The list
-     has no groups. The items keep their order. -->
+     has no groups. The items keep their order. An item can have an icon button at its end (`action`, Carbon contained
+     list item action). The button is in the tab order, and a click on it calls `onAction` and does not select. -->
 <script lang="ts">
   import Close20 from '@carbon/icons/es/close/20.js';
   import Search16 from '@carbon/icons/es/search/16.js';
   import { Command, Dialog } from 'bits-ui';
-  import { buttonClasses, Icon } from '#lib/foundation/carbon';
+  import { buttonClasses, Icon, IconButton } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import type { CommandDialogItem } from './command_dialog';
 
@@ -18,9 +19,11 @@
     searchLabel: string;
     items: CommandDialogItem[];
     onSelect: (value: string) => void;
+    /** A click on the action button of the item with this value. */
+    onAction?: (value: string) => void;
   }
 
-  const { open, onOpenChange, title, searchLabel, items, onSelect }: Props = $props();
+  const { open, onOpenChange, title, searchLabel, items, onSelect, onAction = () => undefined }: Props = $props();
 
   // The modal title is an h2: the dialog is outside the page outline, and the page has its own h1.
   const TITLE_LEVEL = 2;
@@ -111,7 +114,11 @@
                           >
                             {#snippet child({ props: itemProps })}
                               <div
-                                class={['cds--contained-list-item', item.disabledText === undefined && 'cds--contained-list-item--clickable']}
+                                class={[
+                                  'cds--contained-list-item',
+                                  item.disabledText === undefined && 'cds--contained-list-item--clickable',
+                                  item.action !== undefined && 'cds--contained-list-item--with-action',
+                                ]}
                                 role="none"
                               >
                                 <div {...itemProps} class="cds--contained-list-item__content command-dialog-item">
@@ -122,6 +129,19 @@
                                     <span class="command-dialog-detail">{item.detail}</span>
                                   {/if}
                                 </div>
+                                {#if item.action !== undefined}
+                                  <div class="cds--contained-list-item__action command-dialog-action">
+                                    <IconButton
+                                      label={item.action.label}
+                                      icon={item.action.icon}
+                                      align="left"
+                                      floatingTooltip
+                                      onclick={() => {
+                                        onAction(item.value);
+                                      }}
+                                    />
+                                  </div>
+                                {/if}
                               </div>
                             {/snippet}
                           </Command.Item>
@@ -165,6 +185,13 @@
   .command-dialog-item:global([data-disabled]) {
     color: var(--cds-text-disabled);
     cursor: not-allowed;
+  }
+
+  /* The action button is in the middle of the item height, at its end. */
+  .command-dialog-action {
+    inset-block-end: 0;
+    align-items: center;
+    padding-inline-end: var(--cds-spacing-03);
   }
 
   .command-dialog-detail {

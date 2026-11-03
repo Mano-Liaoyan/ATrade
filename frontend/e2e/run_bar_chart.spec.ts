@@ -3,11 +3,17 @@
 // test of the strategy "E2E chart indicators" on them. The strategy template has
 // CHART_INDICATORS = [{"indicator": "sma", "parameters": {"period": "average_period"}}] with average_period 20.
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { useLocalChartIndicatorSet } from './local_chart_indicator_set';
 
 const BAR_COUNT_TEXT = '45 bars';
 const STRATEGY_INDICATOR_NAME = 'SMA 20';
 const NUMBER_PATTERN = /^\d{1,3}(,\d{3})*\.\d{2}$/;
 const INSTRUMENT_PAGE_PATH = '/instruments/SEHK/700?currency=HKD&bar_period=1-DAY';
+
+// Each test has its own chart indicator set: a favorite from here must not change the set of other tests.
+test.beforeEach(async ({ context }) => {
+  await useLocalChartIndicatorSet(context);
+});
 
 async function startBacktest(request: APIRequestContext, name: string): Promise<number> {
   // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
@@ -43,7 +49,8 @@ function legendRow(page: Page, name: RegExp | string): ReturnType<Page['getByRol
   return page.getByRole('list', { name: 'Legend' }).getByRole('listitem').filter({ hasText: name });
 }
 
-/** "Bars" shows the bar chart with the strategy indicators, the address keeps it, and an added EMA is not saved. */
+/** "Bars" shows the bar chart with the strategy indicators, the address keeps it, and an added EMA is not saved. A
+ * favorite (MACD) is saved: the instrument page shows it first. */
 async function expectBarsWithStrategyIndicators(page: Page): Promise<void> {
   const switcher = page.getByRole('tablist', { name: 'Chart' });
   await expect(switcher.getByRole('tab', { name: 'Equity' })).toHaveAttribute('aria-selected', 'true');
@@ -71,6 +78,8 @@ async function expectBarsWithStrategyIndicators(page: Page): Promise<void> {
 
   await page.getByRole('button', { name: 'Add indicator' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add indicator' });
+  await dialog.getByRole('button', { name: 'Add MACD to favorites' }).click();
+  await expect(dialog.getByRole('option').first()).toHaveText('MACD');
   await dialog.getByRole('option', { name: /^EMA/ }).click();
   await expect(dialog).toBeHidden();
   await expect(legendRow(page, /^EMA \d+/)).toBeVisible();
@@ -85,6 +94,8 @@ async function expectBarsWithStrategyIndicators(page: Page): Promise<void> {
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
   await expect(page.getByRole('list', { name: 'Legend' }).first()).toBeVisible();
   await expect(legendRow(page, /^EMA \d+/)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Add indicator' }).click();
+  await expect(dialog.getByRole('option').first()).toHaveText('MACD');
 }
 
 test('the backtest bar chart shows the strategy indicators and keeps "Bars" in the address', async ({ page, request }, currentTest) => {

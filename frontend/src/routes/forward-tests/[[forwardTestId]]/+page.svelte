@@ -62,7 +62,7 @@
     type ForwardTest,
     type ForwardTestDetail,
   } from '#lib/forward_test';
-  import { AddIndicatorButton, formatInstrument, RunBarChart, RunChartIndicators, type ChartIndicatorDefinition, type ChartPane } from '#lib/market_data';
+  import { AddIndicatorButton, ChartIndicatorSetStore, formatInstrument, RunBarChart, RunChartIndicators, type ChartIndicatorDefinition, type ChartPane } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_FORWARD_TEST_FORM_ID } from '../../palette_commands';
@@ -122,6 +122,11 @@
   const chartIndicators = new RunChartIndicators();
   $effect(() => {
     chartIndicators.loadCatalog(fetch);
+  });
+  // Only the favorites of the saved chart indicator set (indicator.md section 23.9.8). The run panes are not saved.
+  const chartIndicatorSet = new ChartIndicatorSetStore();
+  $effect(() => {
+    void chartIndicatorSet.load(fetch);
   });
 
   function changeChartView(view: ChartView): void {
@@ -328,6 +333,10 @@
                 {#if chartView === 'bars' && chartInstrument !== null}
                   <AddIndicatorButton
                     catalog={chartIndicators.catalog}
+                    favorites={chartIndicatorSet.favorites}
+                    onToggleFavorite={(key: string) => {
+                      chartIndicatorSet.toggleFavorite(fetch, key);
+                    }}
                     onAdd={(definition: ChartIndicatorDefinition) => {
                       chartIndicators.add(chartKey, forwardTest.strategy_indicators, definition);
                     }}

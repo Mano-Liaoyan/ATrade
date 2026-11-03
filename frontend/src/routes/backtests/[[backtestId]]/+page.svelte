@@ -54,6 +54,7 @@
   import { isLiveBarPeriod, startForwardTest } from '#lib/forward_test';
   import {
     AddIndicatorButton,
+    ChartIndicatorSetStore,
     formatInstrument,
     RunBarChart,
     RunChartIndicators,
@@ -109,6 +110,11 @@
   const chartIndicators = new RunChartIndicators();
   $effect(() => {
     chartIndicators.loadCatalog(fetch);
+  });
+  // Only the favorites of the saved chart indicator set (indicator.md section 23.9.8). The run panes are not saved.
+  const chartIndicatorSet = new ChartIndicatorSetStore();
+  $effect(() => {
+    void chartIndicatorSet.load(fetch);
   });
 
   function changeChartView(view: ChartView): void {
@@ -317,6 +323,10 @@
                 {#if chartView === 'bars' && instrument !== undefined}
                   <AddIndicatorButton
                     catalog={chartIndicators.catalog}
+                    favorites={chartIndicatorSet.favorites}
+                    onToggleFavorite={(key: string) => {
+                      chartIndicatorSet.toggleFavorite(fetch, key);
+                    }}
                     onAdd={(definition: ChartIndicatorDefinition) => {
                       chartIndicators.add(chartKey, detail.strategy_indicators, definition);
                     }}

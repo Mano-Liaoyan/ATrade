@@ -250,6 +250,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/market-data/chart-indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Chart Indicator Set */
+        get: operations["read_chart_indicator_set_api_market_data_chart_indicators_get"];
+        /**
+         * Save Chart Indicator Set
+         * @description A `422` of section 23.9.7 has the problem list. A body of a wrong JSON type is the FastAPI `422`.
+         */
+        put: operations["save_chart_indicator_set_api_market_data_chart_indicators_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/market-data/hk-instrument-list": {
         parameters: {
             query?: never;
@@ -1295,6 +1316,16 @@ export interface components {
             parameters: {
                 [key: string]: components["schemas"]["ParameterNumber"];
             };
+        };
+        /**
+         * ChartIndicatorSet
+         * @description The first pane is the price pane. The other panes are own panes, in the order on the chart.
+         */
+        ChartIndicatorSet: {
+            /** Panes */
+            panes: components["schemas"]["SavedChartPane"][];
+            /** Favorites */
+            favorites: string[];
         };
         /** CodeCheckFailedResponse */
         CodeCheckFailedResponse: {
@@ -2500,6 +2531,35 @@ export interface components {
              * Format: date-time
              */
             last_start_utc: string;
+        };
+        /** SavedChartIndicator */
+        SavedChartIndicator: {
+            /** Indicator */
+            indicator: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: number;
+            };
+            /** Hidden */
+            hidden: boolean;
+            /** Lines */
+            lines: components["schemas"]["SavedChartLine"][];
+        };
+        /** SavedChartLine */
+        SavedChartLine: {
+            /** Output */
+            output: string;
+            /** Color */
+            color: number;
+            /** Style */
+            style: string;
+            /** Width */
+            width: number;
+        };
+        /** SavedChartPane */
+        SavedChartPane: {
+            /** Indicators */
+            indicators: components["schemas"]["SavedChartIndicator"][];
         };
         /** ScreenCheckFailedResponse */
         ScreenCheckFailedResponse: {
@@ -4240,6 +4300,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IndicatorSeriesResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    read_chart_indicator_set_api_market_data_chart_indicators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChartIndicatorSet"];
+                };
+            };
+        };
+    };
+    save_chart_indicator_set_api_market_data_chart_indicators_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChartIndicatorSet"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChartIndicatorSet"];
                 };
             };
             /** @description Unprocessable Content */

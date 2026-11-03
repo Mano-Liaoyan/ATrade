@@ -17,6 +17,7 @@
     addChartIndicator,
     BAR_PERIODS,
     BarChart,
+    ChartIndicatorSetStore,
     describeLiveBar,
     formatChartSearch,
     formatDayChange,
@@ -77,14 +78,20 @@
     };
   });
 
-  // Indicators on the chart (docs/architecture/indicator.md section 23.9). They are not saved yet: a page load starts
-  // without indicators. They stay when the bar period changes.
+  // Indicators on the chart (docs/architecture/indicator.md section 23.9). The page reads the saved chart indicator
+  // set and saves each change at once (section 23.9.7). The indicators stay when the bar period or the instrument
+  // changes. The pane heights and Maximize are not saved.
   let indicatorCatalog: ChartIndicatorDefinition[] = $state([]);
-  let indicatorPanes: ChartPane[] = $state([{ indicators: [] }]);
+  const chartIndicatorSet = new ChartIndicatorSetStore();
+  const indicatorPanes = $derived(chartIndicatorSet.panes);
   let loadedSeries: { key: string; result: IndicatorSeriesResult } | undefined = $state();
   let seriesError: { key: string; message: string } | undefined = $state();
   const indicatorSeries = $derived(loadedSeries?.key === chartKey ? loadedSeries.result : null);
   const seriesErrorText = $derived(seriesError?.key === chartKey ? seriesError.message : null);
+
+  $effect(() => {
+    void chartIndicatorSet.load(fetch);
+  });
 
   $effect(() => {
     void listChartIndicatorCatalog(fetch).then((result) => {
@@ -126,8 +133,12 @@
     };
   });
 
+  function changeIndicatorPanes(panes: ChartPane[]): void {
+    chartIndicatorSet.changePanes(fetch, panes);
+  }
+
   function addIndicator(definition: ChartIndicatorDefinition): void {
-    indicatorPanes = addChartIndicator(indicatorPanes, definition);
+    changeIndicatorPanes(addChartIndicator(indicatorPanes, definition));
   }
 
   let liveBarError: string | null = $state(null);
@@ -277,7 +288,14 @@
                     onValueChange={changeBarPeriod}
                   />
                 </div>
-                <AddIndicatorButton catalog={indicatorCatalog} onAdd={addIndicator} />
+                <AddIndicatorButton
+                  catalog={indicatorCatalog}
+                  onAdd={addIndicator}
+                  favorites={chartIndicatorSet.favorites}
+                  onToggleFavorite={(key: string) => {
+                    chartIndicatorSet.toggleFavorite(fetch, key);
+                  }}
+                />
               </div>
             {/snippet}
             <div class="chart">
@@ -295,14 +313,23 @@
                 {indicatorPanes}
                 {indicatorSeries}
                 catalog={indicatorCatalog}
-                onPanesChange={(panes: ChartPane[]) => {
-                  indicatorPanes = panes;
-                }}
+                onPanesChange={changeIndicatorPanes}
               />
               {#if isLoading}
                 <p class="chart-message" role="status">Loading bars.</p>
               {:else if barsResult?.kind === 'failed'}
                 <div class="chart-message"><InlineNotification kind="error" title={barsResult.message} lowContrast /></div>
+              {:else if chartIndicatorSet.errorText !== null}
+                <div class="chart-message">
+                  <InlineNotification
+                    kind="error"
+                    title={chartIndicatorSet.errorText}
+                    lowContrast
+                    onClose={() => {
+                      chartIndicatorSet.errorText = null;
+                    }}
+                  />
+                </div>
               {:else if liveBarErrorText !== null}
                 <div class="chart-message"><InlineNotification kind="error" title={liveBarErrorText} lowContrast /></div>
               {:else if seriesErrorText !== null}
