@@ -42,7 +42,11 @@ def to_decimal(ratio: Fraction) -> Decimal:
 
 
 def find_split_ratio(raw_ratio: Decimal) -> Fraction:
-    """The fraction with the smallest denominator near the raw ratio, for example 2 for 2.004 and 11/10 for 1.098."""
+    """The fraction with the smallest denominator near the raw ratio, for example 2 for 2.004 and 11/10 for 1.098.
+    Below 1, the inverse of the split ratio of the inverse, for example 1/150 for 0.00667 (a reverse split). Thus
+    the result is never 0."""
+    if raw_ratio < 1:
+        return 1 / find_split_ratio(1 / raw_ratio)
     exact_ratio = Fraction(raw_ratio)
     for max_denominator in range(1, MAX_SPLIT_RATIO_DENOMINATOR + 1):
         ratio = exact_ratio.limit_denominator(max_denominator)

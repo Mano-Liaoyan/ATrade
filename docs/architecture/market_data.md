@@ -550,7 +550,8 @@ undo the import.
   check. A stock split does not change the trading value (close × volume).
 - A ratio step is a change of more than 3% from one day to the next. The
   split ratio is the nearest fraction with a small denominator (2 for 2.004,
-  11/10 for 1.098).
+  11/10 for 1.098). A ratio below 1 is the inverse of the split ratio of its
+  inverse (1/150 for 0.00667), so a large reverse split never gets the ratio 0.
 - The detection rule accepts the split ratios 3/2, 2, 3, 4, 5, 10, 1/2,
   1/3, 1/4, 1/5, 1/10, and 1/20, each with a tolerance of 3%. A forward
   split needs a higher volume on the ex-date, a reverse split a lower

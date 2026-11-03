@@ -298,6 +298,41 @@ async def test_after_3_timeouts_of_the_same_instrument_the_check_uses_the_detect
 
 
 @pytest.mark.anyio
+async def test_a_reverse_split_of_1_for_150_gets_the_split_ratio_1_150(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """A split ratio below 1/50 was rounded to 0 before, and the database refused the stock split."""
+    bars = create_bars(
+        "SPLT",
+        TRADING_DAYS[:4],
+        [("1.00", "1.00", 150000), ("1.00", "1.01", 150000), ("150", "150", 1000), ("150", "151", 1000)],
+    )
+    import_bars(database_url, tmp_path, bars)
+    gateway.historical_bars[SPLT] = ibkr_bars(TRADING_DAYS[:4], ["150", "151.5", "150", "151"])
+
+    await run_check(database_url, gateway, WaitRecorder())
+
+    assert read_table(database_url, STOCK_SPLIT_QUERY) == [
+        (
+            "SPLT",
+            "NASDAQ",
+            "USD",
+            utc_day(TRADING_DAYS[2]),
+            Decimal(1) / Decimal(150),
+            "databento_import",
+            "bar_evidence",
+        )
+    ]
+    # The split ratio 1/150 has no exact decimal form, so the adjusted closes differ in the last of 28 digits.
+    assert [round(bar.close, 6) for bar in await read_bars(database_url, "SPLT")] == [
+        Decimal(150),
+        Decimal("151.5"),
+        Decimal(150),
+        Decimal(151),
+    ]
+
+
+@pytest.mark.anyio
 async def test_without_ibkr_bars_the_detection_rule_finds_the_stock_split_and_it_waits_for_the_user_check(
     database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
 ) -> None:
