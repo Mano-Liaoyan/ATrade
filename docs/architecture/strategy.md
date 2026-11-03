@@ -148,6 +148,17 @@ New columns of `strategy_version`:
   - The "Blank code" start point, the code templates, and the rule builder
     code have `CHART_INDICATORS`. The AI assistant reads the "Blank code"
     start point in its system prompt, so it writes `CHART_INDICATORS` too.
+  - Decided (#334): `backend/src/atrade/strategy/chart_indicators.py` reads
+    and checks `CHART_INDICATORS`. `list_chart_indicators(code, parameters)`
+    returns `[{"indicator", "parameters"}, ...]` with the values in place of
+    the field names. It leaves out an item that is not correct with these
+    values, and it returns an empty list for code with a syntax error.
+  - Decided (#334): a `parameters` key that is not there gives the default
+    parameters of the indicator. The rule builder code without indicators
+    has `CHART_INDICATORS = []`. A code template (section 9.9.3) shows the
+    indicator of its score with number literals: `momentum_12_1` (252, 21)
+    for M1 and M4, `realized_volatility` (252) for M2, and
+    `distance_to_52_week_high` (252) for M3.
 - The "Blank code" start point is the code in
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
   cross strategy: buy 10 shares when the close goes above SMA(20), sell when
@@ -186,7 +197,11 @@ The checks run in the Web process. They do not import the user code.
   apply. A `# noqa` comment in the strategy code turns off a rule on its line.
   `ruff` is a runtime dependency of the backend for this reason.
 - When `ast.parse` fails, only the syntax error is returned. Otherwise the
-  class problems and the ruff problems are returned together, sorted by line.
+  class problems, the `CHART_INDICATORS` problems, and the ruff problems are
+  returned together, sorted by line.
+- A `CHART_INDICATORS` problem has the line of the item, or of the
+  parameter value, and starts with the item number, for example
+  `CHART_INDICATORS item 2: The period must be from 1 to 1000, not 0.`
 - Each problem has a line number and a reason, for example
   `{"line": 14, "message": "Syntax error: invalid syntax."}`.
 - The checks run before the comparison with the latest version.

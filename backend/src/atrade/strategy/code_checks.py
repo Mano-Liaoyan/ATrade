@@ -1,15 +1,17 @@
 """Checks that strategy code must pass before it is saved (docs/architecture/strategy.md section 9.3).
 
-The checks do not import or run the user code: they use ast.parse, an AST check of the class bases,
-and the ruff F rules.
+The checks do not import or run the user code: they use ast.parse, an AST check of the class bases, an AST
+check of CHART_INDICATORS, and the ruff F rules.
 """
 
 import ast
 import asyncio
 import sys
-from dataclasses import dataclass
 
 from pydantic import BaseModel, TypeAdapter
+
+from atrade.strategy.chart_indicators import find_chart_indicator_problems
+from atrade.strategy.code_syntax import CodeProblem, has_base_class
 
 REQUIRED_BASE_CLASSES = ("Strategy", "StrategyConfig")
 RUFF_ARGUMENTS = (
@@ -27,12 +29,6 @@ RUFF_ARGUMENTS = (
 # ruff exits with 0 when there are no errors and with 1 when it found errors. Other codes are failures of ruff itself.
 RUFF_EXIT_CODES_WITH_REPORT = (0, 1)
 FIRST_LINE = 1
-
-
-@dataclass(frozen=True)
-class CodeProblem:
-    line: int
-    message: str
 
 
 class RuffLocation(BaseModel):
@@ -55,8 +51,9 @@ async def check_strategy_code(code: str) -> list[CodeProblem]:
         # readability-exception: ast.parse reports a syntax error only as an exception.
         return [CodeProblem(line=error.lineno or FIRST_LINE, message=f"Syntax error: {error.msg}.")]
     class_problems = find_class_count_problems(module)
+    chart_problems = find_chart_indicator_problems(module)
     ruff_problems = await find_ruff_problems(code)
-    all_problems = class_problems + ruff_problems
+    all_problems = class_problems + chart_problems + ruff_problems
     return sorted(all_problems, key=lambda problem: problem.line)
 
 
@@ -73,15 +70,6 @@ def find_class_count_problems(module: ast.Module) -> list[CodeProblem]:
             message = f"The code must have exactly 1 {base_class_name} subclass. {extra_subclass.name} is one more."
             problems.append(CodeProblem(line=extra_subclass.lineno, message=message))
     return problems
-
-
-def has_base_class(class_node: ast.ClassDef, base_class_name: str) -> bool:
-    for base in class_node.bases:
-        if isinstance(base, ast.Name) and base.id == base_class_name:
-            return True
-        if isinstance(base, ast.Attribute) and base.attr == base_class_name:
-            return True
-    return False
 
 
 async def find_ruff_problems(code: str) -> list[CodeProblem]:
