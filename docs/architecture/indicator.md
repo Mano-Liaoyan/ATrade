@@ -410,6 +410,9 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
     with width 2. A histogram has a color only. When all 14 colors are in
     use, the palette starts again with the colors that the fewest lines use
     (#327).
+- Crosshair: each visible line series and histogram series shows the
+  crosshair marker (a dot where the line crosses the vertical crosshair
+  line, `crosshairMarkerVisible`).
 
 ### 23.9.4 Legend
 
@@ -426,6 +429,11 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
   leaves the chart, the legend shows the values at the last bar that has
   indicator data (section 23.9.6). A line without a value shows
   "No value".
+- Each line series and histogram series of a visible indicator also shows
+  the value of the legend (the same bar) as a label on the price axis of
+  its pane, in the line color. It is a price line with `lineVisible: false`
+  and `axisLabelVisible: true`; its price follows the crosshair. A hidden
+  indicator or a bar without a value shows no label.
 - When the pointer is on a row, or the focus is in it, the row shows 3 ghost
   icon buttons. Each has a Bits UI `Tooltip`:
   - "Hide <legend name>" (`View`) or "Show <legend name>" (`ViewOff`). A

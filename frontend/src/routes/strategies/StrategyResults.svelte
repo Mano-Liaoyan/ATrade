@@ -3,22 +3,29 @@
      the last selected backtest, like the backtest page: the API has no orders, and Logs shows the strategy error. The
      detail reads again when the status of the backtest changes, for example to finished.
      A failed or timed out backtest tab shows its error at once: the status with the last error line, the "Ask AI to fix"
-     button (the AI assistant reads the error itself with read_backtest), and the full log. -->
+     button (the AI assistant reads the error itself with read_backtest), and the full log.
+     A single-instrument backtest tab has the "Equity" / "Bars" switcher of the backtest page: "Bars" shows the bar
+     chart of the backtest with the strategy indicators, "Add indicator", and the trade marks
+     (docs/architecture/indicator.md section 23.9.8). -->
 <script lang="ts">
   import {
     BacktestTradeTable,
+    ChartViewSwitcher,
     describeBacktestStatus,
     EquityDrawdownChart,
     findBacktestStatusKind,
     findErrorSummary,
     KeyMetricRow,
     readBacktest,
+    readBacktestInstrument,
     type Backtest,
     type BacktestDetail,
+    type ChartView,
   } from '#lib/backtest';
   import { Button, InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
+  import { formatInstrument, RunAddIndicatorButton, RunBarChart, RunChart } from '#lib/market_data';
   import type { ResultTab } from './strategy_workbench';
 
   interface Props {
@@ -40,6 +47,13 @@
   const backtestId = $derived(backtest?.id ?? null);
   const backtestStatus = $derived(backtest?.status ?? null);
   const shownDetail = $derived(detail !== null && detail.id === backtest?.id ? detail : null);
+
+  // Not in the page address: the strategy page keeps its own address (StrategyWorkbench).
+  let chartView: ChartView = $state('equity');
+  const runChart = new RunChart();
+  $effect(() => {
+    runChart.load(fetch);
+  });
 
   $effect(() => {
     const id = backtestId;
@@ -83,45 +97,77 @@
         <pre class="log-text">{run.error_message}</pre>
       </ScrollRegion>
     {/if}
-  {:else if run.metrics === null && (run.status === 'failed' || run.status === 'timed_out')}
-    <div class="failure">
-      <InlineNotification
-        kind={run.status === 'failed' ? 'error' : 'warning'}
-        title={describeBacktestStatus(run.status)}
-        subtitle={findErrorSummary(run.error_message)}
-        lowContrast
-      />
-      {#if run.status === 'failed' && run.error_message !== null && run.error_message !== ''}
-        <div class="failure-actions">
-          <Button
-            size="sm"
-            onclick={() => {
-              onAskAssistant(run.id);
-            }}>Ask AI to fix</Button
-          >
-        </div>
-        <div class="failure-log">
-          <ScrollRegion label="Log" fill>
-            <pre class="log-text">{run.error_message}</pre>
-          </ScrollRegion>
-        </div>
-      {/if}
-    </div>
-  {:else if run.metrics === null}
-    <div class="state-area" role="status" aria-label="Backtest status">
-      <StatusIndicator label={describeBacktestStatus(run.status)} kind={findBacktestStatusKind(run.status)} />
-    </div>
   {:else}
-    <KeyMetricRow metrics={run.metrics} startCapitalUsd={run.paper_capital_usd} />
-    <div class="chart">
-      {#key run.id}
-        <EquityDrawdownChart
-          curves={[{ name: 'Equity', points: run.equity_curve, startCapitalUsd: run.paper_capital_usd }]}
-          label="Equity and drawdown"
-          fill
+    {@const instrument = readBacktestInstrument(run)}
+    {#if instrument !== undefined}
+      <div class="chart-tools">
+        <ChartViewSwitcher
+          value={chartView}
+          onValueChange={(view: ChartView) => {
+            chartView = view;
+          }}
         />
-      {/key}
-    </div>
+        {#if chartView === 'bars'}
+          <RunAddIndicatorButton chart={runChart} runKey={String(run.id)} strategyIndicators={run.strategy_indicators} />
+        {/if}
+      </div>
+    {/if}
+    {#if chartView === 'bars' && instrument !== undefined}
+      {#if run.metrics !== null}
+        <KeyMetricRow metrics={run.metrics} startCapitalUsd={run.paper_capital_usd} />
+      {/if}
+      <div class="chart">
+        <RunBarChart
+          {instrument}
+          barPeriod={run.bar_period}
+          range={{ startUtc: run.start_utc, endUtc: run.end_utc, sourceOrder: run.source_order }}
+          label="Bar chart of {formatInstrument(instrument)}, {run.bar_period} bars"
+          chart={runChart}
+          runKey={String(run.id)}
+          strategyIndicators={run.strategy_indicators}
+          records={run.trades}
+        />
+      </div>
+    {:else if run.metrics === null && (run.status === 'failed' || run.status === 'timed_out')}
+      <div class="failure">
+        <InlineNotification
+          kind={run.status === 'failed' ? 'error' : 'warning'}
+          title={describeBacktestStatus(run.status)}
+          subtitle={findErrorSummary(run.error_message)}
+          lowContrast
+        />
+        {#if run.status === 'failed' && run.error_message !== null && run.error_message !== ''}
+          <div class="failure-actions">
+            <Button
+              size="sm"
+              onclick={() => {
+                onAskAssistant(run.id);
+              }}>Ask AI to fix</Button
+            >
+          </div>
+          <div class="failure-log">
+            <ScrollRegion label="Log" fill>
+              <pre class="log-text">{run.error_message}</pre>
+            </ScrollRegion>
+          </div>
+        {/if}
+      </div>
+    {:else if run.metrics === null}
+      <div class="state-area" role="status" aria-label="Backtest status">
+        <StatusIndicator label={describeBacktestStatus(run.status)} kind={findBacktestStatusKind(run.status)} />
+      </div>
+    {:else}
+      <KeyMetricRow metrics={run.metrics} startCapitalUsd={run.paper_capital_usd} />
+      <div class="chart">
+        {#key run.id}
+          <EquityDrawdownChart
+            curves={[{ name: 'Equity', points: run.equity_curve, startCapitalUsd: run.paper_capital_usd }]}
+            label="Equity and drawdown"
+            fill
+          />
+        {/key}
+      </div>
+    {/if}
   {/if}
 {/if}
 
@@ -141,6 +187,14 @@
     flex: 1;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
+  }
+
+  .chart-tools {
+    display: flex;
+    flex: none;
+    gap: var(--cds-spacing-02);
+    justify-content: flex-end;
+    padding: var(--cds-spacing-03) var(--cds-spacing-05) 0;
   }
 
   .failure {
