@@ -22,6 +22,9 @@ async function openStrategyWithConversation(page: Page, name: string, height = 9
   await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(name);
   await page.getByRole('button', { name: 'Create strategy' }).click();
+  // The /strategies page shows the first strategy of the list, and that can be the new strategy, before the strategy
+  // page opens. The new strategy page reads the strategy again, and until then "New conversation" sends no strategy.
+  await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
   const column = assistantColumn(page);
   await column.getByRole('button', { name: 'New conversation' }).click();
