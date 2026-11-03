@@ -96,6 +96,9 @@ test('the Positions panel maximizes and restores with Escape', async ({ page }) 
   await page.goto('/');
   const splitter = page.getByRole('separator', { name: 'Resize the positions and the orders' });
   await expect(splitter).toBeVisible();
+  // The account message adds the key numbers above the panels, and the connected socket removes the "Live updates
+  // paused" warning. Each moves the Maximize button down. A move between mouse down and mouse up loses the click.
+  await expect(positionsPanel(page).getByRole('heading', { name: /^Positions \(\d+\)$/ })).toBeVisible();
 
   await positionsPanel(page).getByRole('button', { name: 'Maximize panel' }).click();
 
