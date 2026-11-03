@@ -83,7 +83,11 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   instrument page adds SMA, EMA, Bollinger Bands, or the Donchian channel to
   the price pane. The backend calculates the values from the saved bars
   (`POST /api/market-data/indicator-series`). The legend shows the OHLC row
-  and the values at the crosshair bar. The indicators are not saved yet. See
+  and the values at the crosshair bar. Each change of the indicators is saved
+  at once (`GET`/`PUT /api/market-data/chart-indicators`), so the chart has
+  the same indicators after a page load and on each instrument. A star in
+  the "Add indicator" dialog makes an indicator a favorite. The favorites
+  come first. See
   [`docs/architecture/indicator.md`](docs/architecture/indicator.md)
   section 23.9.
 - Live bars: the chart gets the current bar from IBKR over the WebSocket

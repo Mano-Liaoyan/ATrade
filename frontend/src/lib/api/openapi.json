@@ -757,6 +757,61 @@
         }
       }
     },
+    "/api/market-data/chart-indicators": {
+      "get": {
+        "summary": "Read Chart Indicator Set",
+        "operationId": "read_chart_indicator_set_api_market_data_chart_indicators_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartIndicatorSet"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Save Chart Indicator Set",
+        "description": "A `422` of section 23.9.7 has the problem list. A body of a wrong JSON type is the FastAPI `422`.",
+        "operationId": "save_chart_indicator_set_api_market_data_chart_indicators_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChartIndicatorSet"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChartIndicatorSet"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorCheckFailedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/market-data/hk-instrument-list": {
       "get": {
         "summary": "List Instruments",
@@ -4180,6 +4235,31 @@
         ],
         "title": "ChartIndicator",
         "description": "A whole indicator of the chart with its parameter values, as `{\"indicator\", \"parameters\"}` JSON."
+      },
+      "ChartIndicatorSet": {
+        "properties": {
+          "panes": {
+            "items": {
+              "$ref": "#/components/schemas/SavedChartPane"
+            },
+            "type": "array",
+            "title": "Panes"
+          },
+          "favorites": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Favorites"
+          }
+        },
+        "type": "object",
+        "required": [
+          "panes",
+          "favorites"
+        ],
+        "title": "ChartIndicatorSet",
+        "description": "The first pane is the price pane. The other panes are own panes, in the order on the chart."
       },
       "CodeCheckFailedResponse": {
         "properties": {
@@ -7964,6 +8044,91 @@
         ],
         "title": "SavedBarsResponse",
         "description": "The saved bars of one bar source and one bar period: the start of the first and of the last saved bar."
+      },
+      "SavedChartIndicator": {
+        "properties": {
+          "indicator": {
+            "type": "string",
+            "title": "Indicator"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "hidden": {
+            "type": "boolean",
+            "title": "Hidden"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/SavedChartLine"
+            },
+            "type": "array",
+            "title": "Lines"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indicator",
+          "parameters",
+          "hidden",
+          "lines"
+        ],
+        "title": "SavedChartIndicator"
+      },
+      "SavedChartLine": {
+        "properties": {
+          "output": {
+            "type": "string",
+            "title": "Output"
+          },
+          "color": {
+            "type": "integer",
+            "title": "Color"
+          },
+          "style": {
+            "type": "string",
+            "title": "Style"
+          },
+          "width": {
+            "type": "integer",
+            "title": "Width"
+          }
+        },
+        "type": "object",
+        "required": [
+          "output",
+          "color",
+          "style",
+          "width"
+        ],
+        "title": "SavedChartLine"
+      },
+      "SavedChartPane": {
+        "properties": {
+          "indicators": {
+            "items": {
+              "$ref": "#/components/schemas/SavedChartIndicator"
+            },
+            "type": "array",
+            "title": "Indicators"
+          }
+        },
+        "type": "object",
+        "required": [
+          "indicators"
+        ],
+        "title": "SavedChartPane"
       },
       "ScreenCheckFailedResponse": {
         "properties": {
