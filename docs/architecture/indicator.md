@@ -654,8 +654,8 @@ section 6.2).
     calls `onAction` and does not select the item.
   - Playwright tests of the instrument page chart replace the 2 routes with
     a set in the browser context (`e2e/local_chart_indicator_set.ts`), and
-    `run_bar_chart.spec.ts` does the same: the set is one global row, and the 4 projects and other specs use one
-    database at the same time.
+    `run_bar_chart.spec.ts` does the same: the set is one global row, and
+    the 4 projects and other specs use one database at the same time.
 
 ### 23.9.8 Bar charts of backtests and forward tests
 
