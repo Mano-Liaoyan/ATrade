@@ -18,6 +18,7 @@ from atrade.indicator.indicator_catalog import (
 )
 
 REFERENCE_FIELDS = ("indicator", "parameters", "output")
+CHART_REFERENCE_FIELDS = ("indicator", "parameters")
 
 
 @dataclass(frozen=True)
@@ -28,15 +29,20 @@ class IndicatorProblem:
     message: str
 
 
-def check_indicator_reference(reference: object) -> list[IndicatorProblem]:
-    """Returns the problems of a stored indicator reference. An empty list means the reference is correct."""
+def check_indicator_reference(reference: object, *, has_output: bool = True) -> list[IndicatorProblem]:
+    """Returns the problems of a stored indicator reference. An empty list means the reference is correct.
+
+    With `has_output=False` the reference names a whole indicator with all its outputs, as a bar chart does
+    (section 23.9): `output` is then an unknown field.
+    """
     if not isinstance(reference, Mapping):
         return [IndicatorProblem((), "An indicator reference must be an object.")]
     fields = cast("Mapping[object, object]", reference)
+    known_fields = REFERENCE_FIELDS if has_output else CHART_REFERENCE_FIELDS
     problems = [
-        IndicatorProblem((str(field),), f"Unknown field {field!r}. Known fields: {', '.join(REFERENCE_FIELDS)}.")
+        IndicatorProblem((str(field),), f"Unknown field {field!r}. Known fields: {', '.join(known_fields)}.")
         for field in fields
-        if field not in REFERENCE_FIELDS
+        if field not in known_fields
     ]
     key = fields.get("indicator")
     definition = INDICATOR_CATALOG.get(key) if isinstance(key, str) else None
@@ -46,16 +52,17 @@ def check_indicator_reference(reference: object) -> list[IndicatorProblem]:
     return [
         *problems,
         *check_parameters(definition, fields.get("parameters", {})),
-        *check_output(definition, fields.get("output")),
+        *(check_output(definition, fields.get("output")) if has_output else []),
     ]
 
 
-def create_indicator(reference: Mapping[str, object]) -> CatalogIndicator:
+def create_indicator(reference: Mapping[str, object], *, has_output: bool = True) -> CatalogIndicator:
     """Creates the class of a correct reference. Missing parameters get their defaults.
 
-    Raises `ValueError` with the problems when the reference is not correct.
+    Raises `ValueError` with the problems when the reference is not correct. `has_output` is the same as in
+    `check_indicator_reference`.
     """
-    problems = check_indicator_reference(reference)
+    problems = check_indicator_reference(reference, has_output=has_output)
     if problems:
         raise ValueError(" ".join(problem.message for problem in problems))
     definition = INDICATOR_CATALOG[cast("str", reference["indicator"])]

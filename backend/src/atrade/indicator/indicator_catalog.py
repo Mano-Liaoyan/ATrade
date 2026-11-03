@@ -6,7 +6,7 @@ that the UI shows, the parameters, the outputs, and the number of daily bars tha
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from nautilus_trader.model import Bar as NautilusBar
 
@@ -24,6 +24,8 @@ from atrade.indicator.wilder_averages import ATR, RSI
 
 type ParameterValue = int | float
 type ParameterValues = Mapping[str, ParameterValue]
+# `price`: the indicator draws on the price pane of a bar chart. `own`: it draws in an own pane (section 23.9.2).
+type ChartPlacement = Literal["price", "own"]
 
 # A recursive average (EMA, RSI, ATR, MACD) depends a little on its first bar. With 8 x its longest period of bars,
 # each difference that #160 measured is less than 0.005 (docs/architecture.md section 21.1).
@@ -77,6 +79,9 @@ class ScreenLookBack:
 class IndicatorDefinition:
     key: str
     name: str
+    # The name in the legend of a bar chart, for example `BB` (section 23.9.2).
+    short_name: str
+    chart_placement: ChartPlacement
     parameters: tuple[IndicatorParameter, ...]
     outputs: tuple[str, ...]
     indicator_class: Callable[..., CatalogIndicator]
@@ -115,11 +120,13 @@ PERIOD_BARS = ScreenLookBack(("period",))
 RECURSIVE_PERIOD_BARS = ScreenLookBack(("period",), factor=RECURSIVE_LOOK_BACK_FACTOR)
 
 INDICATOR_DEFINITIONS = (
-    IndicatorDefinition("sma", "SMA", (make_period_parameter(default=50),), VALUE, SMA, PERIOD_BARS),
-    IndicatorDefinition("ema", "EMA", (make_period_parameter(),), VALUE, EMA, RECURSIVE_PERIOD_BARS),
+    IndicatorDefinition("sma", "SMA", "SMA", "price", (make_period_parameter(default=50),), VALUE, SMA, PERIOD_BARS),
+    IndicatorDefinition("ema", "EMA", "EMA", "price", (make_period_parameter(),), VALUE, EMA, RECURSIVE_PERIOD_BARS),
     IndicatorDefinition(
         "momentum_12_1",
         "12-1 momentum",
+        "MOM 12-1",
+        "own",
         (
             make_period_parameter("look_back", 252),
             IndicatorParameter("skip", int, 21, 0, MAXIMUM_PERIOD - 1),
@@ -132,6 +139,8 @@ INDICATOR_DEFINITIONS = (
     IndicatorDefinition(
         "distance_to_52_week_high",
         "Distance to 52-week high",
+        "52W HIGH",
+        "own",
         (make_period_parameter(default=252),),
         VALUE,
         DistanceTo52WeekHigh,
@@ -140,6 +149,8 @@ INDICATOR_DEFINITIONS = (
     IndicatorDefinition(
         "realized_volatility",
         "Realized volatility",
+        "RV",
+        "own",
         (
             make_period_parameter(default=60, minimum=2),
             IndicatorParameter("bars_per_year", int, TRADING_DAYS_PER_YEAR, 1, 10_000, is_in_name=False),
@@ -148,19 +159,27 @@ INDICATOR_DEFINITIONS = (
         RealizedVolatility,
         ScreenLookBack(("period",), extra_bars=1),
     ),
-    IndicatorDefinition("atr", "ATR", (make_period_parameter(default=14),), VALUE, ATR, RECURSIVE_PERIOD_BARS),
+    IndicatorDefinition(
+        "atr", "ATR", "ATR", "own", (make_period_parameter(default=14),), VALUE, ATR, RECURSIVE_PERIOD_BARS
+    ),
     IndicatorDefinition(
         "average_trading_value",
         "Average trading value",
+        "ATV",
+        "own",
         (make_period_parameter(),),
         VALUE,
         AverageTradingValue,
         PERIOD_BARS,
     ),
-    IndicatorDefinition("rsi", "RSI", (make_period_parameter(default=14),), VALUE, RSI, RECURSIVE_PERIOD_BARS),
+    IndicatorDefinition(
+        "rsi", "RSI", "RSI", "own", (make_period_parameter(default=14),), VALUE, RSI, RECURSIVE_PERIOD_BARS
+    ),
     IndicatorDefinition(
         "macd",
         "MACD",
+        "MACD",
+        "own",
         (
             make_period_parameter("fast_period", 12),
             make_period_parameter("slow_period", 26, 2),
@@ -175,13 +194,22 @@ INDICATOR_DEFINITIONS = (
     IndicatorDefinition(
         "bollinger_bands",
         "Bollinger Bands",
+        "BB",
+        "price",
         (make_period_parameter(), IndicatorParameter("k", float, 2.0, 0.1, 10.0)),
         THREE_LINES,
         BollingerBands,
         PERIOD_BARS,
     ),
     IndicatorDefinition(
-        "donchian_channel", "Donchian channel", (make_period_parameter(),), THREE_LINES, DonchianChannel, PERIOD_BARS
+        "donchian_channel",
+        "Donchian channel",
+        "DC",
+        "price",
+        (make_period_parameter(),),
+        THREE_LINES,
+        DonchianChannel,
+        PERIOD_BARS,
     ),
 )
 

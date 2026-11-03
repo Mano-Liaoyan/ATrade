@@ -263,6 +263,8 @@ async def test_the_screen_indicator_list_gives_the_catalog_for_the_edit_popover(
     assert indicators["rsi"] == {
         "key": "rsi",
         "name": "RSI",
+        "short_name": "RSI",
+        "chart_placement": "own",
         "parameters": [
             {"name": "period", "value_type": "int", "default": 14, "minimum": 1, "maximum": 1000, "is_in_name": True}
         ],

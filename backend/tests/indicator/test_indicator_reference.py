@@ -102,3 +102,13 @@ def test_a_reference_with_a_wrong_shape_is_a_problem(reference: object, location
 def test_create_indicator_refuses_a_reference_with_problems() -> None:
     with pytest.raises(ValueError, match=r"The period must be from 1 to 1000, not 0\."):
         create_indicator({"indicator": "rsi", "parameters": {"period": 0}})
+
+
+def test_a_chart_reference_has_no_output_and_names_all_outputs() -> None:
+    reference = {"indicator": "bollinger_bands", "parameters": {"period": 20}}
+
+    assert check_indicator_reference(reference, has_output=False) == []
+    assert check_indicator_reference({**reference, "output": "upper"}, has_output=False) == [
+        IndicatorProblem(("output",), "Unknown field 'output'. Known fields: indicator, parameters.")
+    ]
+    assert create_indicator(reference, has_output=False).initialized is False

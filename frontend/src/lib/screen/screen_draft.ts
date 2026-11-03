@@ -4,7 +4,7 @@ import type { components } from '#lib/api';
 import type { IndicatorNames, ScreenDefinition } from './condition_bar';
 
 export type ScreenMarket = 'US' | 'HK';
-export type ScreenIndicator = components['schemas']['ScreenIndicatorResponse'];
+export type ScreenIndicator = components['schemas']['IndicatorResponse'];
 export type ScreenProblem = components['schemas']['ScreenProblemResponse'];
 type Item = Record<string, unknown>;
 

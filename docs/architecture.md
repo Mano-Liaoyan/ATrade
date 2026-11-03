@@ -609,6 +609,14 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   opens. While the read runs, the command list has `aria-busy="true"` (prop
   `busy`). New commands make Bits UI Command move the highlight to the first
   command, so the e2e tests wait until `aria-busy` is `false`.
+- `foundation/command_dialog` has `CommandDialog` (#327): a Carbon modal
+  with a title, a large Carbon search field, and one Carbon contained list
+  without groups, on Bits UI Dialog and Command. The search field has the
+  focus when it opens. The text filters the items (label and keywords).
+  Enter or a click selects the highlighted item and closes the dialog. An
+  item can be disabled with a text that says why. The "Add indicator" dialog
+  of the bar chart uses it (`docs/architecture/indicator.md` section
+  23.9.5).
 - `foundation/carbon` has `Combobox` (Carbon combo box on Bits UI
   Combobox). The page gives the candidates as `items` (`value`, `label`,
   `disabled`). The list is a Bits UI `ContentStatic` in the

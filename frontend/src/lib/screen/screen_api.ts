@@ -6,7 +6,7 @@ export type ScreenListItem = components['schemas']['ScreenListItemResponse'];
 export type Screen = components['schemas']['ScreenResponse'];
 export type ScreenResult = components['schemas']['ScreenResultResponse'];
 export type ScreenResultExclusion = components['schemas']['ScreenResultExclusionResponse'];
-export type ScreenIndicator = components['schemas']['ScreenIndicatorResponse'];
+export type ScreenIndicator = components['schemas']['IndicatorResponse'];
 export type ScreenProblem = components['schemas']['ScreenProblemResponse'];
 /** A save or a run of a screen. `check_failed` has the problems of the 422 answer (section 24.6). */
 export type ScreenCheckResult<T> = RequestResult<T> | { kind: 'check_failed'; problems: ScreenProblem[] };

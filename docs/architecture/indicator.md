@@ -180,8 +180,10 @@ uses it for its condition lists.
 
 Decided (#163): the catalog is `INDICATOR_CATALOG`
 (`indicator/indicator_catalog.py`), a mapping from the key to an
-`IndicatorDefinition` (`key`, `name`, `parameters`, `outputs`,
-`display_name(parameters)`, `screen_look_back_bars(parameters)`). Each
+`IndicatorDefinition` (`key`, `name`, `short_name`, `chart_placement`,
+`parameters`, `outputs`, `display_name(parameters)`,
+`screen_look_back_bars(parameters)`). `short_name` and `chart_placement`
+are the fields for charts of section 23.9.2 (#327). Each
 `IndicatorParameter` has `name`, `value_type` (`int` or `float`), `default`,
 `minimum`, and `maximum`. The range includes both ends.
 
@@ -285,6 +287,10 @@ indicator reference in JSON:
     `look_back`, MACD `fast_period` less than `slow_period`,
   - a multi-line indicator without `output`, or an unknown `output`.
 - A single-line indicator without `output` uses `value`.
+- `check_indicator_reference(reference, has_output=False)` and
+  `create_indicator(reference, has_output=False)` check a reference of a
+  whole indicator, as a bar chart uses it (section 23.9): `output` is then an
+  unknown field, and a multi-line indicator needs no `output` (#327).
 - `create_indicator(reference)` makes the class with the defaults for the
   missing parameters. It raises `ValueError` when the reference has
   problems.
@@ -392,12 +398,18 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
     purple 50). The dark theme uses the dark palette (purple 60, cyan 40,
     teal 60, magenta 40, red 50, red 10, green 30, blue 50, magenta 60,
     yellow 40, teal 40, cyan 20, orange 60, purple 30). A theme change
-    applies the other palette (`watchColorScheme`).
+    applies the other palette (`watchColorScheme`). Checked against
+    `@carbon/colors` 11.61.0 (#327): each name is a color of the package, and
+    the light hex values are the Carbon categorical palette (`#6929c4`,
+    `#1192e8`, ...). `chart_indicator_styles.ts` imports the colors from the
+    package.
   - `style` is `solid`, `dashed`, or `dotted`.
   - `width` is 1 to 4 pixels.
   - A new indicator gets the first palette colors that no line of the chart
     uses, one color for each line, in palette order. Its lines are `solid`
-    with width 2. A histogram has a color only.
+    with width 2. A histogram has a color only. When all 14 colors are in
+    use, the palette starts again with the colors that the fewest lines use
+    (#327).
 
 ### 23.9.4 Legend
 
@@ -454,6 +466,11 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
     and closes the dialog. A click on the star does not add.
 - The favorites are saved in the chart indicator set (section 23.9.7), also
   from a backtest or forward test chart.
+- Until own panes come (#328), the rows of the `own` indicators are disabled
+  with the text "Own pane: not available yet". Until the chart indicator set
+  comes (#330), the indicators of the instrument page are not saved: a page
+  load starts without indicators. They stay when the bar period changes
+  (#327).
 - Settings (B1): a Bits UI `Popover` at the legend row. Heading: the catalog
   `name`. Content, from top to bottom:
   - One Carbon `NumberInput` for each parameter (also the parameters
@@ -512,6 +529,20 @@ section 6.2).
 - Live bars (`/ws/market-data`) have no indicator value. The indicator
   lines end at the last saved bar of the chart request. A new chart request
   (a bar period change, a page load) reads the series again.
+- Decided (#327):
+  - `start_utc` and `end_utc` are required. The route widens the range as
+    the bars route does (whole bar periods, cut at the start of the current
+    bar). The chart sends the start of its first bar and 1 second after the
+    start of its last bar.
+  - The `422` answers of the bars route (time, range, source order) have
+    `{"detail"}`. An unknown bar period is the FastAPI `422`. The problems
+    of `check_indicator_reference(reference, has_output=False)` give
+    `{"problems": [{"location", "message"}]}`, for example
+    `{"location": ["indicators", 0, "parameters", "period"], ...}`.
+  - The route reads the warm-up bars with one read for the largest N of the
+    request. Each indicator then gets the last N bars of its own count.
+  - The indicators of one request each get their own class, so the same
+    indicator 2 times gives the same values 2 times.
 
 ### 23.9.7 Chart indicator set
 
@@ -637,14 +668,28 @@ section 6.2).
   number formats), and `trade_marks.ts` (the series primitive).
   `foundation/carbon` gets `NumberInput`. `foundation` gets the `Command`
   dialog.
+- Done in #327:
+  - `market_data/indicator_series.py`: `list_indicator_catalog()` (also the
+    body of `GET /api/screen-indicators`), the series route, and the
+    warm-up.
+  - `foundation/command_dialog`: `CommandDialog` (Carbon modal, Bits UI
+    Command, one list, disabled items with a reason).
+  - `#lib/market_data`: `AddIndicatorButton` (the header button, the `/`
+    key, and the dialog), `ChartLegend` (one pane legend: the OHLC row and
+    the indicator rows), `chart_indicators.ts` (`formatLegendName`,
+    `addChartIndicator`, `findFreeColors`, `findLegendIndex`,
+    `findIndicatorSeries`, `buildLegendRows`, `isAddIndicatorShortcut`),
+    `chart_indicator_styles.ts` (`readPaletteColor`, `readPaletteColorName`,
+    `formatIndicatorValue`, `readIndicatorPriceFormat`), and
+    `indicator_series.ts` (`listChartIndicatorCatalog`,
+    `readIndicatorSeries`, `listSeriesIndicators`). `BarChart` draws the
+    price pane indicators and its legend. `ChartFrame` gets an `overlay`
+    snippet for HTML over the canvas.
 - Playwright: the 4 projects (chromium, firefox, webkit, msedge) for each
   UI slice.
 
 ### 23.9.11 Left to the implementation
 
-- The Carbon categorical palette names of section 23.9.3 come from the
-  Carbon data visualization guidelines. Check them against `@carbon/colors`
-  before the first chart slice.
 - Check that `pane.setHeight` (or `setStretchFactor`) with height 0 hides
   a pane in `lightweight-charts` 5.2.1. If not, "Maximize" gives the other
   panes their minimum height.
