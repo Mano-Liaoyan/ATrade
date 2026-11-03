@@ -1,7 +1,8 @@
 """The code that a new strategy starts with (docs/architecture/strategy.md section 9.2).
 
 It shows the required file format: 1 Strategy subclass, 1 StrategyConfig subclass with a keyword-only
-__init__ (NautilusTrader 2.0 requires it), and indicator warm-up with request_bars in on_start.
+__init__ (NautilusTrader 2.0 requires it), indicator warm-up with request_bars in on_start, and the
+CHART_INDICATORS of the bar chart.
 """
 
 STRATEGY_TEMPLATE = '''"""Moving average cross: buy when the close goes above the average, sell when it goes below."""
@@ -17,6 +18,12 @@ from nautilus_trader.trading import Strategy
 # and holidays do not leave the indicator without bars. A long warm-up of short bars means many IBKR requests.
 WARM_UP_AVERAGE_PERIODS = 3
 MIN_WARM_UP_LENGTH = timedelta(days=7)
+
+# The bar chart of a backtest or a forward test shows these indicators. It has no effect on the run.
+# A parameter is a number or the name of a configuration field with an int or float default.
+CHART_INDICATORS = [
+    {"indicator": "sma", "parameters": {"period": "average_period"}},
+]
 
 
 def find_warm_up_length(bar_type: BarType, average_period: int) -> timedelta:
