@@ -1,11 +1,11 @@
 <!-- The HTML layer over one pane of a bar chart (docs/architecture/indicator.md section 23.9.4): the legend at the top
      left, and the options menu ("Options for <legend name>") at the top right. A legend that is higher than its pane
      scrolls in itself with a visible track (ScrollRegion). The layer takes no pointer events, so the crosshair follows
-     the pointer over it. Only the options button and the scroll track take them. -->
+     the pointer over it. Only the options button, the scroll track, and the legend rows with buttons take them. -->
 <script lang="ts">
   import { OverflowMenu, type OverflowMenuItem } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
-  import type { LegendBar, LegendRow, PaneBox } from './chart_indicators';
+  import type { LegendBar, LegendRow, LegendRowActions, PaneBox } from './chart_indicators';
   import ChartLegend from './ChartLegend.svelte';
 
   interface Props {
@@ -16,9 +16,11 @@
     /** The name of the pane in labels: the legend name of its first row, or "bars" for the price pane. */
     name: string;
     menuItems: OverflowMenuItem[];
+    /** The buttons of the indicator rows. */
+    actions?: LegendRowActions;
   }
 
-  const { box, bar = null, rows, name, menuItems }: Props = $props();
+  const { box, bar = null, rows, name, menuItems, actions }: Props = $props();
 </script>
 
 <div
@@ -30,7 +32,7 @@
   {#if bar !== null || rows.length > 0}
     <div class="pane-legend">
       <ScrollRegion label={`Legend of ${name}`} maxHeight={`calc(${String(box.height)}px - var(--cds-spacing-03))`}>
-        <ChartLegend {bar} {rows} />
+        <ChartLegend {bar} {rows} {actions} />
       </ScrollRegion>
     </div>
   {/if}

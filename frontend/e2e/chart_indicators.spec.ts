@@ -219,3 +219,189 @@ test('a legend that is higher than its pane scrolls to its last row', async ({ p
   }
   expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(regionBox.y + regionBox.height + 1);
 });
+
+// Legend row buttons and the settings popover (section 23.9.4 and 23.9.5).
+
+// The number of canvas pixels of the chart in the color `hex` (a line color). The live bars change the candlesticks,
+// so the tests look for the line color, not for a full picture.
+async function countColorPixels(page: Page, hex: string): Promise<number> {
+  return page.getByRole('img', { name: CHART_NAME }).evaluate((chart, color) => {
+    const target = [1, 3, 5].map((start) => Number.parseInt(color.slice(start, start + 2), 16));
+    let count = 0;
+    for (const canvas of chart.querySelectorAll('canvas')) {
+      const context = canvas.getContext('2d');
+      if (context === null || canvas.width === 0 || canvas.height === 0) {
+        continue;
+      }
+      const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let index = 0; index < data.length; index += 4) {
+        if (target.every((value, channel) => Math.abs((data[index + channel] ?? 0) - value) <= 6) && (data[index + 3] ?? 0) > 200) {
+          count += 1;
+        }
+      }
+    }
+    return count;
+  }, hex);
+}
+
+// The first palette colors: purple 70 (light) and purple 60 (dark).
+const LIGHT_COLOR_1 = '#6929c4';
+const DARK_COLOR_1 = '#8a3ffc';
+// Antialiasing gives some pixels of other lines a near color; a drawn line gives many more.
+const LINE_PIXELS = 200;
+
+async function hoverRow(page: Page, name: string): Promise<Locator> {
+  const row = legendRow(page, name);
+  await row.hover();
+  return row;
+}
+
+async function addSma(page: Page): Promise<Locator> {
+  await addIndicator(page, /^SMA$/);
+  const row = legendRow(page, 'SMA 50');
+  await expect(row.locator('.legend-value')).toHaveText([NUMBER_PATTERN]);
+  return row;
+}
+
+test('Tab to a legend row shows its buttons', async ({ page }) => {
+  await openChart(page);
+  await addSma(page);
+  const hideButton = page.getByRole('button', { name: 'Hide SMA 50' });
+  const action = (name: string): Locator => page.locator('.legend-action').filter({ has: page.getByRole('button', { name }) });
+  await expect(action('Hide SMA 50')).toHaveCSS('opacity', '0');
+
+  await page.getByRole('button', { name: 'Add indicator' }).focus();
+  // The legend comes after the header buttons and before the pane options button in the tab order.
+  for (let step = 0; step < 40 && !(await hideButton.evaluate((element) => element === document.activeElement)); step += 1) {
+    await page.keyboard.press('Tab');
+  }
+
+  await expect(hideButton).toBeFocused();
+  for (const name of ['Hide SMA 50', 'Settings for SMA 50', 'Remove SMA 50']) {
+    await expect(action(name)).toHaveCSS('opacity', '1');
+  }
+});
+
+test('Hide takes the line away and keeps the row, and Show gives it back', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await openChart(page);
+  await addSma(page);
+  await expect.poll(() => countColorPixels(page, LIGHT_COLOR_1)).toBeGreaterThan(LINE_PIXELS);
+  const shownNameColor = await legendRow(page, 'SMA 50').locator('.legend-name').evaluate((element) => getComputedStyle(element).color);
+
+  const row = await hoverRow(page, 'SMA 50');
+  await row.getByRole('button', { name: 'Hide SMA 50' }).click();
+
+  await expect(row.locator('.legend-value')).toHaveCount(0);
+  // The name takes the disabled text color.
+  await expect(row.locator('.legend-name')).not.toHaveCSS('color', shownNameColor);
+  await expect.poll(() => countColorPixels(page, LIGHT_COLOR_1)).toBeLessThan(LINE_PIXELS);
+  // The Show button stays visible without the pointer or the focus on the row.
+  await page.mouse.move(0, 0);
+  await page.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+  });
+  await expect(page.locator('.legend-action').filter({ has: page.getByRole('button', { name: 'Show SMA 50' }) })).toHaveCSS('opacity', '1');
+  await expect(page.locator('.legend-action').filter({ has: page.getByRole('button', { name: 'Remove SMA 50' }) })).toHaveCSS('opacity', '0');
+
+  await row.getByRole('button', { name: 'Show SMA 50' }).click();
+
+  await expect(row.locator('.legend-value')).toHaveText([NUMBER_PATTERN]);
+  await expect.poll(() => countColorPixels(page, LIGHT_COLOR_1)).toBeGreaterThan(LINE_PIXELS);
+});
+
+test('the settings change SMA to 20 and its color to the third color, and the legend shows the backend values', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await openChart(page);
+  const row = await addSma(page);
+
+  await hoverRow(page, 'SMA 50');
+  await row.getByRole('button', { name: 'Settings for SMA 50' }).click();
+  const settings = page.getByRole('dialog', { name: 'SMA' });
+  await expect(settings.getByRole('heading', { name: 'SMA' })).toBeVisible();
+  await settings.getByRole('spinbutton', { name: 'Period' }).fill('20');
+  // The third color of the light palette.
+  await settings.getByRole('group', { name: 'Line' }).getByRole('radio', { name: 'Teal 70' }).check();
+  const seriesResponse = page.waitForResponse(
+    (response) => response.url().endsWith('/api/market-data/indicator-series') && (response.request().postData() ?? '').includes('"period":20'),
+  );
+  await settings.getByRole('button', { name: 'Apply' }).click();
+
+  await expect(settings).toBeHidden();
+  const body = (await (await seriesResponse).json()) as { series: { indicator: string; outputs: { value: (number | null)[] } }[] };
+  const values = body.series.find((series) => series.indicator === 'sma')?.outputs.value ?? [];
+  const lastValue = values.at(-1);
+  if (lastValue === null || lastValue === undefined) {
+    throw new Error('The series route gave no last SMA value.');
+  }
+  const expected = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(lastValue);
+  const changedRow = legendRow(page, 'SMA 20');
+  await expect(changedRow.locator('.legend-value')).toHaveText([expected]);
+  await expect(changedRow.locator('.legend-value')).toHaveCSS('color', 'rgb(0, 93, 93)');
+});
+
+test('Apply is disabled with the reason while a parameter is invalid, and Escape closes without a change', async ({ page }) => {
+  await openChart(page);
+  await addIndicator(page, /^MACD$/);
+  const row = legendRow(page, 'MACD 12 26 9');
+  await expect(row).toBeVisible();
+  await row.locator('.legend-name').click();
+  const settings = page.getByRole('dialog', { name: 'MACD' });
+  const apply = settings.getByRole('button', { name: 'Apply' });
+
+  const fastPeriod = settings.getByRole('spinbutton', { name: 'Fast period' });
+  await fastPeriod.fill('30');
+  await expect(settings.getByText('Fast period must be less than slow period (26).')).toBeVisible();
+  await expect(fastPeriod).toHaveAttribute('aria-invalid', 'true');
+  await expect(apply).toBeDisabled();
+  await fastPeriod.fill('0');
+  await expect(settings.getByText(/^Enter a value from 1 to \d+\.$/)).toBeVisible();
+  await expect(apply).toBeDisabled();
+
+  await settings.getByRole('button', { name: 'Reset to defaults' }).click();
+  await expect(fastPeriod).toHaveValue('12');
+  await expect(apply).toBeEnabled();
+  await fastPeriod.fill('5');
+  await page.keyboard.press('Escape');
+
+  await expect(settings).toBeHidden();
+  await expect(legendRow(page, 'MACD 12 26 9')).toBeVisible();
+  await expect(legendRow(page, 'MACD 5 26 9')).toHaveCount(0);
+});
+
+test('Remove takes the row and the line away', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await openChart(page);
+  const row = await addSma(page);
+  await expect.poll(() => countColorPixels(page, LIGHT_COLOR_1)).toBeGreaterThan(LINE_PIXELS);
+
+  await hoverRow(page, 'SMA 50');
+  await row.getByRole('button', { name: 'Remove SMA 50' }).click();
+
+  await expect(legendRow(page, 'SMA 50')).toHaveCount(0);
+  await expect.poll(() => countColorPixels(page, LIGHT_COLOR_1)).toBeLessThan(LINE_PIXELS);
+});
+
+test('a theme change gives the lines the other palette without a new chart', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await openChart(page);
+  const row = await addSma(page);
+  // Light palette color 1: Purple 70.
+  await expect(row.locator('.legend-value')).toHaveCSS('color', 'rgb(105, 41, 196)');
+  const chartTable = page.getByRole('img', { name: CHART_NAME }).locator('table').first();
+  await chartTable.evaluate((element) => {
+    element.setAttribute('data-test-first-chart', '');
+  });
+  await expect.poll(() => countColorPixels(page, LIGHT_COLOR_1)).toBeGreaterThan(LINE_PIXELS);
+
+  const header = page.getByRole('banner');
+  await header.getByRole('button', { name: 'Theme: System' }).click();
+  await header.getByRole('button', { name: 'Theme: Light' }).click();
+  await expect(header.getByRole('button', { name: 'Theme: Dark' })).toBeVisible();
+
+  // Dark palette color 1: Purple 60.
+  await expect(row.locator('.legend-value')).toHaveCSS('color', 'rgb(138, 63, 252)');
+  await expect(page.getByRole('img', { name: CHART_NAME }).locator('table[data-test-first-chart]')).toHaveCount(1);
+  await expect.poll(() => countColorPixels(page, DARK_COLOR_1)).toBeGreaterThan(LINE_PIXELS);
+  expect(await countColorPixels(page, LIGHT_COLOR_1)).toBeLessThan(LINE_PIXELS);
+});
