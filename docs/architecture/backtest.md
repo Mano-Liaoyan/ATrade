@@ -382,7 +382,12 @@ document. The implementation can change them.
   trade gets `round_trip_net_profit_usd`. Done in #331:
   `strategy_indicators` (`[{"indicator", "parameters"}]`, from
   `list_chart_indicators(code, parameters)` with the `parameters` of a sweep
-  run). The comparison route has it too.
+  run). The comparison route has it too. Done in #332:
+  `round_trip_net_profit_usd` (decimal text, or null) of each trade, from
+  `find_round_trip_net_profits(trades)` in `universe_instruments.py`. It
+  uses `walk_instrument_round_trips` of `backtest_metrics.py`, the rule of
+  `find_round_trips` and of the Instruments tab. Only the trade that ends a
+  round trip has a value (`test_round_trip_net_profit.py`).
 
 ## 10.6 Frontend
 

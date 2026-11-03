@@ -8,7 +8,10 @@
      a legend at its top left (the price pane also the OHLC row), with the values at the crosshair bar, or at the last
      bar when the crosshair is not on the chart, and an options menu at its top right. With `onPanesChange`, each legend
      row has Hide or Show, Settings (a popover), and Remove. A theme change gives the lines the other palette and does
-     not create the chart again. The backend calculates all values; the chart calculates none. -->
+     not create the chart again. The backend calculates all values; the chart calculates none.
+     With `trades`, the price pane shows a trade mark for each bar and side (section 23.9.9, `trade_marks.ts`). The
+     pointer on a mark gives it the focus ring and a tooltip. `ringTrades` gives the marks of these trades the ring;
+     a new `centerTrade` scrolls the chart so that the bar of the trade is in the center. -->
 <script lang="ts">
   import {
     CandlestickSeries,
@@ -58,6 +61,19 @@
   import { replaceChartIndicator } from './indicator_settings';
   import type { IndicatorSeriesResult } from './indicator_series';
   import { canDrawLiveBar } from './live_bars';
+  import TradeMarkLayer from './TradeMarkLayer.svelte';
+  import {
+    BAR_PERIOD_SECONDS,
+    centerBar,
+    findMarkAt,
+    findTradeBarIndex,
+    groupTradeMarks,
+    TradeMarksPrimitive,
+    type ChartTrade,
+    type TradeMarkBox,
+    type TradeMarkColors,
+  } from './trade_marks';
+  import type { BarPeriod } from './bars';
 
   interface Props {
     bars: Bar[];
@@ -72,6 +88,13 @@
     catalog?: ChartIndicatorDefinition[];
     /** Gets the new panes after a change in a pane options menu or a legend row (Hide, Show, Settings, Remove). */
     onPanesChange?: (panes: ChartPane[]) => void;
+    /** The trades of a backtest or a forward test, for the trade marks. `barPeriod` places them on the bars. */
+    trades?: ChartTrade[];
+    barPeriod?: BarPeriod;
+    /** The trades (indexes into `trades`) whose marks have the focus ring. */
+    ringTrades?: number[];
+    /** A new value scrolls the chart so that the bar of this trade is in the center. */
+    centerTrade?: number | null;
   }
 
   const {
@@ -83,6 +106,10 @@
     indicatorSeries = null,
     catalog = [],
     onPanesChange,
+    trades = [],
+    barPeriod = '1-DAY',
+    ringTrades = [],
+    centerTrade = null,
   }: Props = $props();
 
   const LINE_STYLES: Record<ChartLineStyle, LineStyle> = {
@@ -105,6 +132,10 @@
   let maximized: { paneIndex: number; factors: number[] } | null = $state(null);
   // The indicator whose settings popover is open, and the legend row that the popover is at.
   let settings = $state<{ paneIndex: number; indicatorIndex: number; anchor: HTMLElement } | null>(null);
+  let tradeMarks: TradeMarksPrimitive | undefined = $state();
+  // The place of each trade mark after the last redraw, and the mark under the pointer ("<bar index>:<side>").
+  let markBoxes: TradeMarkBox[] = $state([]);
+  let hoveredMarkKey: string | null = $state(null);
 
   function toCandlestick(bar: Bar): CandlestickData<UTCTimestamp> {
     return { time: bar.time as UTCTimestamp, open: bar.open, high: bar.high, low: bar.low, close: bar.close };
@@ -127,6 +158,31 @@
 
   function followCrosshair(parameters: MouseEventParams): void {
     crosshairTime = parameters.time === undefined ? null : (parameters.time as number);
+    const point = parameters.point;
+    const box = point === undefined || (parameters.paneIndex ?? 0) !== 0 ? undefined : findMarkAt(markBoxes, point.x, point.y);
+    hoveredMarkKey = box === undefined ? null : `${String(box.mark.barIndex)}:${box.mark.side}`;
+  }
+
+  // IBM Plex Mono semibold 11px (section 23.9.9).
+  const MARK_FONT = "600 11px 'IBM Plex Mono', monospace";
+
+  function readMarkColors(): TradeMarkColors {
+    return {
+      background: readChartColor(chartContainer, '--cds-background-inverse'),
+      text: readChartColor(chartContainer, '--cds-text-inverse'),
+      ring: readChartColor(chartContainer, '--cds-focus'),
+      font: MARK_FONT,
+    };
+  }
+
+  // The boxes change at each scroll and zoom. Only a real change updates the state. The chart calls this in the
+  // calls of the effects (setData, addSeries): untrack, so that the effects do not depend on the boxes.
+  function keepMarkBoxes(boxes: TradeMarkBox[]): void {
+    untrack(() => {
+      if (JSON.stringify(boxes) !== JSON.stringify(markBoxes)) {
+        markBoxes = boxes;
+      }
+    });
   }
 
   $effect(() => {
@@ -142,6 +198,13 @@
       timeScale: { ...themeOptions.timeScale, timeVisible: true, secondsVisible: false },
     });
     const createdSeries = createdChart.addSeries(CandlestickSeries, { ...readCandlestickOptions(), priceFormat: CHART_PRICE_FORMAT });
+    const createdMarks = new TradeMarksPrimitive(readMarkColors(), keepMarkBoxes);
+    createdSeries.attachPrimitive(createdMarks);
+    tradeMarks = createdMarks;
+    // The canvas draws with the font only after it loads.
+    void document.fonts.load(MARK_FONT).then(() => {
+      createdMarks.setColors(readMarkColors());
+    });
     candlestickSeries = createdSeries;
     chart = createdChart;
     isDark = isDarkColorScheme();
@@ -150,6 +213,7 @@
       const changedOptions = readChartThemeOptions(chartContainer);
       createdChart.applyOptions({ ...changedOptions, layout: { ...changedOptions.layout, panes: readPaneOptions() } });
       createdSeries.applyOptions(readCandlestickOptions());
+      createdMarks.setColors(readMarkColors());
       isDark = isDarkColorScheme();
     });
     return () => {
@@ -158,6 +222,8 @@
       createdChart.remove();
       chart = undefined;
       candlestickSeries = undefined;
+      tradeMarks = undefined;
+      markBoxes = [];
       paneCount = 0;
       maximized = null;
     };
@@ -183,6 +249,65 @@
     if (canDrawLiveBar(untrack(() => bars), liveBar)) {
       candlestickSeries.update(toCandlestick(liveBar));
     }
+  });
+
+  $effect(() => {
+    tradeMarks?.setMarks(
+      groupTradeMarks(
+        trades,
+        bars.map((bar) => bar.time),
+        BAR_PERIOD_SECONDS[barPeriod],
+      ),
+      bars,
+    );
+  });
+
+  const hoveredTrades = $derived(
+    markBoxes.find((box) => `${String(box.mark.barIndex)}:${box.mark.side}` === hoveredMarkKey)?.mark.tradeIndexes ?? [],
+  );
+
+  $effect(() => {
+    tradeMarks?.setRingTrades([...ringTrades, ...hoveredTrades]);
+  });
+
+  // After the bars effect: a new bar list fits the content, then the chart scrolls to the trade again.
+  $effect(() => {
+    const currentChart = chart;
+    const trade = centerTrade === null ? undefined : untrack(() => trades)[centerTrade];
+    if (currentChart === undefined || trade === undefined || bars.length === 0) {
+      return;
+    }
+    const barIndex = findTradeBarIndex(
+      bars.map((bar) => bar.time),
+      BAR_PERIOD_SECONDS[barPeriod],
+      trade.time,
+    );
+    if (barIndex === -1) {
+      return;
+    }
+    // The chart scrolls when it has its size: lightweight-charts fits the content again at the first size.
+    let frame = 0;
+    const center = (): void => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (currentChart.timeScale().width() > 0) {
+          centerBar(currentChart, barIndex);
+        }
+      });
+    };
+    let isWaitingForSize = currentChart.timeScale().width() === 0;
+    const centerAtFirstSize = (): void => {
+      if (isWaitingForSize) {
+        isWaitingForSize = false;
+        center();
+      }
+    };
+    currentChart.timeScale().subscribeSizeChange(centerAtFirstSize);
+    center();
+    return () => {
+      cancelAnimationFrame(frame);
+      currentChart.timeScale().unsubscribeSizeChange(centerAtFirstSize);
+    };
   });
 
   // The chart has one pane for each pane of `indicatorPanes`: the price pane and the own panes, in this order. Each
@@ -440,6 +565,9 @@
         />
       {/if}
     {/each}
+    {#if trades.length > 0}
+      <TradeMarkLayer boxes={markBoxes} {trades} {hoveredMarkKey} ringTrades={[...ringTrades, ...hoveredTrades]} />
+    {/if}
   {/snippet}
 </ChartFrame>
 

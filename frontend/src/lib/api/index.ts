@@ -1779,6 +1779,8 @@ export interface components {
             amount_usd: string;
             /** Split Ratio */
             split_ratio: string | null;
+            /** Round Trip Net Profit Usd */
+            round_trip_net_profit_usd: string | null;
         };
         /**
          * ForwardTestInstrumentResponse
@@ -3131,6 +3133,8 @@ export interface components {
             symbol: string | null;
             /** Exchange */
             exchange: string | null;
+            /** Round Trip Net Profit Usd */
+            round_trip_net_profit_usd: string | null;
         };
         /**
          * UniverseBody

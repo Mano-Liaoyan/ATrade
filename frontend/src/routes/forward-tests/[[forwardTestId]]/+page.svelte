@@ -8,7 +8,9 @@
      shows the current error and the events (start, interruptions, stop). The open forward test reads again every
      2 seconds. The address #start-forward-test (command palette) opens the New forward test dialog.
      A single-instrument forward test has the "Equity" / "Bars" switcher (?chart=bars): "Bars" shows the bar chart from
-     the start to the stop, or to now, with the strategy indicators (docs/architecture/indicator.md section 23.9.8).
+     the start to the stop, or to now, with the strategy indicators (docs/architecture/indicator.md section 23.9.8) and
+     a mark for each fill (section 23.9.9). Then the pointer or the focus on a Fills row gives its mark the focus ring,
+     and a click on a row selects it, shows "Bars", and scrolls the chart to the bar of the fill.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
@@ -62,7 +64,16 @@
     type ForwardTest,
     type ForwardTestDetail,
   } from '#lib/forward_test';
-  import { AddIndicatorButton, ChartIndicatorSetStore, formatInstrument, RunBarChart, RunChartIndicators, type ChartIndicatorDefinition, type ChartPane } from '#lib/market_data';
+  import {
+    AddIndicatorButton,
+    ChartIndicatorSetStore,
+    formatInstrument,
+    listChartTrades,
+    RunBarChart,
+    RunChartIndicators,
+    type ChartIndicatorDefinition,
+    type ChartPane,
+  } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_FORWARD_TEST_FORM_ID } from '../../palette_commands';
@@ -118,6 +129,24 @@
   $effect(() => feed.start(fetch, window.location));
 
   const chartView = $derived(readChartView(page.url.searchParams));
+  // The Fills row under the pointer or the focus, and the selected row of the open forward test (section 23.9.9).
+  let pointedFillRow: number | null = $state(null);
+  let selectedFill = $state<{ forwardTestId: number; row: number } | null>(null);
+  const selectedFillRow = $derived(selectedFill?.forwardTestId === forwardTestId ? selectedFill.row : null);
+  const chartTrades = $derived(listChartTrades(shownDetail?.fills ?? []));
+  const ringTrades = $derived(
+    [pointedFillRow, selectedFillRow].flatMap((row) => (row === null ? [] : [chartTrades.tradeIndexByRow[row] ?? null])).filter((index) => index !== null),
+  );
+
+  function selectFillRow(row: number): void {
+    if (forwardTestId === null) {
+      return;
+    }
+    selectedFill = { forwardTestId, row };
+    if (chartView !== 'bars') {
+      changeChartView('bars');
+    }
+  }
   // The indicators of the bar chart: the strategy indicators, and the changes of the user for the open forward test.
   const chartIndicators = new RunChartIndicators();
   $effect(() => {
@@ -389,6 +418,9 @@
                   onPanesChange={(panes: ChartPane[]) => {
                     chartIndicators.changePanes(chartKey, panes);
                   }}
+                  trades={chartTrades.trades}
+                  {ringTrades}
+                  centerTrade={selectedFillRow === null ? null : (chartTrades.tradeIndexByRow[selectedFillRow] ?? null)}
                 />
               </div>
             {:else if records.metrics !== null}
@@ -416,7 +448,18 @@
             }}
           >
             {#if selectedTable === 'fills'}
-              <ForwardTestFillTable fills={records.fills} />
+              {#if chartInstrument === null}
+                <ForwardTestFillTable fills={records.fills} />
+              {:else}
+                <ForwardTestFillTable
+                  fills={records.fills}
+                  selectedIndex={selectedFillRow}
+                  onRowPoint={(row: number | null) => {
+                    pointedFillRow = row;
+                  }}
+                  onRowSelect={selectFillRow}
+                />
+              {/if}
             {:else if selectedTable === 'instruments'}
               <UniverseInstrumentTable instruments={records.instruments} countHeader="Fills" />
             {:else if selectedTable === 'comparison'}

@@ -718,7 +718,9 @@ section 6.2).
   - A 4px pointer on the square points at the bar. The "B" mark is 4px
     below the bar low. The "S" mark is 4px above the bar high.
 - One mark for each bar and side. When the bar spacing is less than 16px,
-  marks of the same side that touch become one mark at the first bar.
+  marks of the same side that touch become one mark at the first bar. A
+  mark touches when its bar is less than 16px from the bar of the mark
+  before it on that side (the first bar of a merged mark).
 - When the pointer is on a mark, the mark gets a 2px `--cds-focus` ring.
   A tooltip shows one line for each trade of the mark, in IBM Plex Mono
   with tabular numbers:
@@ -727,6 +729,9 @@ section 6.2).
     round trip that the trade ends, after commissions, in
     `--cds-support-success` or `--cds-support-error`. A trade that ends no
     round trip has no number.
+  - The tooltip is a Carbon popover (no high contrast, so the support
+    colors keep their contrast), below a "B" mark and above an "S" mark.
+  - A legend row over a mark takes the pointer first.
 - Each trade of `GET /api/backtests/{backtest_id}` and each fill of
   `GET /api/forward-tests/{id}` gets `round_trip_net_profit_usd` (decimal
   text, or null). The backend calculates it with the round trip rule of the
@@ -735,10 +740,21 @@ section 6.2).
   tab):
   - A pointer on a row, or the focus on a row, gives the mark of its trade
     the `--cds-focus` ring.
-  - A click on a row (or Enter) selects the row and shows "Bars". The
-    chart scrolls so that the bar of the trade is in the center
-    (`timeScale().setVisibleRange`). The mark keeps the ring while its row
-    stays selected.
+  - A click on a row (or Enter on the number button of the row) selects the
+    row and shows "Bars". The chart scrolls so that the bar of the trade is
+    in the center (`timeScale().setVisibleLogicalRange`, with the width of
+    the visible range). The chart cannot scroll the first bar to the right
+    of the left edge, so for a bar near the first bar the range is
+    narrower: as many bars on each side as there are before the bar, but at
+    least 10. The mark keeps the ring while its row stays selected.
+  - Only a single-instrument run has "Bars", so only its rows link. A split
+    adjustment row has no mark and no link.
+  - The number button has the name "Show trade 3 on the bar chart" (Fills:
+    "Show fill 3 on the bar chart") and `aria-pressed` for the selected
+    row.
+- For screen readers and tests, the chart has a hidden "Trade marks" list:
+  one item for each mark with the tooltip text, the mark center in chart
+  pixels (`data-x`, `data-y`), and `data-ring`.
 
 ### 23.9.10 Code and tests
 
@@ -801,6 +817,19 @@ section 6.2).
   "E2E chart indicators" on 45 saved FTBAR bars). `RunBarChart` passes
   `onPanesChange`, so the legend buttons and the settings of #329 work on
   these charts.
+- Done in #332: `round_trip_net_profit_usd` (`find_round_trip_net_profits`
+  in `backtest/universe_instruments.py`), `trade_marks.ts`
+  (`TradeMarksPrimitive`, `findTradeBarIndex`, `groupTradeMarks`,
+  `mergeTouchingMarks`, `layoutTradeMarks`, `findMarkAt`,
+  `formatTradeLine`, `readCenteredRange`, `listChartTrades`),
+  `TradeMarkLayer` (the tooltip and the "Trade marks" list), the `trades`,
+  `barPeriod`, `ringTrades`, and `centerTrade` props of `BarChart` and
+  `RunBarChart`, and `foundation/carbon` `SelectableTableRow` (the linked
+  rows of `BacktestTradeTable` and `ForwardTestFillTable`). Tests:
+  `test_round_trip_net_profit.py`, `trade_marks.test.ts`, and
+  `e2e/trade_marks.spec.ts` (the e2e server has the finished backtest of
+  "E2E trade marks" with 5 trades and 2 fills on the forward test of "E2E
+  chart indicators").
 - Playwright: the 4 projects (chromium, firefox, webkit, msedge) for each
   UI slice.
 

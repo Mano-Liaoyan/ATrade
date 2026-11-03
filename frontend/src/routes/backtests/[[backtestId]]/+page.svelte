@@ -11,7 +11,9 @@
      The list reads again after each backtest change that /ws/backtests pushes; the open backtest reads again when its
      list row changes. The address #start-backtest (command palette) opens the New backtest dialog.
      A single-instrument backtest has the "Equity" / "Bars" switcher (?chart=bars): "Bars" shows the bar chart of the
-     backtest range with the strategy indicators (docs/architecture/indicator.md section 23.9.8).
+     backtest range with the strategy indicators (docs/architecture/indicator.md section 23.9.8) and a mark for each
+     trade (section 23.9.9). Then the pointer or the focus on a Trades row gives its mark the focus ring, and a click
+     on a row selects it, shows "Bars", and scrolls the chart to the bar of the trade.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -56,6 +58,7 @@
     AddIndicatorButton,
     ChartIndicatorSetStore,
     formatInstrument,
+    listChartTrades,
     RunBarChart,
     RunChartIndicators,
     SplitCheckWarning,
@@ -106,6 +109,24 @@
   const hasLiveBarPeriod = $derived(shownBacktest !== null && isLiveBarPeriod(shownBacktest.bar_period));
 
   const chartView = $derived(readChartView(page.url.searchParams));
+  // The Trades row under the pointer or the focus, and the selected row of the open backtest (section 23.9.9).
+  let pointedTradeRow: number | null = $state(null);
+  let selectedTrade = $state<{ backtestId: number; row: number } | null>(null);
+  const selectedTradeRow = $derived(selectedTrade?.backtestId === backtestId ? selectedTrade.row : null);
+  const chartTrades = $derived(listChartTrades(shownBacktest?.trades ?? []));
+  const ringTrades = $derived(
+    [pointedTradeRow, selectedTradeRow].flatMap((row) => (row === null ? [] : [chartTrades.tradeIndexByRow[row] ?? null])).filter((index) => index !== null),
+  );
+
+  function selectTradeRow(row: number): void {
+    if (backtestId === null) {
+      return;
+    }
+    selectedTrade = { backtestId, row };
+    if (chartView !== 'bars') {
+      changeChartView('bars');
+    }
+  }
   // The indicators of the bar chart: the strategy indicators, and the changes of the user for the open backtest.
   const chartIndicators = new RunChartIndicators();
   $effect(() => {
@@ -377,6 +398,9 @@
                   onPanesChange={(panes: ChartPane[]) => {
                     chartIndicators.changePanes(chartKey, panes);
                   }}
+                  trades={chartTrades.trades}
+                  {ringTrades}
+                  centerTrade={selectedTradeRow === null ? null : (chartTrades.tradeIndexByRow[selectedTradeRow] ?? null)}
                 />
               </div>
             {:else if detail.metrics !== null}
@@ -403,7 +427,18 @@
             }}
           >
             {#if selectedTable === 'trades'}
-              <BacktestTradeTable trades={detail.trades} />
+              {#if instrument === undefined}
+                <BacktestTradeTable trades={detail.trades} />
+              {:else}
+                <BacktestTradeTable
+                  trades={detail.trades}
+                  selectedIndex={selectedTradeRow}
+                  onRowPoint={(row: number | null) => {
+                    pointedTradeRow = row;
+                  }}
+                  onRowSelect={selectTradeRow}
+                />
+              {/if}
             {:else if selectedTable === 'instruments'}
               <UniverseInstrumentTable instruments={detail.instruments} periodHeader={formatPeriodCountHeader(detail)} />
             {:else if selectedTable === 'orders'}

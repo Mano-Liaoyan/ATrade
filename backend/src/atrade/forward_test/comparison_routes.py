@@ -24,6 +24,7 @@ from atrade.backtest import (
     calculate_metrics,
     calculate_round_trip_metrics,
     check_backtest_request,
+    find_round_trip_net_profits,
     find_round_trips,
     queue_backtest,
     read_backtest_outcome,
@@ -117,6 +118,9 @@ class ForwardTestFillResponse(BaseModel):
     # The quantity times the price of a fill, or the cash in lieu of a split adjustment.
     amount_usd: Decimal
     split_ratio: Decimal | None
+    # The net profit after commissions of the round trip that the fill ends, else null. Null for a split adjustment
+    # (indicator.md section 23.9.9).
+    round_trip_net_profit_usd: Decimal | None
 
 
 class ForwardTestInstrumentResponse(BaseModel):
@@ -251,7 +255,18 @@ def to_compared_backtest(backtest: BacktestOutcome) -> ComparedBacktestSummaryRe
     )
 
 
-def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> ForwardTestFillResponse:
+def to_forward_test_fill_responses(forward_test_fills: list[ForwardTestFill]) -> list[ForwardTestFillResponse]:
+    """The fills with the round trip rule of the Instruments tab: the split adjustments are not in it."""
+    fills = [fill for fill in forward_test_fills if fill.kind == "fill"]
+    net_profits = dict(
+        zip((id(fill) for fill in fills), find_round_trip_net_profits([fill.trade for fill in fills]), strict=True)
+    )
+    return [to_forward_test_fill_response(fill, net_profits.get(id(fill))) for fill in forward_test_fills]
+
+
+def to_forward_test_fill_response(
+    forward_test_fill: ForwardTestFill, round_trip_net_profit_usd: Decimal | None
+) -> ForwardTestFillResponse:
     fill = forward_test_fill.trade
     if forward_test_fill.kind == "split_adjustment":
         return ForwardTestFillResponse(
@@ -265,6 +280,7 @@ def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> Forward
             commission_usd=Decimal(0),
             amount_usd=forward_test_fill.cash_in_lieu_usd or Decimal(0),
             split_ratio=forward_test_fill.split_ratio,
+            round_trip_net_profit_usd=None,
         )
     return ForwardTestFillResponse(
         symbol=forward_test_fill.instrument.symbol,
@@ -277,6 +293,7 @@ def to_forward_test_fill_response(forward_test_fill: ForwardTestFill) -> Forward
         commission_usd=fill.commission_usd,
         amount_usd=fill.quantity_shares * fill.price_usd,
         split_ratio=None,
+        round_trip_net_profit_usd=round_trip_net_profit_usd,
     )
 
 
@@ -466,7 +483,7 @@ class ComparisonRoutes:
                 calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())
             ),
             equity_curve=to_equity_curve_response(equity_curve),
-            fills=[to_forward_test_fill_response(fill) for fill in forward_test_fills],
+            fills=to_forward_test_fill_responses(forward_test_fills),
             instruments=to_instrument_responses(fills, members),
             same_period_backtests=[to_compared_backtest(backtest) for backtest in backtests if backtest is not None],
         )

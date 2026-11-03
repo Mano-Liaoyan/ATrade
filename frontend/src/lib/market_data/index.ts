@@ -2,13 +2,14 @@
 // list with its editor, the bar sources and the source order with its list, the survivorship bias warning, and the
 // IBKR stock split check warning, and the indicators of bar charts (indicator catalog, series, legend, Add indicator,
 // the saved chart indicator set with the favorites), and the bar chart of a backtest or forward test run with its
-// strategy indicators.
+// strategy indicators and trade marks.
 export { default as BarChart } from './BarChart.svelte';
 export { default as AddIndicatorButton } from './AddIndicatorButton.svelte';
 export { default as ChartLegend } from './ChartLegend.svelte';
 export { default as RunBarChart } from './RunBarChart.svelte';
 export { RunChartIndicators } from './run_chart_indicators.svelte';
 export { placeStrategyIndicators, type StrategyIndicator } from './strategy_indicators';
+export { listChartTrades, type ChartTrade, type TradeRecord } from './trade_marks';
 export {
   addChartIndicator,
   buildLegendRows,

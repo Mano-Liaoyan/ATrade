@@ -35,7 +35,7 @@ from atrade.backtest.sharpe_probability import (
 )
 from atrade.backtest.strategy_engine_run import write_look_back_catalog
 from atrade.backtest.sweep_routes import SWEEP_CHANGE_SOCKET, create_sweep_router
-from atrade.backtest.universe_instruments import UniverseInstrument, summarize_instruments
+from atrade.backtest.universe_instruments import UniverseInstrument, find_round_trip_net_profits, summarize_instruments
 from atrade.backtest.universe_update import UNIVERSE_UPDATE, UniverseUpdate, make_universe_update
 
 __all__ = [
@@ -70,6 +70,7 @@ __all__ = [
     "create_backtest_router",
     "create_sweep_router",
     "find_look_back",
+    "find_round_trip_net_profits",
     "find_round_trips",
     "find_sharpe_probability_status",
     "make_universe_update",

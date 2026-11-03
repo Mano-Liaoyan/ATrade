@@ -36,6 +36,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
     assert backtest["started_at_utc"] == "2026-01-02T03:04:05Z"
     assert backtest["ended_at_utc"] is not None
     # Each market order fills at the close of the bar that sent it: bars 3, 8, and 13 close at 104, 106, and 96.
+    # The sell ends the round trip 10 * (106 - 104) = 20. The last buy opens a position that stays open.
     assert backtest["trades"] == [
         {
             "time_utc": "2026-03-05T00:00:00Z",
@@ -45,6 +46,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "commission_usd": "0.00",
             "symbol": "BTEST",
             "exchange": "ARCA",
+            "round_trip_net_profit_usd": None,
         },
         {
             "time_utc": "2026-03-10T00:00:00Z",
@@ -54,6 +56,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "commission_usd": "0.00",
             "symbol": "BTEST",
             "exchange": "ARCA",
+            "round_trip_net_profit_usd": "20.00",
         },
         {
             "time_utc": "2026-03-15T00:00:00Z",
@@ -63,6 +66,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "commission_usd": "0.00",
             "symbol": "BTEST",
             "exchange": "ARCA",
+            "round_trip_net_profit_usd": None,
         },
     ]
     # 10000 + 10 * (106 - 104) + 10 * (110 - 96) = 10160. The peak 10060 falls to 10020: 40 / 10060 = 0.40 %.
@@ -174,6 +178,7 @@ async def test_the_template_warms_up_on_saved_bars_before_the_start(
         "commission_usd": "0.00",
         "symbol": "BTEST",
         "exchange": "ARCA",
+        "round_trip_net_profit_usd": None,
     }
     # The equity curve starts at the first bar of the range: look-back bars make no equity point.
     assert backtest["equity_curve"][0]["time_utc"] == "2026-03-03T00:00:00Z"

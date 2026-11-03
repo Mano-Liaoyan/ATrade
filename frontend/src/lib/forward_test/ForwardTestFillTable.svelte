@@ -1,16 +1,25 @@
 <!-- The recorded fills of one forward test (docs/architecture/forward_test.md section 12.8), oldest first: the Fills tab
      of the forward test page. The columns are the columns of the Trades tab of the backtest page, and the amount. A stock
      split adjustment is a row too (section 12.16): "Split 4:1" in Side, the change of the share count, no price, and
-     the cash in lieu as the amount. -->
+     the cash in lieu as the amount. With `onRowSelect` (the forward test page with the bar chart, docs/architecture/
+     indicator.md section 23.9.9), each fill row links to its trade mark: the pointer or the focus on a row gives
+     `onRowPoint` its index, and a click or Enter on the number button selects the row. A split adjustment has no mark. -->
 <script lang="ts">
-  import { DataTable, type TableColumn } from '#lib/foundation/carbon';
+  import { DataTable, SelectableTableRow, type TableColumn } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { formatAmount, formatSplitRatio } from '#lib/foundation/value_format';
   import type { ForwardTestFill } from './forward_test_api';
 
-  const { fills }: { fills: ForwardTestFill[] } = $props();
+  interface Props {
+    fills: ForwardTestFill[];
+    selectedIndex?: number | null;
+    onRowPoint?: (index: number | null) => void;
+    onRowSelect?: (index: number) => void;
+  }
+
+  const { fills, selectedIndex = null, onRowPoint, onRowSelect }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
     { header: '#', align: 'right' },
@@ -42,18 +51,34 @@
     <DataTable columns={COLUMNS} size="sm">
       {#snippet rows()}
         {#each fills as fill, fillIndex (fillIndex)}
-          <tr>
-            <th scope="row" align="right">{fillIndex + 1}</th>
-            <td>{formatUtcTime(fill.time_utc)}</td>
-            <td>{fill.symbol}</td>
-            <td>{describeSide(fill)}</td>
-            <td align="right">{describeQuantity(fill)}</td>
-            <td align="right">{fill.price_usd === null ? '' : formatAmount(fill.price_usd)}</td>
-            <td align="right">{fill.kind === 'fill' ? formatAmount(fill.commission_usd) : ''}</td>
-            <td align="right">{formatAmount(fill.amount_usd)}</td>
-          </tr>
+          {#if onRowSelect === undefined || fill.kind !== 'fill'}
+            <tr>
+              <th scope="row" align="right">{fillIndex + 1}</th>
+              {@render cells(fill)}
+            </tr>
+          {:else}
+            <SelectableTableRow
+              index={fillIndex}
+              label={`Show fill ${String(fillIndex + 1)} on the bar chart`}
+              isSelected={fillIndex === selectedIndex}
+              {onRowPoint}
+              {onRowSelect}
+            >
+              {@render cells(fill)}
+            </SelectableTableRow>
+          {/if}
         {/each}
       {/snippet}
     </DataTable>
   </ScrollRegion>
 {/if}
+
+{#snippet cells(fill: ForwardTestFill)}
+  <td>{formatUtcTime(fill.time_utc)}</td>
+  <td>{fill.symbol}</td>
+  <td>{describeSide(fill)}</td>
+  <td align="right">{describeQuantity(fill)}</td>
+  <td align="right">{fill.price_usd === null ? '' : formatAmount(fill.price_usd)}</td>
+  <td align="right">{fill.kind === 'fill' ? formatAmount(fill.commission_usd) : ''}</td>
+  <td align="right">{formatAmount(fill.amount_usd)}</td>
+{/snippet}
