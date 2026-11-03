@@ -626,6 +626,23 @@ section 6.2).
   colors of a new indicator. "Add indicator", the legend buttons, and the
   settings work as on the instrument page. No change is saved, except the
   favorites.
+- Decided (#331):
+  - `GET /api/backtests/{backtest_id}` has `strategy_indicators` in
+    `BacktestDetailResponse` (so the comparison route has it too). The
+    forward test has it in `forward_test` of
+    `GET /api/forward-tests/{id}` only (`ForwardTestWithIndicatorsResponse`),
+    not in the list. A forward test has no sweep parameters: it uses the
+    field defaults.
+  - The switcher shows for each status of a single-instrument backtest. A
+    queued or failed backtest also shows its bars.
+  - The bars route gets `start_utc`, `end_utc`, and the `source_order` of
+    the backtest. A forward test sends no `end_utc` while it runs, so the
+    range ends now. The bars and the indicator values are read one time for
+    each run; a running forward test does not read new bars.
+  - The changes of the user belong to the open run in the page
+    (`RunChartIndicators`). Another run, or a page load, starts again with
+    the strategy indicators. "Equity" and "Bars" keep the changes while the
+    run stays open.
 
 ### 23.9.9 Trade marks
 
@@ -709,6 +726,14 @@ section 6.2).
   `findMaximizedStretchFactors`), `chart_indicator_styles.ts`
   (`isHistogramLine`, `RSI_GUIDE_LEVELS`), and the `horizontal` icon of
   `OverflowMenu`. `BarChart` gets `onPanesChange` for the menu changes.
+- Done in #331: `strategy_indicators` of the 2 detail routes,
+  `readBars` with an optional range and source order, `RunBarChart` (the
+  bar chart of a run range), `RunChartIndicators` (the panes of a run chart),
+  `strategy_indicators.ts` (`placeStrategyIndicators`), and in
+  `#lib/backtest` `ChartViewSwitcher` and `chart_view.ts` (`readChartView`,
+  `formatChartViewSearch`). Tests: `test_strategy_indicators.py`,
+  `e2e/run_bar_chart.spec.ts` (the e2e server has a stopped forward test of
+  "E2E chart indicators" on 45 saved FTBAR bars).
 - Playwright: the 4 projects (chromium, firefox, webkit, msedge) for each
   UI slice.
 
