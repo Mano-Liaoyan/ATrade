@@ -1,6 +1,7 @@
 // Public entry of market_data: instrument search and its panel, bars, live bars, the bar chart, the HK instrument
 // list with its editor, the bar sources and the source order with its list, the survivorship bias warning, and the
-// IBKR stock split check warning, and the indicators of bar charts (indicator catalog, series, legend, Add indicator).
+// IBKR stock split check warning, and the indicators of bar charts (indicator catalog, series, legend, Add indicator, the saved chart indicator set
+// with the favorites).
 export { default as BarChart } from './BarChart.svelte';
 export { default as AddIndicatorButton } from './AddIndicatorButton.svelte';
 export { default as ChartLegend } from './ChartLegend.svelte';
@@ -25,6 +26,15 @@ export {
   type LegendRow,
   type LegendValue,
 } from './chart_indicators';
+export {
+  EMPTY_CHART_INDICATOR_SET,
+  orderByFavorites,
+  readChartIndicatorSet,
+  saveChartIndicatorSet,
+  toggleFavorite,
+  type ChartIndicatorSet,
+} from './chart_indicator_set';
+export { ChartIndicatorSetStore } from './chart_indicator_set_store.svelte';
 export {
   CHART_PALETTE_SIZE,
   formatIndicatorValue,

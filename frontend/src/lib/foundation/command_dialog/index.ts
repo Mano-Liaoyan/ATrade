@@ -2,5 +2,5 @@
 // Dialog and Command. It has no domain meaning. The bar chart "Add indicator" dialog uses it
 // (docs/architecture/indicator.md section 23.9.5).
 
-export type { CommandDialogItem } from './command_dialog';
+export type { CommandDialogItem, CommandDialogItemAction } from './command_dialog';
 export { default as CommandDialog } from './CommandDialog.svelte';

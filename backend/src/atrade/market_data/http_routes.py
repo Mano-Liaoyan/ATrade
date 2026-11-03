@@ -20,6 +20,7 @@ from atrade.market_data.bar_models import (
 )
 from atrade.market_data.bar_reading import BarReader, BarRequest, GatewayNotConnectedError
 from atrade.market_data.bar_source import BarSource, check_source_order
+from atrade.market_data.chart_indicator_set import create_chart_indicator_set_router
 from atrade.market_data.hk_instrument_list_routes import create_hk_instrument_list_router
 from atrade.market_data.indicator_series import create_indicator_series_router
 from atrade.market_data.instrument_lookup import InstrumentLookup
@@ -139,6 +140,7 @@ def create_market_data_router(
 
     router.include_router(create_source_order_router(database_url=database_url, clock=clock))
     router.include_router(create_indicator_series_router(database_url=database_url, clock=clock))
+    router.include_router(create_chart_indicator_set_router(database_url=database_url, clock=clock))
     router.include_router(create_live_bar_router(gateway_connection=gateway_connection, host=host, port=port))
     instrument_lookup = InstrumentLookup(gateway_connection=gateway_connection, host=host, port=port)
     router.include_router(
