@@ -3,6 +3,7 @@ import {
   addChartIndicator,
   findFreeColors,
   buildLegendRows,
+  createChartIndicator,
   findIndicatorSeries,
   findLegendIndex,
   formatLegendName,
@@ -216,9 +217,11 @@ describe('chart indicators', () => {
     const catalog = [SMA, BOLLINGER_BANDS];
 
     expect(buildLegendRows(panes[0]?.indicators ?? [], catalog, result, 1, false)).toEqual([
-      { name: 'SMA 50', values: [{ text: '1,240.00', color: '#6929c4' }] },
+      { name: 'SMA 50', indicatorIndex: 0, hidden: false, values: [{ text: '1,240.00', color: '#6929c4' }] },
       {
         name: 'BB 20 2',
+        indicatorIndex: 1,
+        hidden: false,
         values: [
           { text: '191.20', color: '#1192e8' },
           { text: '185.10', color: '#005d5d' },
@@ -235,13 +238,21 @@ describe('chart indicators', () => {
     const withEma = addChartIndicator(panes, { ...SMA, key: 'ema', name: 'EMA', short_name: 'EMA', parameters: [period(20)] });
     expect(findIndicatorSeries(result, withEma[0]?.indicators[2])).toBeNull();
     expect(buildLegendRows(withEma[0]?.indicators ?? [], [...catalog, { ...SMA, key: 'ema', short_name: 'EMA', parameters: [period(20)] }], result, null, false)).toEqual([
-      { name: 'SMA 50', values: [{ text: 'No value', color: '#6929c4' }] },
-      { name: 'BB 20 2', values: [
+      { name: 'SMA 50', indicatorIndex: 0, hidden: false, values: [{ text: 'No value', color: '#6929c4' }] },
+      { name: 'BB 20 2', indicatorIndex: 1, hidden: false, values: [
         { text: 'No value', color: '#1192e8' },
         { text: 'No value', color: '#005d5d' },
         { text: 'No value', color: '#9f1853' },
       ] },
-      { name: 'EMA 20', values: [{ text: 'No value', color: '#fa4d56' }] },
+      { name: 'EMA 20', indicatorIndex: 2, hidden: false, values: [{ text: 'No value', color: '#fa4d56' }] },
+    ]);
+  });
+
+  it('gives a hidden indicator its row without values', () => {
+    const sma = createChartIndicator(SMA, []);
+    const result: IndicatorSeriesResult = { times: [100], series: [{ indicator: 'sma', parameters: { period: 50 }, outputs: { value: [1240] } }] };
+    expect(buildLegendRows([{ ...sma, hidden: true }], [SMA], result, 0, false)).toEqual([
+      { name: 'SMA 50', indicatorIndex: 0, hidden: true, values: [] },
     ]);
   });
 });

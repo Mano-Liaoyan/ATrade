@@ -36,10 +36,20 @@ export interface LegendValue {
   color: string;
 }
 
-/** A legend row: the legend name and one value for each line. */
+/** A legend row: the legend name and one value for each line. A hidden indicator has no values. */
 export interface LegendRow {
   name: string;
+  /** The index of the indicator in its pane. */
+  indicatorIndex: number;
+  hidden: boolean;
   values: LegendValue[];
+}
+
+/** The buttons of the legend rows (section 23.9.4). `anchor` is the row element, for the settings popover. */
+export interface LegendRowActions {
+  onToggleHidden: (row: LegendRow) => void;
+  onOpenSettings: (row: LegendRow, anchor: HTMLElement) => void;
+  onRemove: (row: LegendRow) => void;
 }
 
 /** The OHLC row of the price pane legend, as text. */
@@ -283,7 +293,7 @@ export function buildLegendRows(
   legendIndex: number | null,
   dark: boolean,
 ): LegendRow[] {
-  return indicators.flatMap((indicator) => {
+  return indicators.flatMap((indicator, indicatorIndex) => {
     const definition = catalog.find((item) => item.key === indicator.indicator);
     if (definition === undefined) {
       return [];
@@ -292,7 +302,9 @@ export function buildLegendRows(
     return [
       {
         name: formatLegendName(definition, indicator.parameters),
-        values: indicator.lines.map((line) => {
+        indicatorIndex,
+        hidden: indicator.hidden,
+        values: (indicator.hidden ? [] : indicator.lines).map((line) => {
           const value = legendIndex === null ? null : (series?.outputs[line.output]?.[legendIndex] ?? null);
           return { text: formatIndicatorValue(indicator.indicator, value), color: readPaletteColor(line.color, dark) };
         }),
