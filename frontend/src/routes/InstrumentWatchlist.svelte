@@ -122,7 +122,9 @@
   async function addInstrument(candidate: Instrument): Promise<void> {
     const addResult = await addToWatchlist(fetch, candidate);
     if (addResult.kind === 'ok') {
-      instruments = [...(instruments ?? []), addResult.value];
+      // The list read after the change push can come back first and already have the instrument.
+      const added = addResult.value;
+      instruments = [...(instruments ?? []).filter((saved) => saved.id !== added.id), added];
       changeMessage = null;
       readQuotes([addResult.value]);
     } else {

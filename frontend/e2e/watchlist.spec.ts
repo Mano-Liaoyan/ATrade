@@ -1,6 +1,6 @@
 // Watchlist against the real backend with the IBKR fake. The Playwright projects share one database and run at the same
 // time, so each project uses its own instruments <PROJECT NAME>01 ... <PROJECT NAME>25 (backend/tests/e2e_server.py).
-import { expect, test, type APIRequestContext, type Locator, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Locator, type Page, type TestInfo, type WebSocketRoute } from '@playwright/test';
 
 const WATCHLIST_PATH = '/api/watchlist';
 const INSTRUMENTS_PER_PROJECT = 25;
@@ -72,7 +72,41 @@ test('adds an instrument from the search, keeps it after a reload, and deletes i
   await expect(watchlistColumn(page).getByRole('link', { name: symbol, exact: true })).toHaveCount(0);
 });
 
-test('a watchlist instrument opens its instrument page', async ({ page, request }, currentTest) => {
+test('shows one row when the live push reads the list before the add response arrives', async ({ page }, currentTest) => {
+  const symbol = projectSymbol(currentTest, 3);
+  // A fake /ws/watchlist socket sends the change push of the add. The list read after the push comes back before the
+  // response of the add.
+  const watchlistSocket = new Promise<WebSocketRoute>((resolve) => {
+    void page.routeWebSocket(/\/ws\/watchlist$/, resolve);
+  });
+  await page.route(`**${WATCHLIST_PATH}`, async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.fallback();
+      return;
+    }
+    const addResponse = await route.fetch();
+    const listReadWithInstrument = page.waitForResponse(
+      async (response) =>
+        response.request().method() === 'GET' &&
+        response.url().endsWith(WATCHLIST_PATH) &&
+        (await response.text()).includes(`"${symbol}"`),
+    );
+    (await watchlistSocket).send(JSON.stringify({ type: 'changed' }));
+    await listReadWithInstrument;
+    await route.fulfill({ response: addResponse });
+  });
+  await page.goto('/');
+
+  await searchFor(page, symbol);
+  const addResponse = page.waitForResponse((response) => response.request().method() === 'POST');
+  await page.getByRole('option', { name: `${symbol} / ARCA / USD` }).click();
+  await addResponse;
+
+  const watchlistTable = watchlistColumn(page).getByRole('region', { name: 'Watchlist table' });
+  await expect(watchlistTable.getByRole('link', { name: symbol, exact: true })).toHaveCount(1);
+});
+
+test('a watchlist instrument opens its instrument page',async ({ page, request }, currentTest) => {
   const symbol = projectSymbol(currentTest, 2);
   await addThroughBackend(request, symbol);
   await page.goto('/');
