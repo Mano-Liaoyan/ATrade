@@ -15,6 +15,7 @@ async function createStrategy(page: Page, strategyName: string): Promise<void> {
   // (docs/architecture/backtest.md, decided in #198). Template M1 is one.
   await dialog.getByRole('listbox', { name: 'Start from' }).getByRole('option', { name: 'Cross-sectional momentum' }).click();
   await dialog.getByRole('button', { name: 'Create strategy' }).click();
+  await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(strategyName);
 }
 

@@ -38,6 +38,7 @@ async function openNewStrategy(page: Page, name: string): Promise<void> {
   await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(name);
   await page.getByRole('button', { name: 'Create strategy' }).click();
+  await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
 }
 

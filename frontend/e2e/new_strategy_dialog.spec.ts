@@ -55,6 +55,7 @@ test('a strategy from template S1 opens with version 1 made by the rule builder'
   await dialog.getByRole('button', { name: 'Create strategy' }).click();
 
   expect((await request).postDataJSON()).toEqual({ name, start_from: 's1' });
+  await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('200-day trend');
   const strategyId = /\/strategies\/(\d+)/.exec(page.url())?.[1];
@@ -77,6 +78,7 @@ test('a strategy from template M1 opens with version 1 that holds the template c
   await dialog.getByRole('button', { name: 'Create strategy' }).click();
 
   expect((await request).postDataJSON()).toEqual({ name, start_from: 'm1' });
+  await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('Cross-sectional momentum');
   const strategyId = /\/strategies\/(\d+)/.exec(page.url())?.[1];
