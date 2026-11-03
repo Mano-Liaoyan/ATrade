@@ -206,7 +206,8 @@
   });
 
   function syncPaneCount(currentChart: IChartApi, count: number): void {
-    if (maximized !== null) {
+    // A new or removed pane ends "Maximize". New values or a theme change keep it.
+    if (maximized !== null && currentChart.panes().length !== Math.max(count, 1)) {
       restorePanes();
     }
     while (currentChart.panes().length < count) {
