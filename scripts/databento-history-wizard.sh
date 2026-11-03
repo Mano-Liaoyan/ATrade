@@ -266,7 +266,9 @@ if mode == "cost":
 # The hourly purchase: one batch job for each quarter of the universe (section 8.8.1). With "submit", the arguments
 # after the mode are the quarter starts that have a job already.
 HOURLY_JOBS_PY='
+import re
 import sys
+import time
 from datetime import UTC, date, datetime
 import databento
 from atrade.foundation.settings import Settings
@@ -281,11 +283,21 @@ done = set(sys.argv[2:])
 for purchase in purchases:
     if purchase.start.isoformat() in done:
         continue
-    job = client.batch.submit_job(
-        dataset="XNAS.ITCH", schema="ohlcv-1h", symbols=purchase.symbols,
-        start=purchase.start.isoformat(), end=purchase.end.isoformat(),
-        encoding="dbn", compression="zstd", split_duration="month",
-    )
+    while True:
+        try:
+            job = client.batch.submit_job(
+                dataset="XNAS.ITCH", schema="ohlcv-1h", symbols=purchase.symbols,
+                start=purchase.start.isoformat(), end=purchase.end.isoformat(),
+                encoding="dbn", compression="zstd", split_duration="month",
+            )
+            break
+        except databento.BentoClientError as error:
+            if error.http_status != 429:
+                raise
+            wait = re.search(r"Retry in (\d+)s", str(error))
+            seconds = int(wait.group(1)) + 1 if wait else 60
+            print(f"WAIT {seconds}", flush=True)
+            time.sleep(seconds)
     print(purchase.start.isoformat(), job["id"], flush=True)
 print(f"QUARTERS {len(purchases)}", flush=True)
 '
@@ -332,9 +344,15 @@ container_user() {
 }
 
 # Downloads each job that has no folder yet, then imports all DBN files of the directory (no IBKR request).
+# After a successful import, imported.txt holds the job IDs. When it holds all job IDs of jobs.txt, the wizard does
+# not import again.
 import_directory() {
   local dir="$1" job_id
   local -a args=()
+  if [[ -f "$dir/imported.txt" ]] && diff -q <(read_job_ids "$dir/jobs.txt" | sort) <(sort "$dir/imported.txt") >/dev/null; then
+    note "All jobs of $dir/jobs.txt are imported already ($dir/imported.txt)."
+    return 0
+  fi
   while read -r job_id; do
     [[ -n "$job_id" ]] || continue
     if compgen -G "$dir/$job_id/*.dbn*" >/dev/null; then
@@ -345,6 +363,7 @@ import_directory() {
   done < <(read_job_ids "$dir/jobs.txt")
   dc run --rm --user "$(container_user)" -v "$dir:/databento:z" web \
     python -m atrade.app.databento_import /databento "${args[@]}"
+  read_job_ids "$dir/jobs.txt" > "$dir/imported.txt"
 }
 
 run_wizard() {
@@ -469,6 +488,8 @@ if confirm "Buy the hourly batch jobs of the quarters that have no job yet? This
   web_python "$HOURLY_JOBS_PY" submit "${bought_quarters[@]}" | while read -r line; do
     if [[ "$line" == QUARTERS* ]]; then
       note "Quarters in the purchase list: ${line#QUARTERS }"
+    elif [[ "$line" == WAIT* ]]; then
+      note "Databento limits the job submit rate. The next submit is in ${line#WAIT } s."
     else
       printf '%s\n' "$line" >> "$HOURLY_DIR/jobs.txt"
       note "bought $line"
