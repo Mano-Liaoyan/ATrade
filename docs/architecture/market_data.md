@@ -707,7 +707,8 @@ Quarterly update in the `forward-test` worker:
   `market_data/us_universe_update.py` (`UsUniverseUpdate`),
   `market_data/us_trading_days.py`, and `market_data/us_etf_symbols.py`.
   The Databento client gets `read_daily_summary_end_utc()`
-  (`metadata.get_dataset_range`) and `download_daily_summary()`
+  (`metadata.get_dataset_range`, the end of the `ohlcv-1d` schema, not the
+  later end of the dataset (#350)) and `download_daily_summary()`
   (`timeseries.get_range`). Tests: `tests/market_data/test_us_universe.py`
   and `tests/market_data/test_us_universe_update.py`.
 - The average trading value is the sum of close × volume in the window

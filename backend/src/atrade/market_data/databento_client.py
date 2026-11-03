@@ -7,7 +7,7 @@ the quarterly US universe update (docs/architecture.md section 6.2, docs/archite
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, cast
 
 import databento
 
@@ -46,6 +46,21 @@ def parse_range_end(value: str) -> datetime:
     return datetime.fromisoformat(value[:ISO_SECONDS_LENGTH]).replace(tzinfo=UTC)
 
 
+def find_schema_end(dataset_range: dict[str, object], schema: str) -> datetime:
+    """The end of `schema` in a `metadata.get_dataset_range` answer. The end of one schema can be earlier than the end
+    of the dataset: `ohlcv-1d` ends at 00:00 UTC of a day. Without the schema in the answer, 00:00 UTC of the day of
+    the dataset end."""
+    schema_ranges = dataset_range.get("schema")
+    if isinstance(schema_ranges, dict):
+        schema_range = cast("dict[str, object]", schema_ranges).get(schema)
+        if isinstance(schema_range, dict):
+            schema_end = cast("dict[str, object]", schema_range).get("end")
+            if isinstance(schema_end, str):
+                return parse_range_end(schema_end)
+    dataset_end = parse_range_end(str(dataset_range["end"]))
+    return datetime(dataset_end.year, dataset_end.month, dataset_end.day, tzinfo=UTC)
+
+
 class DatabentoHistoricalClient:
     """The real client. A download of a done batch job does not cost again for 30 days (section 8.8.1)."""
 
@@ -56,7 +71,8 @@ class DatabentoHistoricalClient:
         return self.historical.batch.download(job_id=job_id, output_dir=output_dir)
 
     def read_daily_summary_end_utc(self) -> datetime:
-        return parse_range_end(self.historical.metadata.get_dataset_range(dataset=SUMMARY_DATASET)["end"])
+        dataset_range: dict[str, object] = dict(self.historical.metadata.get_dataset_range(dataset=SUMMARY_DATASET))
+        return find_schema_end(dataset_range, DAILY_SCHEMA)
 
     def read_hourly_cost(self, symbols: list[str], start: date, end: date) -> Decimal:
         cost = self.historical.metadata.get_cost(
