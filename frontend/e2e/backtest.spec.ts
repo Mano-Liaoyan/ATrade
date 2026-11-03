@@ -121,6 +121,7 @@ test('starts a backtest and sees its metrics, curves, and trades on the workbenc
   await page.getByRole('button', { name: 'New strategy' }).click();
   await page.getByLabel('Strategy name').fill(strategyName);
   await page.getByRole('button', { name: 'Create strategy' }).click();
+  await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(strategyName);
 
   await page.getByRole('link', { name: 'Backtests' }).click();
