@@ -233,9 +233,9 @@ async function countColorPixels(page: Page, hex: string): Promise<number> {
       if (context === null || canvas.width === 0 || canvas.height === 0) {
         continue;
       }
-      const data = context.getImageData(0, 0, canvas.width, canvas.height).data;
-      for (let index = 0; index < data.length; index += 4) {
-        if (target.every((value, channel) => Math.abs((data[index + channel] ?? 0) - value) <= 6) && (data[index + 3] ?? 0) > 200) {
+      const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+      for (let index = 0; index < pixels.length; index += 4) {
+        if (target.every((value, channel) => Math.abs((pixels[index + channel] ?? 0) - value) <= 6) && (pixels[index + 3] ?? 0) > 200) {
           count += 1;
         }
       }
@@ -348,6 +348,8 @@ test('Apply is disabled with the reason while a parameter is invalid, and Escape
   await row.locator('.legend-name').click();
   const settings = page.getByRole('dialog', { name: 'MACD' });
   const apply = settings.getByRole('button', { name: 'Apply' });
+  // The MACD fields are higher than the popover: they scroll with a visible track.
+  await expect(page.getByRole('scrollbar', { name: 'Settings of MACD scroll bar' })).toBeVisible();
 
   const fastPeriod = settings.getByRole('spinbutton', { name: 'Fast period' });
   await fastPeriod.fill('30');

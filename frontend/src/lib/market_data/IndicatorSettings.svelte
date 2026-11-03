@@ -6,6 +6,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { Button, ContentSwitcher, NumberInput, Popover, type ContentSwitcherItem } from '#lib/foundation/carbon';
+  import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { CHART_PALETTE_SIZE, isHistogramLine, readPaletteColor, readPaletteColorName } from './chart_indicator_styles';
   import type { ChartIndicator, ChartIndicatorDefinition, ChartLineStyle } from './chart_indicators';
   import {
@@ -73,69 +74,74 @@
     }}
   >
     <h2 class="settings-heading">{definition.name}</h2>
-    {#each definition.parameters as parameter (parameter.name)}
-      <NumberInput
-        label={formatParameterLabel(parameter.name)}
-        size="sm"
-        value={draft.parameters[parameter.name] ?? ''}
-        min={parameter.minimum}
-        max={parameter.maximum}
-        step={parameter.value_type === 'int' ? 1 : FLOAT_STEP}
-        invalidText={problems[parameter.name] ?? null}
-        onValueChange={(value: string) => {
-          draft.parameters[parameter.name] = value;
-        }}
-      />
-    {/each}
-    {#each draft.lines as line, lineIndex (line.output)}
-      {@const lineLabel = formatLineLabel(definition, line.output)}
-      <fieldset class="line-group">
-        <legend class="line-heading">{lineLabel}</legend>
-        <div class="color-swatches" role="radiogroup" aria-label="Color">
-          {#each colors as color (color)}
-            <span class="color-swatch">
-              <input
-                type="radio"
-                name={`line-color-${uid}-${String(lineIndex)}`}
-                value={color}
-                checked={line.color === color}
-                aria-label={readPaletteColorName(color, dark)}
-                onchange={() => {
-                  line.color = color;
-                }}
-              />
-              <span class="swatch-fill" style:background-color={readPaletteColor(color, dark)}></span>
-            </span>
-          {/each}
-        </div>
-        {#if !isHistogramLine(definition.key, line.output)}
-          <div class="line-field">
-            <span class="cds--label" aria-hidden="true">Line style</span>
-            <ContentSwitcher
-              label="Line style"
-              size="sm"
-              items={STYLE_ITEMS}
-              value={line.style}
-              onValueChange={(style: ChartLineStyle) => {
-                line.style = style;
-              }}
-            />
-          </div>
-          <div class="line-field">
-            <span class="cds--label" aria-hidden="true">Width</span>
-            <ContentSwitcher
-              label="Width"
-              size="sm"
-              items={WIDTH_ITEMS}
-              value={String(line.width)}
-              onValueChange={(width: string) => {
-                line.width = Number(width);
-              }}
-            />
-          </div>
-        {/if}
-      </fieldset>
-    {/each}
+    <!-- The fields scroll between the heading and the buttons, with a visible track. -->
+    <ScrollRegion label={`Settings of ${definition.name}`} maxHeight="min(28rem, 60vh)">
+      <div class="settings-fields">
+        {#each definition.parameters as parameter (parameter.name)}
+          <NumberInput
+            label={formatParameterLabel(parameter.name)}
+            size="sm"
+            value={draft.parameters[parameter.name] ?? ''}
+            min={parameter.minimum}
+            max={parameter.maximum}
+            step={parameter.value_type === 'int' ? 1 : FLOAT_STEP}
+            invalidText={problems[parameter.name] ?? null}
+            onValueChange={(value: string) => {
+              draft.parameters[parameter.name] = value;
+            }}
+          />
+        {/each}
+        {#each draft.lines as line, lineIndex (line.output)}
+          {@const lineLabel = formatLineLabel(definition, line.output)}
+          <fieldset class="line-group">
+            <legend class="line-heading">{lineLabel}</legend>
+            <div class="color-swatches" role="radiogroup" aria-label="Color">
+              {#each colors as color (color)}
+                <span class="color-swatch">
+                  <input
+                    type="radio"
+                    name={`line-color-${uid}-${String(lineIndex)}`}
+                    value={color}
+                    checked={line.color === color}
+                    aria-label={readPaletteColorName(color, dark)}
+                    onchange={() => {
+                      line.color = color;
+                    }}
+                  />
+                  <span class="swatch-fill" style:background-color={readPaletteColor(color, dark)}></span>
+                </span>
+              {/each}
+            </div>
+            {#if !isHistogramLine(definition.key, line.output)}
+              <div class="line-field">
+                <span class="cds--label" aria-hidden="true">Line style</span>
+                <ContentSwitcher
+                  label="Line style"
+                  size="sm"
+                  items={STYLE_ITEMS}
+                  value={line.style}
+                  onValueChange={(style: ChartLineStyle) => {
+                    line.style = style;
+                  }}
+                />
+              </div>
+              <div class="line-field">
+                <span class="cds--label" aria-hidden="true">Width</span>
+                <ContentSwitcher
+                  label="Width"
+                  size="sm"
+                  items={WIDTH_ITEMS}
+                  value={String(line.width)}
+                  onValueChange={(width: string) => {
+                    line.width = Number(width);
+                  }}
+                />
+              </div>
+            {/if}
+          </fieldset>
+        {/each}
+      </div>
+    </ScrollRegion>
     <div class="settings-buttons">
       <Button
         kind="ghost"
@@ -155,8 +161,13 @@
     flex-direction: column;
     gap: var(--cds-spacing-05);
     padding: var(--cds-spacing-05);
-    max-block-size: 70vh;
-    overflow-y: auto;
+  }
+
+  .settings-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--cds-spacing-05);
+    padding-inline-end: var(--cds-spacing-03);
   }
 
   .settings-heading {

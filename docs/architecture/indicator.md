@@ -517,7 +517,8 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
     pointer over that row.
   - The tooltips of the row buttons go under `<body>` (`IconButton`
     `floatingTooltip`), so the legend `ScrollRegion` does not clip them. The
-    popover is at the legend row.
+    popover is at the legend row. Its fields scroll between the heading and
+    the buttons in a `ScrollRegion` ("Settings of <name>").
   - The line group headings: "Line" (or "Histogram") for an indicator with
     one line, "MACD line" and "Signal line" for MACD, else the output label
     ("Upper", "Histogram").
