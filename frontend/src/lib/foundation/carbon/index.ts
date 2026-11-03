@@ -20,7 +20,7 @@ export { default as Popover } from './Popover.svelte';
 export { default as MenuButton, type MenuButtonItem } from './MenuButton.svelte';
 export { default as ContextMenu, type ContextMenuItem } from './ContextMenu.svelte';
 export { default as IconMenuButton, type IconMenuItem } from './IconMenuButton.svelte';
-export type { ButtonKind, ButtonSize } from './carbon_state';
+export { buttonClasses, type ButtonKind, type ButtonSize } from './carbon_state';
 export { default as Icon } from './Icon.svelte';
 export { default as IconButton, type IconTone } from './IconButton.svelte';
 export type { CarbonIcon, CarbonIconNode } from './carbon_icon';

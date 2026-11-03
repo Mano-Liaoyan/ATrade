@@ -105,6 +105,7 @@ layers = [
     # screen -> indicator, market_data, watchlist (docs/architecture.md section 6.2). backtest imports screen.
     "atrade.screen",
     "atrade.watchlist",
+    # market_data -> ibkr, indicator: the indicator series route of bar charts (indicator.md section 23.9.6).
     "atrade.strategy | atrade.market_data",
     # indicator -> foundation only, assistant -> foundation only (docs/architecture.md section 6.2).
     "atrade.ibkr | atrade.indicator | atrade.assistant",

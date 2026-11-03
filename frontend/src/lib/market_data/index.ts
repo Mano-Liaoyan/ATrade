@@ -1,7 +1,45 @@
 // Public entry of market_data: instrument search and its panel, bars, live bars, the bar chart, the HK instrument
 // list with its editor, the bar sources and the source order with its list, the survivorship bias warning, and the
-// IBKR stock split check warning.
+// IBKR stock split check warning, and the indicators of bar charts (indicator catalog, series, legend, Add indicator).
 export { default as BarChart } from './BarChart.svelte';
+export { default as AddIndicatorButton } from './AddIndicatorButton.svelte';
+export { default as ChartLegend } from './ChartLegend.svelte';
+export {
+  addChartIndicator,
+  buildLegendRows,
+  createChartIndicator,
+  findFreeColors,
+  findIndicatorSeries,
+  findLegendIndex,
+  formatLegendName,
+  isAddIndicatorShortcut,
+  listUsedColors,
+  MAX_OWN_PANES,
+  withDefaults,
+  type ChartIndicator,
+  type ChartIndicatorDefinition,
+  type ChartIndicatorLine,
+  type ChartLineStyle,
+  type ChartPane,
+  type LegendBar,
+  type LegendRow,
+  type LegendValue,
+} from './chart_indicators';
+export {
+  CHART_PALETTE_SIZE,
+  formatIndicatorValue,
+  NO_VALUE_TEXT,
+  readIndicatorPriceFormat,
+  readPaletteColor,
+  readPaletteColorName,
+} from './chart_indicator_styles';
+export {
+  listChartIndicatorCatalog,
+  listSeriesIndicators,
+  readIndicatorSeries,
+  type IndicatorSeriesRequest,
+  type IndicatorSeriesResult,
+} from './indicator_series';
 export { default as InstrumentSearch } from './InstrumentSearch.svelte';
 export { default as SplitCheckWarning } from './SplitCheckWarning.svelte';
 export { default as SurvivorshipBiasWarning } from './SurvivorshipBiasWarning.svelte';

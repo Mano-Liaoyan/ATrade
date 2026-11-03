@@ -23,6 +23,8 @@
     minHeight?: string;
     /** Content under the canvas, for example a legend. */
     children?: Snippet;
+    /** HTML over the canvas, for example the legend of a bar chart pane. It is not in the img role. */
+    overlay?: Snippet;
   }
 
   let {
@@ -32,18 +34,22 @@
     height = 'min(32rem, 60vh)',
     minHeight = '16rem',
     children,
+    overlay,
   }: Props = $props();
 </script>
 
 <figure class={['chart-frame', fill && 'chart-frame--fill']}>
-  <div
-    class="chart-canvas"
-    role="img"
-    aria-label={label}
-    style:height={fill ? undefined : height}
-    style:min-height={fill ? undefined : minHeight}
-    bind:this={canvas}
-  ></div>
+  <div class="chart-area">
+    <div
+      class="chart-canvas"
+      role="img"
+      aria-label={label}
+      style:height={fill ? undefined : height}
+      style:min-height={fill ? undefined : minHeight}
+      bind:this={canvas}
+    ></div>
+    {@render overlay?.()}
+  </div>
   {@render children?.()}
 </figure>
 
@@ -60,9 +66,20 @@
     box-sizing: border-box;
   }
 
+  .chart-area {
+    position: relative;
+  }
+
   .chart-canvas {
     position: relative;
     overflow: hidden;
+  }
+
+  .chart-frame--fill .chart-area {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-block-size: 0;
   }
 
   .chart-frame--fill .chart-canvas {

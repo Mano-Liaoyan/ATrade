@@ -79,6 +79,13 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   `GET /api/market-data/bars`. See
   [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
   section 8.4.
+- Indicators on the bar chart: "Add indicator" (or the `/` key) on the
+  instrument page adds SMA, EMA, Bollinger Bands, or the Donchian channel to
+  the price pane. The backend calculates the values from the saved bars
+  (`POST /api/market-data/indicator-series`). The legend shows the OHLC row
+  and the values at the crosshair bar. The indicators are not saved yet. See
+  [`docs/architecture/indicator.md`](docs/architecture/indicator.md)
+  section 23.9.
 - Live bars: the chart gets the current bar from IBKR over the WebSocket
   `/ws/market-data` and updates it without a page reload. The page connects
   again after a lost connection and when a background tab becomes visible.
