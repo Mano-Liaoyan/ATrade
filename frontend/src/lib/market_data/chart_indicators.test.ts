@@ -7,6 +7,11 @@ import {
   findLegendIndex,
   formatLegendName,
   isAddIndicatorShortcut,
+  findMaximizedStretchFactors,
+  listPaneActions,
+  moveOwnPane,
+  removeOwnPane,
+  removeChartIndicator,
   type ChartIndicatorDefinition,
   type ChartPane,
 } from './chart_indicators';
@@ -55,6 +60,10 @@ const REALIZED_VOLATILITY: ChartIndicatorDefinition = {
 const RSI: ChartIndicatorDefinition = { ...SMA, key: 'rsi', name: 'RSI', short_name: 'RSI', chart_placement: 'own', parameters: [period(14)] };
 
 const EMPTY_CHART: ChartPane[] = [{ indicators: [] }];
+
+function listKeys(pane: ChartPane): string[] {
+  return pane.indicators.map((indicator) => indicator.indicator);
+}
 
 describe('chart indicators', () => {
   it('names a legend row with the short name and the parameters that are in the name', () => {
@@ -115,6 +124,57 @@ describe('chart indicators', () => {
       ['macd'],
       ['realized_volatility', 'rsi'],
     ]);
+  });
+
+  it('removes an indicator, and the own pane goes away with its last indicator', () => {
+    let panes = addChartIndicator(EMPTY_CHART, SMA);
+    panes = addChartIndicator(panes, RSI);
+    panes = addChartIndicator(panes, MACD);
+
+    const withoutSma = removeChartIndicator(panes, 0, 0);
+    expect(withoutSma.map(listKeys)).toEqual([[], ['rsi'], ['macd']]);
+    const withoutRsi = removeChartIndicator(panes, 1, 0);
+    expect(withoutRsi.map(listKeys)).toEqual([['sma'], ['macd']]);
+    // The old panes do not change.
+    expect(panes.map(listKeys)).toEqual([['sma'], ['rsi'], ['macd']]);
+  });
+
+  it('moves an own pane up or down; the price pane and the ends do not move', () => {
+    let panes = addChartIndicator(EMPTY_CHART, RSI);
+    panes = addChartIndicator(panes, MACD);
+    panes = addChartIndicator(panes, REALIZED_VOLATILITY);
+
+    expect(moveOwnPane(panes, 2, 'up').map(listKeys)).toEqual([[], ['macd'], ['rsi'], ['realized_volatility']]);
+    expect(moveOwnPane(panes, 2, 'down').map(listKeys)).toEqual([[], ['rsi'], ['realized_volatility'], ['macd']]);
+    expect(moveOwnPane(panes, 1, 'up').map(listKeys)).toEqual([[], ['rsi'], ['macd'], ['realized_volatility']]);
+    expect(moveOwnPane(panes, 3, 'down').map(listKeys)).toEqual([[], ['rsi'], ['macd'], ['realized_volatility']]);
+    expect(moveOwnPane(panes, 0, 'down').map(listKeys)).toEqual([[], ['rsi'], ['macd'], ['realized_volatility']]);
+  });
+
+  it('removes an own pane with all its indicators, never the price pane', () => {
+    let panes = addChartIndicator(EMPTY_CHART, SMA);
+    panes = addChartIndicator(panes, RSI);
+    panes = addChartIndicator(panes, MACD);
+
+    expect(removeOwnPane(panes, 1).map(listKeys)).toEqual([['sma'], ['macd']]);
+    expect(removeOwnPane(panes, 0).map(listKeys)).toEqual([['sma'], ['rsi'], ['macd']]);
+  });
+
+  it('lists the options of a pane: Move up, Move down, Maximize or Restore, Remove indicators', () => {
+    // The price pane and 3 own panes.
+    expect(listPaneActions(0, 4, false)).toEqual(['maximize']);
+    expect(listPaneActions(0, 4, true)).toEqual(['restore']);
+    expect(listPaneActions(1, 4, false)).toEqual(['move_down', 'maximize', 'remove']);
+    expect(listPaneActions(2, 4, false)).toEqual(['move_up', 'move_down', 'maximize', 'remove']);
+    expect(listPaneActions(3, 4, true)).toEqual(['move_up', 'restore', 'remove']);
+    // A single own pane does not move.
+    expect(listPaneActions(1, 2, false)).toEqual(['maximize', 'remove']);
+  });
+
+  it('gives a maximized pane all the height but 2 pixels for each other pane', () => {
+    // lightweight-charts 5.2.1 draws a pane at least 2 pixels high, and the stretch factors are relative.
+    expect(findMaximizedStretchFactors([300, 100, 100], 1)).toEqual([2, 496, 2]);
+    expect(findMaximizedStretchFactors([400, 100], 0)).toEqual([498, 2]);
   });
 
   it('shows the values at the crosshair bar, or at the last bar with indicator data', () => {

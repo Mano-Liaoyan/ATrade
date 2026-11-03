@@ -50,6 +50,13 @@ export interface LegendBar {
   close: string;
 }
 
+/** The place of a pane in the chart area, in pixels. `width` is the plot width, without the price scale. */
+export interface PaneBox {
+  top: number;
+  height: number;
+  width: number;
+}
+
 /** A chart has the price pane and at most this many own panes (section 23.9.3). */
 export const MAX_OWN_PANES = 3;
 const NEW_LINE_STYLE: ChartLineStyle = 'solid';
@@ -119,6 +126,74 @@ export function addChartIndicator(panes: readonly ChartPane[], definition: Chart
   }
   const lastPane = ownPanes.at(-1) ?? { indicators: [] };
   return [pricePane, ...ownPanes.slice(0, -1), { indicators: [...lastPane.indicators, indicator] }];
+}
+
+/**
+ * Removes indicator `indicatorIndex` of pane `paneIndex`. An own pane without indicators goes away; the price pane
+ * stays. Returns new panes; the old panes do not change.
+ */
+export function removeChartIndicator(panes: readonly ChartPane[], paneIndex: number, indicatorIndex: number): ChartPane[] {
+  return panes.flatMap((pane, index) => {
+    if (index !== paneIndex) {
+      return [pane];
+    }
+    const indicators = pane.indicators.filter((_, itemIndex) => itemIndex !== indicatorIndex);
+    return index > 0 && indicators.length === 0 ? [] : [{ indicators }];
+  });
+}
+
+/** Moves own pane `paneIndex` one place up or down. The price pane, the first own pane up, and the last down stay. */
+export function moveOwnPane(panes: readonly ChartPane[], paneIndex: number, direction: 'up' | 'down'): ChartPane[] {
+  const otherIndex = direction === 'up' ? paneIndex - 1 : paneIndex + 1;
+  const pane = panes[paneIndex];
+  const otherPane = panes[otherIndex];
+  if (paneIndex < 1 || otherIndex < 1 || pane === undefined || otherPane === undefined) {
+    return [...panes];
+  }
+  const moved = [...panes];
+  moved[paneIndex] = otherPane;
+  moved[otherIndex] = pane;
+  return moved;
+}
+
+/** Removes own pane `paneIndex` and all its indicators. The price pane stays. */
+export function removeOwnPane(panes: readonly ChartPane[], paneIndex: number): ChartPane[] {
+  return panes.filter((_, index) => index === 0 || index !== paneIndex);
+}
+
+export type PaneAction = 'move_up' | 'move_down' | 'maximize' | 'restore' | 'remove';
+
+/**
+ * The options menu items of pane `paneIndex` of `paneCount` panes (section 23.9.4). The price pane has "Maximize" or
+ * "Restore" only. `isMaximized` is true while this pane has all the chart height.
+ */
+export function listPaneActions(paneIndex: number, paneCount: number, isMaximized: boolean): PaneAction[] {
+  const size: PaneAction = isMaximized ? 'restore' : 'maximize';
+  if (paneIndex === 0) {
+    return [size];
+  }
+  const actions: PaneAction[] = [];
+  if (paneIndex > 1) {
+    actions.push('move_up');
+  }
+  if (paneIndex < paneCount - 1) {
+    actions.push('move_down');
+  }
+  return [...actions, size, 'remove'];
+}
+
+// lightweight-charts 5.2.1 draws each pane at least this high, also with stretch factor 0. `pane.setHeight(0)` gives
+// 30 pixels (its minimum), so "Maximize" sets stretch factors (section 23.9.4).
+const MINIMIZED_PANE_PIXELS = 2;
+
+/**
+ * The stretch factors that give pane `paneIndex` all the chart height. `heights` are the pane heights in pixels now.
+ * Each other pane keeps 2 pixels, so the panes fill the same height as before and none goes out of the chart.
+ */
+export function findMaximizedStretchFactors(heights: readonly number[], paneIndex: number): number[] {
+  const total = heights.reduce((sum, height) => sum + height, 0);
+  const otherPixels = MINIMIZED_PANE_PIXELS * (heights.length - 1);
+  return heights.map((_, index) => (index === paneIndex ? Math.max(total - otherPixels, 1) : MINIMIZED_PANE_PIXELS));
 }
 
 /**

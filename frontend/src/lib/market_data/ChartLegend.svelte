@@ -1,5 +1,5 @@
-<!-- The legend of one chart pane (docs/architecture/indicator.md section 23.9.4): an HTML layer at the top left of the
-     pane, over the canvas. The price pane has the OHLC row first. Each indicator has one row: its legend name and one
+<!-- The legend of one chart pane (docs/architecture/indicator.md section 23.9.4). ChartPaneOverlay puts it at the top
+     left of the pane, over the canvas. The price pane has the OHLC row first. Each indicator has one row: its legend name and one
      value for each line, in the line color. IBM Plex Mono with tabular numbers, Carbon label-01. -->
 <script lang="ts">
   import type { LegendBar, LegendRow } from './chart_indicators';
@@ -41,10 +41,6 @@
 <style>
   /* The legend does not take pointer events, so the crosshair follows the pointer also over the legend. */
   .chart-legend {
-    position: absolute;
-    inset-block-start: var(--cds-spacing-02);
-    inset-inline-start: var(--cds-spacing-03);
-    z-index: 1;
     margin: 0;
     padding: 0;
     list-style: none;

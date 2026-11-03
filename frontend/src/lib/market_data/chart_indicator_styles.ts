@@ -150,3 +150,19 @@ export function readIndicatorPriceFormat(indicator: string): PriceFormatCustom {
   }
   return { type: 'custom', minMove: 0.0001, formatter: (value: number) => formatNumber(format, value) };
 }
+
+// The outputs that draw as a HistogramSeries. All other outputs draw as a LineSeries (section 23.9.3).
+const HISTOGRAM_OUTPUTS: Record<string, readonly string[]> = {
+  macd: ['histogram'],
+  average_trading_value: ['value'],
+};
+
+/** True when the output of the indicator draws as a histogram. A histogram has a color only. */
+export function isHistogramLine(indicator: string, output: string): boolean {
+  return HISTOGRAM_OUTPUTS[indicator]?.includes(output) ?? false;
+}
+
+const RSI_OVERSOLD_LEVEL = 30;
+const RSI_OVERBOUGHT_LEVEL = 70;
+/** RSI draws dashed price lines at these levels (section 23.9.3). */
+export const RSI_GUIDE_LEVELS: readonly number[] = [RSI_OVERSOLD_LEVEL, RSI_OVERBOUGHT_LEVEL];

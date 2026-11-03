@@ -70,9 +70,11 @@
     position: relative;
   }
 
+  /* lightweight-charts gives its canvases a z-index. The isolation keeps them under the overlay. */
   .chart-canvas {
     position: relative;
     overflow: hidden;
+    isolation: isolate;
   }
 
   .chart-frame--fill .chart-area {

@@ -439,8 +439,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   cell has `align="right"` and tabular numbers.
 - `foundation/carbon` `OverflowMenu` is the Carbon overflow menu on Bits UI
   DropdownMenu: `label` (the trigger name), `items` (`label`, `disabled`,
-  `danger`, `onSelect`), and `size`. The menu goes under `<body>`, so a
-  scroll region does not clip it.
+  `danger`, `onSelect`), `size`, and `horizontal` (the
+  `OverflowMenuHorizontal` icon instead of the vertical one). The menu goes
+  under `<body>`, so a scroll region does not clip it.
 - `foundation/carbon` `MenuButton` is a ghost button with a text that opens
   a menu with the Carbon overflow menu options, on Bits UI DropdownMenu:
   `label`, `items` (`label`, `divider`, `onSelect(trigger)`).

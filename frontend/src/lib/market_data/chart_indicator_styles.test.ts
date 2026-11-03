@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vite-plus/test';
-import { CHART_PALETTE_SIZE, formatIndicatorValue, readPaletteColor, readPaletteColorName } from './chart_indicator_styles';
+import {
+  CHART_PALETTE_SIZE,
+  formatIndicatorValue,
+  isHistogramLine,
+  readPaletteColor,
+  readPaletteColorName,
+} from './chart_indicator_styles';
 
 describe('chart indicator styles', () => {
   it('formats prices, RSI, percents, and short amounts as the legend shows them', () => {
@@ -15,6 +21,14 @@ describe('chart indicator styles', () => {
     expect(formatIndicatorValue('average_trading_value', 45_600)).toBe('45.60 K');
     expect(formatIndicatorValue('average_trading_value', 512)).toBe('512.00');
     expect(formatIndicatorValue('average_trading_value', 3_200_000_000_000)).toBe('3.20 T');
+  });
+
+  it('draws the MACD histogram and the average trading value as histograms, all other outputs as lines', () => {
+    expect(isHistogramLine('macd', 'histogram')).toBe(true);
+    expect(isHistogramLine('average_trading_value', 'value')).toBe(true);
+    expect(isHistogramLine('macd', 'value')).toBe(false);
+    expect(isHistogramLine('macd', 'signal')).toBe(false);
+    expect(isHistogramLine('rsi', 'value')).toBe(false);
   });
 
   it('shows "No value" for a bar without a value', () => {

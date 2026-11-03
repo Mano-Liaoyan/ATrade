@@ -89,3 +89,132 @@ test('the Add indicator dialog closes with Escape without a new indicator', asyn
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('list', { name: 'Legend' }).getByRole('listitem')).toHaveCount(1);
 });
+
+// Own panes (section 23.9.3 and 23.9.4). Each own indicator gets a new pane; the fourth goes into the last pane.
+
+async function addIndicator(page: Page, optionName: RegExp): Promise<void> {
+  await page.getByRole('button', { name: 'Add indicator' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add indicator' });
+  await dialog.getByRole('option', { name: optionName }).click();
+  await expect(dialog).toBeHidden();
+}
+
+function paneOptions(page: Page, name: string): Locator {
+  return page.getByRole('button', { name: `Options for ${name}` });
+}
+
+async function choosePaneOption(page: Page, name: string, item: string): Promise<void> {
+  await paneOptions(page, name).click();
+  await page.getByRole('menuitem', { name: item }).click();
+  await expect(page.getByRole('menu')).toBeHidden();
+}
+
+async function readTop(locator: Locator): Promise<number> {
+  const box = await locator.boundingBox();
+  if (box === null) {
+    throw new Error('The element has no box.');
+  }
+  return box.y;
+}
+
+async function addOwnIndicators(page: Page): Promise<void> {
+  await addIndicator(page, /^RSI$/);
+  await addIndicator(page, /^MACD$/);
+  await addIndicator(page, /^ATR$/);
+  await addIndicator(page, /^Realized volatility/);
+}
+
+test('own indicators get at most 3 own panes, and the fourth goes into the last pane', async ({ page }) => {
+  await openChart(page);
+  await addOwnIndicators(page);
+
+  await expect(paneOptions(page, 'RSI 14')).toBeVisible();
+  await expect(paneOptions(page, 'MACD 12 26 9')).toBeVisible();
+  await expect(paneOptions(page, 'ATR 14')).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Options for / })).toHaveCount(4);
+  // RV is in the legend of the last pane, after ATR.
+  const lastLegend = page.getByRole('region', { name: 'Legend of ATR 14' }).getByRole('listitem');
+  await expect(lastLegend).toHaveText([/^ATR 14/, /^RV 60/]);
+  await expect(lastLegend.nth(1).locator('.legend-value')).toHaveText([/^-?\d+\.\d{2} %$/]);
+
+  expect(await readTop(paneOptions(page, 'bars'))).toBeLessThan(await readTop(paneOptions(page, 'RSI 14')));
+  expect(await readTop(paneOptions(page, 'RSI 14'))).toBeLessThan(await readTop(paneOptions(page, 'MACD 12 26 9')));
+  expect(await readTop(paneOptions(page, 'MACD 12 26 9'))).toBeLessThan(await readTop(paneOptions(page, 'ATR 14')));
+});
+
+test('Move up changes the order of the own panes, and the first own pane has no Move up', async ({ page }) => {
+  await openChart(page);
+  await addOwnIndicators(page);
+
+  await paneOptions(page, 'RSI 14').click();
+  await expect(page.getByRole('menuitem')).toHaveText(['Move down', 'Maximize', 'Remove indicators']);
+  await page.keyboard.press('Escape');
+  await paneOptions(page, 'bars').click();
+  await expect(page.getByRole('menuitem')).toHaveText(['Maximize']);
+  await page.keyboard.press('Escape');
+
+  await choosePaneOption(page, 'MACD 12 26 9', 'Move up');
+
+  await expect
+    .poll(async () => (await readTop(paneOptions(page, 'MACD 12 26 9'))) < (await readTop(paneOptions(page, 'RSI 14'))))
+    .toBe(true);
+  expect(await readTop(paneOptions(page, 'bars'))).toBeLessThan(await readTop(paneOptions(page, 'MACD 12 26 9')));
+});
+
+test('Maximize gives a pane all the chart height, and Restore gives back the heights', async ({ page }) => {
+  await openChart(page);
+  await addOwnIndicators(page);
+  const macdLegend = page.getByRole('region', { name: 'Legend of MACD 12 26 9' });
+  const topBefore = await readTop(macdLegend);
+
+  await choosePaneOption(page, 'MACD 12 26 9', 'Maximize');
+
+  // The other panes have no height: their legends and buttons go away.
+  await expect(page.getByRole('button', { name: /^Options for / })).toHaveCount(1);
+  await expect(paneOptions(page, 'bars')).toBeHidden();
+  const chartTop = await readTop(page.getByRole('img', { name: CHART_NAME }));
+  await expect.poll(async () => (await readTop(macdLegend)) - chartTop).toBeLessThan(20);
+
+  await choosePaneOption(page, 'MACD 12 26 9', 'Restore');
+
+  await expect(page.getByRole('button', { name: /^Options for / })).toHaveCount(4);
+  await expect.poll(async () => Math.abs((await readTop(macdLegend)) - topBefore)).toBeLessThan(2);
+});
+
+test('Remove indicators removes the pane and all its indicators', async ({ page }) => {
+  await openChart(page);
+  await addOwnIndicators(page);
+
+  await choosePaneOption(page, 'ATR 14', 'Remove indicators');
+
+  await expect(page.getByRole('button', { name: /^Options for / })).toHaveCount(3);
+  await expect(legendRow(page, 'ATR 14')).toHaveCount(0);
+  await expect(legendRow(page, 'RV 60')).toHaveCount(0);
+  await expect(legendRow(page, 'MACD 12 26 9')).toBeVisible();
+});
+
+test('a legend that is higher than its pane scrolls to its last row', async ({ page }) => {
+  await openChart(page);
+  await addOwnIndicators(page);
+  // 6 more rows go into the last pane.
+  for (const option of [/^12-1 momentum/, /^Distance to 52-week high/, /^Average trading value/, /^RSI$/, /^RSI$/, /^RSI$/]) {
+    await addIndicator(page, option);
+  }
+  const region = page.getByRole('region', { name: 'Legend of ATR 14' });
+  const lastRow = region.getByRole('listitem').last();
+  await expect(region.getByRole('listitem')).toHaveCount(8);
+  const track = page.getByRole('scrollbar', { name: 'Legend of ATR 14 scroll bar' });
+  await expect(track).toBeVisible();
+  await expect(lastRow).not.toBeInViewport({ ratio: 1 });
+
+  await track.focus();
+  await page.keyboard.press('End');
+
+  await expect(lastRow).toBeInViewport({ ratio: 1 });
+  const regionBox = await region.boundingBox();
+  const rowBox = await lastRow.boundingBox();
+  if (regionBox === null || rowBox === null) {
+    throw new Error('The legend has no box.');
+  }
+  expect(rowBox.y + rowBox.height).toBeLessThanOrEqual(regionBox.y + regionBox.height + 1);
+});
