@@ -1,7 +1,8 @@
 <!-- The bar chart of a backtest or a forward test (docs/architecture/indicator.md section 23.9.8): the saved bars of
      one instrument and bar period in a fixed range, read with the source order of the run, and the indicators of
      `panes`. The page holds the panes (the strategy indicators and the changes of the user, not saved) and the
-     "Add indicator" button of the header line. -->
+     "Add indicator" button of the header line. `trades` gives the trade marks (section 23.9.9); the page gives the
+     trades of its table row under the pointer or the focus (`ringTrades`) and the selected row (`centerTrade`). -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { InlineNotification } from '#lib/foundation/carbon';
@@ -10,6 +11,7 @@
   import type { ChartIndicatorDefinition, ChartPane } from './chart_indicators';
   import { listSeriesIndicators, readIndicatorSeries, type IndicatorSeriesResult } from './indicator_series';
   import type { Instrument } from './instrument_search';
+  import type { ChartTrade } from './trade_marks';
 
   interface Props {
     instrument: Instrument;
@@ -19,9 +21,12 @@
     catalog: ChartIndicatorDefinition[];
     panes: ChartPane[];
     onPanesChange: (panes: ChartPane[]) => void;
+    trades?: ChartTrade[];
+    ringTrades?: number[];
+    centerTrade?: number | null;
   }
 
-  const { instrument, barPeriod, range, label, catalog, panes, onPanesChange }: Props = $props();
+  const { instrument, barPeriod, range, label, catalog, panes, onPanesChange, trades = [], ringTrades = [], centerTrade = null }: Props = $props();
 
   // The bars and the series keep the request that they belong to, so a new run shows no data of the run before.
   const barsKey = $derived(
@@ -91,7 +96,7 @@
     <span role="status" aria-label="Bar count">{bars.length === 1 ? '1 bar' : `${String(bars.length)} bars`}</span>
   {/if}
 </div>
-<BarChart {bars} fill {label} indicatorPanes={panes} {indicatorSeries} {catalog} {onPanesChange} />
+<BarChart {bars} fill {label} indicatorPanes={panes} {indicatorSeries} {catalog} {onPanesChange} {trades} {barPeriod} {ringTrades} {centerTrade} />
 {#if barsResult === undefined}
   <p class="chart-message" role="status">Loading bars.</p>
 {:else if barsResult.kind === 'failed'}

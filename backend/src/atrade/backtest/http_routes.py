@@ -53,7 +53,7 @@ from atrade.backtest.backtest_universe import (
     make_list_periods,
 )
 from atrade.backtest.sharpe_probability import SharpeProbabilityStatus
-from atrade.backtest.universe_instruments import summarize_instruments
+from atrade.backtest.universe_instruments import find_round_trip_net_profits, summarize_instruments
 from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
@@ -213,6 +213,8 @@ class TradeResponse(BaseModel):
     # The real exchange, not the simulated venue SMART. Null for a trade from before the multi-instrument backtest.
     symbol: str | None
     exchange: str | None
+    # The net profit after commissions of the round trip that the trade ends, else null (indicator.md 23.9.9).
+    round_trip_net_profit_usd: Decimal | None
 
 
 class BacktestRobustnessResponse(BaseModel):
@@ -610,8 +612,9 @@ class BacktestRoutes:
                     commission_usd=trade.commission_usd,
                     symbol=trade.symbol,
                     exchange=trade.exchange,
+                    round_trip_net_profit_usd=net_profit_usd,
                 )
-                for trade in trades
+                for trade, net_profit_usd in zip(trades, find_round_trip_net_profits(trades), strict=True)
             ],
             split_metrics=(
                 None

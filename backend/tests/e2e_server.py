@@ -63,6 +63,11 @@ E2E_COMPARED_INTERRUPTION_OFFSET = timedelta(hours=1)
 E2E_CHART_INDICATORS_STRATEGY_NAME = "E2E chart indicators"
 E2E_CHART_SYMBOL = "FTBAR"
 E2E_CHART_FIRST_BAR_START_UTC = datetime(2025, 11, 3, tzinfo=UTC)
+# The trade marks (indicator.md section 23.9.9): the fills of the chart forward test (bar number, side), each 1 second
+# after the bar end, and a finished backtest on the same bars with trades at the bar ends (bar number, side, quantity).
+E2E_CHART_FILLS = [(8, "BUY"), (15, "SELL")]
+E2E_TRADE_MARKS_STRATEGY_NAME = "E2E trade marks"
+E2E_TRADE_MARKS_TRADES = [(5, "BUY", 10), (12, "SELL", 10), (30, "BUY", 10), (38, "SELL", 5), (38, "SELL", 5)]
 # A stopped watchlist forward test with an allocated capital, for the comparison with a backtest of the same period of
 # its recorded members (forward_test.md 12.10): FTUA and FTUB in the first quarter, FTUA and FTUC from 2026-04-01.
 E2E_UNIVERSE_COMPARED_STRATEGY_NAME = "E2E universe compared forward test"
@@ -327,6 +332,68 @@ def add_chart_indicator_forward_test(database_url: str) -> None:
                 "start_utc": E2E_CHART_FIRST_BAR_START_UTC,
                 "stopped_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
             },
+        )
+        connection.cursor().executemany(
+            """
+            INSERT INTO forward_test_fill (forward_test_id, trade_id, time_utc, side, quantity_shares, price_usd,
+                commission_usd)
+            SELECT id, %(trade_id)s, %(time_utc)s, %(side)s, 1, %(price_usd)s, 0
+            FROM forward_test WHERE strategy_version_id = %(version_id)s
+            """,
+            [
+                {
+                    "version_id": version_id,
+                    "trade_id": f"E2E-CHART-{bar_number}",
+                    "time_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=bar_number, seconds=1),
+                    "side": side,
+                    "price_usd": make_compared_close_usd(bar_number) + Decimal("0.01"),
+                }
+                for bar_number, side in E2E_CHART_FILLS
+            ],
+        )
+
+
+def add_trade_marks_backtest(database_url: str) -> None:
+    """A finished backtest on the chart bars (add_chart_indicator_forward_test saves them) with trades at the bar
+    ends, 1 USD commission each."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_id = insert_strategy_version(connection, name=E2E_TRADE_MARKS_STRATEGY_NAME, code=STRATEGY_TEMPLATE)
+        if version_id is None:
+            return
+        row = connection.execute(
+            """
+            INSERT INTO backtest (strategy_version_id, symbol, exchange, currency, bar_period, start_utc, end_utc,
+                paper_capital_usd, status, created_at_utc, started_at_utc, ended_at_utc, final_equity_usd,
+                total_return_percent, max_drawdown_percent, trade_count)
+            VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(end_utc)s, 10000, 'finished',
+                %(now)s, %(now)s, %(now)s, 9985, -0.15, 0.5, %(trade_count)s)
+            RETURNING id
+            """,
+            {
+                "version_id": version_id,
+                "symbol": E2E_CHART_SYMBOL,
+                "start_utc": E2E_CHART_FIRST_BAR_START_UTC,
+                "end_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+                "now": FIXED_NOW_UTC,
+                "trade_count": len(E2E_TRADE_MARKS_TRADES),
+            },
+        ).fetchone()
+        assert row is not None
+        connection.cursor().executemany(
+            """
+            INSERT INTO backtest_trade (backtest_id, time_utc, side, quantity_shares, price_usd, commission_usd)
+            VALUES (%(backtest_id)s, %(time_utc)s, %(side)s, %(quantity)s, %(price_usd)s, 1)
+            """,
+            [
+                {
+                    "backtest_id": row[0],
+                    "time_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=bar_number),
+                    "side": side,
+                    "quantity": quantity,
+                    "price_usd": make_compared_close_usd(bar_number),
+                }
+                for bar_number, side, quantity in E2E_TRADE_MARKS_TRADES
+            ],
         )
 
 
@@ -622,6 +689,7 @@ def main() -> None:
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
     add_chart_indicator_forward_test(database_url)
+    add_trade_marks_backtest(database_url)
     add_universe_compared_forward_test(database_url)
     add_discarded_version(database_url)
     add_owner_ledger_start(database_url)

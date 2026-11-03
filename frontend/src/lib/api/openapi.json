@@ -5656,6 +5656,17 @@
               }
             ],
             "title": "Split Ratio"
+          },
+          "round_trip_net_profit_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Trip Net Profit Usd"
           }
         },
         "type": "object",
@@ -5669,7 +5680,8 @@
           "price_usd",
           "commission_usd",
           "amount_usd",
-          "split_ratio"
+          "split_ratio",
+          "round_trip_net_profit_usd"
         ],
         "title": "ForwardTestFillResponse",
         "description": "A fill, or a stock split adjustment (section 12.16). A split adjustment has no price, the split ratio, and the\ncash in lieu as `amount_usd`. `side` gives the direction of the share change."
@@ -9612,6 +9624,17 @@
               }
             ],
             "title": "Exchange"
+          },
+          "round_trip_net_profit_usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Round Trip Net Profit Usd"
           }
         },
         "type": "object",
@@ -9622,7 +9645,8 @@
           "price_usd",
           "commission_usd",
           "symbol",
-          "exchange"
+          "exchange",
+          "round_trip_net_profit_usd"
         ],
         "title": "TradeResponse"
       },
