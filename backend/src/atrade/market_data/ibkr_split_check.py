@@ -51,6 +51,11 @@ MAX_PACING_WAIT_SECONDS = 1800.0
 PACING_VIOLATION_TEXT = "pacing violation"
 # Without a connection to IB Gateway or to IBKR, the check tries again after this time.
 CONNECTION_WAIT_SECONDS = 60.0
+# IBKR can give no answer to the requests of 1 instrument while the link works, for example ABX (NYSE) after the
+# symbol change. After this count of timeouts of the same instrument in a row, the check uses the detection rule for
+# the instrument, the same as for an instrument without IBKR bars.
+MAX_NO_ANSWER_TRIES = 3
+NO_ANSWER_TEXT = "did not answer the historical data request"
 PROGRESS_LOG_INSTRUMENT_COUNT = 100
 
 UPSERT_SPLIT_CHECK: LiteralString = """
@@ -162,6 +167,27 @@ def is_pacing_violation(error: GatewayRequestError) -> bool:
     return PACING_VIOLATION_TEXT in str(error).lower()
 
 
+def is_no_answer(error: GatewayRequestError) -> bool:
+    return NO_ANSWER_TEXT in str(error)
+
+
+@dataclass
+class NoAnswerCounter:
+    """The count of timeouts of the same instrument in a row."""
+
+    instrument: Instrument | None = None
+    count: int = 0
+
+    def add(self, instrument: Instrument) -> bool:
+        """Counts 1 timeout. True when the instrument reaches MAX_NO_ANSWER_TRIES."""
+        self.count = self.count + 1 if instrument == self.instrument else 1
+        self.instrument = instrument
+        return self.is_at_limit(instrument)
+
+    def is_at_limit(self, instrument: Instrument) -> bool:
+        return instrument == self.instrument and self.count >= MAX_NO_ANSWER_TRIES
+
+
 def is_retry_needed(error: GatewayRequestError, gateway: GatewayConnection) -> bool:
     """A pacing violation and a lost connection end the check of the instrument, and the check tries it again later.
     Another API error, for example an unknown contract, means that IBKR has no bars of the instrument."""
@@ -224,13 +250,13 @@ async def read_stored_prices(
 
 async def check_instrument(
     connection: psycopg.AsyncConnection,
-    gateway: GatewayConnection,
+    gateway: GatewayConnection | None,
     instrument: Instrument,
     report: IbkrSplitCheckReport,
     checked_at_utc: datetime,
 ) -> None:
     """Checks 1 instrument in 1 transaction. A pacing violation or a lost connection raises GatewayRequestError and
-    the transaction saves nothing."""
+    the transaction saves nothing. Without a gateway, the check sends no IBKR request and uses the detection rule."""
     async with connection.transaction():
         await connection.execute(LOCK_DATABENTO_BARS, {"lock_key": DATABENTO_BAR_LOCK_KEY})
         cursor = await connection.execute(SELECT_CHECK_FOR_UPDATE, create_key_parameters(instrument))
@@ -245,7 +271,7 @@ async def check_instrument(
         prices = await read_stored_prices(connection, instrument, TimeRange(read_start_utc, check_end_utc))
         if prices:
             ibkr_time_range = TimeRange(to_utc_day(prices[0].day), check_end_utc)
-            ibkr_closes = await read_ibkr_closes(gateway, instrument, ibkr_time_range)
+            ibkr_closes = None if gateway is None else await read_ibkr_closes(gateway, instrument, ibkr_time_range)
             if ibkr_closes is None:
                 found_splits = find_splits_by_detection_rule(prices)
                 report.waiting_split_count += await save_found_splits(
@@ -298,12 +324,21 @@ async def run_ibkr_split_check(
     once, so a new run after a stop checks only the instruments that still wait."""
     report = IbkrSplitCheckReport()
     pacing_wait_seconds = FIRST_PACING_WAIT_SECONDS
+    no_answers = NoAnswerCounter()
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
         logger.info("%d instruments wait for the IBKR stock split check.", await count_waiting_instruments(connection))
         while (instrument := await read_next_instrument(connection)) is not None:
+            request_gateway = None if no_answers.is_at_limit(instrument) else gateway
             try:
-                await check_instrument(connection, gateway, instrument, report, clock.read_now_utc())
+                await check_instrument(connection, request_gateway, instrument, report, clock.read_now_utc())
             except GatewayRequestError as error:
+                if is_no_answer(error) and no_answers.add(instrument):
+                    logger.warning(
+                        "IBKR gave no answer for %s %d times. The check uses the detection rule.",
+                        instrument,
+                        MAX_NO_ANSWER_TRIES,
+                    )
+                    continue
                 if is_pacing_violation(error):
                     logger.warning("IBKR pacing violation: %s. Next try in %s seconds.", error, pacing_wait_seconds)
                     await wait(pacing_wait_seconds)
