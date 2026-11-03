@@ -205,12 +205,13 @@ test('a legend that is higher than its pane scrolls to its last row', async ({ p
   await expect(region.getByRole('listitem')).toHaveCount(8);
   const track = page.getByRole('scrollbar', { name: 'Legend of ATR 14 scroll bar' });
   await expect(track).toBeVisible();
-  await expect(lastRow).not.toBeInViewport({ ratio: 1 });
+  // WebKit gives a fully shown row a ratio a bit under 1 (sub-pixel heights).
+  await expect(lastRow).not.toBeInViewport({ ratio: 0.9 });
 
   await track.focus();
   await page.keyboard.press('End');
 
-  await expect(lastRow).toBeInViewport({ ratio: 1 });
+  await expect(lastRow).toBeInViewport({ ratio: 0.99 });
   const regionBox = await region.boundingBox();
   const rowBox = await lastRow.boundingBox();
   if (regionBox === null || rowBox === null) {
