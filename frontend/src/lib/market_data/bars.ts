@@ -3,6 +3,7 @@
 import type { components } from '#lib/api';
 import { readErrorMessage, sendRequest } from '#lib/foundation/http_request';
 import type { Instrument } from './instrument_search';
+import type { BarSource } from './source_order';
 
 export type Bar = components['schemas']['BarResponse'];
 export type BarPeriod = components['schemas']['BarPeriod'];
@@ -24,13 +25,30 @@ export const DEFAULT_BAR_PERIOD: BarPeriod = '1-DAY';
 
 const BARS_PATH = '/api/market-data/bars';
 
+/** The range of a backtest or forward test chart (ISO times). Without `endUtc`, the range ends now. */
+export interface BarsRange {
+  startUtc: string;
+  endUtc?: string;
+  sourceOrder?: BarSource[] | null;
+}
+
 export async function readBars(
   fetchFunction: typeof fetch,
   instrument: Instrument,
   barPeriod: BarPeriod,
+  range?: BarsRange,
 ): Promise<BarsResult> {
   const { symbol, exchange, currency } = instrument;
   const searchParameters = new URLSearchParams({ symbol, exchange, currency, bar_period: barPeriod });
+  if (range !== undefined) {
+    searchParameters.set('start_utc', range.startUtc);
+    if (range.endUtc !== undefined) {
+      searchParameters.set('end_utc', range.endUtc);
+    }
+    for (const source of range.sourceOrder ?? []) {
+      searchParameters.append('source_order', source);
+    }
+  }
   const response = await sendRequest(fetchFunction, `${BARS_PATH}?${searchParameters.toString()}`);
   if (response === null) {
     return { kind: 'failed', message: 'Backend not reachable. The bars did not load.' };

@@ -23,7 +23,8 @@ test('changes the backtest limits and sees the saved values', async ({ page }) =
 
   await concurrencyField.fill('17');
   await saveButton.click();
-  await expect(page.getByRole('alert')).toContainText('concurrency');
+  // The open backtest of the page can show its own alert (for example a split check warning).
+  await expect(page.getByRole('dialog', { name: 'Backtest limits' }).getByRole('alert')).toContainText('concurrency');
   await expect(limitsStatus).toHaveCount(0);
 
   await concurrencyField.fill('1');

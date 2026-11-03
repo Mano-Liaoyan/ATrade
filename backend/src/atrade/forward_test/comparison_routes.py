@@ -37,6 +37,7 @@ from atrade.forward_test.http_routes import ForwardTestResponse, to_forward_test
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
+from atrade.strategy import ChartIndicator, list_chart_indicators, read_strategy_version
 
 
 class SamePeriodBacktestResponse(BaseModel):
@@ -128,11 +129,17 @@ class ForwardTestInstrumentResponse(BaseModel):
     quarter_count: int
 
 
+class ForwardTestWithIndicatorsResponse(ForwardTestResponse):
+    """The forward test of the detail: also `CHART_INDICATORS` of the version code (indicator.md section 23.9.8)."""
+
+    strategy_indicators: list[ChartIndicator]
+
+
 class ForwardTestDetailResponse(BaseModel):
     """The forward test page: the forward test, its records, and the backtests that "Backtest the same period" started,
     newest first."""
 
-    forward_test: ForwardTestResponse
+    forward_test: ForwardTestWithIndicatorsResponse
     # None until the forward test has a start balance.
     metrics: ComparedMetricsResponse | None
     equity_curve: list[ComparedEquityPointResponse]
@@ -444,8 +451,17 @@ class ComparisonRoutes:
             await read_backtest_outcome(database_url=self.database_url, backtest_id=backtest_id)
             for backtest_id in backtest_ids
         ]
+        strategy_version = await read_strategy_version(
+            database_url=self.database_url, strategy_version_id=row.strategy_version_id
+        )
+        forward_test = await to_forward_test_response(self.database_url, row)
         return ForwardTestDetailResponse(
-            forward_test=await to_forward_test_response(self.database_url, row),
+            forward_test=ForwardTestWithIndicatorsResponse(
+                **forward_test.model_dump(),
+                strategy_indicators=list_chart_indicators(
+                    "" if strategy_version is None else strategy_version.code, {}
+                ),
+            ),
             metrics=to_forward_test_metrics_response(
                 calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())
             ),

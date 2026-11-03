@@ -58,6 +58,11 @@ E2E_COMPARED_FILL_COUNT = 40
 # An interruption over these bars: no equity points, and the chart marks them grey.
 E2E_COMPARED_INTERRUPTED_BAR_NUMBERS = range(20, 23)
 E2E_COMPARED_INTERRUPTION_OFFSET = timedelta(hours=1)
+# A stopped forward test on the compared bars, of a version with CHART_INDICATORS (indicator.md section 23.9.8).
+# Its bars are before the fixed clock: the bars route cuts each range at now.
+E2E_CHART_INDICATORS_STRATEGY_NAME = "E2E chart indicators"
+E2E_CHART_SYMBOL = "FTBAR"
+E2E_CHART_FIRST_BAR_START_UTC = datetime(2025, 11, 3, tzinfo=UTC)
 # A stopped watchlist forward test with an allocated capital, for the comparison with a backtest of the same period of
 # its recorded members (forward_test.md 12.10): FTUA and FTUB in the first quarter, FTUA and FTUC from 2026-04-01.
 E2E_UNIVERSE_COMPARED_STRATEGY_NAME = "E2E universe compared forward test"
@@ -268,6 +273,61 @@ def add_compared_forward_test(database_url: str) -> None:
         ).fetchone()
         assert forward_test_row is not None
         add_compared_records(connection, int(forward_test_row[0]))
+
+
+def add_chart_bars(connection: psycopg.Connection) -> None:
+    """Saved daily bars of the chart forward test and of the backtests of run_bar_chart.spec.ts."""
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            VALUES (%(symbol)s, 'ARCA', 'USD', '1-DAY', %(start_utc)s, %(close)s, %(high)s, %(low)s, %(close)s, 1000)
+            ON CONFLICT DO NOTHING
+            """,
+            [
+                {
+                    "symbol": E2E_CHART_SYMBOL,
+                    "start_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=bar_number - 1),
+                    "close": make_compared_close_usd(bar_number),
+                    "high": make_compared_close_usd(bar_number) + 1,
+                    "low": make_compared_close_usd(bar_number) - 1,
+                }
+                for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
+            ],
+        )
+        save_ibkr_saved_range(
+            connection,
+            Instrument(symbol=E2E_CHART_SYMBOL, exchange="ARCA", currency="USD"),
+            "1-DAY",
+            E2E_CHART_FIRST_BAR_START_UTC,
+            E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+        )
+
+
+def add_chart_indicator_forward_test(database_url: str) -> None:
+    """A stopped forward test of a version with CHART_INDICATORS (the strategy template: SMA of average_period) on
+    saved daily bars (docs/architecture/indicator.md section 23.9.8)."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        version_id = insert_strategy_version(
+            connection, name=E2E_CHART_INDICATORS_STRATEGY_NAME, code=STRATEGY_TEMPLATE
+        )
+        if version_id is None:
+            return
+        add_chart_bars(connection)
+        connection.execute(
+            """
+            INSERT INTO forward_test (strategy_version_id, symbol, exchange, currency, bar_period, desired_state,
+                status, start_balance_usd, created_at_utc, stopped_at_utc)
+            VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', 'stopped', 'stopped', 10000, %(start_utc)s,
+                %(stopped_utc)s)
+            """,
+            {
+                "version_id": version_id,
+                "symbol": E2E_CHART_SYMBOL,
+                "start_utc": E2E_CHART_FIRST_BAR_START_UTC,
+                "stopped_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
+            },
+        )
 
 
 def add_universe_compared_bars(connection: psycopg.Connection) -> None:
@@ -561,6 +621,7 @@ def main() -> None:
     upgrade_database(database_url)
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
+    add_chart_indicator_forward_test(database_url)
     add_universe_compared_forward_test(database_url)
     add_discarded_version(database_url)
     add_owner_ledger_start(database_url)
