@@ -318,6 +318,17 @@ wait_for_jobs() {
   printf '  %s✓ all %d jobs are done%s\n' "$GREEN" "${#ids[@]}" "$RESET"
 }
 
+# The container user that can write to a host directory of the current user. Rootless Podman and rootless Docker map
+# the container root to the current user, and another container user to a sub-UID without write access. Rootful
+# Docker needs the same UID and GID as the current user.
+container_user() {
+  if docker info 2>/dev/null | grep -qiE '^[[:space:]]*rootless(: true)?[[:space:]]*$'; then
+    printf '0:0'
+  else
+    printf '%s:%s' "$(id -u)" "$(id -g)"
+  fi
+}
+
 # Downloads each job that has no folder yet, then imports all DBN files of the directory (no IBKR request).
 import_directory() {
   local dir="$1" job_id
@@ -330,7 +341,7 @@ import_directory() {
       args+=(--job-id "$job_id")
     fi
   done < <(read_job_ids "$dir/jobs.txt")
-  dc run --rm --user "$(id -u):$(id -g)" -v "$dir:/databento" web \
+  dc run --rm --user "$(container_user)" -v "$dir:/databento" web \
     python -m atrade.app.databento_import /databento "${args[@]}"
 }
 
