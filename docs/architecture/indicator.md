@@ -761,7 +761,9 @@ section 6.2).
   `#lib/backtest` `ChartViewSwitcher` and `chart_view.ts` (`readChartView`,
   `formatChartViewSearch`). Tests: `test_strategy_indicators.py`,
   `e2e/run_bar_chart.spec.ts` (the e2e server has a stopped forward test of
-  "E2E chart indicators" on 45 saved FTBAR bars).
+  "E2E chart indicators" on 45 saved FTBAR bars). `RunBarChart` passes
+  `onPanesChange`, so the legend buttons and the settings of #329 work on
+  these charts.
 - Playwright: the 4 projects (chromium, firefox, webkit, msedge) for each
   UI slice.
 

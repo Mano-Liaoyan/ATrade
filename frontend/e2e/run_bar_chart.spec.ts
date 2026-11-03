@@ -59,12 +59,22 @@ async function expectBarsWithStrategyIndicators(page: Page): Promise<void> {
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText(BAR_COUNT_TEXT);
   await expect(legendRow(page, STRATEGY_INDICATOR_NAME)).toBeVisible();
 
+  // The settings of a strategy indicator work as on the instrument page (#329).
+  const strategyRow = legendRow(page, STRATEGY_INDICATOR_NAME);
+  await strategyRow.hover();
+  await strategyRow.getByRole('button', { name: `Settings for ${STRATEGY_INDICATOR_NAME}` }).click();
+  const settings = page.getByRole('dialog', { name: 'SMA' });
+  await settings.getByRole('spinbutton', { name: 'Period' }).fill('10');
+  await settings.getByRole('button', { name: 'Apply' }).click();
+  await expect(settings).toBeHidden();
+  await expect(legendRow(page, 'SMA 10').locator('.legend-value')).toHaveText([NUMBER_PATTERN]);
+
   await page.getByRole('button', { name: 'Add indicator' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add indicator' });
   await dialog.getByRole('option', { name: /^EMA/ }).click();
   await expect(dialog).toBeHidden();
   await expect(legendRow(page, /^EMA \d+/)).toBeVisible();
-  await expect(legendRow(page, STRATEGY_INDICATOR_NAME)).toBeVisible();
+  await expect(legendRow(page, 'SMA 10')).toBeVisible();
 
   await switcher.getByRole('tab', { name: 'Equity' }).click();
   await expect(page).not.toHaveURL(/chart=bars/);
