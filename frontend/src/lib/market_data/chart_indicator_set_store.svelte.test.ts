@@ -14,9 +14,12 @@ interface FakeBackend {
   savedSets: ChartIndicatorSet[];
   /** Answers the waiting GET. */
   answerRead: () => void;
+  /** Sets the status of the GET answers from now on. */
+  setReadStatus: (status: number) => void;
 }
 
-function createBackend({ readStatus = 200, saveStatus = 200 } = {}): FakeBackend {
+function createBackend({ readStatus: firstReadStatus = 200, saveStatus = 200 } = {}): FakeBackend {
+  let readStatus = firstReadStatus;
   const savedSets: ChartIndicatorSet[] = [];
   let answerRead: () => void = () => undefined;
   const fetchFunction: typeof fetch = (_input, init) => {
@@ -38,6 +41,9 @@ function createBackend({ readStatus = 200, saveStatus = 200 } = {}): FakeBackend
     savedSets,
     answerRead: () => {
       answerRead();
+    },
+    setReadStatus: (status) => {
+      readStatus = status;
     },
   };
 }
@@ -100,6 +106,40 @@ describe('ChartIndicatorSetStore', () => {
 
     expect(backend.savedSets).toEqual([]);
     expect(store.errorText).toBe('Reading failed.');
+  });
+
+  it('does not save a pane change when the read fails, so the saved favorites stay', async () => {
+    const backend = createBackend({ readStatus: 500 });
+    const store = new ChartIndicatorSetStore();
+    const emptyPanes: ChartPane[] = [{ indicators: [] }];
+
+    store.changePanes(backend.fetchFunction, emptyPanes);
+    await settle();
+    backend.answerRead();
+    await settle();
+
+    expect(backend.savedSets).toEqual([]);
+    expect(store.panes).toEqual(emptyPanes);
+    expect(store.errorText).toBe('Reading failed.');
+  });
+
+  it('reads the set again at the next change and then saves the changes with the saved favorites', async () => {
+    const backend = createBackend({ readStatus: 500 });
+    const store = new ChartIndicatorSetStore();
+    const emptyPanes: ChartPane[] = [{ indicators: [] }];
+    store.changePanes(backend.fetchFunction, SMA_PANES);
+    await settle();
+    backend.answerRead();
+    await settle();
+
+    backend.setReadStatus(200);
+    store.changePanes(backend.fetchFunction, emptyPanes);
+    await settle();
+    backend.answerRead();
+    await settle();
+
+    expect(backend.savedSets).toEqual([{ panes: emptyPanes, favorites: ['rsi'] }]);
+    expect(store.errorText).toBeNull();
   });
 
   it('keeps the change and shows the detail text when the save fails', async () => {

@@ -1,8 +1,8 @@
 <!-- The trades of a backtest in 32px rows: number, time, symbol, side, quantity, price, and commission, with right-aligned
      tabular numbers. It fills the height of its panel body and scrolls in itself. The backtest page and the strategy
      page show it in their Trades tab. With `onRowSelect` (the backtest page with the bar chart, docs/architecture/
-     indicator.md section 23.9.9), the pointer or the focus on a row gives `onRowPoint` its index, and a click or Enter
-     on the number button selects the row. The selected row has the Carbon selected row color. -->
+     indicator.md section 23.9.9), the pointer or the focus on a row gives `onRowPoint` its index, and a click on a row
+     or Enter selects the row. The selected row has the Carbon selected row color. -->
 <script lang="ts">
   import { DataTable, SelectableTableRow, type TableColumn } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
@@ -47,7 +47,6 @@
           {:else}
             <SelectableTableRow
               index={tradeIndex}
-              label={`Show trade ${String(tradeIndex + 1)} on the bar chart`}
               isSelected={tradeIndex === selectedIndex}
               {onRowPoint}
               {onRowSelect}

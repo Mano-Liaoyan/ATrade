@@ -173,7 +173,7 @@ counts from `atrade/`.
 
 | Module | Responsibility |
 |---|---|
-| `market_data/` | Search instruments. Read bars and daily exchange rates from IBKR and save them in PostgreSQL. Import Databento history bars. Keep the bar tables of each bar source, the source order, the quarterly US universe, the HK instrument list, the daily bar summary, and the stock splits of the stored bars. Push live market data. |
+| `market_data/` | Search instruments. Read bars and daily exchange rates from IBKR and save them in PostgreSQL. Import Databento history bars. Keep the bar tables of each bar source, the source order, the quarterly US universe, the HK instrument list, the daily bar summary, and the stock splits of the stored bars. Push live market data. Calculate the indicator series of bar charts (`POST /api/market-data/indicator-series`) and save the chart indicator set (`GET`/`PUT /api/market-data/chart-indicators`, indicator.md section 23.9). |
 | `watchlist/` | Add, delete, and list watchlist instruments. |
 | `strategy/` | Save, check, and compare strategies and strategy versions. Make strategy code from rule builder rules. Hold the strategy template list. |
 | `indicator/` | The indicators of screens and strategies (section 23). One class for each indicator. It reads no database and has no table. |

@@ -4,6 +4,7 @@ import {
   applySettingsDraft,
   checkSettingsDraft,
   createSettingsDraft,
+  describeApplyBlock,
   formatLineLabel,
   formatParameterLabel,
   hasSettingsProblems,
@@ -61,6 +62,16 @@ const smaIndicator: ChartIndicator = {
   hidden: false,
   lines: [{ output: 'value', color: 1, style: 'solid', width: 2 }],
 };
+
+describe('describeApplyBlock', () => {
+  it('names the first field with a problem, in the order of the fields', () => {
+    expect(describeApplyBlock(MACD, { slow_period: 'Enter a number.', fast_period: 'Enter a number.' })).toBe('Fix Fast period to apply.');
+  });
+
+  it('is null without a problem', () => {
+    expect(describeApplyBlock(SMA, {})).toBeNull();
+  });
+});
 
 describe('createSettingsDraft', () => {
   it('holds the parameters as text and a copy of the lines', () => {

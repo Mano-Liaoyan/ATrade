@@ -10,7 +10,7 @@ import ast
 import httpx
 import pytest
 
-from atrade.strategy import list_chart_indicators
+from atrade.strategy import StrategyVersion, list_chart_indicators, list_version_chart_indicators
 from atrade.strategy.code_checks import CodeProblem, check_strategy_code
 from atrade.strategy.rules_code import make_rules_code
 from atrade.strategy.strategy_rules import StrategyRules
@@ -197,6 +197,19 @@ def test_list_chart_indicators_is_empty_without_chart_indicators() -> None:
 
 def test_list_chart_indicators_is_empty_for_code_with_a_syntax_error() -> None:
     assert list_chart_indicators("def broken(:\n", {}) == []
+
+
+def test_list_version_chart_indicators_reads_the_code_of_the_version() -> None:
+    code = make_code('CHART_INDICATORS = [{"indicator": "sma", "parameters": {"period": "average_period"}}]')
+    version = StrategyVersion(id=1, strategy_id=1, strategy_name="Chart", version_number=1, code=code)
+
+    assert list_version_chart_indicators(version, {"average_period": 55}) == [
+        {"indicator": "sma", "parameters": {"period": 55}},
+    ]
+
+
+def test_list_version_chart_indicators_is_empty_without_a_version() -> None:
+    assert list_version_chart_indicators(None, {}) == []
 
 
 def test_list_chart_indicators_leaves_out_an_item_that_a_sweep_run_makes_wrong() -> None:

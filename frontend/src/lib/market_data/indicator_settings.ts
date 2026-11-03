@@ -77,6 +77,12 @@ export function hasSettingsProblems(problems: SettingsProblems): boolean {
   return Object.keys(problems).length > 0;
 }
 
+/** Why "Apply" is disabled: the first field with a problem, in the order of the fields. Null when it is not. */
+export function describeApplyBlock(definition: ChartIndicatorDefinition, problems: SettingsProblems): string | null {
+  const parameter = definition.parameters.find((item) => problems[item.name] !== undefined);
+  return parameter === undefined ? null : `Fix ${formatParameterLabel(parameter.name)} to apply.`;
+}
+
 /** "Reset to defaults": the catalog defaults of the parameters, solid lines of width 2. The colors do not change. */
 export function resetSettingsDraft(definition: ChartIndicatorDefinition, draft: IndicatorSettingsDraft): IndicatorSettingsDraft {
   return {

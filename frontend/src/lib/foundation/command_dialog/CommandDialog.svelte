@@ -45,9 +45,6 @@
   }
 
   function selectItem(item: CommandDialogItem): void {
-    if (item.disabledText !== undefined) {
-      return;
-    }
     onOpenChange(false);
     onSelect(item.value);
   }
@@ -107,7 +104,6 @@
                           <Command.Item
                             value={item.label}
                             keywords={item.keywords}
-                            disabled={item.disabledText !== undefined}
                             onSelect={() => {
                               selectItem(item);
                             }}
@@ -116,16 +112,14 @@
                               <div
                                 class={[
                                   'cds--contained-list-item',
-                                  item.disabledText === undefined && 'cds--contained-list-item--clickable',
+                                  'cds--contained-list-item--clickable',
                                   item.action !== undefined && 'cds--contained-list-item--with-action',
                                 ]}
                                 role="none"
                               >
                                 <div {...itemProps} class="cds--contained-list-item__content command-dialog-item">
                                   <span>{item.label}</span>
-                                  {#if item.disabledText !== undefined}
-                                    <span class="command-dialog-disabled-text">{item.disabledText}</span>
-                                  {:else if item.detail !== undefined}
+                                  {#if item.detail !== undefined}
                                     <span class="command-dialog-detail">{item.detail}</span>
                                   {/if}
                                 </div>
@@ -182,11 +176,6 @@
     background-color: var(--cds-layer-hover);
   }
 
-  .command-dialog-item:global([data-disabled]) {
-    color: var(--cds-text-disabled);
-    cursor: not-allowed;
-  }
-
   /* The action button is in the middle of the item height, at its end. */
   .command-dialog-action {
     inset-block-end: 0;
@@ -196,10 +185,6 @@
 
   .command-dialog-detail {
     font-family: var(--cds-code-01-font-family, 'IBM Plex Mono', monospace);
-    color: var(--cds-text-secondary);
-  }
-
-  .command-dialog-disabled-text {
     color: var(--cds-text-secondary);
   }
 

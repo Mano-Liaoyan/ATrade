@@ -1,54 +1,49 @@
 <!-- A Carbon data table row that the user can point at and select, for example a trade row that links to its mark on
-     the bar chart (docs/architecture/indicator.md section 23.9.9). The pointer or the focus in the row gives `onRowPoint` the row index
-     (null when it goes). A click on the row, or Enter on the number button of the row header, gives `onRowSelect` the
-     index. The selected row has the Carbon selected row color, and its button is pressed. -->
+     the bar chart (docs/architecture/indicator.md section 23.9.9). The row itself takes the focus. The pointer or the
+     focus on the row gives `onRowPoint` the row index (null when it goes). A click on the row, or Enter, gives
+     `onRowSelect` the index. The selected row has the Carbon selected row color and `aria-current`. The row header
+     cell shows the row number. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
   interface Props {
     index: number;
-    /** The accessible name of the number button in the row header, for example "Show trade 3 on the bar chart". */
-    label: string;
     isSelected: boolean;
     onRowPoint?: ((index: number | null) => void) | undefined;
     onRowSelect: (index: number) => void;
     children: Snippet;
   }
 
-  const { index, label, isSelected, onRowPoint, onRowSelect, children }: Props = $props();
+  const { index, isSelected, onRowPoint, onRowSelect, children }: Props = $props();
 </script>
 
 <tr
   class={['selectable-row', isSelected && 'cds--data-table--selected']}
+  tabindex="0"
+  aria-current={isSelected ? 'true' : undefined}
   onpointerenter={() => {
     onRowPoint?.(index);
   }}
   onpointerleave={() => {
     onRowPoint?.(null);
   }}
-  onfocusin={() => {
+  onfocus={() => {
     onRowPoint?.(index);
   }}
-  onfocusout={() => {
+  onblur={() => {
     onRowPoint?.(null);
   }}
   onclick={() => {
     onRowSelect(index);
   }}
+  onkeydown={(event: KeyboardEvent) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      onRowSelect(index);
+    }
+  }}
 >
-  <th scope="row" align="right">
-    <button
-      type="button"
-      class="row-button"
-      aria-label={label}
-      aria-pressed={isSelected}
-      onclick={(event: MouseEvent) => {
-        // The row click handler selects the row.
-        event.stopPropagation();
-        onRowSelect(index);
-      }}>{index + 1}</button
-    >
-  </th>
+  <th scope="row" align="right">{index + 1}</th>
   {@render children()}
 </tr>
 
@@ -57,18 +52,29 @@
     cursor: pointer;
   }
 
-  .row-button {
-    padding: 0;
-    border: 0;
-    background: none;
-    color: inherit;
-    font: inherit;
-    font-variant-numeric: tabular-nums;
-    cursor: pointer;
+  /* The Carbon focus: a 2px --cds-focus inset border. The cells draw it, because not all browsers draw an outline on a
+     table row. */
+  .selectable-row:focus {
+    outline: none;
   }
 
-  .row-button:focus {
-    outline: 2px solid var(--cds-focus);
-    outline-offset: -2px;
+  .selectable-row:focus-visible > :global(*) {
+    box-shadow:
+      inset 0 2px 0 0 var(--cds-focus),
+      inset 0 -2px 0 0 var(--cds-focus);
+  }
+
+  .selectable-row:focus-visible > :global(:first-child) {
+    box-shadow:
+      inset 2px 0 0 0 var(--cds-focus),
+      inset 0 2px 0 0 var(--cds-focus),
+      inset 0 -2px 0 0 var(--cds-focus);
+  }
+
+  .selectable-row:focus-visible > :global(:last-child) {
+    box-shadow:
+      inset -2px 0 0 0 var(--cds-focus),
+      inset 0 2px 0 0 var(--cds-focus),
+      inset 0 -2px 0 0 var(--cds-focus);
   }
 </style>

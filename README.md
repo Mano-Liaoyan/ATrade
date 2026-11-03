@@ -81,15 +81,26 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   section 8.4.
 - Indicators on the bar chart: "Add indicator" (or the `/` key) on the
   instrument page adds SMA, EMA, Bollinger Bands, or the Donchian channel to
-  the price pane. The backend calculates the values from the saved bars
-  (`POST /api/market-data/indicator-series`). The legend shows the OHLC row
-  and the values at the crosshair bar. Each change of the indicators is saved
-  at once (`GET`/`PUT /api/market-data/chart-indicators`), so the chart has
-  the same indicators after a page load and on each instrument. A star in
-  the "Add indicator" dialog makes an indicator a favorite. The favorites
-  come first. See
+  the price pane, and RSI, MACD, ATR, or other indicators without the price
+  scale to an own pane below it (at most 3 own panes). The options menu of a
+  pane moves, maximizes, or removes it. The backend calculates the values
+  from the saved bars (`POST /api/market-data/indicator-series`). The legend
+  shows the OHLC row and the values at the crosshair bar; its row buttons
+  hide, remove, or open the settings of an indicator. Each change of the
+  indicators is saved at once in the chart indicator set
+  (`GET`/`PUT /api/market-data/chart-indicators`), so the chart has the same
+  indicators after a page load and on each instrument. A star in the "Add
+  indicator" dialog makes a favorite indicator. The favorite indicators come
+  first. See
   [`docs/architecture/indicator.md`](docs/architecture/indicator.md)
   section 23.9.
+- Bars of a backtest or forward test: the "Bars" switch of the backtest
+  page and the forward test page shows the bar chart of a single-instrument
+  run, with the indicators of `CHART_INDICATORS` in the strategy code and a
+  trade mark ("B" or "S") for the trades of each bar. A click on a Trades or
+  Fills row shows its trade mark in the center of the chart. See
+  [`docs/architecture/indicator.md`](docs/architecture/indicator.md)
+  sections 23.9.8 and 23.9.9.
 - Live bars: the chart gets the current bar from IBKR over the WebSocket
   `/ws/market-data` and updates it without a page reload. The page connects
   again after a lost connection and when a background tab becomes visible.

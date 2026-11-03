@@ -6,10 +6,11 @@
 export { default as BarChart } from './BarChart.svelte';
 export { default as AddIndicatorButton } from './AddIndicatorButton.svelte';
 export { default as ChartLegend } from './ChartLegend.svelte';
+export { default as RunAddIndicatorButton } from './RunAddIndicatorButton.svelte';
 export { default as RunBarChart } from './RunBarChart.svelte';
-export { RunChartIndicators } from './run_chart_indicators.svelte';
+export { RunChart } from './run_chart.svelte';
 export { placeStrategyIndicators, type StrategyIndicator } from './strategy_indicators';
-export { listChartTrades, type ChartTrade, type TradeRecord } from './trade_marks';
+export type { ChartTrade, TradeRecord } from './trade_marks';
 export {
   addChartIndicator,
   buildLegendRows,

@@ -40,15 +40,14 @@ export class ChartIndicatorSetStore {
     return this.#loading;
   }
 
-  /** Shows the panes at once and saves them. A failed save keeps the change and sets `errorText`. */
+  /** Shows the panes at once and saves them. A failed read or save keeps the change and sets `errorText`. */
   changePanes(fetchFunction: typeof fetch, panes: ChartPane[]): void {
     this.panes = panes;
     this.#arePanesChanged = true;
     this.#save(fetchFunction);
   }
 
-  /** Adds or removes a favorite at once and saves it with the saved panes. When the read of the saved set fails, the
-   * favorites are not saved. */
+  /** Adds or removes a favorite at once and saves it with the saved panes. */
   toggleFavorite(fetchFunction: typeof fetch, key: string): void {
     this.favorites = toggleFavorite(this.favorites, key);
     this.#areFavoritesChanged = true;
@@ -57,8 +56,9 @@ export class ChartIndicatorSetStore {
 
   #save(fetchFunction: typeof fetch): void {
     this.#saving = this.#saving.then(async () => {
-      // Without the saved set, only a pane change is saved: a favorite change would save over the saved panes.
-      if (!(await this.load(fetchFunction)) && !this.#arePanesChanged) {
+      // Without the saved set, nothing is saved: the PUT would save over the part that did not load. The read
+      // runs again at the next change, and that save then has all changes.
+      if (!(await this.load(fetchFunction))) {
         return;
       }
       const result = await saveChartIndicatorSet(fetchFunction, $state.snapshot({ panes: this.panes, favorites: this.favorites }));

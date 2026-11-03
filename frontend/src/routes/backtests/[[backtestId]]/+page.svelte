@@ -55,16 +55,12 @@
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { isLiveBarPeriod, startForwardTest } from '#lib/forward_test';
   import {
-    AddIndicatorButton,
-    ChartIndicatorSetStore,
     formatInstrument,
-    listChartTrades,
+    RunAddIndicatorButton,
     RunBarChart,
-    RunChartIndicators,
+    RunChart,
     SplitCheckWarning,
-    type ChartIndicatorDefinition,
     SurvivorshipBiasWarning,
-    type ChartPane,
   } from '#lib/market_data';
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
@@ -109,34 +105,21 @@
   const hasLiveBarPeriod = $derived(shownBacktest !== null && isLiveBarPeriod(shownBacktest.bar_period));
 
   const chartView = $derived(readChartView(page.url.searchParams));
-  // The Trades row under the pointer or the focus, and the selected row of the open backtest (section 23.9.9).
-  let pointedTradeRow: number | null = $state(null);
-  let selectedTrade = $state<{ backtestId: number; row: number } | null>(null);
-  const selectedTradeRow = $derived(selectedTrade?.backtestId === backtestId ? selectedTrade.row : null);
-  const chartTrades = $derived(listChartTrades(shownBacktest?.trades ?? []));
-  const ringTrades = $derived(
-    [pointedTradeRow, selectedTradeRow].flatMap((row) => (row === null ? [] : [chartTrades.tradeIndexByRow[row] ?? null])).filter((index) => index !== null),
-  );
+  // The bar chart: the run indicators, the favorite indicators, and the link with the Trades rows (section 23.9.9).
+  const runChart = new RunChart();
+  $effect(() => {
+    runChart.load(fetch);
+  });
 
   function selectTradeRow(row: number): void {
     if (backtestId === null) {
       return;
     }
-    selectedTrade = { backtestId, row };
+    runChart.selectRow(String(backtestId), row);
     if (chartView !== 'bars') {
       changeChartView('bars');
     }
   }
-  // The indicators of the bar chart: the strategy indicators, and the changes of the user for the open backtest.
-  const chartIndicators = new RunChartIndicators();
-  $effect(() => {
-    chartIndicators.loadCatalog(fetch);
-  });
-  // Only the favorites of the saved chart indicator set (indicator.md section 23.9.8). The run panes are not saved.
-  const chartIndicatorSet = new ChartIndicatorSetStore();
-  $effect(() => {
-    void chartIndicatorSet.load(fetch);
-  });
 
   function changeChartView(view: ChartView): void {
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- the current path with a new search.
@@ -342,16 +325,7 @@
                   <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
                 {/if}
                 {#if chartView === 'bars' && instrument !== undefined}
-                  <AddIndicatorButton
-                    catalog={chartIndicators.catalog}
-                    favorites={chartIndicatorSet.favorites}
-                    onToggleFavorite={(key: string) => {
-                      chartIndicatorSet.toggleFavorite(fetch, key);
-                    }}
-                    onAdd={(definition: ChartIndicatorDefinition) => {
-                      chartIndicators.add(chartKey, detail.strategy_indicators, definition);
-                    }}
-                  />
+                  <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={detail.strategy_indicators} />
                 {/if}
                 <IconButton
                   label={describeForwardTestButton(detail, instrument)}
@@ -393,14 +367,10 @@
                   barPeriod={detail.bar_period}
                   range={{ startUtc: detail.start_utc, endUtc: detail.end_utc, sourceOrder: detail.source_order }}
                   label="Bar chart of {formatInstrument(instrument)}, {detail.bar_period} bars"
-                  catalog={chartIndicators.catalog}
-                  panes={chartIndicators.readPanes(chartKey, detail.strategy_indicators)}
-                  onPanesChange={(panes: ChartPane[]) => {
-                    chartIndicators.changePanes(chartKey, panes);
-                  }}
-                  trades={chartTrades.trades}
-                  {ringTrades}
-                  centerTrade={selectedTradeRow === null ? null : (chartTrades.tradeIndexByRow[selectedTradeRow] ?? null)}
+                  chart={runChart}
+                  runKey={chartKey}
+                  strategyIndicators={detail.strategy_indicators}
+                  records={detail.trades}
                 />
               </div>
             {:else if detail.metrics !== null}
@@ -432,9 +402,9 @@
               {:else}
                 <BacktestTradeTable
                   trades={detail.trades}
-                  selectedIndex={selectedTradeRow}
+                  selectedIndex={runChart.readSelectedRow(chartKey)}
                   onRowPoint={(row: number | null) => {
-                    pointedTradeRow = row;
+                    runChart.pointedRow = row;
                   }}
                   onRowSelect={selectTradeRow}
                 />

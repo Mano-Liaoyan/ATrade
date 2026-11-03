@@ -18,6 +18,14 @@ async function findRunId(request: APIRequestContext, path: string, strategyName:
   return run.id;
 }
 
+/** Row n (from 1) of the Trades or Fills table: the row header cell has the number. */
+function tableRow(page: Page, table: 'Trades' | 'Fills', number: number): Locator {
+  return page
+    .getByRole('region', { name: table })
+    .getByRole('row')
+    .filter({ has: page.getByRole('rowheader', { name: String(number), exact: true }) });
+}
+
 async function readMarkPoint(mark: Locator): Promise<{ x: number; y: number }> {
   return { x: Number(await mark.getAttribute('data-x')), y: Number(await mark.getAttribute('data-y')) };
 }
@@ -47,7 +55,7 @@ test('the backtest bar chart shows a mark for each bar and side, with a tooltip,
   await expect(page.getByRole('tab', { name: 'Equity' })).toHaveAttribute('aria-selected', 'true');
 
   // A click on a Trades row in "Equity" shows "Bars" and scrolls to the bar of the trade.
-  await page.getByRole('button', { name: 'Show trade 2 on the bar chart' }).locator('xpath=ancestor::tr').getByRole('cell').first().click();
+  await tableRow(page, 'Trades', 2).getByRole('cell').first().click();
 
   await expect(page).toHaveURL(/[?&]chart=bars(&|$)/);
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('45 bars');
@@ -60,7 +68,7 @@ test('the backtest bar chart shows a mark for each bar and side, with a tooltip,
   ]);
   await expect(markItems(page).nth(0)).toHaveAttribute('data-side', 'BUY');
   await expect(markItems(page).nth(1)).toHaveAttribute('data-side', 'SELL');
-  await expect(page.getByRole('button', { name: 'Show trade 2 on the bar chart' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(tableRow(page, 'Trades', 2)).toHaveAttribute('aria-current', 'true');
   // The mark of the selected row keeps the focus ring.
   await expect(markItems(page).nth(1)).toHaveAttribute('data-ring', 'true');
   await expectInCenter(page, markItems(page).nth(1));
@@ -75,14 +83,19 @@ test('the backtest bar chart shows a mark for each bar and side, with a tooltip,
   await page.mouse.move(0, 0);
   await expect(tooltip).toBeHidden();
   await expect(markItems(page).nth(0)).toHaveAttribute('data-ring', 'false');
-  await page.getByRole('button', { name: 'Show trade 1 on the bar chart' }).hover();
+  await tableRow(page, 'Trades', 1).hover();
   await expect(markItems(page).nth(0)).toHaveAttribute('data-ring', 'true');
 
-  // Enter on a row selects it and scrolls to its bar.
-  await page.getByRole('button', { name: 'Show trade 5 on the bar chart' }).focus();
+  // The row itself takes the focus with Tab, shows the Carbon focus, and Enter selects it and scrolls to its bar.
+  await page.mouse.move(0, 0);
+  await tableRow(page, 'Trades', 4).focus();
+  await page.keyboard.press('Tab');
+  await expect(tableRow(page, 'Trades', 5)).toBeFocused();
+  await expect(tableRow(page, 'Trades', 5).getByRole('cell').first()).toHaveCSS('box-shadow', /inset/);
   await expect(markItems(page).nth(3)).toHaveAttribute('data-ring', 'true');
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('button', { name: 'Show trade 5 on the bar chart' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(tableRow(page, 'Trades', 5)).toHaveAttribute('aria-current', 'true');
+  await expect(tableRow(page, 'Trades', 2)).not.toHaveAttribute('aria-current', 'true');
   await expectInCenter(page, markItems(page).nth(3));
   await hoverMark(page, markItems(page).nth(3));
   await expect(tooltip.locator('.trade-line')).toHaveCount(2);
@@ -94,7 +107,7 @@ test('the forward test bar chart shows a mark for each fill, linked to the Fills
   await page.goto(`/forward-tests/${String(forwardTestId)}`);
   await expect(page.getByRole('tab', { name: 'Equity' })).toHaveAttribute('aria-selected', 'true');
 
-  await page.getByRole('button', { name: 'Show fill 2 on the bar chart' }).locator('xpath=ancestor::tr').getByRole('cell').first().click();
+  await tableRow(page, 'Fills', 2).getByRole('cell').first().click();
 
   await expect(page).toHaveURL(/[?&]chart=bars(&|$)/);
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('45 bars');
@@ -108,6 +121,6 @@ test('the forward test bar chart shows a mark for each fill, linked to the Fills
   await expect(page.getByRole('tooltip')).toContainText('Sell 1 @ 105.01');
   await expect(page.getByRole('tooltip').locator('.trade-profit--error')).toHaveText('−3.00');
   await page.mouse.move(0, 0);
-  await page.getByRole('button', { name: 'Show fill 1 on the bar chart' }).hover();
+  await tableRow(page, 'Fills', 1).hover();
   await expect(markItems(page).nth(0)).toHaveAttribute('data-ring', 'true');
 });

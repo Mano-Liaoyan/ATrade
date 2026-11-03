@@ -68,6 +68,32 @@ enough bars to calculate it. It is not 0. A screen excludes the instrument
 with this reason. In Chinese, write 无值.
 _Avoid_: null, NaN, empty, 0
 
+**Price pane**:
+The top pane of a bar chart. It shows the bars and the indicators that have
+the price scale, for example SMA or Bollinger Bands. In Chinese, write
+价格窗格.
+_Avoid_: main chart, main pane
+
+**Own pane**:
+A pane below the price pane with its own scale, for one or more indicators
+that do not have the price scale, for example RSI or MACD. A bar chart has at
+most 3 own panes. In Chinese, write 独立窗格.
+_Avoid_: sub chart, sub pane, oscillator pane
+
+**Chart indicator set**:
+The saved indicators of the instrument page bar chart: the panes, the
+indicators in each pane with their parameters and line styles, and the
+favorite indicators. ATrade has one set. Each change is saved at once. In
+Chinese, write 图表指标组.
+_Avoid_: layout, template, study set
+
+**Favorite indicator**:
+An indicator that the user marks with the star in the "Add indicator"
+dialog. Favorite indicators come first in the dialog. They are part of the
+chart indicator set. In Chinese, write 常用指标.
+_Avoid_: favorites (alone, this can be confused with the watchlist), pinned
+indicator
+
 **Screen**:
 A saved set of conditions on the instruments of one market, and an order. It
 names the instruments that it starts from, then filters them by price, trading
@@ -167,6 +193,12 @@ _Avoid_: optimization, grid search, batch backtest
 One fill of an order in a backtest or a forward test: the time, the side, the
 quantity, and the price.
 _Avoid_: deal, execution
+
+**Trade mark**:
+The "B" or "S" mark of the trades of one bar and side on the price pane of a
+backtest or forward test bar chart. The pointer on a mark shows its trades.
+In Chinese, write 成交标记.
+_Avoid_: marker, arrow, signal
 
 **Equity curve**:
 The cash plus the value of the positions at the end of each bar of a test.
