@@ -446,6 +446,23 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
 - The price pane has the same button with "Maximize" or "Restore" only.
 - A legend that is higher than its pane scrolls in itself with a visible
   track (`ScrollRegion`, section 13.1).
+- Decided (#328):
+  - `lightweight-charts` 5.2.1 does not hide a pane with height 0:
+    `pane.setHeight(0)` gives the minimum height of 30 pixels, and a stretch
+    factor of 0 gives 2 pixels (the layout minimum). So "Maximize" sets the
+    stretch factors: the pane gets all the height but 2 pixels for each
+    other pane (`findMaximizedStretchFactors`). A pane of 2 pixels shows no
+    legend and no options button.
+  - The options button of the price pane is "Options for bars".
+  - "Move up" and "Move down" move the pane height with the pane. "Move
+    up", "Move down", "Remove indicators", and a new or removed pane first
+    do "Restore".
+  - The own panes stay in the chart while their series are drawn again
+    (`setPreserveEmptyPane`), so a new value list keeps the heights that the
+    user dragged. An own pane with only hidden indicators stays.
+  - The legend layer takes no pointer events (the crosshair follows the
+    pointer over it). The options button and the legend scroll track take
+    them. The mouse wheel over a legend moves the chart, not the legend.
 
 ### 23.9.5 Add indicator and settings
 
@@ -466,8 +483,7 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
     and closes the dialog. A click on the star does not add.
 - The favorites are saved in the chart indicator set (section 23.9.7), also
   from a backtest or forward test chart.
-- Until own panes come (#328), the rows of the `own` indicators are disabled
-  with the text "Own pane: not available yet". Until the chart indicator set
+- Until the chart indicator set
   comes (#330), the indicators of the instrument page are not saved: a page
   load starts without indicators. They stay when the bar period changes
   (#327).
@@ -685,11 +701,17 @@ section 6.2).
     `readIndicatorSeries`, `listSeriesIndicators`). `BarChart` draws the
     price pane indicators and its legend. `ChartFrame` gets an `overlay`
     snippet for HTML over the canvas.
+- Done in #328: `BarChart` draws one chart pane for each pane of the
+  indicators (line series, histogram series, the RSI price lines),
+  `ChartPaneOverlay` (the legend in a `ScrollRegion` and the options menu
+  of one pane), `chart_indicators.ts` (`removeChartIndicator`,
+  `moveOwnPane`, `removeOwnPane`, `listPaneActions`,
+  `findMaximizedStretchFactors`), `chart_indicator_styles.ts`
+  (`isHistogramLine`, `RSI_GUIDE_LEVELS`), and the `horizontal` icon of
+  `OverflowMenu`. `BarChart` gets `onPanesChange` for the menu changes.
 - Playwright: the 4 projects (chromium, firefox, webkit, msedge) for each
   UI slice.
 
 ### 23.9.11 Left to the implementation
 
-- Check that `pane.setHeight` (or `setStretchFactor`) with height 0 hides
-  a pane in `lightweight-charts` 5.2.1. If not, "Maximize" gives the other
-  panes their minimum height.
+Nothing now. The height 0 check is in section 23.9.4 (#328).

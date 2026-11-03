@@ -11,6 +11,7 @@
 </script>
 
 <script lang="ts">
+  import OverflowMenuHorizontal16 from '@carbon/icons/es/overflow-menu--horizontal/16.js';
   import OverflowMenuVertical16 from '@carbon/icons/es/overflow-menu--vertical/16.js';
   import { DropdownMenu } from 'bits-ui';
   import Icon from './Icon.svelte';
@@ -21,9 +22,11 @@
     items: OverflowMenuItem[];
     // The Carbon size of the trigger and the items. In a data table, use the size of the table rows.
     size?: 'xs' | 'sm' | 'md' | 'lg';
+    // The trigger icon: three dots in a column (the Carbon default) or in a row (OverflowMenuHorizontal).
+    horizontal?: boolean;
   }
 
-  const { label, items, size = 'md' }: Props = $props();
+  const { label, items, size = 'md', horizontal = false }: Props = $props();
 
   let open = $state(false);
 </script>
@@ -32,7 +35,7 @@
   <DropdownMenu.Trigger>
     {#snippet child({ props })}
       <button {...props} type="button" class={['cds--overflow-menu', `cds--layout--size-${size}`, open && 'cds--overflow-menu--open']} aria-label={label}>
-        <Icon icon={OverflowMenuVertical16} class="cds--overflow-menu__icon" />
+        <Icon icon={horizontal ? OverflowMenuHorizontal16 : OverflowMenuVertical16} class="cds--overflow-menu__icon" />
       </button>
     {/snippet}
   </DropdownMenu.Trigger>

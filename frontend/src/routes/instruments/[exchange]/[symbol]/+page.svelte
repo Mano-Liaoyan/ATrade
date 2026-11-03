@@ -130,11 +130,6 @@
     indicatorPanes = addChartIndicator(indicatorPanes, definition);
   }
 
-  // Own panes come with #328. Until then the dialog shows these indicators as not available.
-  function findDisabledText(definition: ChartIndicatorDefinition): string | undefined {
-    return definition.chart_placement === 'own' ? 'Own pane: not available yet' : undefined;
-  }
-
   let liveBarError: string | null = $state(null);
   let isLiveSocketConnected = $state(false);
 
@@ -282,7 +277,7 @@
                     onValueChange={changeBarPeriod}
                   />
                 </div>
-                <AddIndicatorButton catalog={indicatorCatalog} onAdd={addIndicator} {findDisabledText} />
+                <AddIndicatorButton catalog={indicatorCatalog} onAdd={addIndicator} />
               </div>
             {/snippet}
             <div class="chart">
@@ -300,6 +295,9 @@
                 {indicatorPanes}
                 {indicatorSeries}
                 catalog={indicatorCatalog}
+                onPanesChange={(panes: ChartPane[]) => {
+                  indicatorPanes = panes;
+                }}
               />
               {#if isLoading}
                 <p class="chart-message" role="status">Loading bars.</p>
