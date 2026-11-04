@@ -5,6 +5,8 @@ new shares for 1 old share: after the ex-date, the price is the old price divide
 """
 
 import itertools
+import math
+import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -17,6 +19,12 @@ RATIO_STEP_TOLERANCE = Decimal("0.03")
 # A split ratio is a fraction with a small denominator. The search accepts the first fraction this near.
 SPLIT_RATIO_TOLERANCE = Fraction(2, 100)
 MAX_SPLIT_RATIO_DENOMINATOR = 50
+# A step of the close ratio compares the median ratio of up to this count of days before the step with the median
+# ratio of up to this count of days from the step on.
+STEP_WINDOW_DAYS = 10
+# The split ratios of a step, above 1, besides the whole numbers. Their inverses are reverse splits.
+STEP_SPLIT_FRACTIONS = tuple(Fraction(ratio) for ratio in ("3/2", "4/3", "5/4", "5/2", "5/3"))
+STEP_SPLIT_RATIO_TOLERANCE = Fraction(4, 100)
 # The detection rule accepts only these split ratios, so a large price gap of a normal day is not a stock split.
 COMMON_SPLIT_RATIOS = tuple(
     Fraction(ratio) for ratio in ("3/2", "2", "3", "4", "5", "10", "1/2", "1/3", "1/4", "1/5", "1/10", "1/20")
@@ -55,22 +63,55 @@ def find_split_ratio(raw_ratio: Decimal) -> Fraction:
     return exact_ratio.limit_denominator(MAX_SPLIT_RATIO_DENOMINATOR)
 
 
+def find_step_split_ratio(raw_ratio: Decimal) -> Fraction | None:
+    """The split ratio of a lasting step of the close ratio: a whole number n or 1/n (n at least 2), or one of
+    STEP_SPLIT_FRACTIONS or its inverse, within STEP_SPLIT_RATIO_TOLERANCE. None for another step, for example a
+    difference of the closes of a stock with few trades."""
+    ratio_above_1 = Fraction(raw_ratio) if raw_ratio >= 1 else 1 / Fraction(raw_ratio)
+    candidates = [Fraction(round(ratio_above_1)), *STEP_SPLIT_FRACTIONS]
+    for candidate in candidates:
+        if candidate > 1 and abs(ratio_above_1 / candidate - 1) <= STEP_SPLIT_RATIO_TOLERANCE:
+            return candidate if raw_ratio >= 1 else 1 / candidate
+    return None
+
+
 def find_splits_from_ibkr_closes(
     databento_prices: Sequence[DailyPrices], ibkr_closes: dict[date, Decimal]
 ) -> list[FoundSplit]:
     """Instruments that still trade. On each day of the overlap, the ratio is the Databento close divided by the IBKR
-    close. A constant ratio means no stock split. A step from one day to the next is a stock split on the second day."""
-    splits: list[FoundSplit] = []
-    previous_ratio: Decimal | None = None
+    close. A constant ratio means no stock split. A stock split is a lasting step: the median ratio of the days before
+    the step divided by the median ratio of the days from the step on is a split ratio (`find_step_split_ratio`). The two closes of a stock with few trades can differ by some
+    percent on many days. Such differences change the medians only a little, so they are not a stock split."""
+    days: list[date] = []
+    ratios: list[Decimal] = []
     for prices in databento_prices:
         ibkr_close = ibkr_closes.get(prices.day)
         if ibkr_close is None or ibkr_close <= 0 or prices.close <= 0:
             continue
-        ratio = prices.close / ibkr_close
-        if previous_ratio is not None and abs(ratio / previous_ratio - 1) > RATIO_STEP_TOLERANCE:
-            split_ratio = find_split_ratio(previous_ratio / ratio)
-            splits.append(FoundSplit(ex_date=prices.day, split_ratio=to_decimal(split_ratio)))
-        previous_ratio = ratio
+        days.append(prices.day)
+        ratios.append(prices.close / ibkr_close)
+
+    def find_change(index: int) -> float:
+        return abs(math.log(ratios[index - 1] / ratios[index]))
+
+    splits: list[FoundSplit] = []
+    next_index = 1
+    for index in range(1, len(ratios)):
+        if index < next_index or abs(ratios[index] / ratios[index - 1] - 1) <= RATIO_STEP_TOLERANCE:
+            continue
+        # The step is the largest change of the days around it. A small difference of the closes some days before a
+        # stock split is not the step: its windows hold both levels.
+        nearby = range(max(1, index - STEP_WINDOW_DAYS + 1), min(index + STEP_WINDOW_DAYS, len(ratios)))
+        if max(nearby, key=find_change) != index:
+            continue
+        ratios_before = ratios[max(0, index - STEP_WINDOW_DAYS) : index]
+        ratios_after = ratios[index : index + STEP_WINDOW_DAYS]
+        split_ratio = find_step_split_ratio(statistics.median(ratios_before) / statistics.median(ratios_after))
+        if split_ratio is None:
+            continue
+        splits.append(FoundSplit(ex_date=days[index], split_ratio=to_decimal(split_ratio)))
+        # The days after the step hold the new ratio. They are not a second step.
+        next_index = index + STEP_WINDOW_DAYS
     return splits
 
 

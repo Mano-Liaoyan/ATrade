@@ -298,6 +298,26 @@ async def test_after_3_timeouts_of_the_same_instrument_the_check_uses_the_detect
 
 
 @pytest.mark.anyio
+async def test_closes_that_differ_by_some_percent_on_single_days_are_not_a_stock_split(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """A stock with few trades: the official close and the IBKR close differ by about 5% on some days. Each such day
+    changes the close ratio by more than 3%, but the ratio does not stay at a new level."""
+    closes = ["100", "105", "100", "95", "100", "106"]
+    bars = create_bars("SPLT", TRADING_DAYS, [(close, close, 1000) for close in closes])
+    import_bars(database_url, tmp_path, bars)
+    gateway.historical_bars[SPLT] = ibkr_bars(TRADING_DAYS, ["100"] * len(TRADING_DAYS))
+
+    await run_check(database_url, gateway, WaitRecorder())
+
+    assert read_table(database_url, STOCK_SPLIT_QUERY) == []
+    assert [bar.close for bar in await read_bars(database_url, "SPLT")] == [Decimal(close) for close in closes]
+    assert [row[2] for row in read_table(database_url, SPLIT_CHECK_QUERY)] == [
+        utc_day(TRADING_DAYS[-1]) + timedelta(days=1)
+    ]
+
+
+@pytest.mark.anyio
 async def test_a_reverse_split_of_1_for_150_gets_the_split_ratio_1_150(
     database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
 ) -> None:
