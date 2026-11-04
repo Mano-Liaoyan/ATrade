@@ -328,27 +328,42 @@ a stock split does not change the trading value (close × volume).
 
 ### Run the IBKR stock split check
 
-The check compares the stored Databento daily closes of each instrument that
-still trades with the IBKR daily closes, one instrument at a time. It adjusts
-the stored Databento bars for each stock split that it finds. With some
-thousand instruments, it can run for many hours. It needs IB Gateway (`ibkr`
-profile) and connects with client ID 30. Use `--ibkr-client-id <ID>` for
-another free client ID. Start it in a temporary container in the background,
-and read its log:
+The check of the instruments that still trade has 3 steps
+(`docs/architecture/market_data.md` section 8.8.3.1):
+
+1. `read` reads the IBKR daily closes, one instrument at a time, and stores
+   them. It changes no bar. With some thousand instruments, it can run for
+   many hours. It needs IB Gateway (`ibkr` profile) and connects with client
+   ID 30. Use `--ibkr-client-id <ID>` for another free client ID.
+2. `report` tests the stock split rule on the stored closes against the
+   confirmed stock splits of the import check. It changes nothing and takes
+   some minutes.
+3. `apply` adjusts the stored Databento bars for each stock split that it
+   finds in the stored closes. It sends no IBKR request.
+
+Start the read in a temporary container in the background, and read its log:
 
 ```sh
 docker compose --file deploy/compose.yaml --env-file .env run --rm --detach --name atrade-ibkr-split-check web \
-  python -m atrade.app.ibkr_split_check
+  python -m atrade.app.ibkr_split_check read
 docker logs --follow atrade-ibkr-split-check
 ```
 
-- After an IBKR pacing violation, the check waits 1 minute, then 2, 4, and
+- After an IBKR pacing violation, the read waits 1 minute, then 2, 4, and
   more minutes, up to 30 minutes, and continues.
 - Without IB Gateway or without the IBKR connection, for example during the
   daily restart of `ib-gateway`, it tries again each minute.
-- It saves the result of each instrument at once. After a stop, start it
-  again: it checks only the instruments that still wait. It stops when no
+- It saves the closes of each instrument at once. After a stop, start it
+  again: it reads only the instruments that still wait. It stops when no
   instrument waits.
+
+When the read is done, run the report, and then the apply:
+
+```sh
+docker compose --file deploy/compose.yaml --env-file .env run --rm web python -m atrade.app.ibkr_split_check report
+docker compose --file deploy/compose.yaml --env-file .env run --rm web python -m atrade.app.ibkr_split_check apply
+```
+
 - A backtest that uses an instrument that waits for the check shows the
   warning "IBKR stock split check not done".
 

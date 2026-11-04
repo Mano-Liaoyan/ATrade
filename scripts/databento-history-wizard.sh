@@ -457,17 +457,20 @@ printf '  %s✓%s daily import done\n' "$GREEN" "$RESET"
 pause
 
 # ── 6 ─────────────────────────────────────────────────────────────────────
-stage "Start the IBKR stock split check"
+stage "Start the IBKR close read"
 if docker ps --format '{{.Names}}' | grep -qx "$SPLIT_CHECK_CONTAINER"; then
-  say "The check runs already."
+  say "The read runs already."
 else
-  dc run --rm --detach --name "$SPLIT_CHECK_CONTAINER" web python -m atrade.app.ibkr_split_check
+  dc run --rm --detach --name "$SPLIT_CHECK_CONTAINER" web python -m atrade.app.ibkr_split_check read
   printf '  %s✓%s started in the background (container %s)\n' "$GREEN" "$RESET" "$SPLIT_CHECK_CONTAINER"
 fi
 say "Read its log in another pane:"
 note "  docker logs --follow $SPLIT_CHECK_CONTAINER"
 say "It can run for many hours. It continues after a pacing violation or a Gateway restart."
 say "It stops when no instrument waits. If it stops early, run this wizard again: stage 6 starts it again."
+say "When it is done, test the stock split rule (changes nothing), then apply it:"
+note "  python -m atrade.app.ibkr_split_check report"
+note "  python -m atrade.app.ibkr_split_check apply"
 pause
 
 # ── 7 ─────────────────────────────────────────────────────────────────────
@@ -522,7 +525,7 @@ stage "Check the result"
 say "Quarterly US universe (expected: each quarter from 2018-10-01, 500 members each):"
 psql_query "SELECT count(DISTINCT quarter_start_utc) AS quarters, min(quarter_start_utc)::date AS first, max(quarter_start_utc)::date AS last, count(*) AS members FROM us_universe_member WHERE currency = 'USD';"
 say "IBKR stock split check:"
-psql_query "SELECT count(*) FILTER (WHERE checked_end_utc IS NULL OR checked_end_utc < check_end_utc) AS waiting, count(*) AS total FROM ibkr_split_check;"
+psql_query "SELECT count(*) FILTER (WHERE read_end_utc IS NULL OR read_end_utc < check_end_utc) AS read_waiting, count(*) FILTER (WHERE checked_end_utc IS NULL OR checked_end_utc < check_end_utc) AS apply_waiting, count(*) AS total FROM ibkr_split_check;"
 say "Tomorrow, after 18:00 ET, check that the daily bar update ran:"
 note "  docker compose --file deploy/compose.yaml --env-file .env logs web | grep 'daily bar update'"
 note "  Expected: 'The daily bar update of <day> saved the daily bars of <n> instruments.'"

@@ -1,6 +1,11 @@
 """The IBKR stock split check of the Databento instruments that still trade (docs/architecture/market_data.md section
-8.8.3). The import records the instruments. A one-time program compares their stored Databento daily closes with the
-IBKR daily closes, one instrument at a time, and adjusts the stored Databento bars for each stock split that it finds.
+8.8.3.1). The import records the instruments. A one-time program does the check in 3 steps:
+
+1. read: reads the IBKR daily closes of each instrument once and stores them in `ibkr_daily_close`. It finds no
+   stock split and changes no bar.
+2. report (`ibkr_split_report.py`): finds the stock splits in the stored closes and compares them with the stock
+   splits that the import check confirmed. It changes nothing.
+3. apply: finds the stock splits in the stored closes and adjusts the stored Databento bars for each of them.
 """
 
 import asyncio
@@ -64,17 +69,30 @@ UPSERT_SPLIT_CHECK: LiteralString = """
     ON CONFLICT (symbol, exchange, currency) DO UPDATE
     SET check_end_utc = greatest(ibkr_split_check.check_end_utc, excluded.check_end_utc)
 """
-SELECT_NEXT_INSTRUMENT: LiteralString = """
+# An instrument waits for the read step while read_end_utc is NULL or earlier than check_end_utc. After the read, it
+# waits for the apply step while checked_end_utc is NULL or earlier than check_end_utc.
+SELECT_NEXT_READ: LiteralString = """
     SELECT symbol, exchange, currency FROM ibkr_split_check
-    WHERE checked_end_utc IS NULL OR checked_end_utc < check_end_utc
+    WHERE (read_end_utc IS NULL OR read_end_utc < check_end_utc)
     ORDER BY symbol, exchange, currency
     LIMIT 1
 """
-COUNT_WAITING_INSTRUMENTS: LiteralString = """
-    SELECT count(*) FROM ibkr_split_check WHERE checked_end_utc IS NULL OR checked_end_utc < check_end_utc
+COUNT_WAITING_READS: LiteralString = """
+    SELECT count(*) FROM ibkr_split_check WHERE (read_end_utc IS NULL OR read_end_utc < check_end_utc)
+"""
+SELECT_NEXT_APPLY: LiteralString = """
+    SELECT symbol, exchange, currency FROM ibkr_split_check
+    WHERE read_end_utc >= check_end_utc AND (checked_end_utc IS NULL OR checked_end_utc < check_end_utc)
+    ORDER BY symbol, exchange, currency
+    LIMIT 1
+"""
+SELECT_READ_FOR_UPDATE: LiteralString = """
+    SELECT check_end_utc, read_end_utc, has_ibkr_closes FROM ibkr_split_check
+    WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
+    FOR UPDATE
 """
 SELECT_CHECK_FOR_UPDATE: LiteralString = """
-    SELECT check_end_utc, checked_end_utc FROM ibkr_split_check
+    SELECT check_end_utc, checked_end_utc, read_end_utc, has_ibkr_closes FROM ibkr_split_check
     WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
     FOR UPDATE
 """
@@ -83,6 +101,20 @@ SELECT_STORED_DAILY_PRICES: LiteralString = """
     WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s AND bar_period = '1-DAY'
         AND start_utc >= %(start_utc)s AND start_utc < %(end_utc)s
     ORDER BY start_utc
+"""
+UPSERT_IBKR_CLOSE: LiteralString = """
+    INSERT INTO ibkr_daily_close (symbol, exchange, currency, day, close)
+    VALUES (%(symbol)s, %(exchange)s, %(currency)s, %(day)s, %(close)s)
+    ON CONFLICT (symbol, exchange, currency, day) DO UPDATE SET close = excluded.close
+"""
+SELECT_STORED_IBKR_CLOSES: LiteralString = """
+    SELECT day, close FROM ibkr_daily_close
+    WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s AND day >= %(start_day)s
+    ORDER BY day
+"""
+SET_READ: LiteralString = """
+    UPDATE ibkr_split_check SET read_end_utc = %(read_end_utc)s, has_ibkr_closes = %(has_ibkr_closes)s
+    WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
 """
 INSERT_SPLIT: LiteralString = """
     INSERT INTO stock_split (symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc)
@@ -117,6 +149,13 @@ IS_INSTRUMENT_WAITING: LiteralString = """
 """
 
 type Wait = Callable[[float], Awaitable[None]]
+
+
+@dataclass
+class IbkrCloseReadReport:
+    read_instrument_count: int = 0
+    # The instruments without IBKR daily bars. The apply step uses the detection rule for them.
+    without_closes_count: int = 0
 
 
 @dataclass
@@ -248,36 +287,79 @@ async def read_stored_prices(
     return [DailyPrices(day=row[0].date(), open=row[1], close=row[2], volume=row[3]) for row in await cursor.fetchall()]
 
 
-async def check_instrument(
+async def read_stored_ibkr_closes(
+    connection: psycopg.AsyncConnection, instrument: Instrument, start_day: date
+) -> dict[date, Decimal]:
+    cursor = await connection.execute(
+        SELECT_STORED_IBKR_CLOSES, {**create_key_parameters(instrument), "start_day": start_day}
+    )
+    return {row[0]: row[1] for row in await cursor.fetchall()}
+
+
+def find_read_start(read_end_utc: datetime | None) -> datetime:
+    return DATABENTO_HISTORY_START_UTC if read_end_utc is None else read_end_utc - CHECKED_DAYS_READ_AGAIN
+
+
+async def read_instrument_closes(
     connection: psycopg.AsyncConnection,
     gateway: GatewayConnection | None,
     instrument: Instrument,
-    report: IbkrSplitCheckReport,
-    checked_at_utc: datetime,
+    report: IbkrCloseReadReport,
 ) -> None:
-    """Checks 1 instrument in 1 transaction. A pacing violation or a lost connection raises GatewayRequestError and
-    the transaction saves nothing. Without a gateway, the check sends no IBKR request and uses the detection rule."""
+    """Reads and stores the IBKR closes of 1 instrument in 1 transaction. A pacing violation or a lost connection
+    raises GatewayRequestError and the transaction saves nothing. Without a gateway, the read sends no request and
+    records that IBKR has no closes of the instrument."""
     async with connection.transaction():
-        await connection.execute(LOCK_DATABENTO_BARS, {"lock_key": DATABENTO_BAR_LOCK_KEY})
-        cursor = await connection.execute(SELECT_CHECK_FOR_UPDATE, create_key_parameters(instrument))
+        cursor = await connection.execute(SELECT_READ_FOR_UPDATE, create_key_parameters(instrument))
         row = await cursor.fetchone()
         if row is None:
             return
         check_end_utc: datetime = row[0]
-        checked_end_utc: datetime | None = row[1]
-        read_start_utc = (
-            DATABENTO_HISTORY_START_UTC if checked_end_utc is None else checked_end_utc - CHECKED_DAYS_READ_AGAIN
-        )
-        prices = await read_stored_prices(connection, instrument, TimeRange(read_start_utc, check_end_utc))
+        has_ibkr_closes: bool = bool(row[2])
+        prices = await read_stored_prices(connection, instrument, TimeRange(find_read_start(row[1]), check_end_utc))
         if prices:
             ibkr_time_range = TimeRange(to_utc_day(prices[0].day), check_end_utc)
             ibkr_closes = None if gateway is None else await read_ibkr_closes(gateway, instrument, ibkr_time_range)
-            if ibkr_closes is None:
+            has_ibkr_closes = ibkr_closes is not None
+            if ibkr_closes is not None:
+                async with connection.cursor() as close_cursor:
+                    await close_cursor.executemany(
+                        UPSERT_IBKR_CLOSE,
+                        [
+                            {**create_key_parameters(instrument), "day": day, "close": close}
+                            for day, close in ibkr_closes.items()
+                        ],
+                    )
+        await connection.execute(
+            SET_READ,
+            {**create_key_parameters(instrument), "read_end_utc": check_end_utc, "has_ibkr_closes": has_ibkr_closes},
+        )
+    report.read_instrument_count += 1
+    if not has_ibkr_closes:
+        report.without_closes_count += 1
+
+
+async def apply_instrument(
+    connection: psycopg.AsyncConnection, instrument: Instrument, report: IbkrSplitCheckReport, checked_at_utc: datetime
+) -> None:
+    """Finds the stock splits of 1 read instrument in its stored IBKR closes and applies them, in 1 transaction.
+    Without IBKR closes, it uses the detection rule, and the stock splits wait for the user check."""
+    async with connection.transaction():
+        await connection.execute(LOCK_DATABENTO_BARS, {"lock_key": DATABENTO_BAR_LOCK_KEY})
+        cursor = await connection.execute(SELECT_CHECK_FOR_UPDATE, create_key_parameters(instrument))
+        row = await cursor.fetchone()
+        if row is None or row[2] is None or row[2] < row[0]:
+            return
+        check_end_utc: datetime = row[0]
+        prices = await read_stored_prices(connection, instrument, TimeRange(find_read_start(row[1]), check_end_utc))
+        if prices:
+            if not row[3]:
                 found_splits = find_splits_by_detection_rule(prices)
                 report.waiting_split_count += await save_found_splits(
                     connection, instrument, found_splits, confirmation=None, recorded_at_utc=checked_at_utc
                 )
             else:
+                ibkr_closes = await read_stored_ibkr_closes(connection, instrument, prices[0].day)
                 found_splits = find_splits_from_ibkr_closes(prices, ibkr_closes)
                 applied_count = await save_found_splits(
                     connection, instrument, found_splits, confirmation=BAR_EVIDENCE, recorded_at_utc=checked_at_utc
@@ -292,16 +374,16 @@ async def check_instrument(
     report.checked_instrument_count += 1
 
 
-async def read_next_instrument(connection: psycopg.AsyncConnection) -> Instrument | None:
-    cursor = await connection.execute(SELECT_NEXT_INSTRUMENT)
+async def read_next_instrument(connection: psycopg.AsyncConnection, query: LiteralString) -> Instrument | None:
+    cursor = await connection.execute(query)
     row = await cursor.fetchone()
     if row is None:
         return None
     return Instrument(symbol=str(row[0]), exchange=str(row[1]), currency=str(row[2]))
 
 
-async def count_waiting_instruments(connection: psycopg.AsyncConnection) -> int:
-    cursor = await connection.execute(COUNT_WAITING_INSTRUMENTS)
+async def count_waiting_reads(connection: psycopg.AsyncConnection) -> int:
+    cursor = await connection.execute(COUNT_WAITING_READS)
     row = await cursor.fetchone()
     return 0 if row is None else int(row[0])
 
@@ -317,24 +399,25 @@ async def restore_connection(gateway: GatewayConnection) -> None:
         logger.warning("IB Gateway is not reachable: %s", error)
 
 
-async def run_ibkr_split_check(
-    *, database_url: str, gateway: GatewayConnection, clock: Clock, wait: Wait = asyncio.sleep
-) -> IbkrSplitCheckReport:
-    """Checks all waiting instruments, one at a time, and returns when none waits. Each instrument saves its result at
-    once, so a new run after a stop checks only the instruments that still wait."""
-    report = IbkrSplitCheckReport()
+async def run_ibkr_close_read(
+    *, database_url: str, gateway: GatewayConnection, wait: Wait = asyncio.sleep
+) -> IbkrCloseReadReport:
+    """The read step: reads the IBKR closes of all instruments that wait for it, one at a time, and returns when none
+    waits. Each instrument saves its closes at once, so a new run after a stop reads only the instruments that still
+    wait."""
+    report = IbkrCloseReadReport()
     pacing_wait_seconds = FIRST_PACING_WAIT_SECONDS
     no_answers = NoAnswerCounter()
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
-        logger.info("%d instruments wait for the IBKR stock split check.", await count_waiting_instruments(connection))
-        while (instrument := await read_next_instrument(connection)) is not None:
+        logger.info("%d instruments wait for the IBKR close read.", await count_waiting_reads(connection))
+        while (instrument := await read_next_instrument(connection, SELECT_NEXT_READ)) is not None:
             request_gateway = None if no_answers.is_at_limit(instrument) else gateway
             try:
-                await check_instrument(connection, request_gateway, instrument, report, clock.read_now_utc())
+                await read_instrument_closes(connection, request_gateway, instrument, report)
             except GatewayRequestError as error:
                 if is_no_answer(error) and no_answers.add(instrument):
                     logger.warning(
-                        "IBKR gave no answer for %s %d times. The check uses the detection rule.",
+                        "IBKR gave no answer for %s %d times. The apply step uses the detection rule.",
                         instrument,
                         MAX_NO_ANSWER_TRIES,
                     )
@@ -349,11 +432,23 @@ async def run_ibkr_split_check(
                 await restore_connection(gateway)
                 continue
             pacing_wait_seconds = FIRST_PACING_WAIT_SECONDS
-            if report.checked_instrument_count % PROGRESS_LOG_INSTRUMENT_COUNT == 0:
+            if report.read_instrument_count % PROGRESS_LOG_INSTRUMENT_COUNT == 0:
                 logger.info(
-                    "Checked %d instruments. %d wait.",
-                    report.checked_instrument_count,
-                    await count_waiting_instruments(connection),
+                    "Read %d instruments. %d wait.",
+                    report.read_instrument_count,
+                    await count_waiting_reads(connection),
                 )
             await wait(REQUEST_INTERVAL_SECONDS)
+    return report
+
+
+async def apply_ibkr_split_check(*, database_url: str, clock: Clock) -> IbkrSplitCheckReport:
+    """The apply step: applies the stock splits of all read instruments that wait for it. It sends no IBKR request.
+    An instrument that waits for the read step keeps waiting."""
+    report = IbkrSplitCheckReport()
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
+        while (instrument := await read_next_instrument(connection, SELECT_NEXT_APPLY)) is not None:
+            await apply_instrument(connection, instrument, report, clock.read_now_utc())
+            if report.checked_instrument_count % PROGRESS_LOG_INSTRUMENT_COUNT == 0:
+                logger.info("Applied the check of %d instruments.", report.checked_instrument_count)
     return report

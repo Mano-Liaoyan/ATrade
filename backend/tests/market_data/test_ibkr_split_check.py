@@ -15,7 +15,13 @@ import pytest
 
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import has_pending_split_check, import_databento_files, run_ibkr_split_check
+from atrade.market_data import (
+    apply_ibkr_split_check,
+    has_pending_split_check,
+    import_databento_files,
+    report_ibkr_split_check,
+    run_ibkr_close_read,
+)
 from tests.fakes.clock import FixedClock
 from tests.fakes.databento import write_dbn_files
 from tests.fakes.ibkr import FakeGatewayConnection, HistoricalBarRequest
@@ -43,6 +49,7 @@ NO_CONTRACT_MESSAGE = "Error 200, reqId 3: No security definition has been found
 SPLIT_CHECK_QUERY = (
     "SELECT symbol, check_end_utc, checked_end_utc, checked_at_utc FROM ibkr_split_check ORDER BY symbol"
 )
+READ_QUERY = "SELECT symbol, read_end_utc, has_ibkr_closes FROM ibkr_split_check ORDER BY symbol"
 
 
 class StopCheckError(Exception):
@@ -95,9 +102,9 @@ def import_bars(database_url: str, directory: Path, bars: list[DailyBar]) -> Non
 
 
 async def run_check(database_url: str, gateway: FakeGatewayConnection, recorder: WaitRecorder) -> None:
-    await run_ibkr_split_check(
-        database_url=database_url, gateway=gateway, clock=FixedClock(CHECK_TIME_UTC), wait=recorder.wait
-    )
+    """The read step, then the apply step."""
+    await run_ibkr_close_read(database_url=database_url, gateway=gateway, wait=recorder.wait)
+    await apply_ibkr_split_check(database_url=database_url, clock=FixedClock(CHECK_TIME_UTC))
 
 
 async def assert_split_applied(database_url: str) -> None:
@@ -208,7 +215,7 @@ async def test_after_a_lost_ibkr_link_the_check_tries_the_instrument_again(
 
 
 @pytest.mark.anyio
-async def test_a_new_run_after_a_stop_checks_only_the_instruments_that_still_wait(
+async def test_a_new_read_after_a_stop_reads_only_the_instruments_that_still_wait(
     database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
 ) -> None:
     stay_bars = create_bars("STAY", TRADING_DAYS[:4], [("50", "51", 1000)] * 4)
@@ -223,12 +230,12 @@ async def test_a_new_run_after_a_stop_checks_only_the_instruments_that_still_wai
 
     with pytest.raises(StopCheckError):
         await run_check(database_url, gateway, WaitRecorder(stop_at_the_second_instrument))
-    checked = [row[0] for row in read_table(database_url, SPLIT_CHECK_QUERY) if row[2] is not None]
+    read = [row[0] for row in read_table(database_url, READ_QUERY) if row[1] is not None]
     gateway.historical_bar_requests.clear()
 
     await run_check(database_url, gateway, WaitRecorder())
 
-    assert checked == ["SPLT"]
+    assert read == ["SPLT"]
     assert [request.instrument for request in gateway.historical_bar_requests] == [STAY]
     assert all(row[2] is not None for row in read_table(database_url, SPLIT_CHECK_QUERY))
     await assert_split_applied(database_url)
@@ -418,3 +425,82 @@ async def test_an_instrument_waits_for_the_check_until_the_check_reaches_its_che
     assert waiting_before == [True, False, True, False]
     assert await read_pending(database_url, SPLT, "USD") is False
     assert await read_pending(database_url, None, "USD") is False
+
+
+@pytest.mark.anyio
+async def test_the_read_step_stores_the_ibkr_closes_and_changes_no_bar(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    import_bars(database_url, tmp_path, split_bars())
+    serve_split_closes(gateway)
+
+    await run_ibkr_close_read(database_url=database_url, gateway=gateway, wait=WaitRecorder().wait)
+
+    assert read_table(database_url, "SELECT symbol, day, close FROM ibkr_daily_close ORDER BY day") == [
+        ("SPLT", day, Decimal(close)) for day, close in zip(TRADING_DAYS[:4], ["101.05", "102.10", "103.00", "104.00"])
+    ]
+    assert read_table(database_url, READ_QUERY) == [("SPLT", utc_day(TRADING_DAYS[4]), True)]
+    assert read_table(database_url, STOCK_SPLIT_QUERY) == []
+    assert [bar.close for bar in await read_bars(database_url, "SPLT")] == [
+        Decimal(202),
+        Decimal(204),
+        Decimal(103),
+        Decimal(104),
+    ]
+    assert await read_pending(database_url, SPLT, "USD") is True
+
+
+@pytest.mark.anyio
+async def test_the_apply_step_sends_no_ibkr_request_and_skips_the_instruments_that_wait_for_the_read(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    stay_bars = create_bars("STAY", TRADING_DAYS[:4], [("50", "51", 1000)] * 4)
+    import_bars(database_url, tmp_path, split_bars())
+    serve_split_closes(gateway)
+    await run_ibkr_close_read(database_url=database_url, gateway=gateway, wait=WaitRecorder().wait)
+    import_bars(database_url, tmp_path / "stay", stay_bars)
+    gateway.historical_bar_requests.clear()
+
+    report = await apply_ibkr_split_check(database_url=database_url, clock=FixedClock(CHECK_TIME_UTC))
+
+    assert gateway.historical_bar_requests == []
+    assert report.checked_instrument_count == 1
+    await assert_split_applied(database_url)
+    assert await read_pending(database_url, STAY, "USD") is True
+
+
+@pytest.mark.anyio
+async def test_the_report_finds_the_known_stock_splits_and_lists_the_others_and_changes_nothing(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """SPLT has a known 2-for-1 split that the import applied already. OTHR has a step that no import check
+    confirmed. The report removes the applied stock split from the stored closes, so the rule must find it again."""
+    othr = Instrument(symbol="OTHR", exchange="NASDAQ", currency="USD")
+    othr_bars = create_bars(
+        "OTHR", TRADING_DAYS[:4], [("60", "60", 1000), ("60", "60", 1000)] + [("20", "20", 3000)] * 2
+    )
+    import_bars(database_url, tmp_path, [*split_bars(), *othr_bars])
+    serve_split_closes(gateway)
+    gateway.historical_bars[othr] = ibkr_bars(TRADING_DAYS[:4], ["20"] * 4)
+    await run_ibkr_close_read(database_url=database_url, gateway=gateway, wait=WaitRecorder().wait)
+    with psycopg.connect(database_url) as connection:
+        connection.execute(
+            "INSERT INTO stock_split (symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation,"
+            " recorded_at_utc) VALUES ('SPLT', 'NASDAQ', 'USD', %s, 2, 'databento_import', 'import_check', %s)",
+            (utc_day(TRADING_DAYS[2]), CHECK_TIME_UTC),
+        )
+        connection.execute(
+            "UPDATE databento_bar SET close = close / 2 WHERE symbol = 'SPLT' AND start_utc < %s",
+            (utc_day(TRADING_DAYS[2]),),
+        )
+    closes_before = [bar.close for bar in await read_bars(database_url, "SPLT")]
+
+    report = await report_ibkr_split_check(database_url=database_url)
+
+    assert (report.read_instrument_count, report.known_split_count, report.found_known_count) == (2, 1, 1)
+    assert report.missed_splits == []
+    assert [(split.instrument, split.ex_date, split.split_ratio) for split in report.other_splits] == [
+        (othr, TRADING_DAYS[2], Decimal(3))
+    ]
+    assert [bar.close for bar in await read_bars(database_url, "SPLT")] == closes_before
+    assert len(read_table(database_url, STOCK_SPLIT_QUERY)) == 1

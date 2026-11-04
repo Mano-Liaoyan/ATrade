@@ -579,57 +579,93 @@ undo the import.
 
 #### 8.8.3.1 IBKR stock split check
 
-Table `ibkr_split_check` (migration `b7e2d4f19a63`): one row for each
-Databento instrument that still trades.
+Table `ibkr_split_check` (migration `b7e2d4f19a63`, changed by
+`c4e8a1f7b2d6`): one row for each Databento instrument that still trades.
 
 | Column | Meaning |
 |---|---|
 | `symbol`, `exchange`, `currency` | The instrument. Primary key. |
 | `check_end_utc` | The end of the days to check: the day after the last day of the import. |
-| `checked_end_utc` | The end of the checked days. Empty before the first check. |
-| `checked_at_utc` | The time of the last check. |
+| `read_end_utc` | The end of the days with stored IBKR closes. Empty before the first read. |
+| `has_ibkr_closes` | False when IBKR has no daily bars of the instrument at the last read. |
+| `checked_end_utc` | The end of the checked days. Empty before the first apply. |
+| `checked_at_utc` | The time of the last apply. |
 
-- An instrument waits for the check when `checked_end_utc` is empty or
-  earlier than `check_end_utc`.
-- The program `app/ibkr_split_check.py` checks the waiting instruments one
-  at a time, in the order of the symbol. It connects to IB Gateway with its
-  own client ID (`--ibkr-client-id`, default `30`). It runs in a temporary
-  container of the `web` image (README.md), not in `forward-test`. It stops
-  when no instrument waits.
-- For each instrument, one transaction:
+Table `ibkr_daily_close` (migration `c4e8a1f7b2d6`): the IBKR `TRADES`
+daily close of each instrument and day. Primary key `symbol`, `exchange`,
+`currency`, `day`.
+
+- The check has 3 steps. The read of the IBKR closes is slow (about 20 hours
+  for 5700 instruments), so it is done once. A change of the stock split rule
+  needs only the report step and the apply step, which take minutes.
+  1. `read`: reads the IBKR closes and stores them. It finds no stock split
+     and changes no bar.
+  2. `report`: tests the stock split rule on the stored closes and changes
+     nothing (see below).
+  3. `apply`: finds the stock splits in the stored closes and adjusts the
+     bars. It sends no IBKR request.
+- An instrument waits for the read when `read_end_utc` is empty or earlier
+  than `check_end_utc`. It waits for the check (and for the apply after the
+  read) when `checked_end_utc` is empty or earlier than `check_end_utc`.
+- The program `app/ibkr_split_check.py` does the steps
+  (`python -m atrade.app.ibkr_split_check read|report|apply`). The read
+  step connects to IB Gateway with its own client ID (`--ibkr-client-id`,
+  default `30`). It runs in a temporary container of the `web` image
+  (README.md), not in `forward-test`. Each step does the waiting instruments
+  one at a time, in the order of the symbol, and stops when none waits.
+- Read step, one transaction for each instrument:
   1. Read the stored Databento daily bars from the first stored day, or from
-     10 days before `checked_end_utc` after an earlier check, to
+     10 days before `read_end_utc` after an earlier read, to
      `check_end_utc`.
   2. Read the IBKR `TRADES` daily bars of the same days, with 1 request at a
-     time (section 7).
-  3. IBKR has bars: find the steps of the close ratio. Write each new stock
-     split to `stock_split` with the source `databento_import` and the
+     time (section 7), and write them to `ibkr_daily_close`.
+  3. Set `read_end_utc` to `check_end_utc`. Set `has_ibkr_closes` to false
+     when IBKR has no bars or does not know the contract.
+- Apply step, one transaction for each read instrument:
+  1. Read the stored Databento daily bars from the first stored day, or from
+     10 days before `checked_end_utc` after an earlier apply, to
+     `check_end_utc`, and the stored IBKR closes of the same days.
+  2. With IBKR closes: find the steps of the close ratio. Write each new
+     stock split to `stock_split` with the source `databento_import` and the
      confirmation `bar_evidence`. Divide the stored `databento_bar` bars of
      all bar periods before the ex-date, and update the daily bar summary.
      The `ibkr_bar` bars do not change: IBKR adjusted them.
-  4. IBKR has no bars, or IBKR does not know the contract: the detection
-     rule finds the stock splits. They wait for the user check.
-  5. Set `checked_end_utc` to `check_end_utc`, and `checked_at_utc`.
+  3. Without IBKR closes: the detection rule finds the stock splits. They
+     wait for the user check.
+  4. Set `checked_end_utc` to `check_end_utc`, and `checked_at_utc`.
+- Report step (`market_data/ibkr_split_report.py`): the stock splits that
+  the import check confirmed (`import_check`, `user_apply`,
+  `both_evidences`) are the known stock splits. For each read instrument
+  with IBKR closes, the report removes all applied stock splits from the
+  stored Databento closes and finds the stock splits with the rule. A found
+  stock split is a known one when its ex-date is within 5 days and its split
+  ratio within 4%. The report counts the known stock splits that have IBKR
+  closes before and from their ex-date, the found and the missed known
+  stock splits, and the other found stock splits. It lists the missed and
+  the other stock splits, and the other ones by split ratio and by symbol.
+  The other stock splits are the ones that the apply step adds.
 - A new stock split only: a stock split that is in `stock_split` already
   keeps its row and changes no bar.
 - The import and the check take the same PostgreSQL advisory lock: the
-  import for its whole transaction, the check for 1 instrument. Thus an
+  import for its whole transaction, the apply step for 1 instrument. Thus an
   import at the same time cannot adjust a bar 2 times or miss a stock split.
-- IBKR pacing violation: the check waits 1 minute, and doubles the wait
-  after each further violation, up to 30 minutes. The first check without a
+- IBKR pacing violation: the read waits 1 minute, and doubles the wait
+  after each further violation, up to 30 minutes. The first read without a
   violation sets the wait back to 1 minute.
-- No connection to IB Gateway or to IBKR: the check waits 1 minute,
-  connects again, and checks the same instrument again.
+- No connection to IB Gateway or to IBKR: the read waits 1 minute,
+  connects again, and reads the same instrument again.
 - IBKR gives no answer in time to the requests of the same instrument 3
-  times in a row (for example ABX on NYSE after the symbol change): the
-  check uses the detection rule for the instrument, as in step 4, and
-  continues with the next instrument.
-- The check waits 0.5 seconds after each instrument. It logs its progress
+  times in a row (for example ABX on NYSE after the symbol change): the read
+  sets `has_ibkr_closes` to false, so the apply step uses the detection
+  rule, and continues with the next instrument.
+- The read waits 0.5 seconds after each instrument. It logs its progress
   each 100 instruments.
 - A backtest that is created while one of its instruments waits gets the
   IBKR stock split check warning (`backtest.md` section 10.12).
-- Code (#324): `market_data/ibkr_split_check.py` (`run_ibkr_split_check`,
-  `has_pending_split_check`, `record_split_checks`) and the program
+- Code (#324): `market_data/ibkr_split_check.py` (`run_ibkr_close_read`,
+  `apply_ibkr_split_check`, `has_pending_split_check`,
+  `record_split_checks`), `market_data/ibkr_split_report.py`
+  (`report_ibkr_split_check`), and the program
   `app/ibkr_split_check.py`. Tests:
   `tests/market_data/test_ibkr_split_check.py` and
   `tests/app/test_ibkr_split_check_program.py`.
