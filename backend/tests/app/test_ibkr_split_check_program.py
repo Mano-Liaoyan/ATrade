@@ -34,12 +34,16 @@ def test_the_program_checks_the_waiting_instruments_and_stops_when_none_waits(
     monkeypatch.setattr("atrade.app.ibkr_split_check.IbAsyncGatewayConnection", create_fake_gateway)
     caplog.set_level("INFO")
 
-    main([])
+    main(["read"])
+    main(["report"])
+    main(["apply"])
 
     assert client_ids == [30]
     with psycopg.connect(database_url) as connection:
         row = connection.execute("SELECT count(*) FROM ibkr_split_check WHERE checked_end_utc IS NULL").fetchone()
     assert row == (0,)
+    assert "Read 1 instruments. 0 of them have no IBKR closes." in caplog.text
+    assert "Known stock splits: 0. Found: 0. Missed: 0. Other found stock splits: 0." in caplog.text
     assert "Checked 1 instruments. Applied 0 stock splits. 0 stock splits wait for the check." in caplog.text
 
 
@@ -47,7 +51,7 @@ def test_the_program_refuses_client_id_0(monkeypatch: pytest.MonkeyPatch, caplog
     monkeypatch.setenv("DATABASE_URL", "postgresql://localhost/atrade")
 
     with pytest.raises(SystemExit) as stop:
-        main(["--ibkr-client-id", "0"])
+        main(["read", "--ibkr-client-id", "0"])
 
     assert stop.value.code == 1
     assert "client ID 0 is not allowed" in caplog.text
