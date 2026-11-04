@@ -548,10 +548,15 @@ undo the import.
   `check_end_utc`. A second import of the same days changes nothing.
 - The universe (section 8.9) and the hourly bar purchase do not wait for the
   check. A stock split does not change the trading value (close × volume).
-- A ratio step is a change of more than 3% from one day to the next. The
-  split ratio is the nearest fraction with a small denominator (2 for 2.004,
-  11/10 for 1.098). A ratio below 1 is the inverse of the split ratio of its
-  inverse (1/150 for 0.00667), so a large reverse split never gets the ratio 0.
+- A ratio step is a lasting change. The ratio changes by more than 3% from
+  one day to the next, and this change is the largest of the 10 days before
+  and after. The median ratio of up to 10 days before the step divided by the
+  median ratio of up to 10 days from the step on is the split ratio. It must
+  be within 4% of a whole number n or 1/n, or of 3/2, 4/3, 5/4, 5/2, 5/3, or
+  their inverses. The closes of a stock with few trades can differ by some
+  percent on many days. These differences change the medians only a little,
+  so they are not a stock split. A smaller stock dividend, for example 11/10,
+  is not found.
 - The detection rule accepts the split ratios 3/2, 2, 3, 4, 5, 10, 1/2,
   1/3, 1/4, 1/5, 1/10, and 1/20, each with a tolerance of 3%. A forward
   split needs a higher volume on the ex-date, a reverse split a lower
