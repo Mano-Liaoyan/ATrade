@@ -318,6 +318,23 @@ async def test_closes_that_differ_by_some_percent_on_single_days_are_not_a_stock
 
 
 @pytest.mark.anyio
+async def test_a_step_of_a_close_ratio_that_is_not_flat_is_not_a_stock_split(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """The ratio changes by 25% in 1 day, near the split ratio 4/5. But it is not flat before the step, as the
+    ratio of 2 different stocks with the same symbol, or of closes with much noise."""
+    closes = ["100", "104", "96", "125", "120", "131"]
+    bars = create_bars("SPLT", TRADING_DAYS, [(close, close, 1000) for close in closes])
+    import_bars(database_url, tmp_path, bars)
+    gateway.historical_bars[SPLT] = ibkr_bars(TRADING_DAYS, ["100"] * len(TRADING_DAYS))
+
+    await run_check(database_url, gateway, WaitRecorder())
+
+    assert read_table(database_url, STOCK_SPLIT_QUERY) == []
+    assert [bar.close for bar in await read_bars(database_url, "SPLT")] == [Decimal(close) for close in closes]
+
+
+@pytest.mark.anyio
 async def test_a_reverse_split_of_1_for_150_gets_the_split_ratio_1_150(
     database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
 ) -> None:

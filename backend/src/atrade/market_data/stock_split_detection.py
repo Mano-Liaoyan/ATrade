@@ -25,6 +25,10 @@ STEP_WINDOW_DAYS = 10
 # The split ratios of a step, above 1, besides the whole numbers. Their inverses are reverse splits.
 STEP_SPLIT_FRACTIONS = tuple(Fraction(ratio) for ratio in ("3/2", "4/3", "5/4", "5/2", "5/3"))
 STEP_SPLIT_RATIO_TOLERANCE = Fraction(4, 100)
+# Before and after a stock split, the close ratio is flat: at least this part of the ratios of each window is within
+# RATIO_STEP_TOLERANCE of the median of the window. The ratio of closes with much noise, or of 2 different stocks with
+# the same symbol, is not flat.
+FLAT_WINDOW_PART = Decimal("0.8")
 # The detection rule accepts only these split ratios, so a large price gap of a normal day is not a stock split.
 COMMON_SPLIT_RATIOS = tuple(
     Fraction(ratio) for ratio in ("3/2", "2", "3", "4", "5", "10", "1/2", "1/3", "1/4", "1/5", "1/10", "1/20")
@@ -75,13 +79,20 @@ def find_step_split_ratio(raw_ratio: Decimal) -> Fraction | None:
     return None
 
 
+def is_flat(ratios: Sequence[Decimal]) -> bool:
+    median = statistics.median(ratios)
+    near_count = sum(1 for ratio in ratios if abs(ratio / median - 1) <= RATIO_STEP_TOLERANCE)
+    return near_count >= FLAT_WINDOW_PART * len(ratios)
+
+
 def find_splits_from_ibkr_closes(
     databento_prices: Sequence[DailyPrices], ibkr_closes: dict[date, Decimal]
 ) -> list[FoundSplit]:
     """Instruments that still trade. On each day of the overlap, the ratio is the Databento close divided by the IBKR
     close. A constant ratio means no stock split. A stock split is a lasting step: the median ratio of the days before
-    the step divided by the median ratio of the days from the step on is a split ratio (`find_step_split_ratio`). The two closes of a stock with few trades can differ by some
-    percent on many days. Such differences change the medians only a little, so they are not a stock split."""
+    the step divided by the median ratio of the days from the step on is a split ratio (`find_step_split_ratio`), and the ratio is flat before and after the step (`is_flat`). The
+    two closes of a stock with few trades can differ by some percent on many days. Such differences change the
+    medians only a little, so they are not a stock split."""
     days: list[date] = []
     ratios: list[Decimal] = []
     for prices in databento_prices:
@@ -106,6 +117,8 @@ def find_splits_from_ibkr_closes(
             continue
         ratios_before = ratios[max(0, index - STEP_WINDOW_DAYS) : index]
         ratios_after = ratios[index : index + STEP_WINDOW_DAYS]
+        if not (is_flat(ratios_before) and is_flat(ratios_after)):
+            continue
         split_ratio = find_step_split_ratio(statistics.median(ratios_before) / statistics.median(ratios_after))
         if split_ratio is None:
             continue

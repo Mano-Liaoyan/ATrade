@@ -553,7 +553,10 @@ undo the import.
   and after. The median ratio of up to 10 days before the step divided by the
   median ratio of up to 10 days from the step on is the split ratio. It must
   be within 4% of a whole number n or 1/n, or of 3/2, 4/3, 5/4, 5/2, 5/3, or
-  their inverses. The closes of a stock with few trades can differ by some
+  their inverses. The ratio must also be flat before and after the step: in
+  each window, at least 80% of the ratios are within 3% of the median of the
+  window. The ratio of closes with much noise, or of 2 different stocks with
+  the same symbol, is not flat. The closes of a stock with few trades can differ by some
   percent on many days. These differences change the medians only a little,
   so they are not a stock split. A smaller stock dividend, for example 11/10,
   is not found.
