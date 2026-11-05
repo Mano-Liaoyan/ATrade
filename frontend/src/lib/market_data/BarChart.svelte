@@ -12,7 +12,10 @@
      not create the chart again. The backend calculates all values; the chart calculates none.
      With `trades`, the price pane shows a trade mark for each bar and side (section 23.9.9, `trade_marks.ts`). The
      pointer on a mark gives it the focus ring and a tooltip. `ringTrades` gives the marks of these trades the ring;
-     a new `centerTrade` scrolls the chart so that the bar of the trade is in the center. -->
+     a new `centerTrade` scrolls the chart so that the bar of the trade is in the center.
+     With `onNeedOlderBars`, a scroll or drag of the user to the left near the first bar calls it (older_bars.ts). A
+     new bar list that is the shown bars with older bars before them keeps the visible range; other new bars fit the
+     view. -->
 <script lang="ts">
   import {
     CandlestickSeries,
@@ -28,6 +31,7 @@
     type ISeriesApi,
     type LineData,
     type LineWidth,
+    type LogicalRange,
     type MouseEventParams,
     type UTCTimestamp,
     type WhitespaceData,
@@ -63,6 +67,7 @@
   import { replaceChartIndicator } from './indicator_settings';
   import type { IndicatorSeriesResult } from './indicator_series';
   import { canDrawLiveBar } from './live_bars';
+  import { countPrependedBars, isMoveToFirstBar } from './older_bars';
   import TradeMarkLayer from './TradeMarkLayer.svelte';
   import {
     BAR_PERIOD_SECONDS,
@@ -97,6 +102,8 @@
     ringTrades?: number[];
     /** A new value scrolls the chart so that the bar of this trade is in the center. */
     centerTrade?: number | null;
+    /** Called when the user scrolls or drags the chart to the left near the first bar. */
+    onNeedOlderBars?: () => void;
   }
 
   const {
@@ -112,6 +119,7 @@
     barPeriod = '1-DAY',
     ringTrades = [],
     centerTrade = null,
+    onNeedOlderBars,
   }: Props = $props();
 
   const LINE_STYLES: Record<ChartLineStyle, LineStyle> = {
@@ -140,6 +148,9 @@
   let hoveredMarkKey: string | null = $state(null);
   // One price axis label for each drawn indicator series, with the values of the series (section 23.9.4).
   let axisLabels: { priceLine: IPriceLine; values: readonly (number | null)[] }[] = [];
+  // The bars of the last setData, and whether the user moved the view after the last fit (a fit is no user move).
+  let shownBars: readonly Bar[] = [];
+  let isMovedByUser = false;
 
   function toCandlestick(bar: Bar): CandlestickData<UTCTimestamp> {
     return { time: bar.time as UTCTimestamp, open: bar.open, high: bar.high, low: bar.low, close: bar.close };
@@ -227,6 +238,7 @@
       chart = undefined;
       candlestickSeries = undefined;
       tradeMarks = undefined;
+      shownBars = [];
       markBoxes = [];
       paneCount = 0;
       maximized = null;
@@ -237,13 +249,54 @@
     if (chart === undefined || candlestickSeries === undefined) {
       return;
     }
+    const timeScale = chart.timeScale();
+    const prependedCount = countPrependedBars(shownBars, bars);
+    const visibleRange = timeScale.getVisibleLogicalRange();
     candlestickSeries.setData(bars.map(toCandlestick));
-    chart.timeScale().fitContent();
+    if (prependedCount !== null && visibleRange !== null) {
+      // The older bars are left of the view: the same bars stay visible.
+      timeScale.setVisibleLogicalRange({ from: visibleRange.from + prependedCount, to: visibleRange.to + prependedCount });
+    } else {
+      timeScale.fitContent();
+      isMovedByUser = false;
+    }
+    shownBars = bars;
     // The live bar that came before the bars is drawn again. A new live bar does not run this effect.
     const currentLiveBar = untrack(() => liveBar);
     if (currentLiveBar !== null && canDrawLiveBar(bars, currentLiveBar)) {
       candlestickSeries.update(toCandlestick(currentLiveBar));
     }
+  });
+
+  // Only a move of the user asks for older bars: the first fit shows the first bar too.
+  $effect(() => {
+    const currentChart = chart;
+    const container = chartContainer;
+    const needOlderBars = onNeedOlderBars;
+    if (currentChart === undefined || container === undefined || needOlderBars === undefined) {
+      return;
+    }
+    let previousFrom: number | null = null;
+    const markUserMove = (): void => {
+      isMovedByUser = true;
+    };
+    const followVisibleRange = (range: LogicalRange | null): void => {
+      if (range === null) {
+        return;
+      }
+      if (isMovedByUser && isMoveToFirstBar(previousFrom, range.from)) {
+        needOlderBars();
+      }
+      previousFrom = range.from;
+    };
+    container.addEventListener('pointerdown', markUserMove, { capture: true });
+    container.addEventListener('wheel', markUserMove, { capture: true, passive: true });
+    currentChart.timeScale().subscribeVisibleLogicalRangeChange(followVisibleRange);
+    return () => {
+      container.removeEventListener('pointerdown', markUserMove, { capture: true });
+      container.removeEventListener('wheel', markUserMove, { capture: true });
+      currentChart.timeScale().unsubscribeVisibleLogicalRangeChange(followVisibleRange);
+    };
   });
 
   $effect(() => {

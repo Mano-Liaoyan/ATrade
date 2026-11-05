@@ -1,5 +1,5 @@
 // Public entry of market_data: instrument search and its panel, bars, live bars, the bar chart, the HK instrument
-// list with its editor, the bar sources and the source order with its list, the survivorship bias warning, and the
+// list with its editor, the older bars of the instrument page chart, the bar sources and the source order with its list, the survivorship bias warning, and the
 // IBKR stock split check warning, and the indicators of bar charts (indicator catalog, series, legend, Add indicator,
 // the saved chart indicator set with the favorites), and the bar chart of a backtest or forward test run with its
 // strategy indicators and trade marks.
@@ -91,6 +91,8 @@ export {
   type HkInstrumentsAdded,
 } from './hk_instrument_list';
 export { formatDayChange, readDayQuote, type DayQuote } from './day_quote';
+export { prependOlderBars, readOlderBars } from './older_bars';
+export { readRunIndicatorSeries } from './run_bars';
 export {
   canDrawLiveBar,
   describeLiveBar,

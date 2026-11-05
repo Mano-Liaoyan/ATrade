@@ -28,8 +28,10 @@
     readBars,
     readChartRequest,
     readDayQuote,
-    readIndicatorSeries,
+    prependOlderBars,
     readLiveBarMessage,
+    readOlderBars,
+    readRunIndicatorSeries,
     type Bar,
     type BarPeriod,
     type BarsResult,
@@ -61,6 +63,14 @@
     return barsResult.bars;
   });
 
+  // Older bars (docs/architecture/market_data.md section 8.4): a scroll or drag of the user to the left near the
+  // first bar reads the next older range and puts its bars before the chart bars. One read at a time. An empty
+  // answer ends the history of this chart request. After a failure, the next move to the left reads again.
+  let olderBars: { key: string; isLoading: boolean; isComplete: boolean; error: string | null } | undefined = $state();
+  const olderBarsError = $derived(olderBars?.key === chartKey ? olderBars.error : null);
+  // The number of the last read. A new chart request or a new read of the bars makes an open read old.
+  let olderBarsRead = 0;
+
   $effect(() => {
     if (chartRequest === null) {
       return;
@@ -68,6 +78,8 @@
     const { instrument, barPeriod } = chartRequest;
     const key = formatLiveBarsPath(chartRequest);
     let isCurrent = true;
+    olderBars = undefined;
+    olderBarsRead += 1;
     void readBars(fetch, instrument, barPeriod).then((result) => {
       if (isCurrent) {
         loadedBars = { key, result };
@@ -77,6 +89,33 @@
       isCurrent = false;
     };
   });
+
+  function loadOlderBars(): void {
+    const firstBar = chartBars.at(0);
+    if (chartRequest === null || chartKey === null || firstBar === undefined) {
+      return;
+    }
+    if (olderBars?.key === chartKey && (olderBars.isLoading || olderBars.isComplete)) {
+      return;
+    }
+    const key = chartKey;
+    olderBarsRead += 1;
+    const read = olderBarsRead;
+    olderBars = { key, isLoading: true, isComplete: false, error: null };
+    void readOlderBars(fetch, chartRequest.instrument, chartRequest.barPeriod, firstBar.time).then((result) => {
+      if (read !== olderBarsRead || loadedBars?.key !== key || loadedBars.result.kind !== 'loaded') {
+        return;
+      }
+      if (result.kind === 'failed') {
+        olderBars = { key, isLoading: false, isComplete: false, error: result.message };
+        return;
+      }
+      olderBars = { key, isLoading: false, isComplete: result.bars.length === 0, error: null };
+      if (result.bars.length > 0) {
+        loadedBars = { key, result: { kind: 'loaded', bars: prependOlderBars(result.bars, loadedBars.result.bars) } };
+      }
+    });
+  }
 
   // Indicators on the chart (docs/architecture/indicator.md section 23.9). The page reads the saved chart indicator
   // set and saves each change at once (section 23.9.7). The indicators stay when the bar period or the instrument
@@ -101,7 +140,8 @@
     });
   });
 
-  // The series route reads only saved bars, so it runs after the bars route answered. Live bars get no values.
+  // The series route reads only saved bars, so it runs after the bars route answered. Live bars get no values. Older
+  // bars make the range longer than the limit of the route, so the range is read in windows (run_bars.ts).
   $effect(() => {
     const indicators = listSeriesIndicators(indicatorPanes);
     const firstBar = chartBars.at(0);
@@ -111,7 +151,7 @@
     }
     const key = chartKey;
     let isCurrent = true;
-    void readIndicatorSeries(fetch, {
+    void readRunIndicatorSeries(fetch, {
       instrument: chartRequest.instrument,
       barPeriod: chartRequest.barPeriod,
       firstBarTime: firstBar.time,
@@ -314,11 +354,14 @@
                 {indicatorSeries}
                 catalog={indicatorCatalog}
                 onPanesChange={changeIndicatorPanes}
+                onNeedOlderBars={loadOlderBars}
               />
               {#if isLoading}
                 <p class="chart-message" role="status">Loading bars.</p>
               {:else if barsResult?.kind === 'failed'}
                 <div class="chart-message"><InlineNotification kind="error" title={barsResult.message} lowContrast /></div>
+              {:else if olderBarsError !== null}
+                <div class="chart-message"><InlineNotification kind="error" title={olderBarsError} lowContrast /></div>
               {:else if chartIndicatorSet.errorText !== null}
                 <div class="chart-message">
                   <InlineNotification
