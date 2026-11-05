@@ -37,7 +37,6 @@
     type BarsResult,
     type ChartIndicatorDefinition,
     type ChartPane,
-    type DayQuote,
     type IndicatorSeriesResult,
   } from '#lib/market_data';
   import { FilledManualOrderList, InstrumentOrderPanel, OpenOrderList, PaperAccountFeed, PositionTable } from '#lib/paper_trading';
@@ -219,9 +218,10 @@
     return isLiveSocketConnected ? 'Waiting for live bars.' : 'Connecting to live bars.';
   });
 
-  // The price line uses the daily bars: the change is from the close of the previous day.
+  // The last price and the change from the previous close come from one quote: the daily bars and the live bar. The
+  // header, the watchlist row of this instrument, and the limit price thus show the same price.
   const instrumentKey = $derived(chartRequest === null ? null : formatInstrument(chartRequest.instrument));
-  let dayQuote = $state<{ instrumentKey: string; quote: DayQuote | null } | null>(null);
+  let dailyBars = $state<{ instrumentKey: string; bars: Bar[] | null } | null>(null);
   $effect(() => {
     if (chartRequest === null || instrumentKey === null) {
       return;
@@ -230,15 +230,17 @@
     let isCurrent = true;
     void readBars(fetch, chartRequest.instrument, '1-DAY').then((result) => {
       if (isCurrent) {
-        dayQuote = { instrumentKey: key, quote: result.kind === 'loaded' ? readDayQuote(result.bars) : null };
+        dailyBars = { instrumentKey: key, bars: result.kind === 'loaded' ? result.bars : null };
       }
     });
     return () => {
       isCurrent = false;
     };
   });
-  const shownDayQuote = $derived(dayQuote?.instrumentKey === instrumentKey ? dayQuote.quote : null);
-  const lastPrice = $derived(liveBar?.close ?? shownDayQuote?.last ?? chartBars.at(-1)?.close ?? null);
+  const shownDayQuote = $derived(
+    dailyBars?.instrumentKey === instrumentKey && dailyBars.bars !== null ? readDayQuote(dailyBars.bars, liveBar) : null,
+  );
+  const lastPrice = $derived(shownDayQuote?.last ?? liveBar?.close ?? chartBars.at(-1)?.close ?? null);
 
   // The paper account. Forward tests and orders by hand share the instruments (forward_test.md section 12.2).
   const accountFeed = new PaperAccountFeed();
@@ -301,7 +303,7 @@
   {@const instrumentName = formatInstrument(chartRequest.instrument)}
   <Workbench>
     <SideColumn label="Watchlist" side="start" width="20rem" storageKey="atrade.instrument-page.watchlist-column">
-      <InstrumentWatchlist instrument={chartRequest.instrument} barPeriod={chartRequest.barPeriod} />
+      <InstrumentWatchlist instrument={chartRequest.instrument} barPeriod={chartRequest.barPeriod} openQuote={shownDayQuote} />
     </SideColumn>
 
     <PanelSplit storageKey="atrade.instrument-page.panel-split" panels={PANELS}>

@@ -94,7 +94,9 @@ test('a maximized panel restores with Escape, and the browser keeps the panel la
   await accountPanel(page).getByRole('button', { name: 'Maximize panel' }).click();
 
   await expect(chart).toBeHidden();
-  await expect(chartPanel(page).getByRole('heading', { name: '700 / SEHK / HKD' })).toBeVisible();
+  // The header line of the chart panel stays. The fake's live change (about +19 %) is long: the instrument name can
+  // shrink to no width, so the bar period switcher shows the header line.
+  await expect(chartPanel(page).getByRole('tablist', { name: 'Bar period' })).toBeVisible();
 
   await page.reload();
   await expect(chart).toBeHidden();

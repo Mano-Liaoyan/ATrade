@@ -1,7 +1,7 @@
 <!-- The watchlist column of a workbench (the home page and the instrument page): 32px rows with the symbol, the last
      price, and the change from the previous close (from the daily bars of each instrument). A row opens its
      instrument page, with the bar period of the open chart when there is one. On the instrument page, the open
-     instrument is the selected row. With `editable` (the home page), the instrument search above the table adds an
+     instrument is the selected row, and its row shows the quote of the page (with the live bar). With `editable` (the home page), the instrument search above the table adds an
      instrument, and each row has a Delete button. The side column around it is the "Watchlist" landmark, so this
      part has no landmark of its own. -->
 <script lang="ts">
@@ -38,9 +38,12 @@
     barPeriod?: BarPeriod;
     // The instrument search adds instruments, and each row has a Delete button (home page).
     editable?: boolean;
+    // The quote of the open instrument from its page (daily bars and live bar). Its row shows it, so the row and
+    // the chart header show the same last price and change.
+    openQuote?: DayQuote | null;
   }
 
-  const { instrument, barPeriod, editable = false }: Props = $props();
+  const { instrument, barPeriod, editable = false, openQuote = null }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
     { header: 'Symbol' },
@@ -199,7 +202,7 @@
         {#snippet rows()}
           {#each watchlistInstruments as watchlistInstrument (watchlistInstrument.id)}
             {@const href = createInstrumentHref(watchlistInstrument, barPeriod)}
-            {@const quote = quotes[watchlistInstrument.id]}
+            {@const quote = isOpen(watchlistInstrument) && openQuote !== null ? openQuote : quotes[watchlistInstrument.id]}
             <tr class={['row', isOpen(watchlistInstrument) && 'cds--data-table--selected']} {@attach openOnRowClick(href)}>
               <th scope="row">
                 <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolved the path. -->
