@@ -499,8 +499,27 @@ async def test_the_report_finds_the_known_stock_splits_and_lists_the_others_and_
 
     assert (report.read_instrument_count, report.known_split_count, report.found_known_count) == (2, 1, 1)
     assert report.missed_splits == []
-    assert [(split.instrument, split.ex_date, split.split_ratio) for split in report.other_splits] == [
-        (othr, TRADING_DAYS[2], Decimal(3))
-    ]
+    assert [
+        (split.instrument, split.ex_date, split.split_ratio, split.has_price_gap) for split in report.other_splits
+    ] == [(othr, TRADING_DAYS[2], Decimal(3), True)]
     assert [bar.close for bar in await read_bars(database_url, "SPLT")] == closes_before
     assert len(read_table(database_url, STOCK_SPLIT_QUERY)) == 1
+
+
+@pytest.mark.anyio
+async def test_a_step_of_the_ibkr_closes_without_a_databento_price_gap_waits_for_the_user_check(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """The IBKR closes halve on the third day, but the Databento prices have no gap: the close before and the open
+    of the day are the same. Only 1 source shows the stock split, so it changes no bar and waits for the user."""
+    closes = ["100", "100", "100", "101"]
+    bars = create_bars("SPLT", TRADING_DAYS[:4], [(close, close, 1000) for close in closes])
+    import_bars(database_url, tmp_path, bars)
+    gateway.historical_bars[SPLT] = ibkr_bars(TRADING_DAYS[:4], ["50", "50", "100", "101"])
+
+    await run_check(database_url, gateway, WaitRecorder())
+
+    assert read_table(database_url, STOCK_SPLIT_QUERY) == [
+        ("SPLT", "NASDAQ", "USD", utc_day(TRADING_DAYS[2]), Decimal(2), "databento_import", None)
+    ]
+    assert [bar.close for bar in await read_bars(database_url, "SPLT")] == [Decimal(close) for close in closes]

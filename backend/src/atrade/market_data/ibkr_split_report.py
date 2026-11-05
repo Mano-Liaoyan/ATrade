@@ -24,8 +24,8 @@ from atrade.market_data.ibkr_split_check import (
 )
 from atrade.market_data.stock_split_detection import (
     DailyPrices,
-    FoundSplit,
     find_splits_from_ibkr_closes,
+    has_price_gap,
 )
 
 # A found stock split is a known stock split when its ex-date is this near and its split ratio is this near, the same
@@ -52,6 +52,9 @@ class ReportedSplit:
     instrument: Instrument
     ex_date: date
     split_ratio: Decimal
+    # The Databento prices show the gap of the stock split (`has_price_gap`). The apply step adjusts the bars only
+    # then. Without the gap, the stock split waits for the user check.
+    has_price_gap: bool = False
 
 
 @dataclass
@@ -62,14 +65,19 @@ class SplitRuleReport:
     known_split_count: int = 0
     found_known_count: int = 0
     missed_splits: list[ReportedSplit] = field(default_factory=list)
-    # The found stock splits that are not known. The apply step applies them.
+    # The found stock splits that are not known. The apply step adds them.
     other_splits: list[ReportedSplit] = field(default_factory=list)
 
-    def count_other_ratios(self) -> list[tuple[Decimal, int]]:
-        return Counter(round(split.split_ratio, 4) for split in self.other_splits).most_common()
+    def select_other_splits(self, *, has_price_gap: bool) -> list[ReportedSplit]:
+        return [split for split in self.other_splits if split.has_price_gap == has_price_gap]
 
-    def count_other_symbols(self) -> list[tuple[str, int]]:
-        return Counter(split.instrument.symbol for split in self.other_splits).most_common()
+    def count_other_ratios(self, *, has_price_gap: bool) -> list[tuple[Decimal, int]]:
+        splits = self.select_other_splits(has_price_gap=has_price_gap)
+        return Counter(round(split.split_ratio, 4) for split in splits).most_common()
+
+    def count_other_symbols(self, *, has_price_gap: bool) -> list[tuple[str, int]]:
+        splits = self.select_other_splits(has_price_gap=has_price_gap)
+        return Counter(split.instrument.symbol for split in splits).most_common()
 
 
 def remove_applied_splits(prices: list[DailyPrices], applied_splits: list[tuple[date, Decimal]]) -> list[DailyPrices]:
@@ -92,7 +100,7 @@ def remove_applied_splits(prices: list[DailyPrices], applied_splits: list[tuple[
     return raw_prices
 
 
-def is_same_split(found: FoundSplit, ex_date: date, split_ratio: Decimal) -> bool:
+def is_same_split(found: ReportedSplit, ex_date: date, split_ratio: Decimal) -> bool:
     return (
         abs(found.ex_date - ex_date) <= MATCH_DAYS and abs(found.split_ratio / split_ratio - 1) <= MATCH_RATIO_TOLERANCE
     )
@@ -101,7 +109,7 @@ def is_same_split(found: FoundSplit, ex_date: date, split_ratio: Decimal) -> boo
 def compare_splits(
     report: SplitRuleReport,
     instrument: Instrument,
-    found_splits: list[FoundSplit],
+    found_splits: list[ReportedSplit],
     known_splits: list[tuple[date, Decimal]],
     overlap_days: list[date],
 ) -> None:
@@ -117,7 +125,7 @@ def compare_splits(
         else:
             report.found_known_count += 1
             unmatched.remove(match)
-    report.other_splits.extend(ReportedSplit(instrument, found.ex_date, found.split_ratio) for found in unmatched)
+    report.other_splits.extend(unmatched)
 
 
 async def report_instrument(
@@ -133,7 +141,10 @@ async def report_instrument(
     ibkr_closes = await read_stored_ibkr_closes(connection, instrument, prices[0].day)
     raw_prices = remove_applied_splits(prices, applied_splits)
     overlap_days = [prices_of_day.day for prices_of_day in raw_prices if prices_of_day.day in ibkr_closes]
-    found_splits = find_splits_from_ibkr_closes(raw_prices, ibkr_closes)
+    found_splits = [
+        ReportedSplit(instrument, found.ex_date, found.split_ratio, has_price_gap(raw_prices, found))
+        for found in find_splits_from_ibkr_closes(raw_prices, ibkr_closes)
+    ]
     compare_splits(report, instrument, found_splits, known_splits, overlap_days)
 
 

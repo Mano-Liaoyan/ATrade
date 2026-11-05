@@ -29,6 +29,10 @@ STEP_SPLIT_RATIO_TOLERANCE = Fraction(4, 100)
 # RATIO_STEP_TOLERANCE of the median of the window. The ratio of closes with much noise, or of 2 different stocks with
 # the same symbol, is not flat.
 FLAT_WINDOW_PART = Decimal("0.8")
+# The Databento evidence of a stock split: the close of the day before the ex-date divided by the open of the ex-date
+# is near the split ratio. The price can move on the ex-date, so the tolerance is 20%, but at most half of the
+# distance from the split ratio to 1 (in log), so a 5-for-4 split needs a gap nearer to 5/4 than to 1.
+PRICE_GAP_TOLERANCE = math.log(1.2)
 # The detection rule accepts only these split ratios, so a large price gap of a normal day is not a stock split.
 COMMON_SPLIT_RATIOS = tuple(
     Fraction(ratio) for ratio in ("3/2", "2", "3", "4", "5", "10", "1/2", "1/3", "1/4", "1/5", "1/10", "1/20")
@@ -126,6 +130,21 @@ def find_splits_from_ibkr_closes(
         # The days after the step hold the new ratio. They are not a second step.
         next_index = index + STEP_WINDOW_DAYS
     return splits
+
+
+def has_price_gap(databento_prices: Sequence[DailyPrices], split: FoundSplit) -> bool:
+    """True when the Databento prices, before any adjustment of this stock split, show the gap of the stock split on
+    its ex-date. An IBKR close ratio step without this gap is not proven: the IBKR data can have an error."""
+    index = next((index for index, prices in enumerate(databento_prices) if prices.day == split.ex_date), None)
+    if index is None or index == 0:
+        return False
+    close_before = databento_prices[index - 1].close
+    open_on_ex_date = databento_prices[index].open
+    if close_before <= 0 or open_on_ex_date <= 0:
+        return False
+    split_distance = abs(math.log(split.split_ratio))
+    gap_distance = abs(math.log(close_before / open_on_ex_date / split.split_ratio))
+    return gap_distance <= min(PRICE_GAP_TOLERANCE, split_distance / 2)
 
 
 def find_common_ratio(raw_ratio: Decimal) -> Fraction | None:
