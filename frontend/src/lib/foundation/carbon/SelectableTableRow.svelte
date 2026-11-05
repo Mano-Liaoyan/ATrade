@@ -2,19 +2,20 @@
      the bar chart (docs/architecture/indicator.md section 23.9.9). The row itself takes the focus. The pointer or the
      focus on the row gives `onRowPoint` the row index (null when it goes). A click on the row, or Enter, gives
      `onRowSelect` the index. The selected row has the Carbon selected row color and `aria-current`. The row header
-     cell shows the row number. -->
+     cell shows the row number, unless `hasRowNumber` is false. -->
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
   interface Props {
     index: number;
     isSelected: boolean;
+    hasRowNumber?: boolean;
     onRowPoint?: ((index: number | null) => void) | undefined;
     onRowSelect: (index: number) => void;
     children: Snippet;
   }
 
-  const { index, isSelected, onRowPoint, onRowSelect, children }: Props = $props();
+  const { index, isSelected, hasRowNumber = true, onRowPoint, onRowSelect, children }: Props = $props();
 </script>
 
 <tr
@@ -43,7 +44,9 @@
     }
   }}
 >
-  <th scope="row" align="right">{index + 1}</th>
+  {#if hasRowNumber}
+    <th scope="row" align="right">{index + 1}</th>
+  {/if}
   {@render children()}
 </tr>
 

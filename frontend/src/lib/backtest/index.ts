@@ -4,6 +4,7 @@
 export { default as BacktestLimitsForm } from './BacktestLimitsForm.svelte';
 export { default as BacktestMetricTable } from './BacktestMetricTable.svelte';
 export { default as BacktestTradeTable } from './BacktestTradeTable.svelte';
+export { default as ChartInstrumentSelect } from './ChartInstrumentSelect.svelte';
 export { default as ChartViewSwitcher } from './ChartViewSwitcher.svelte';
 export { default as ComparedKeyMetrics } from './ComparedKeyMetrics.svelte';
 export { default as EquityDrawdownChart, type DrawdownCurve } from './EquityDrawdownChart.svelte';
@@ -22,6 +23,7 @@ export {
   listBacktests,
   readBacktestLimits,
   readBacktest,
+  listChartInstruments,
   readBacktestInstrument,
   readUsUniverseRange,
   startBacktest,

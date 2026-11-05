@@ -687,10 +687,18 @@ section 6.2).
   a Carbon `sm` content switcher with "Equity" and "Bars". It has the size
   of the bar period switcher of the instrument page. "Equity" shows the
   `EquityDrawdownChart` (the default). "Bars" shows the bar chart. The page
-  address keeps the choice (`?chart=bars`). Only a single-instrument
-  backtest or forward test has the switcher.
+  address keeps the choice (`?chart=bars`). A backtest has the switcher,
+  and a single-instrument forward test has it.
 - The bar chart of a backtest shows the bars of its instrument, bar period,
-  and range, read with its `source_order`. The bar chart of a forward test
+  and range, read with its `source_order`. A multi-instrument backtest shows
+  one universe member and only the trades of that member. While "Bars" shows,
+  the header line has the "Instrument" select (`ChartInstrumentSelect`): the
+  members with trades come first, and the first member is the default. On
+  the backtest page, a click on a Trades row or an Instruments row also
+  selects the member. The member comes from `instruments` and the `currency`
+  of the backtest. A backtest from before the migration has no `currency`,
+  so it has no switcher. `RunChart` keeps the selected member while the run
+  stays open; the page address does not keep it. The bar chart of a forward test
   shows the bars from `created_at_utc` to `stopped_at_utc`, or to now.
 - Strategy indicators: `GET /api/backtests/{backtest_id}` and
   `GET /api/forward-tests/{id}` (in `forward_test`) get
@@ -719,8 +727,8 @@ section 6.2).
     `GET /api/forward-tests/{id}` only (`ForwardTestWithIndicatorsResponse`),
     not in the list. A forward test has no sweep parameters: it uses the
     field defaults.
-  - The switcher shows for each status of a single-instrument backtest. A
-    queued or failed backtest also shows its bars.
+  - The switcher shows for each status of a backtest. A queued or failed
+    backtest also shows its bars.
   - The bars route gets `start_utc`, `end_utc`, and the `source_order` of
     the backtest. A forward test sends no `end_utc` while it runs, so the
     range ends now. The bars and the indicator values are read one time for

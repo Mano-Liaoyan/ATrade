@@ -86,6 +86,7 @@ max-statements = 50
 "tests/**" = ["PLR2004"]
 
 [tool.basedpyright]
+extraPaths = ["src"]
 include = ["src", "tests", "migrations"]
 pythonVersion = "3.14"
 typeCheckingMode = "strict"

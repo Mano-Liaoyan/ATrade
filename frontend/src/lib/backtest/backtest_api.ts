@@ -41,6 +41,22 @@ export function readBacktestInstrument(backtest: Backtest): BacktestInstrument |
   return { symbol, exchange, currency };
 }
 
+// The instruments that the "Bars" view can show: the instrument of a single-instrument backtest, or the universe
+// members with currency, the members with trades first. A backtest from before the migration has no currency: none.
+export function listChartInstruments(backtest: BacktestDetail): BacktestInstrument[] {
+  const instrument = readBacktestInstrument(backtest);
+  if (instrument !== undefined) {
+    return [instrument];
+  }
+  const { currency, instruments } = backtest;
+  if (currency === null) {
+    return [];
+  }
+  return [...instruments]
+    .sort((first, second) => Number(second.trade_count > 0) - Number(first.trade_count > 0))
+    .map(({ symbol, exchange }) => ({ symbol, exchange, currency }));
+}
+
 // The change socket of the list: a "changed" message after each change (foundation/live_socket readOnChange).
 export const BACKTESTS_SOCKET_PATH = '/ws/backtests';
 const BACKTESTS_PATH = '/api/backtests';

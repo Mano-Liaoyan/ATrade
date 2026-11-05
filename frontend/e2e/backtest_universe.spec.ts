@@ -77,4 +77,17 @@ test('starts a watchlist backtest and sees each instrument and the symbol of eac
   await lastRow.scrollIntoViewIfNeeded();
   await expect(lastRow).toBeInViewport();
   await expect(lastRow.getByRole('cell').last()).toHaveAttribute('align', 'right');
+
+  // The "Bars" view shows one universe member.
+  await rows.nth(1).click();
+  await expect(page).toHaveURL(/chart=bars/);
+  const instrumentSelect = chartPanel.getByRole('combobox', { name: 'Instrument' });
+  await expect(instrumentSelect).toHaveText((await rows.nth(1).getByRole('cell').first().textContent()) ?? '');
+  await expect(rows.nth(1)).toHaveAttribute('aria-current', 'true');
+  await expect(chartPanel.getByRole('status', { name: 'Bar count' })).toHaveText(/\d+ bars?/);
+  await instrumentSelect.click();
+  await expect(page.getByRole('option', { name: 'AAPL', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await chartPanel.getByRole('tablist', { name: 'Chart' }).getByRole('tab', { name: 'Equity' }).click();
+  await expect(instrumentSelect).toHaveCount(0);
 });

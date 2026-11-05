@@ -15,6 +15,7 @@ import type {
 import type { components } from '#lib/api';
 import { formatAmount } from '#lib/foundation/value_format';
 import type { BarPeriod } from './bars';
+import type { Instrument } from './instrument_search';
 
 /** A row of the backtest Trades tab or of the forward test Fills tab. */
 export type TradeRecord =
@@ -97,13 +98,19 @@ export function findTradeBarIndex(
 }
 
 /** The chart trades of the table rows, and the chart trade of each row (null for a split adjustment: no mark). */
-export function listChartTrades(records: readonly TradeRecord[]): {
+export function listChartTrades(
+  records: readonly TradeRecord[],
+  member?: Pick<Instrument, 'symbol' | 'exchange'>,
+): {
   trades: ChartTrade[];
   tradeIndexByRow: (number | null)[];
 } {
   const trades: ChartTrade[] = [];
   const tradeIndexByRow = records.map((record) => {
     if (('kind' in record && record.kind !== 'fill') || record.price_usd === null) {
+      return null;
+    }
+    if (member !== undefined && (record.symbol !== member.symbol || record.exchange !== member.exchange)) {
       return null;
     }
     trades.push({

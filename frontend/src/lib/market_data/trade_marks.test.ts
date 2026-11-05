@@ -192,4 +192,23 @@ describe('listChartTrades', () => {
       tradeIndexByRow: [null, 0],
     });
   });
+
+  it('keeps the table rows but gives only the trades of the universe member a chart trade', () => {
+    const trade = {
+      symbol: 'AAPL',
+      exchange: 'NASDAQ',
+      time_utc: '2025-11-04T00:00:01Z',
+      side: 'BUY' as const,
+      quantity_shares: '10',
+      price_usd: '100',
+      commission_usd: '0',
+      round_trip_net_profit_usd: null,
+    };
+    const other = { ...trade, symbol: 'MSFT' };
+
+    const { trades, tradeIndexByRow } = listChartTrades([other, trade], { symbol: 'AAPL', exchange: 'NASDAQ' });
+
+    expect(trades).toHaveLength(1);
+    expect(tradeIndexByRow).toEqual([null, 0]);
+  });
 });

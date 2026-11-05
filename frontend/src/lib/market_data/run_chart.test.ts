@@ -1,6 +1,6 @@
 // The link of a backtest or forward test bar chart with its Trades or Fills table (indicator.md section 23.9.9).
 import { describe, expect, it } from 'vite-plus/test';
-import { findRowTrade, findRingTrades } from './run_chart.svelte';
+import { findRowTrade, findRingTrades, RunChart } from './run_chart.svelte';
 
 // Row 1 is a split adjustment: it has no trade mark.
 const TRADE_INDEX_BY_ROW = [0, null, 1, 2];
@@ -21,5 +21,25 @@ describe('findRowTrade', () => {
     expect(findRowTrade(TRADE_INDEX_BY_ROW, 2)).toBe(1);
     expect(findRowTrade(TRADE_INDEX_BY_ROW, 1)).toBeNull();
     expect(findRowTrade(TRADE_INDEX_BY_ROW, null)).toBeNull();
+  });
+});
+
+describe('RunChart.findInstrument', () => {
+  const instruments = [
+    { symbol: 'AAPL', exchange: 'NASDAQ' },
+    { symbol: 'MSFT', exchange: 'NASDAQ' },
+  ];
+
+  it('gives the first instrument without a selection', () => {
+    expect(new RunChart().findInstrument('1', instruments)).toEqual(instruments[0]);
+    expect(new RunChart().findInstrument('1', instruments.slice(2))).toBeUndefined();
+  });
+
+  it('gives the selected instrument of the run only', () => {
+    const chart = new RunChart();
+    chart.selectInstrument('1', { symbol: 'MSFT', exchange: 'NASDAQ' });
+
+    expect(chart.findInstrument('1', instruments)).toEqual(instruments[1]);
+    expect(chart.findInstrument('2', instruments)).toEqual(instruments[0]);
   });
 });

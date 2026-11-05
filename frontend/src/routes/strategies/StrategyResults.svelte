@@ -4,22 +4,25 @@
      detail reads again when the status of the backtest changes, for example to finished.
      A failed or timed out backtest tab shows its error at once: the status with the last error line, the "Ask AI to fix"
      button (the AI assistant reads the error itself with read_backtest), and the full log.
-     A single-instrument backtest tab has the "Equity" / "Bars" switcher of the backtest page: "Bars" shows the bar
-     chart of the backtest with the strategy indicators, "Add indicator", and the trade marks
-     (docs/architecture/indicator.md section 23.9.8). -->
+     A backtest tab has the "Equity" / "Bars" switcher of the backtest page: "Bars" shows the bar chart of the backtest
+     with the strategy indicators, "Add indicator", and the trade marks (docs/architecture/indicator.md section
+     23.9.8). A multi-instrument backtest shows the universe member of the "Instrument" select. -->
 <script lang="ts">
   import {
     BacktestTradeTable,
+    ChartInstrumentSelect,
     ChartViewSwitcher,
     describeBacktestStatus,
     EquityDrawdownChart,
     findBacktestStatusKind,
     findErrorSummary,
     KeyMetricRow,
+    listChartInstruments,
     readBacktest,
     readBacktestInstrument,
     type Backtest,
     type BacktestDetail,
+    type BacktestInstrument,
     type ChartView,
   } from '#lib/backtest';
   import { Button, InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
@@ -98,7 +101,9 @@
       </ScrollRegion>
     {/if}
   {:else}
-    {@const instrument = readBacktestInstrument(run)}
+    {@const isMultiInstrument = readBacktestInstrument(run) === undefined}
+    {@const chartInstruments = listChartInstruments(run)}
+    {@const instrument = runChart.findInstrument(String(run.id), chartInstruments)}
     {#if instrument !== undefined}
       <div class="chart-tools">
         <ChartViewSwitcher
@@ -108,6 +113,15 @@
           }}
         />
         {#if chartView === 'bars'}
+          {#if isMultiInstrument}
+            <ChartInstrumentSelect
+              instruments={chartInstruments}
+              value={instrument}
+              onValueChange={(selected: BacktestInstrument) => {
+                runChart.selectInstrument(String(run.id), selected);
+              }}
+            />
+          {/if}
           <RunAddIndicatorButton chart={runChart} runKey={String(run.id)} strategyIndicators={run.strategy_indicators} />
         {/if}
       </div>
@@ -119,6 +133,7 @@
       <div class="chart">
         <RunBarChart
           {instrument}
+          isUniverseMember={isMultiInstrument}
           barPeriod={run.bar_period}
           range={{ startUtc: run.start_utc, endUtc: run.end_utc, sourceOrder: run.source_order }}
           label="Bar chart of {formatInstrument(instrument)}, {run.bar_period} bars"
