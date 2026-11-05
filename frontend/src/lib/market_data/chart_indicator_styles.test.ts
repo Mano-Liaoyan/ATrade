@@ -16,6 +16,7 @@ describe('chart indicator styles', () => {
     expect(formatIndicatorValue('momentum_12_1', -0.032)).toBe('-3.20 %');
     expect(formatIndicatorValue('distance_to_52_week_high', 0.968)).toBe('96.80 %');
     expect(formatIndicatorValue('realized_volatility', 0.2512)).toBe('25.12 %');
+    expect(formatIndicatorValue('adr_percent', 5.2)).toBe('5.20 %');
     expect(formatIndicatorValue('average_trading_value', 12_345_000_000)).toBe('12.35 B');
     expect(formatIndicatorValue('average_trading_value', 820_100_000)).toBe('820.10 M');
     expect(formatIndicatorValue('average_trading_value', 45_600)).toBe('45.60 K');

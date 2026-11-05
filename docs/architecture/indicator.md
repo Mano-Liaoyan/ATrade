@@ -55,10 +55,11 @@ ADR [0001](../adr/0001-one-indicator-definition-for-screens-and-strategies.md).
 Source: [Indicator library scope and calculation place](https://github.com/Mano-Liaoyan/ATrade/issues/136),
 [Evidence for classic indicators and factors](https://github.com/Mano-Liaoyan/ATrade/issues/130).
 
-The first set has 11 indicators. All of them use bars only. The formulas and
+The first set has 12 indicators. All of them use bars only. The formulas and
 the usual parameters come from the #130 research
 (`docs/research/indicators-and-factors-evidence.md` on the branch
-`research/indicators-and-factors-evidence`). The level is the evidence level
+`research/indicators-and-factors-evidence`). ADR% comes from #371, not from
+#130, so it has no level. The level is the evidence level
 of #130 (A is the strongest, D is practitioner use only).
 
 | Indicator | Formula (daily bars, period n) | Usual parameters (#130) | Outputs | Code | Level (#130) |
@@ -74,6 +75,7 @@ of #130 (A is the strongest, D is practitioner use only).
 | MACD | fast EMA − slow EMA, and its signal line | not given | `value` (MACD line), `signal`, `histogram` | wraps `MovingAverageConvergenceDivergence` | D (entry timing) |
 | Bollinger Bands | mean of the last n closes ± k population standard deviations of the same closes | not given | `upper`, `middle`, `lower` | wraps `BollingerBands` | D (entry timing) |
 | Donchian channel | highest high and lowest low of the last n bars | not given | `upper`, `middle`, `lower` | wraps `DonchianChannel` | B (trend filter, range break) |
+| ADR% | 100 × (mean(high / low of the last n bars) − 1) | n = 20 | `value` | ATrade | not rated (#371) |
 
 - The output names of the wrapped indicators are the NautilusTrader names.
   Checked in #138: MACD has `value`, `signal`, and `histogram`. Bollinger
@@ -102,6 +104,7 @@ of #130 (A is the strongest, D is practitioner use only).
   | Distance to 52-week high | `DistanceTo52WeekHigh` | `period=252` | `period` |
   | Realized volatility | `RealizedVolatility` | `period=60`, `bars_per_year=252` | `period + 1` |
   | Average trading value | `AverageTradingValue` | `period=20` | `period` |
+  | ADR% | `ADRPercent` | `period=20` | `period` |
 
 - 12-1 momentum accepts `skip` from 0 to `look_back − 1`. With `skip=0` the
   value is close(t) / close(t − look-back) − 1 (template S3). The class
@@ -121,6 +124,8 @@ of #130 (A is the strongest, D is practitioner use only).
   [`docs/architecture.md`](../architecture.md)).
 - Average trading value is in the currency of the instrument (USD for US
   instruments, HKD for Hong Kong instruments).
+- ADR% is in percent, not a fraction: 5.2 is 5.2 %. It is "no value" while a
+  bar of the window has a low of 0 or less (#371).
 - RSI, MACD, and Bollinger Bands are entry timing tools only. #130 found no
   reliable evidence of a return after costs for them.
 - ATR does not predict direction. Use it for stops and position size.
@@ -162,7 +167,7 @@ Each class has:
 | Constructor | The parameters of the indicator, each with a default value. |
 | `handle_bar(bar)` | Takes one NautilusTrader `Bar`. `register_indicator_for_bars` calls it. |
 | `update(bar)` | The screen path: takes one `foundation` `Bar`. It gives the same update as `handle_bar` for the same open, high, low, close, and volume. A wrapped class makes a NautilusTrader bar from it and calls `handle_bar`. |
-| `initialized` | `True` when the class has enough bars for a value. NautilusTrader reads it for `indicators_initialized()`. |
+| `initialized` | `True` when the class has a value. NautilusTrader reads it for `indicators_initialized()`. |
 | Outputs (`value`, or the names of section 23.2) | The value (`float`), or "no value" (`None`) while `initialized` is `False`. |
 | `reset()` | Removes all received bars. |
 
@@ -203,6 +208,7 @@ are the fields for charts of section 23.9.2 (#327). Each
 | `macd` | `MACD(12, 26, 9)` | `fast_period`: 12 (1 to 1000, less than `slow_period`), `slow_period`: 26 (2 to 1000), `signal_period`: 9 (1 to 1000) | `value`, `signal`, `histogram` |
 | `bollinger_bands` | `Bollinger Bands(20, 2)` | `period`: 20 (1 to 1000), `k`: 2.0 (0.1 to 10.0) | `upper`, `middle`, `lower` |
 | `donchian_channel` | `Donchian channel(20)` | `period`: 20 (1 to 1000) | `upper`, `middle`, `lower` |
+| `adr_percent` | `ADR%(20)` | `period`: 20 (1 to 1000) | `value` |
 
 - The UI name is the indicator name and its parameter values in the
   constructor order, for example `RSI(14)`. A `float` shows without a
@@ -220,7 +226,7 @@ needs. Examples from #136: RSI(14) reads about 100 bars. 12-1 momentum reads
 
 | Indicator | Daily bars that a screen reads |
 |---|---|
-| SMA(n), average trading value(n), Bollinger Bands(n), Donchian channel(n) | n |
+| SMA(n), average trading value(n), Bollinger Bands(n), Donchian channel(n), ADR%(n) | n |
 | Distance to 52-week high (period n, default 252) | n |
 | 12-1 momentum (look-back L) | L + 1 |
 | Realized volatility(n) | n + 1 (n log returns) |
@@ -269,7 +275,7 @@ indicator reference in JSON:
 - `indicator` is a catalog key. The keys are choices of this document:
   `sma`, `ema`, `momentum_12_1`, `distance_to_52_week_high`,
   `realized_volatility`, `atr`, `average_trading_value`, `rsi`, `macd`,
-  `bollinger_bands`, `donchian_channel`.
+  `bollinger_bands`, `donchian_channel`, `adr_percent`.
 - `parameters` holds the constructor parameters. A missing parameter gets
   its default.
 - `output` names one output of section 23.2. A multi-line indicator needs it
@@ -302,7 +308,7 @@ indicator reference in JSON:
 
 | Part | Phase of map #129 |
 |---|---|
-| `indicator/` module, the 11 classes, the catalog, the consistency tests | Phase 1 |
+| `indicator/` module, the 12 classes, the catalog, the consistency tests | Phase 1 |
 | Use of the classes in the rule builder and the strategy templates | Phase 1 |
 | Use of the classes in screens (section 24) | Phase 3 |
 | Financial-data indicators (section 23.2.1) | After a decision on a financial data source. Not in a phase yet. |
@@ -357,6 +363,7 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
 | `momentum_12_1` | `MOM 12-1` | `own` |
 | `distance_to_52_week_high` | `52W HIGH` | `own` |
 | `average_trading_value` | `ATV` | `own` |
+| `adr_percent` | `ADR%` | `own` |
 
 - `price`: the indicator draws on the price pane. `own`: it draws in an own
   pane.
@@ -378,7 +385,7 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
 
   | Indicator | Series |
   |---|---|
-  | SMA, EMA, ATR, realized volatility, 12-1 momentum, distance to 52-week high | 1 `LineSeries` |
+  | SMA, EMA, ATR, realized volatility, 12-1 momentum, distance to 52-week high, ADR% | 1 `LineSeries` |
   | Bollinger Bands, Donchian channel | 3 `LineSeries` (`upper`, `middle`, `lower`). The first version has no fill between the bands. |
   | RSI | 1 `LineSeries`, and 2 price lines at 30 and 70 (`createPriceLine`, dashed, `--cds-border-strong-01`, no axis label) |
   | MACD | 2 `LineSeries` (`value`, `signal`) and 1 `HistogramSeries` (`histogram`) |
@@ -391,6 +398,7 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
   | SMA, EMA, Bollinger Bands, Donchian channel, ATR, MACD | `CHART_PRICE_FORMAT` ("11,000.00") |
   | RSI | 2 decimals ("75.86") |
   | 12-1 momentum, distance to 52-week high, realized volatility | The value × 100 with 2 decimals and " %" ("-3.20 %"). Distance to 52-week high shows "96.80 %" for 0.968. |
+  | ADR% | The value with 2 decimals and " %" ("5.20 %"). The value is already in percent. |
   | Average trading value | A short amount with 2 decimals ("12.35 B", "820.10 M") |
 
 - Line style. Each line has `color`, `style`, and `width`:

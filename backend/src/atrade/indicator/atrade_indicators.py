@@ -1,4 +1,4 @@
-"""The 4 indicators that NautilusTrader does not have (docs/architecture/indicator.md section 23.2, #162)."""
+"""The 5 indicators that NautilusTrader does not have (docs/architecture/indicator.md section 23.2, #162, #371)."""
 
 import itertools
 import math
@@ -129,6 +129,36 @@ class AverageTradingValue:
     def value(self) -> float | None:
         bars = self._window.bars
         return None if bars is None else statistics.fmean(bar.close * bar.volume for bar in bars)
+
+    def handle_bar(self, bar: NautilusBar) -> None:
+        self._window.add(bar)
+
+    def update(self, bar: Bar) -> None:
+        self._window.add(make_nautilus_bar(bar))
+
+    def reset(self) -> None:
+        self._window.clear()
+
+
+class ADRPercent:
+    """100 x (the mean of high / low of the last `period` bars - 1). The unit is percent: 5.2 is 5.2 %. The value is
+    None ("no value") while a bar of the window has a low of 0 or less, because high / low then has no meaning.
+    """
+
+    def __init__(self, period: int = 20) -> None:
+        self.period = period
+        self._window = BarWindow(period)
+
+    @property
+    def initialized(self) -> bool:
+        return self.value is not None
+
+    @property
+    def value(self) -> float | None:
+        bars = self._window.bars
+        if bars is None or any(bar.low <= 0 for bar in bars):
+            return None
+        return 100 * (statistics.fmean(bar.high / bar.low for bar in bars) - 1)
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._window.add(bar)

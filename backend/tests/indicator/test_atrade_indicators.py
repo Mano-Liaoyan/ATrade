@@ -1,5 +1,5 @@
-"""The 4 indicator classes that ATrade writes (docs/architecture/indicator.md sections 23.2, 23.3, 23.4, and 23.5,
-#162).
+"""The 5 indicator classes that ATrade writes (docs/architecture/indicator.md sections 23.2, 23.3, 23.4, and 23.5,
+#162, #371).
 """
 
 import math
@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from atrade.foundation.bar import Bar
-from atrade.indicator import AverageTradingValue, DistanceTo52WeekHigh, Momentum12_1, RealizedVolatility
+from atrade.indicator import ADRPercent, AverageTradingValue, DistanceTo52WeekHigh, Momentum12_1, RealizedVolatility
 from tests.indicator.test_wrapped_indicators import (
     IndicatorCase,
     IndicatorWithOutputs,
@@ -23,7 +23,7 @@ FIRST_BAR_UTC = datetime(2026, 1, 1, tzinfo=UTC)
 # More bars than the longest default warm-up (12-1 momentum: 253 bars).
 BAR_COUNT = 300
 
-type ValueIndicator = Momentum12_1 | DistanceTo52WeekHigh | RealizedVolatility | AverageTradingValue
+type ValueIndicator = Momentum12_1 | DistanceTo52WeekHigh | RealizedVolatility | AverageTradingValue | ADRPercent
 
 
 def with_value(indicator: ValueIndicator) -> IndicatorWithOutputs:
@@ -47,6 +47,8 @@ CASES = [
     IndicatorCase("RealizedVolatility()", ["value"], 61, lambda: with_value(RealizedVolatility())),
     IndicatorCase("RealizedVolatility(period=252)", ["value"], 253, lambda: with_value(RealizedVolatility(period=252))),
     IndicatorCase("AverageTradingValue()", ["value"], 20, lambda: with_value(AverageTradingValue())),
+    IndicatorCase("ADRPercent()", ["value"], 20, lambda: with_value(ADRPercent())),
+    IndicatorCase("ADRPercent(period=5)", ["value"], 5, lambda: with_value(ADRPercent(period=5))),
 ]
 CASE_IDS = [case.constructor_code for case in CASES]
 
@@ -192,9 +194,41 @@ def test_the_average_trading_value_is_the_mean_of_close_times_volume() -> None:
     assert values == [None, 125000.0, 100000.0]
 
 
+def test_the_adr_percent_is_100_times_the_mean_of_high_over_low_minus_1() -> None:
+    # The low is the close minus 1: the bars have high / low of 1.10, 1.05, and 1.04.
+    bars = make_bars([(110, 101, 1), (126, 121, 1), (104, 101, 1)])
+
+    values = read_values(ADRPercent(period=2), bars)
+
+    # Bar 2: 100 x ((1.10 + 1.05) / 2 - 1). Bar 3: 100 x ((1.05 + 1.04) / 2 - 1).
+    assert values == [None, pytest.approx(7.5, rel=1e-12), pytest.approx(4.5, rel=1e-12)]
+
+
+def test_the_adr_percent_is_no_value_while_the_window_has_a_low_of_0() -> None:
+    # Bar 2 has the low 0. The value comes back when bar 2 leaves the window.
+    bars = make_bars([(110, 101, 1), (2, 1, 1), (110, 101, 1), (110, 101, 1)])
+
+    values = read_values(ADRPercent(period=2), bars)
+
+    assert values == [None, None, None, pytest.approx(10.0, rel=1e-12)]
+
+
+def test_the_adr_percent_is_not_initialized_while_it_has_no_value() -> None:
+    # A strategy reads `value` after `initialized`, so `initialized` must not be true while `value` is None.
+    indicator = ADRPercent(period=2)
+    for bar in make_bars([(110, 101, 1), (2, 1, 1)]):
+        indicator.update(bar)
+    assert not indicator.initialized
+
+    for bar in make_bars([(110, 101, 1), (110, 101, 1)]):
+        indicator.update(bar)
+    assert indicator.initialized
+
+
 def test_the_defaults_of_the_indicators() -> None:
     realized_volatility = RealizedVolatility()
 
     assert DistanceTo52WeekHigh().period == 252
     assert (realized_volatility.period, realized_volatility.bars_per_year) == (60, 252)
     assert AverageTradingValue().period == 20
+    assert ADRPercent().period == 20

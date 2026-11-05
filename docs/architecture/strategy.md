@@ -418,7 +418,7 @@ One condition is one row: left side, comparison, right side.
 
 | Part | Values |
 |---|---|
-| Left side | A price (Close, Open, High, Low) or one of the 11 indicators of [#136](https://github.com/Mano-Liaoyan/ATrade/issues/136): SMA, EMA, 12-1 momentum, distance to 52-week high, realized volatility, ATR, average trading value, RSI, MACD, Bollinger Bands, Donchian channel. |
+| Left side | A price (Close, Open, High, Low) or one of the 12 indicators of [#136](https://github.com/Mano-Liaoyan/ATrade/issues/136) and [#371](https://github.com/Mano-Liaoyan/ATrade/issues/371): SMA, EMA, 12-1 momentum, distance to 52-week high, realized volatility, ATR, average trading value, RSI, MACD, Bollinger Bands, Donchian channel, ADR%. |
 | Line of a multi-line indicator | MACD: MACD line, signal line, histogram. Bollinger Bands and Donchian channel: upper, middle, lower. |
 | Comparison | above, below, at or above, at or below, crosses above, crosses below. |
 | Right side | A number, a price, or an indicator. |
@@ -665,7 +665,7 @@ Decided (#201):
 - The rules hold the universe mode in `settings.universe` (section 9.8.2).
   When it is set, `make_rules_code` makes multi-instrument code, and
   `settings.position_size` is not used.
-- The rank indicator is an indicator operand (one of the 11 indicators).
+- The rank indicator is an indicator operand (one of the 12 indicators).
   A wrong indicator, `hold_count` less than 1, or an unknown direction or
   period gives `422`.
 - The code gets the members from `UniverseUpdate` (section 9.8.7). Each

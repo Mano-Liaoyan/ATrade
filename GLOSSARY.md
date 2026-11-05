@@ -62,9 +62,15 @@ or its financial data, for example RSI(14) or the price to earnings ratio. In
 Chinese, write 指标.
 _Avoid_: metric, signal, factor (in user copy)
 
+**ADR%**:
+The average daily range of an instrument as a percent: 100 × (the mean of
+high / low of the last n daily bars − 1). The catalog key is `adr_percent`.
+The value 5.2 is 5.2 %. In Chinese, write 平均日波幅.
+_Avoid_: ATR
+
 **No value**:
 The state of an indicator at a time when the instrument does not have
-enough bars to calculate it. It is not 0. A screen excludes the instrument
+enough bars to calculate it, or its bars have no usable value. It is not 0. A screen excludes the instrument
 with this reason. In Chinese, write 无值.
 _Avoid_: null, NaN, empty, 0
 

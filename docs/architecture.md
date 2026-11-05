@@ -1999,6 +1999,9 @@ option and records it in this document.
   21.1). The UI names, the allowed ranges, and the problem format are in
   sections 23.3, 23.4, and 23.6 of
   [`indicator.md`](architecture/indicator.md).
+- Decided (#371): the class `ADRPercent` of `atrade.indicator` is the catalog
+  indicator `adr_percent`. Its value is in percent, not a fraction. Section
+  23.2 of [`indicator.md`](architecture/indicator.md) has the formula.
 - Decided (#74): a forward test child passes its own connection as the
   `gateway_connection` argument of `require_paper_account()` (section 11.5).
 - Decided (#171): a named CHECK constraint holds the values of

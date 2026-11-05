@@ -22,6 +22,10 @@ describe('createOperand', () => {
     expect(createOperand('indicator:rsi')).toEqual({ type: 'indicator', indicator: 'rsi', parameters: { period: 14 } });
   });
 
+  it('gives ADR% with the catalog default period', () => {
+    expect(createOperand('indicator:adr_percent')).toEqual({ type: 'indicator', indicator: 'adr_percent', parameters: { period: 20 } });
+  });
+
   it('gives the first line of a multi-line indicator', () => {
     expect(createOperand('indicator:macd')).toEqual({
       type: 'indicator',

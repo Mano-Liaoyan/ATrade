@@ -3,6 +3,7 @@
 Each instrument has daily bars with one constant close, so SMA(n) is the close when the instrument has n bars.
 """
 
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -168,6 +169,27 @@ async def test_an_instrument_without_a_value_of_a_condition_or_of_the_order_is_e
     assert symbols(outcome) == ["LONG"]
     assert reasons(outcome) == {"SHORT": "No value: SMA(20)", "TINY": "No value: SMA(5)"}
     assert outcome.rows[0].indicator_values == {"SMA(5)": 10.0, "SMA(20)": 10.0}
+
+
+@pytest.mark.anyio
+async def test_adr_percent_works_as_a_condition_and_as_the_order() -> None:
+    def make_wide_bars(high: str) -> list[Bar]:
+        return [replace(bar, high=Decimal(high)) for bar in make_bars("10", 5)]
+
+    adr_percent = {"indicator": "adr_percent", "parameters": {"period": 3}, "output": "value"}
+    bars = {
+        stock("NARROW"): make_wide_bars("10.1"),
+        stock("MIDDLE"): make_wide_bars("10.5"),
+        stock("WIDE"): make_wide_bars("11"),
+    }
+    definition = make_definition(
+        conditions=[compare(adr_percent, ">", "3")], order={"indicator": adr_percent, "direction": "descending"}
+    )
+
+    outcome = await run(definition, bars)
+
+    assert symbols(outcome) == ["WIDE", "MIDDLE"]
+    assert outcome.rows[0].indicator_values == {"ADR%(3)": pytest.approx(10.0, rel=1e-9)}
 
 
 @pytest.mark.anyio

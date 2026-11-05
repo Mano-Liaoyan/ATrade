@@ -14,6 +14,7 @@ from nautilus_trader.model import Bar as NautilusBar
 from atrade.foundation.bar import Bar
 from atrade.indicator.atrade_indicators import (
     TRADING_DAYS_PER_YEAR,
+    ADRPercent,
     AverageTradingValue,
     DistanceTo52WeekHigh,
     Momentum12_1,
@@ -266,6 +267,17 @@ INDICATOR_DEFINITIONS = (
         PERIOD_BARS,
         "`upper` is the highest high and `lower` is the lowest low of the last `period` bars. `middle` is their mean. "
         f"{PRICE_UNIT}",
+    ),
+    IndicatorDefinition(
+        "adr_percent",
+        "ADR%",
+        "ADR%",
+        "own",
+        (make_period_parameter(),),
+        VALUE,
+        ADRPercent,
+        PERIOD_BARS,
+        "The average daily range of the last `period` bars: 100 x (mean of high / low - 1), in percent. 5.2 is 5.2%.",
     ),
 )
 

@@ -71,7 +71,8 @@ CASES = [
             problem(
                 [*CONDITIONS, 0, "indicator", "indicator"],
                 "Unknown indicator 'vwap'. Known indicators: sma, ema, momentum_12_1, distance_to_52_week_high, "
-                "realized_volatility, atr, average_trading_value, rsi, macd, bollinger_bands, donchian_channel.",
+                "realized_volatility, atr, average_trading_value, rsi, macd, bollinger_bands, donchian_channel, "
+                "adr_percent.",
             )
         ],
     ),

@@ -174,6 +174,7 @@ async def test_the_catalog_route_gives_the_short_name_and_the_chart_placement(cl
         ("macd", "MACD", "own"),
         ("bollinger_bands", "BB", "price"),
         ("donchian_channel", "DC", "price"),
+        ("adr_percent", "ADR%", "own"),
     ]
     assert indicators[7] == {
         "key": "rsi",
