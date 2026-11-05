@@ -20,6 +20,7 @@ from atrade.assistant.system_prompt import make_default_text
 from atrade.forward_test import ForwardTestWorker
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
+from atrade.market_data import LiveDailyBarHub
 from atrade.strategy import STRATEGY_TEMPLATE
 from tests.e2e_split_checks import add_split_checks
 from tests.fakes.clock import FixedClock
@@ -100,6 +101,7 @@ E2E_SPLIT_CHECK_SYMBOL = "SCHK"
 E2E_UNIVERSE_QUARTER_START_UTC = datetime(2026, 1, 2, tzinfo=UTC)
 E2E_UNIVERSE_MEMBER_COUNT = 30
 LISTEN_HOST = "127.0.0.1"
+E2E_LIVE_DAILY_BAR_INSTRUMENTS = 200
 # The Playwright projects run at the same time against one database. The watchlist holds each instrument once,
 # so each project gets its own watchlist instruments: <PROJECT NAME>01 ... <PROJECT NAME>25 (frontend/e2e/watchlist.spec.ts).
 PLAYWRIGHT_PROJECT_NAMES = ["chromium", "firefox", "webkit", "msedge"]
@@ -730,6 +732,9 @@ def main() -> None:
         clock=clock,
         gateway_connection=gateway_connection,
         assistant_service=E2EAssistantService(database_url),
+        # The Playwright projects share one watchlist of up to 4 x 25 project instruments and a few others. All of
+        # them get live daily bars, so a test does not depend on the instruments of the other projects.
+        live_daily_bar_hub=LiveDailyBarHub(gateway_connection, max_instruments=E2E_LIVE_DAILY_BAR_INSTRUMENTS),
     )
     # Each fake child stops at once, like a stop that cancelled all orders (section 17.5).
     child_starter = FakeChildStarter(is_ending_children_at_once=True)

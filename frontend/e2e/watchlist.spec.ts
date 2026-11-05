@@ -138,3 +138,25 @@ test('long watchlist has a visible scroll track and the last instrument is reach
   await expect(lastInstrument).toBeInViewport();
   await expect(scrollTrack).toHaveAttribute('aria-valuenow', '100');
 });
+
+test('each row shows the live last price and its change from the previous close', async ({ page, request }, currentTest) => {
+  const symbol = projectSymbol(currentTest, 4);
+  await addThroughBackend(request, symbol);
+  await page.goto('/');
+
+  // The last complete daily bar of the fake is 2026-01-01 (close 104.50). The fake updates the daily bar of
+  // 2026-01-02 over /ws/watchlist-live-bars: the close moves from 105 to 106.75. Without it the row shows 104.50.
+  const row = watchlistColumn(page)
+    .getByRole('row')
+    .filter({ has: page.getByRole('link', { name: symbol, exact: true }) });
+  const lastCell = row.getByRole('cell').first();
+  await expect(lastCell).toHaveText(/^10[56]\.\d\d$/);
+  const firstLast = (await lastCell.textContent())?.trim() ?? '';
+  await expect(lastCell).not.toHaveText(firstLast);
+
+  // One read of both cells: the live bar changes a few times each second.
+  const cells = await row.evaluate((rowElement) => Array.from(rowElement.querySelectorAll('td'), (cell) => cell.textContent.trim()));
+  const previousClose = 104.5;
+  const changePercent = ((Number(cells[0]) - previousClose) / previousClose) * 100;
+  expect(cells[1]).toBe(`+${changePercent.toFixed(2)} %`);
+});

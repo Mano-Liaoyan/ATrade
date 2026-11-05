@@ -345,8 +345,9 @@ instrument search (`GET /api/market-data/instrument-search`), the
 watchlist routes (`/api/watchlist`), the daily exchange rates of
 backtests, the bar sources and the source order, the Databento history
 import, the quarterly US universe, the HK instrument list, the daily bar
-update and the daily bar summary, and the change of the stored bars at a
-stock split.
+update and the daily bar summary, the change of the stored bars at a
+stock split, and the live daily bars of the watchlist
+(`/ws/watchlist-live-bars`).
 
 ## 9. Strategies and strategy versions
 
@@ -709,8 +710,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     during a read give one more read. A page calls it in an `$effect` and
     returns its stop function. A detail that changes with its list row (the
     open backtest, the open sweep) reads again when its row changes.
-  - `/ws/paper-trading` and `/ws/market-data` push IBKR data, not table
-    changes. They keep their own messages.
+  - `/ws/paper-trading`, `/ws/market-data`, and `/ws/watchlist-live-bars`
+    push IBKR data, not table changes. They keep their own messages.
 - `lightweight-charts` uses the Apache 2.0 license. The UI must show the
   TradingView attribution: the TradingView logo in each chart
   (`layout.attributionLogo`, true by default), which links to
@@ -852,8 +853,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
   The left `SideColumn` "Watchlist" lists the watchlist instruments in 32px
   rows: symbol, last price, and change from the previous close (from the
-  daily bars). The row of the open instrument shows the quote of the chart
-  header (`openQuote`). A row opens its instrument page with the same bar
+  daily bars and the live daily bar of `/ws/watchlist-live-bars`, with
+  `readDayQuote`; `docs/architecture/market_data.md` section 8.5.1). The row
+  of the open instrument shows the quote of the chart header (`openQuote`). A row opens its instrument page with the same bar
   period. The
   center `PanelSplit` has the chart panel and the "Paper account" panel. The
   chart panel header line has the instrument name, the last price, the change

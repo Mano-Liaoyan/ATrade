@@ -3715,6 +3715,33 @@ export interface components {
             /** Backtest Status */
             backtest_status: string | null;
         };
+        /**
+         * WatchlistLiveBar
+         * @description The live daily bar of one watchlist instrument. `bar` is null when there is no live bar.
+         */
+        WatchlistLiveBar: {
+            /** Symbol */
+            symbol: string;
+            /** Exchange */
+            exchange: string;
+            /** Currency */
+            currency: string;
+            bar: components["schemas"]["BarResponse"] | null;
+        };
+        /**
+         * WatchlistLiveBarsMessage
+         * @description The instruments with a change since the last message. The first message has all followed instruments.
+         */
+        WatchlistLiveBarsMessage: {
+            /**
+             * Type
+             * @default live_bars
+             * @constant
+             */
+            type: "live_bars";
+            /** Live Bars */
+            live_bars: components["schemas"]["WatchlistLiveBar"][];
+        };
     };
     responses: never;
     parameters: never;

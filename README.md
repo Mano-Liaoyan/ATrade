@@ -26,7 +26,8 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   `/api/backtests` and `/api/backtest-limits`, the forward test routes under
   `/api/forward-tests`, `/ws/paper-trading`, and the change sockets
   `/ws/backtests`, `/ws/sweeps`, `/ws/strategies`, `/ws/screens`,
-  `/ws/watchlist`, and `/ws/forward-tests`. A change of a list shows in each
+  `/ws/watchlist`, and `/ws/forward-tests`, and the live daily bars of the
+  watchlist `/ws/watchlist-live-bars`. A change of a list shows in each
   open tab without a reload, also a change from the AI assistant or a
   backtest process.
 - The app shell header shows the Paper tag of the checked paper account and a
@@ -106,6 +107,12 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   again after a lost connection and when a background tab becomes visible.
   See [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
   section 8.5.
+- Live watchlist prices: each watchlist row shows the live last price and
+  the change from the previous close, from one shared IBKR subscription for
+  each instrument (40 instruments at most). Without IB Gateway or outside the
+  trading hours, the row shows the values of the daily bars. See
+  [`docs/architecture/market_data.md`](docs/architecture/market_data.md)
+  section 8.5.1.
 - Backtests: the "New backtest" button on `/backtests` starts a backtest of a strategy version on
   the saved bars of one USD instrument, with paper capital from the paper
   account balance or the local setting. Each backtest runs in its own child
