@@ -159,6 +159,30 @@ async def test_a_bar_from_2024_07_01_is_the_equs_summary_bar_on_the_listing_exch
     ]
 
 
+@pytest.mark.anyio
+async def test_a_record_with_price_0_gives_no_bar_and_the_other_days_keep_their_bars(
+    database_url: str, tmp_path: Path, history_files: list[DbnFile]
+) -> None:
+    summary_file = DbnFile(
+        "EQUS.SUMMARY",
+        DAILY_SCHEMA,
+        EQUS_START,
+        PURCHASE_END,
+        daily_records=[
+            daily_record("AAPL", date(2025, 3, 3), "241.79 244.03 236.11 238.03", 47184000),
+            daily_record("AAPL", date(2025, 3, 4), "0 0 0 0", 414),
+            daily_record("AAPL", date(2025, 3, 5), "238.00 240.00 237.00 239.00", 40000000),
+        ],
+    )
+    import_databento_files(
+        database_url=database_url, file_paths=write_dbn_files(tmp_path, [*history_files, summary_file])
+    )
+
+    bars = await read_databento_bars(database_url, APPLE_NASDAQ, date(2025, 3, 3), date(2025, 3, 6))
+
+    assert [bar.start_utc.date() for bar in bars] == [date(2025, 3, 3), date(2025, 3, 5)]
+
+
 def read_table(database_url: str, query: LiteralString) -> list[tuple[object, ...]]:
     with psycopg.connect(database_url) as connection:
         return connection.execute(query).fetchall()

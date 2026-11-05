@@ -581,6 +581,12 @@ official close. Its volume is the volume of the full market.
 Its listing exchange is the exchange of the latest earlier Databento daily
 bar of the same symbol (section 8.14).
 
+EQUS.SUMMARY has records with open, high, low, and close 0 for days without a
+price. Some of these records have a volume. The import skips them, so the day
+has no bar. Do not fill the day with an earlier close: 0 and a filled close
+are both wrong prices for indicators. The constraint
+`databento_bar_close_is_positive` keeps such bars out of `databento_bar`.
+
 Hourly bars:
 
 - Use XNAS.ITCH `ohlcv-1h` only.
