@@ -282,6 +282,32 @@ async def test_the_import_does_not_link_when_one_condition_is_false(
     assert [bar.start_utc.date() for bar in await read_bars(database_url, "SQ")] == TRADING_DAYS[:3]
 
 
+@pytest.mark.anyio
+async def test_a_day_with_price_0_stops_a_symbol_link_and_a_detected_split_across_it(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """OLD has prices to 2020-01-08, then price 0. NEW has price 0, then a near price from 2020-01-09. They are 2
+    different stocks. GONE has price 0 between the close of 80 and the open of 40."""
+    old_bars = create_bars("OLD", TRADING_DAYS[:5], [("99", "100", 1000)] * 3 + [("0", "0", 5), ("0", "0", 0)])
+    new_bars = create_bars(
+        "NEW", TRADING_DAYS[:5], [("0", "0", 0)] * 3 + [("100.80", "101", 1000), ("101", "101", 1000)]
+    )
+    gone_bars = create_bars(
+        "GONE", TRADING_DAYS[:4], [("79", "80", 1000), ("0", "0", 5), ("40", "41", 2100), ("41", "42", 2000)]
+    )
+    anchor_bars = create_bars("ANCH", TRADING_DAYS, [("10", "10", 500)] * len(TRADING_DAYS))
+    serve_same_closes(gateway, anchor_bars)
+
+    report = await run_import(
+        database_url, tmp_path, gateway, create_history_files([*old_bars, *new_bars, *gone_bars, *anchor_bars])
+    )
+
+    assert report.symbol_links == []
+    assert read_table(database_url, STOCK_SPLIT_QUERY) == []
+    assert [bar.start_utc.date() for bar in await read_bars(database_url, "OLD")] == TRADING_DAYS[:3]
+    assert [bar.start_utc.date() for bar in await read_bars(database_url, "NEW")] == TRADING_DAYS[3:5]
+
+
 async def import_a_detected_split(database_url: str, tmp_path: Path, gateway: FakeGatewayConnection) -> list[DbnFile]:
     """GONE stopped trading. The detection rule finds its 2-for-1 split on the third day."""
     gone_bars = create_bars("GONE", TRADING_DAYS[:3], [("79", "80", 1000), ("40", "41", 2100), ("41", "42", 2000)])

@@ -355,7 +355,7 @@ async def apply_instrument(
         prices = await read_stored_prices(connection, instrument, TimeRange(find_read_start(row[1]), check_end_utc))
         if prices:
             if not row[3]:
-                found_splits = find_splits_by_detection_rule(prices)
+                found_splits = find_splits_by_detection_rule(prices, skip_missing_days=True)
                 report.waiting_split_count += await save_found_splits(
                     connection, instrument, found_splits, confirmation=None, recorded_at_utc=checked_at_utc
                 )

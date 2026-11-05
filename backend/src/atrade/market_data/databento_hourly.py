@@ -43,7 +43,8 @@ HOURLY_RECORD_IN_NEW_YORK: LiteralString = """
         FROM databento_hourly_record
         WHERE start_utc >= %(start_utc)s AND start_utc < %(end_utc)s
     ), daily AS (
-        SELECT symbol, exchange, currency, start_utc FROM databento_import_bar WHERE bar_period = '1-DAY'
+        SELECT symbol, exchange, currency, start_utc FROM databento_import_bar
+        WHERE bar_period = '1-DAY' AND close > 0
         UNION
         SELECT symbol, exchange, currency, start_utc FROM databento_bar WHERE bar_period = '1-DAY'
     ), regular_hours AS (
@@ -95,7 +96,7 @@ SET_OFFICIAL_OPEN: LiteralString = """
         SELECT DISTINCT ON (symbol, exchange, currency, start_utc) symbol, exchange, currency, start_utc, open
         FROM (
             SELECT symbol, exchange, currency, start_utc, open, 0 AS priority
-            FROM databento_import_bar WHERE bar_period = '1-DAY'
+            FROM databento_import_bar WHERE bar_period = '1-DAY' AND close > 0
             UNION ALL
             SELECT symbol, exchange, currency, start_utc, open, 1 AS priority
             FROM databento_bar WHERE bar_period = '1-DAY'

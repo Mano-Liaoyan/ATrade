@@ -20,8 +20,9 @@ CREATE_TEMPORARY_TABLES: LiteralString = """
         open numeric NOT NULL, high numeric NOT NULL, low numeric NOT NULL, close numeric NOT NULL,
         volume numeric NOT NULL
     ) ON COMMIT DROP;
-    -- The bars of this import before the symbol links and the stock split adjustment (sections 8.8.3 and 8.8.4).
-    CREATE TEMPORARY TABLE databento_import_bar (LIKE databento_bar INCLUDING ALL) ON COMMIT DROP;
+    -- The bars of this import before the symbol links and the stock split adjustment (sections 8.8.3 and 8.8.4). The
+    -- days with price 0 stay here, so these 2 steps do not compare the days on each side of them (section 8.8.2).
+    CREATE TEMPORARY TABLE databento_import_bar (LIKE databento_bar INCLUDING ALL EXCLUDING CONSTRAINTS) ON COMMIT DROP;
 """
 
 COPY_DAILY_RECORDS: LiteralString = """
@@ -134,6 +135,7 @@ SAVE_IMPORT_BARS: LiteralString = (
     """
     INSERT INTO databento_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
     SELECT symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume FROM databento_import_bar
+    WHERE close > 0
     """
     + UPSERT_BARS
 )

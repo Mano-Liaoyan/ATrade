@@ -13,6 +13,8 @@ from datetime import date
 from decimal import Decimal
 from fractions import Fraction
 
+from atrade.market_data.us_trading_days import find_previous_trading_day
+
 # A change of the close ratio above this part is a step. The IBKR close and the official close can differ by about
 # 1% (section 8.8.2), and a bonus issue of 1 new share for 10 shares changes the ratio by 10%.
 RATIO_STEP_TOLERANCE = Decimal("0.03")
@@ -155,12 +157,20 @@ def find_common_ratio(raw_ratio: Decimal) -> Fraction | None:
     return None
 
 
-def find_splits_by_detection_rule(databento_prices: Sequence[DailyPrices]) -> list[FoundSplit]:
+def find_splits_by_detection_rule(
+    databento_prices: Sequence[DailyPrices], *, skip_missing_days: bool = False
+) -> list[FoundSplit]:
     """Instruments that stopped trading. The close of one day divided by the open of the next day is near a common
-    split ratio, and the volume changes in the opposite direction of the price."""
+    split ratio, and the volume changes in the opposite direction of the price.
+
+    `skip_missing_days`: for stored prices, which have no days with price 0 (section 8.8.2). A pair of days with a
+    weekday between them is not compared. The calendar does not know all holidays, so the rule also does not compare
+    the 2 days around a holiday in the week."""
     splits: list[FoundSplit] = []
     for prices, next_prices in itertools.pairwise(databento_prices):
         if next_prices.open <= 0:
+            continue
+        if skip_missing_days and find_previous_trading_day(next_prices.day) != prices.day:
             continue
         ratio = find_common_ratio(prices.close / next_prices.open)
         if ratio is None:

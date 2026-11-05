@@ -402,6 +402,22 @@ async def test_without_ibkr_bars_the_detection_rule_finds_the_stock_split_and_it
     assert [row[2] for row in read_table(database_url, SPLIT_CHECK_QUERY)] == [utc_day(TRADING_DAYS[4])]
 
 
+@pytest.mark.anyio
+async def test_the_detection_rule_does_not_compare_the_stored_days_around_a_day_with_price_0(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    """The close of 80 and the open of 40 look like a ratio of 2, but a day with price 0 is between them."""
+    bars = create_bars(
+        "SPLT", TRADING_DAYS[:4], [("79", "80", 1000), ("0", "0", 5), ("40", "41", 2100), ("41", "42", 2000)]
+    )
+    import_bars(database_url, tmp_path, bars)
+    gateway.historical_bars_error_message = NO_CONTRACT_MESSAGE
+
+    await run_check(database_url, gateway, WaitRecorder())
+
+    assert read_table(database_url, STOCK_SPLIT_QUERY) == []
+
+
 async def read_pending(database_url: str, instrument: Instrument | None, currency: str) -> bool:
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         return await has_pending_split_check(connection, instrument=instrument, currency=currency)
