@@ -28,6 +28,7 @@ from atrade.market_data.stock_split_detection import (
     FoundSplit,
     find_splits_by_detection_rule,
     find_splits_from_ibkr_closes,
+    has_price_gap,
 )
 
 logger = logging.getLogger(__name__)
@@ -361,8 +362,18 @@ async def apply_instrument(
             else:
                 ibkr_closes = await read_stored_ibkr_closes(connection, instrument, prices[0].day)
                 found_splits = find_splits_from_ibkr_closes(prices, ibkr_closes)
+                # Both the IBKR close ratio and the Databento price gap show the stock split: it changes the bars.
+                # Only the IBKR close ratio: the stock split waits for the user check.
+                proven_splits = [split for split in found_splits if has_price_gap(prices, split)]
                 applied_count = await save_found_splits(
-                    connection, instrument, found_splits, confirmation=BAR_EVIDENCE, recorded_at_utc=checked_at_utc
+                    connection, instrument, proven_splits, confirmation=BAR_EVIDENCE, recorded_at_utc=checked_at_utc
+                )
+                report.waiting_split_count += await save_found_splits(
+                    connection,
+                    instrument,
+                    [split for split in found_splits if split not in proven_splits],
+                    confirmation=None,
+                    recorded_at_utc=checked_at_utc,
                 )
                 report.applied_split_count += applied_count
                 if applied_count > 0:

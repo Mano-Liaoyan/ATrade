@@ -72,6 +72,8 @@ def log_report(report: SplitRuleReport) -> None:
         report.read_instrument_count,
         report.without_closes_count,
     )
+    with_gap = report.select_other_splits(has_price_gap=True)
+    without_gap = report.select_other_splits(has_price_gap=False)
     logger.info(
         "Known stock splits: %d. Found: %d. Missed: %d. Other found stock splits: %d.",
         report.known_split_count,
@@ -79,17 +81,27 @@ def log_report(report: SplitRuleReport) -> None:
         len(report.missed_splits),
         len(report.other_splits),
     )
+    logger.info(
+        "Other stock splits with the Databento price gap (apply adjusts the bars): %d. Without the gap (they wait for"
+        " the user check): %d.",
+        len(with_gap),
+        len(without_gap),
+    )
     logger.info("Missed known stock splits (first %d):", REPORT_LINE_COUNT)
     for split in report.missed_splits[:REPORT_LINE_COUNT]:
         logger.info("  %s", format_split(split))
-    logger.info("Other found stock splits by split ratio:")
-    for ratio, count in report.count_other_ratios()[:REPORT_LINE_COUNT]:
-        logger.info("  %s: %d", f"{ratio:f}", count)
-    logger.info("Other found stock splits by symbol:")
-    for symbol, count in report.count_other_symbols()[:REPORT_LINE_COUNT]:
-        logger.info("  %s: %d", symbol, count)
-    logger.info("Other found stock splits (first %d):", REPORT_LINE_COUNT)
-    for split in report.other_splits[:REPORT_LINE_COUNT]:
+    for has_gap, name in ((True, "with the price gap"), (False, "without the price gap")):
+        logger.info("Other stock splits %s, by split ratio:", name)
+        for ratio, count in report.count_other_ratios(has_price_gap=has_gap)[:REPORT_LINE_COUNT]:
+            logger.info("  %s: %d", f"{ratio:f}", count)
+        logger.info("Other stock splits %s, by symbol:", name)
+        for symbol, count in report.count_other_symbols(has_price_gap=has_gap)[:REPORT_LINE_COUNT]:
+            logger.info("  %s: %d", symbol, count)
+    logger.info("All other stock splits without the price gap:")
+    for split in without_gap:
+        logger.info("  %s", format_split(split))
+    logger.info("All other stock splits with the price gap:")
+    for split in with_gap:
         logger.info("  %s", format_split(split))
 
 

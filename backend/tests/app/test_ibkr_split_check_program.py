@@ -44,6 +44,7 @@ def test_the_program_checks_the_waiting_instruments_and_stops_when_none_waits(
     assert row == (0,)
     assert "Read 1 instruments. 0 of them have no IBKR closes." in caplog.text
     assert "Known stock splits: 0. Found: 0. Missed: 0. Other found stock splits: 0." in caplog.text
+    assert "with the Databento price gap (apply adjusts the bars): 0. Without the gap" in caplog.text
     assert "Checked 1 instruments. Applied 0 stock splits. 0 stock splits wait for the check." in caplog.text
 
 

@@ -625,11 +625,16 @@ daily close of each instrument and day. Primary key `symbol`, `exchange`,
   1. Read the stored Databento daily bars from the first stored day, or from
      10 days before `checked_end_utc` after an earlier apply, to
      `check_end_utc`, and the stored IBKR closes of the same days.
-  2. With IBKR closes: find the steps of the close ratio. Write each new
-     stock split to `stock_split` with the source `databento_import` and the
-     confirmation `bar_evidence`. Divide the stored `databento_bar` bars of
-     all bar periods before the ex-date, and update the daily bar summary.
-     The `ibkr_bar` bars do not change: IBKR adjusted them.
+  2. With IBKR closes: find the steps of the close ratio. A step needs a
+     second, independent evidence: the Databento price gap. The close of
+     the day before the ex-date divided by the open of the ex-date is within
+     20% of the split ratio, and at most half as far from it as 1 is (in
+     log). With the gap, write the new stock split to `stock_split` with the
+     source `databento_import` and the confirmation `bar_evidence`. Divide
+     the stored `databento_bar` bars of all bar periods before the ex-date,
+     and update the daily bar summary. The `ibkr_bar` bars do not change:
+     IBKR adjusted them. Without the gap, write the stock split without a
+     confirmation: it waits for the user check and changes no bar.
   3. Without IBKR closes: the detection rule finds the stock splits. They
      wait for the user check.
   4. Set `checked_end_utc` to `check_end_utc`, and `checked_at_utc`.
@@ -642,8 +647,10 @@ daily close of each instrument and day. Primary key `symbol`, `exchange`,
   ratio within 4%. The report counts the known stock splits that have IBKR
   closes before and from their ex-date, the found and the missed known
   stock splits, and the other found stock splits. It lists the missed and
-  the other stock splits, and the other ones by split ratio and by symbol.
-  The other stock splits are the ones that the apply step adds.
+  the other stock splits, and the other ones by split ratio and by symbol,
+  each with and without the Databento price gap. The other stock splits are
+  the ones that the apply step adds: with the gap applied, without the gap
+  waiting for the user check.
 - A new stock split only: a stock split that is in `stock_split` already
   keeps its row and changes no bar.
 - The import and the check take the same PostgreSQL advisory lock: the
