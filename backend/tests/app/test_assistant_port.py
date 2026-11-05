@@ -40,6 +40,7 @@ ALLOWED_ROUTES = {
     ("PUT", "/api/screens/{screen_id}"),
     ("POST", "/api/screens/{screen_id}/runs"),
     ("GET", "/api/screen-results/{screen_result_id}"),
+    ("GET", "/api/screen-indicators"),
 }
 REPO_ROOT = Path(__file__).resolve().parents[3]
 

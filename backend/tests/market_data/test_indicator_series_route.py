@@ -184,6 +184,7 @@ async def test_the_catalog_route_gives_the_short_name_and_the_chart_placement(cl
             {"name": "period", "value_type": "int", "default": 14, "minimum": 1, "maximum": 1000, "is_in_name": True}
         ],
         "outputs": ["value"],
+        "value_description": INDICATOR_CATALOG["rsi"].value_description,
     }
 
 

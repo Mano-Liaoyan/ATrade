@@ -13,6 +13,7 @@ import { startFakeModelServer, type ChatMessage, type FakeModelServer, type Mode
 import {
   backtestBody,
   COMPARISON,
+  INDICATOR_CATALOG,
   NO_SAVED_BARS,
   SCREEN,
   SCREEN_DEFINITION,
@@ -439,6 +440,26 @@ describe('the screen tools', () => {
     expect(web.requests[4]?.body).toEqual({ name: 'Momentum leaders (AI)', definition: DEFINITION });
     const results = readToolResults();
     expect(results.slice(0, 4)).toEqual([SCREEN_LIST, SCREEN, SCREEN, SCREEN]);
+  });
+
+  test('list_indicators gives the catalog of port 8001 to the model', async () => {
+    const conversations = await openConversations([call('list_indicators'), { text: 'Done.' }]);
+
+    await runOnce(conversations);
+
+    expect(web.requests.map((request) => `${request.method} ${request.path}`)).toEqual(['GET /api/screen-indicators']);
+    expect(web.requests[0]?.conversationId).toBe(CONVERSATION_ID);
+    expect(readToolResults()).toEqual([INDICATOR_CATALOG]);
+  });
+
+  test('list_indicators shows a new catalog indicator without a change of the tool', async () => {
+    const newIndicator = { key: 'new_indicator', value_description: 'A new meaning.', future_field: 1 };
+    web.indicatorCatalog = [...INDICATOR_CATALOG, newIndicator];
+    const conversations = await openConversations([call('list_indicators'), { text: 'Done.' }]);
+
+    await runOnce(conversations);
+
+    expect(readToolResults()).toEqual([[...INDICATOR_CATALOG, newIndicator]]);
   });
 
   test('create_screen and update_screen announce the screen for the condition card, with the definition before', async () => {

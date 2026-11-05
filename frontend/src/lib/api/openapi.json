@@ -6600,6 +6600,10 @@
             },
             "type": "array",
             "title": "Outputs"
+          },
+          "value_description": {
+            "type": "string",
+            "title": "Value Description"
           }
         },
         "type": "object",
@@ -6609,7 +6613,8 @@
           "short_name",
           "chart_placement",
           "parameters",
-          "outputs"
+          "outputs",
+          "value_description"
         ],
         "title": "IndicatorResponse",
         "description": "One indicator of the catalog (indicator.md sections 23.3 and 23.9.2)."

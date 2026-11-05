@@ -164,6 +164,7 @@ The screen paths come from #150. Decided (#205): they are the final paths
 | `GET /api/backtests` | `list_backtests` | 2 | None. |
 | `GET /api/backtests/{backtest_id}` | `read_backtest`, `run_backtest` (wait) | 2 | None. |
 | `GET /api/backtests/{first_id}/comparison/{second_id}` | `compare_backtests` | 2 | None. |
+| `GET /api/screen-indicators` | `list_indicators` | 3 | None. |
 | `GET /api/screens` | `list_screens` | 3 | None. |
 | `GET /api/screens/{screen_id}` | `read_screen` | 3 | None. |
 | `POST /api/screens` | `create_screen` | 3 | The screen records the conversation ID. Its name is "<name> (AI)" (25.6). |
@@ -172,8 +173,8 @@ The screen paths come from #150. Decided (#205): they are the final paths
 | `GET /api/screen-results/{screen_result_id}` (with page parameters) | `read_screen_result` | 3 | None. |
 
 Decided (#209): `screen/http_routes.py` has `create_screen_assistant_router`.
-`app/assistant_port.py` adds it to the port 8001 app. It has the 6 screen
-routes and no `DELETE`. `POST`, `PUT`, and the run route read the
+`app/assistant_port.py` adds it to the port 8001 app. It has the 7 screen
+routes (`GET /api/screen-indicators` came with #373) and no `DELETE`. `POST`, `PUT`, and the run route read the
 conversation from the header `X-ATrade-Conversation-Id` (25.3.2), as the
 strategy and backtest routes do. The `403` body is
 `{"detail": "The AI assistant cannot change screen <id>. ..."}`.
@@ -307,6 +308,7 @@ prompt does not list the tools.
 
 | Tool | Does | Result to the model |
 |---|---|---|
+| `list_indicators` | Lists the indicator catalog (#373). | The body of `GET /api/screen-indicators` without a change: key, name, parameters with default, minimum, and maximum, outputs, and `value_description` for each indicator. |
 | `list_screens` | Lists the screens. | The screen list. |
 | `read_screen` | Reads one screen. | The conditions of the screen. |
 | `create_screen` | Saves a new screen (25.6). The optional `source_screen_id` names the screen that the new screen changes (#210). | The new screen. On `422`, the problem list. |
@@ -339,6 +341,13 @@ the funnel counts. A failed save or run sends neither.
   result leaves out the `exclusions` list, because the summary has the count
   of each exclusion reason. `run_screen` gives the same result for offset 0.
   The code is `assistant/src/screen_tools.ts`.
+
+`list_indicators`:
+
+- The catalog is the only source of the indicator keys, the parameter
+  ranges, and the value meanings. A tool description or the system prompt
+  has no list of indicators. A new catalog indicator comes to the AI
+  assistant without a change of the tool.
 
 Problem list of the screen tools (#150 B5):
 

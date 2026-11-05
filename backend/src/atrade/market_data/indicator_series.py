@@ -50,6 +50,8 @@ class IndicatorResponse(BaseModel):
     chart_placement: Literal["price", "own"]
     parameters: list[IndicatorParameterResponse]
     outputs: list[str]
+    # The meaning, the range, and the unit of the value.
+    value_description: str
 
 
 def list_indicator_catalog() -> list[IndicatorResponse]:
@@ -72,6 +74,7 @@ def list_indicator_catalog() -> list[IndicatorResponse]:
                 for parameter in definition.parameters
             ],
             outputs=list(definition.outputs),
+            value_description=definition.value_description,
         )
         for definition in INDICATOR_CATALOG.values()
     ]

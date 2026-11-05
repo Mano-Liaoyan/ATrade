@@ -31,7 +31,7 @@ const SAVED_SET: ChartIndicatorSet = {
 };
 
 function definition(key: string): ChartIndicatorDefinition {
-  return { key, name: key.toUpperCase(), short_name: key.toUpperCase(), chart_placement: 'price', parameters: [], outputs: ['value'] };
+  return { key, name: key.toUpperCase(), short_name: key.toUpperCase(), chart_placement: 'price', parameters: [], outputs: ['value'], value_description: '' };
 }
 
 describe('readChartIndicatorSet', () => {

@@ -444,7 +444,7 @@ def add_read_routes(router: APIRouter, routes: ScreenRoutes) -> None:
 def create_screen_assistant_router(
     *, database_url: str, clock: Clock, conversation_exists: ConversationCheck
 ) -> APIRouter:
-    """The 6 screen routes of port 8001 (docs/architecture/assistant.md 25.3.3, screen.md 24.8). No delete."""
+    """The 7 screen routes of port 8001 (docs/architecture/assistant.md 25.3.3, screen.md 24.8). No delete."""
     routes = ScreenRoutes(database_url=database_url, clock=clock)
     read_conversation_id = create_conversation_dependency(conversation_exists)
 
@@ -465,6 +465,8 @@ def create_screen_assistant_router(
 
     router = APIRouter()
     add_read_routes(router, routes)
+    # The body of GET /api/screen-indicators on the Web port. The tool list_indicators reads it.
+    router.add_api_route("/api/screen-indicators", list_indicator_catalog, methods=["GET"])
     router.add_api_route(
         "/api/screens",
         create_screen,

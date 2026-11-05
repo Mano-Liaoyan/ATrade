@@ -10,6 +10,8 @@ import psycopg
 import pytest
 from psycopg.types.json import Jsonb
 
+from atrade.indicator import INDICATOR_CATALOG
+
 NOW_TEXT = "2026-01-02T03:04:05Z"
 
 
@@ -269,6 +271,7 @@ async def test_the_screen_indicator_list_gives_the_catalog_for_the_edit_popover(
             {"name": "period", "value_type": "int", "default": 14, "minimum": 1, "maximum": 1000, "is_in_name": True}
         ],
         "outputs": ["value"],
+        "value_description": INDICATOR_CATALOG["rsi"].value_description,
     }
     assert indicators["bollinger_bands"]["parameters"][1] == {
         "name": "k",

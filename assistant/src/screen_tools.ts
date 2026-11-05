@@ -7,6 +7,7 @@
 //   gives the event screen_run_finished with the funnel counts.
 // - read_screen_result gives the summary and one page of rows, default the first 50. It leaves out the excluded
 //   list: the summary has the count of each exclusion reason.
+// - list_indicators gives the indicator catalog of port 8001 without a change, so the catalog is the only source.
 import { defineTool, type ToolDefinition } from '@earendil-works/pi-coding-agent';
 import { Type } from 'typebox';
 import { answerResult, isSuccess, textResult, type ToolResult } from './tool_results.ts';
@@ -16,7 +17,9 @@ export const SCREEN_RESULT_PAGE_SIZE = 50;
 const Id = Type.Integer({ minimum: 1 });
 // The screen check of port 8001 checks the definition and gives the location of each problem (screen.md 24.6).
 const Definition = Type.Record(Type.String(), Type.Unknown(), {
-  description: 'The screen definition of screen.md 24.4.1: start, filters, indicator_conditions, and order.',
+  description:
+    'The screen definition of screen.md 24.4.1: start, filters, indicator_conditions, and order. ' +
+    'Call list_indicators to get the indicator keys, the parameter ranges, and the meaning of each value.',
 });
 
 interface ScreenResultBody {
@@ -111,6 +114,17 @@ async function readScreenResult(
 
 export function createScreenTools(client: WebPortClient): ToolDefinition[] {
   return [
+    defineTool({
+      name: 'list_indicators',
+      label: 'List indicators',
+      description:
+        'Lists the indicator catalog: for each indicator its key, name, parameters (default, minimum, maximum), ' +
+        'outputs, and value_description (the meaning, range, and unit of the value). Call it before you write an ' +
+        'indicator condition. Do not guess a range: some values are fractions, not percents.',
+      parameters: Type.Object({}),
+      execute: async (_id, _params, signal) =>
+        answerResult(await client.request('GET', '/api/screen-indicators', undefined, signal)),
+    }),
     defineTool({
       name: 'list_screens',
       label: 'List screens',
