@@ -134,6 +134,14 @@ Source: [Watchlist](https://github.com/Mano-Liaoyan/ATrade/issues/67).
   rule as the chart header. The live daily bar comes from
   `/ws/watchlist-live-bars` (section 8.5.1). Without it, the row shows the
   values of the daily bars.
+- One map in `#lib/market_data` holds the latest quote of each instrument.
+  `writeLatestQuote(instrument, daily bars, live bar)` writes it: a quote
+  with a live bar (of the watchlist or of the chart) replaces the quote, and a
+  quote of the daily bars only is written only when the instrument has no
+  quote. The watchlist rows, the chart header, and the limit price read it
+  with `readLatestQuote(instrument)`. So a row shows the same quote before a
+  click, while its instrument page is open, and after the user leaves the
+  page.
 
 ## 8.4 Bars and the bar chart
 
@@ -366,12 +374,12 @@ Source: [Live last price in each watchlist row](https://github.com/Mano-Liaoyan/
   `WatchlistLiveBarsMessage` and `WatchlistLiveBar` come from `#lib/api`.
 - Frontend: `#lib/watchlist` has `applyWatchlistLiveBars` and
   `findWatchlistLiveBar`. `InstrumentWatchlist.svelte` opens the socket with
-  `foundation/live_socket` and gives the live bar of each row to
-  `readDayQuote`.
+  `foundation/live_socket` and writes the quote of each changed live bar
+  with `writeLatestQuote`.
 - Tests: `tests/market_data/test_live_daily_bars.py` (the hub with the IBKR
   fake), `tests/watchlist/test_watchlist_live_bar_socket.py` (the socket with
-  PostgreSQL), the Vitest tests of `live_bars`, and the last test of
-  `e2e/watchlist.spec.ts`. The e2e server sets the limit to 200, because the
+  PostgreSQL), the Vitest tests of `live_bars` and `day_quote`, and the last
+  2 tests of `e2e/watchlist.spec.ts`. The e2e server sets the limit to 200, because the
   Playwright projects share one watchlist.
 
 ## 8.6 Daily exchange rates

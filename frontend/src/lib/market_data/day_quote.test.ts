@@ -1,6 +1,6 @@
 // The last price and the change from the previous close, from the daily bars and the live bar.
 import { describe, expect, it } from 'vite-plus/test';
-import { formatDayChange, readDayQuote, type Bar } from './index';
+import { formatDayChange, readDayQuote, readLatestQuote, writeLatestQuote, type Bar } from './index';
 
 const DAY_SECONDS = 86_400;
 
@@ -67,5 +67,37 @@ describe('formatDayChange', () => {
 
   it('shows a dash without a change', () => {
     expect(formatDayChange({ last: 100, change: null, changePercent: null })).toBe('–');
+  });
+});
+
+// The map is one for the module, so each test uses its own instrument.
+describe('writeLatestQuote', () => {
+  const DAILY_BARS = [createBar(1, 100), createBar(2, 102)];
+
+  it('writes the quote of the daily bars only when the instrument has no quote', () => {
+    const instrument = { symbol: 'DAILY', exchange: 'ARCA', currency: 'USD' };
+    expect(readLatestQuote(instrument)).toBeNull();
+
+    writeLatestQuote(instrument, DAILY_BARS, null);
+
+    expect(readLatestQuote(instrument)).toEqual({ last: 102, change: 2, changePercent: 2 });
+  });
+
+  it('keeps one quote through a click on the row, the open page, and a move to another page', () => {
+    const instrument = { symbol: 'CLICK', exchange: 'ARCA', currency: 'USD' };
+    // Before the click: the watchlist live bar.
+    writeLatestQuote(instrument, DAILY_BARS, createBar(3, 104.04));
+    const beforeClick = readLatestQuote(instrument);
+    expect(beforeClick?.last).toBe(104.04);
+
+    // The open page: its daily bars arrive before its own live bar. The quote stays the live quote.
+    writeLatestQuote(instrument, DAILY_BARS, null);
+    expect(readLatestQuote(instrument)).toEqual(beforeClick);
+
+    // The live bar of the page replaces the quote, and the quote stays after the user leaves the page.
+    writeLatestQuote(instrument, DAILY_BARS, createBar(3, 105.06));
+    expect(readLatestQuote(instrument)?.last).toBe(105.06);
+    writeLatestQuote(instrument, DAILY_BARS, null);
+    expect(readLatestQuote(instrument)?.last).toBe(105.06);
   });
 });

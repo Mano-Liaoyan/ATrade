@@ -90,7 +90,7 @@ export {
   type HkInstrument,
   type HkInstrumentsAdded,
 } from './hk_instrument_list';
-export { formatDayChange, readDayQuote, type DayQuote } from './day_quote';
+export { formatDayChange, readDayQuote, readLatestQuote, writeLatestQuote, type DayQuote } from './day_quote';
 export { prependOlderBars, readOlderBars } from './older_bars';
 export { readRunIndicatorSeries } from './run_bars';
 export {

@@ -160,3 +160,82 @@ test('each row shows the live last price and its change from the previous close'
   const changePercent = ((Number(cells[0]) - previousClose) / previousClose) * 100;
   expect(cells[1]).toBe(`+${changePercent.toFixed(2)} %`);
 });
+
+test('a row and the instrument page show one quote before the click, on the open page, and after the user leaves', async ({
+  page,
+  request,
+}, currentTest) => {
+  const symbol = projectSymbol(currentTest, 5);
+  const otherSymbol = projectSymbol(currentTest, 6);
+  await addThroughBackend(request, symbol);
+  await addThroughBackend(request, otherSymbol);
+  // Fake live sockets. The first /ws/watchlist-live-bars socket sends one live daily bar of 2026-01-02 (close 107);
+  // the sockets after a page change send nothing, so no new tick arrives. The page live bars come only when the test
+  // sends them. The last complete daily bar is 2026-01-01 (close 104.50; the day before closed at 103.50).
+  const liveDailyBar = { time: 1_767_312_000, open: 105, high: 108, low: 104, close: 107, volume: 10 };
+  let watchlistSockets = 0;
+  await page.routeWebSocket(/\/ws\/watchlist-live-bars$/, (socket) => {
+    watchlistSockets += 1;
+    if (watchlistSockets === 1) {
+      socket.send(JSON.stringify({ type: 'live_bars', live_bars: [{ symbol, exchange: 'ARCA', currency: 'USD', bar: liveDailyBar }] }));
+    }
+  });
+  let chartSocket: WebSocketRoute | undefined;
+  await page.routeWebSocket(/\/ws\/market-data\?/, (socket) => {
+    chartSocket = socket;
+  });
+  let openBarReads = 0;
+  page.on('request', (sent) => {
+    if (sent.url().includes('/api/market-data/bars?')) {
+      openBarReads += 1;
+    }
+  });
+  page.on('requestfinished', (finished) => {
+    if (finished.url().includes('/api/market-data/bars?')) {
+      openBarReads -= 1;
+    }
+  });
+  page.on('requestfailed', (failed) => {
+    if (failed.url().includes('/api/market-data/bars?')) {
+      openBarReads -= 1;
+    }
+  });
+  const readRow = (rowSymbol: string): Promise<string[]> =>
+    watchlistColumn(page)
+      .getByRole('row')
+      .filter({ has: page.getByRole('link', { name: rowSymbol, exact: true }) })
+      .evaluate((rowElement) => Array.from(rowElement.querySelectorAll('td'), (cell) => cell.textContent.trim()).slice(0, 2));
+  const lastPrice = page.getByLabel('Last price', { exact: true });
+  const change = page.getByLabel('Change from the previous close', { exact: true });
+  await page.goto('/');
+
+  // Before the click.
+  await expect.poll(() => readRow(symbol)).toEqual(['107.00', '+2.39 %']);
+
+  // On the open page, before its own live bar: all bar reads (the daily bars of the page too) are done.
+  await watchlistColumn(page).getByRole('link', { name: symbol, exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${symbol} / ARCA / USD`);
+  await expect(page.getByRole('status', { name: 'Bar count' })).toBeAttached();
+  await expect.poll(() => openBarReads).toBe(0);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  expect(await readRow(symbol)).toEqual(['107.00', '+2.39 %']);
+  await expect(lastPrice).toHaveText('107.00');
+  await expect(change).toHaveText('+2.50 (+2.39 %)');
+
+  // The live bar of the page changes the header and the row together.
+  expect(chartSocket).toBeDefined();
+  chartSocket?.send(JSON.stringify({ type: 'bar', bar: { ...liveDailyBar, close: 108 } }));
+  await expect(lastPrice).toHaveText('108.00');
+  await expect(change).toHaveText('+3.50 (+3.35 %)');
+  expect(await readRow(symbol)).toEqual(['108.00', '+3.35 %']);
+
+  // After the user leaves: another instrument page, then the home page. The row keeps the last quote.
+  await watchlistColumn(page).getByRole('link', { name: otherSymbol, exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${otherSymbol} / ARCA / USD`);
+  expect(await readRow(symbol)).toEqual(['108.00', '+3.35 %']);
+  await page.getByRole('link', { name: 'ATrade', exact: true }).click();
+  await expect(page).toHaveURL('/');
+  await expect.poll(() => openBarReads).toBe(0);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  expect(await readRow(symbol)).toEqual(['108.00', '+3.35 %']);
+});

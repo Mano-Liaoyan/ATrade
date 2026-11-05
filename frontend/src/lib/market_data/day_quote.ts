@@ -1,6 +1,8 @@
 // The last price of an instrument and its change from the previous close, from its daily bars and its live bar.
 import { formatSignedNumber, formatSignedPercent, MISSING_VALUE } from '#lib/foundation/value_format';
+import { SvelteMap } from 'svelte/reactivity';
 import type { Bar } from './bars';
+import { formatInstrument, type Instrument } from './instrument_search';
 
 export interface DayQuote {
   last: number;
@@ -37,6 +39,26 @@ export function readDayQuote(dailyBars: readonly Bar[], liveBar: Bar | null = nu
   }
   const change = last - previousBar.close;
   return { last, change, changePercent: (change / previousBar.close) * PERCENT };
+}
+
+// The one latest quote of each instrument in the browser. Each view (the watchlist rows, the header of the instrument
+// page, the order panel) reads it, so all show the same numbers, also after a page change.
+const latestQuotes = new SvelteMap<string, DayQuote>();
+
+/**
+ * Writes the quote of the daily bars and a live bar. A quote with a live bar replaces the quote of the instrument. A
+ * quote of the daily bars only is written when the instrument has no quote.
+ */
+export function writeLatestQuote(instrument: Instrument, dailyBars: readonly Bar[], liveBar: Bar | null): void {
+  const key = formatInstrument(instrument);
+  const quote = readDayQuote(dailyBars, liveBar);
+  if (quote !== null && (liveBar !== null || !latestQuotes.has(key))) {
+    latestQuotes.set(key, quote);
+  }
+}
+
+export function readLatestQuote(instrument: Instrument): DayQuote | null {
+  return latestQuotes.get(formatInstrument(instrument)) ?? null;
 }
 
 /** "+2.00 (+2.00 %)". */

@@ -27,17 +27,19 @@
     listSeriesIndicators,
     readBars,
     readChartRequest,
-    readDayQuote,
+    readLatestQuote,
     prependOlderBars,
     readLiveBarMessage,
     readOlderBars,
     readRunIndicatorSeries,
+    writeLatestQuote,
     type Bar,
     type BarPeriod,
     type BarsResult,
     type ChartIndicatorDefinition,
     type ChartPane,
     type IndicatorSeriesResult,
+    type Instrument,
   } from '#lib/market_data';
   import { FilledManualOrderList, InstrumentOrderPanel, OpenOrderList, PaperAccountFeed, PositionTable } from '#lib/paper_trading';
   import InstrumentWatchlist from '../../../InstrumentWatchlist.svelte';
@@ -197,6 +199,7 @@
         if (liveBarMessage?.type === 'bar') {
           receivedLiveBar = { key, bar: liveBarMessage.bar };
           liveBarError = null;
+          writePageQuote(liveBarMessage.bar);
         } else if (liveBarMessage?.type === 'error') {
           liveBarError = liveBarMessage.detail;
         }
@@ -218,28 +221,33 @@
     return isLiveSocketConnected ? 'Waiting for live bars.' : 'Connecting to live bars.';
   });
 
-  // The last price and the change from the previous close come from one quote: the daily bars and the live bar. The
-  // header, the watchlist row of this instrument, and the limit price thus show the same price.
-  const instrumentKey = $derived(chartRequest === null ? null : formatInstrument(chartRequest.instrument));
-  let dailyBars = $state<{ instrumentKey: string; bars: Bar[] | null } | null>(null);
+  // The last price and the change from the previous close come from the latest quote of the instrument
+  // (readLatestQuote). The daily bars and the live bar of this page write it. The header, the watchlist row of this
+  // instrument, and the limit price thus show the same price.
+  let dailyBars: { instrument: Instrument; bars: Bar[] } | null = null;
   $effect(() => {
-    if (chartRequest === null || instrumentKey === null) {
+    if (chartRequest === null) {
       return;
     }
-    const key = instrumentKey;
+    const { instrument } = chartRequest;
     let isCurrent = true;
-    void readBars(fetch, chartRequest.instrument, '1-DAY').then((result) => {
-      if (isCurrent) {
-        dailyBars = { instrumentKey: key, bars: result.kind === 'loaded' ? result.bars : null };
+    dailyBars = null;
+    void readBars(fetch, instrument, '1-DAY').then((result) => {
+      if (isCurrent && result.kind === 'loaded') {
+        dailyBars = { instrument, bars: result.bars };
+        writePageQuote(liveBar);
       }
     });
     return () => {
       isCurrent = false;
     };
   });
-  const shownDayQuote = $derived(
-    dailyBars?.instrumentKey === instrumentKey && dailyBars.bars !== null ? readDayQuote(dailyBars.bars, liveBar) : null,
-  );
+  function writePageQuote(bar: Bar | null): void {
+    if (dailyBars !== null) {
+      writeLatestQuote(dailyBars.instrument, dailyBars.bars, bar);
+    }
+  }
+  const shownDayQuote = $derived(chartRequest === null ? null : readLatestQuote(chartRequest.instrument));
   const lastPrice = $derived(shownDayQuote?.last ?? liveBar?.close ?? chartBars.at(-1)?.close ?? null);
 
   // The paper account. Forward tests and orders by hand share the instruments (forward_test.md section 12.2).
@@ -303,7 +311,7 @@
   {@const instrumentName = formatInstrument(chartRequest.instrument)}
   <Workbench>
     <SideColumn label="Watchlist" side="start" width="20rem" storageKey="atrade.instrument-page.watchlist-column">
-      <InstrumentWatchlist instrument={chartRequest.instrument} barPeriod={chartRequest.barPeriod} openQuote={shownDayQuote} />
+      <InstrumentWatchlist instrument={chartRequest.instrument} barPeriod={chartRequest.barPeriod} />
     </SideColumn>
 
     <PanelSplit storageKey="atrade.instrument-page.panel-split" panels={PANELS}>

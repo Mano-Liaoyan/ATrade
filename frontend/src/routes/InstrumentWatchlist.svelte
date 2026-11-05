@@ -1,10 +1,10 @@
 <!-- The watchlist column of a workbench (the home page and the instrument page): 32px rows with the symbol, the last
      price, and the change from the previous close (from the daily bars and the live daily bar of each instrument,
-     /ws/watchlist-live-bars). A row opens its instrument page, with the bar period of the open chart when there is
-     one. On the instrument page, the open instrument is the selected row, and its row shows the quote of the page
-     (with the live bar of the chart). With `editable` (the home page), the instrument search above the table adds an
-     instrument, and each row has a Delete button. The side column around it is the "Watchlist" landmark, so this
-     part has no landmark of its own. -->
+     /ws/watchlist-live-bars). Each row shows the latest quote of its instrument (readLatestQuote), the same as the
+     header of the instrument page. A row opens its instrument page, with the bar period of the open chart when there
+     is one. On the instrument page, the open instrument is the selected row. With `editable` (the home page), the
+     instrument search above the table adds an instrument, and each row has a Delete button. The side column around
+     it is the "Watchlist" landmark, so this part has no landmark of its own. -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
@@ -17,7 +17,8 @@
     InstrumentSearch,
     isSameInstrument,
     readBars,
-    readDayQuote,
+    readLatestQuote,
+    writeLatestQuote,
     type Bar,
     type BarPeriod,
     type DayQuote,
@@ -44,12 +45,9 @@
     barPeriod?: BarPeriod;
     // The instrument search adds instruments, and each row has a Delete button (home page).
     editable?: boolean;
-    // The quote of the open instrument from its page (daily bars and live bar). Its row shows it, so the row and
-    // the chart header show the same last price and change.
-    openQuote?: DayQuote | null;
   }
 
-  const { instrument, barPeriod, editable = false, openQuote = null }: Props = $props();
+  const { instrument, barPeriod, editable = false }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
     { header: 'Symbol' },
@@ -69,9 +67,10 @@
   let instruments = $state<WatchlistInstrument[] | null>(null);
   let failedMessage = $state<string | null>(null);
   let changeMessage = $state<string | null>(null);
-  // The daily bars of each instrument (null: not read), and the live daily bar of each instrument from IBKR.
-  let dailyBars = $state<Record<number, Bar[] | null>>({});
-  let liveBars = $state<WatchlistLiveBars>({});
+  // The daily bars of each instrument, and the live daily bar of each instrument from IBKR. Each change writes the
+  // latest quote of its instrument.
+  const dailyBars: Record<number, Bar[]> = {};
+  let liveBars: WatchlistLiveBars = {};
   let isMounted = true;
   // A function, so that the check after each await reads the current value.
   const isReading = (): boolean => isMounted;
@@ -90,8 +89,9 @@
       for (let next = waiting.shift(); next !== undefined && isReading(); next = waiting.shift()) {
         const watchlistInstrument = next;
         const barsResult = await readBars(fetch, watchlistInstrument, '1-DAY');
-        if (isReading()) {
-          dailyBars[watchlistInstrument.id] = barsResult.kind === 'loaded' ? barsResult.bars : null;
+        if (isReading() && barsResult.kind === 'loaded') {
+          dailyBars[watchlistInstrument.id] = barsResult.bars;
+          writeQuote(watchlistInstrument);
         }
       }
     };
@@ -128,19 +128,24 @@
     openLiveSocket({
       url: buildSocketUrl(WATCHLIST_LIVE_BARS_SOCKET_PATH, window.location),
       onMessage: (message) => {
+        const previousLiveBars = liveBars;
         liveBars = applyWatchlistLiveBars(liveBars, message);
+        for (const listed of instruments ?? []) {
+          if (findWatchlistLiveBar(liveBars, listed) !== findWatchlistLiveBar(previousLiveBars, listed)) {
+            writeQuote(listed);
+          }
+        }
       },
       onConnectionChange: () => undefined,
     }),
   );
 
-  // The same rule as the chart header: the live bar gives the last price, the daily bars give the previous close.
-  function readRowQuote(watchlistInstrument: WatchlistInstrument): DayQuote | null {
-    if (isOpen(watchlistInstrument) && openQuote !== null) {
-      return openQuote;
-    }
+  // The live bar gives the last price, the daily bars give the previous close.
+  function writeQuote(watchlistInstrument: WatchlistInstrument): void {
     const bars = dailyBars[watchlistInstrument.id];
-    return bars === undefined || bars === null ? null : readDayQuote(bars, findWatchlistLiveBar(liveBars, watchlistInstrument));
+    if (bars !== undefined) {
+      writeLatestQuote(watchlistInstrument, bars, findWatchlistLiveBar(liveBars, watchlistInstrument));
+    }
   }
 
   function isOpen(watchlistInstrument: WatchlistInstrument): boolean {
@@ -231,7 +236,7 @@
         {#snippet rows()}
           {#each watchlistInstruments as watchlistInstrument (watchlistInstrument.id)}
             {@const href = createInstrumentHref(watchlistInstrument, barPeriod)}
-            {@const quote = readRowQuote(watchlistInstrument)}
+            {@const quote = readLatestQuote(watchlistInstrument)}
             <tr class={['row', isOpen(watchlistInstrument) && 'cds--data-table--selected']} {@attach openOnRowClick(href)}>
               <th scope="row">
                 <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolved the path. -->
