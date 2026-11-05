@@ -45,8 +45,11 @@ export class RunChart {
 
   /** The selected instrument of the run `key` in `instruments`, else the first one. */
   findInstrument<T extends MemberId>(key: string, instruments: readonly T[]): T | undefined {
-    const member = this.#member?.key === key ? this.#member : null;
-    return instruments.find((item) => item.symbol === member?.symbol && item.exchange === member.exchange) ?? instruments[0];
+    const member = this.#member;
+    if (member?.key !== key) {
+      return instruments[0];
+    }
+    return instruments.find((item) => item.symbol === member.symbol && item.exchange === member.exchange) ?? instruments[0];
   }
 
   selectInstrument(key: string, { symbol, exchange }: MemberId): void {
