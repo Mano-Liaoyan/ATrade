@@ -125,8 +125,7 @@ of #130 (A is the strongest, D is practitioner use only).
 - Average trading value is in the currency of the instrument (USD for US
   instruments, HKD for Hong Kong instruments).
 - ADR% is in percent, not a fraction: 5.2 is 5.2 %. It is "no value" while a
-  bar of the window has a low of 0 or less. `initialized` then stays `True`,
-  because it tells only that the window is full (#371).
+  bar of the window has a low of 0 or less (#371).
 - RSI, MACD, and Bollinger Bands are entry timing tools only. #130 found no
   reliable evidence of a return after costs for them.
 - ATR does not predict direction. Use it for stops and position size.
@@ -168,7 +167,7 @@ Each class has:
 | Constructor | The parameters of the indicator, each with a default value. |
 | `handle_bar(bar)` | Takes one NautilusTrader `Bar`. `register_indicator_for_bars` calls it. |
 | `update(bar)` | The screen path: takes one `foundation` `Bar`. It gives the same update as `handle_bar` for the same open, high, low, close, and volume. A wrapped class makes a NautilusTrader bar from it and calls `handle_bar`. |
-| `initialized` | `True` when the class has enough bars for a value. NautilusTrader reads it for `indicators_initialized()`. |
+| `initialized` | `True` when the class has a value. NautilusTrader reads it for `indicators_initialized()`. |
 | Outputs (`value`, or the names of section 23.2) | The value (`float`), or "no value" (`None`) while `initialized` is `False`. |
 | `reset()` | Removes all received bars. |
 

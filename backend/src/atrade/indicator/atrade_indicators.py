@@ -151,7 +151,7 @@ class ADRPercent:
 
     @property
     def initialized(self) -> bool:
-        return self._window.full
+        return self.value is not None
 
     @property
     def value(self) -> float | None:

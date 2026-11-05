@@ -213,6 +213,18 @@ def test_the_adr_percent_is_no_value_while_the_window_has_a_low_of_0() -> None:
     assert values == [None, None, None, pytest.approx(10.0, rel=1e-12)]
 
 
+def test_the_adr_percent_is_not_initialized_while_it_has_no_value() -> None:
+    # A strategy reads `value` after `initialized`, so `initialized` must not be true while `value` is None.
+    indicator = ADRPercent(period=2)
+    for bar in make_bars([(110, 101, 1), (2, 1, 1)]):
+        indicator.update(bar)
+    assert not indicator.initialized
+
+    for bar in make_bars([(110, 101, 1), (110, 101, 1)]):
+        indicator.update(bar)
+    assert indicator.initialized
+
+
 def test_the_defaults_of_the_indicators() -> None:
     realized_volatility = RealizedVolatility()
 

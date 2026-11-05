@@ -70,7 +70,7 @@ _Avoid_: ATR
 
 **No value**:
 The state of an indicator at a time when the instrument does not have
-enough bars to calculate it. It is not 0. A screen excludes the instrument
+enough bars to calculate it, or its bars have no usable value. It is not 0. A screen excludes the instrument
 with this reason. In Chinese, write 无值.
 _Avoid_: null, NaN, empty, 0
 
