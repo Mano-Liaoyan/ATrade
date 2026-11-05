@@ -23,6 +23,7 @@ export const ASSISTANT_TOOL_NAMES: readonly string[] = [
   'list_backtests',
   'read_backtest',
   'compare_backtests',
+  'list_indicators',
   'list_screens',
   'read_screen',
   'create_screen',

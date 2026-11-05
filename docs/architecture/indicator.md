@@ -173,6 +173,9 @@ indicator, the catalog has:
 - the name that the UI shows, for example `RSI(14)`,
 - the parameters with their types, defaults, and allowed ranges,
 - the outputs,
+- the value description: the meaning, the range, and the unit of the value
+  (#373). Each definition must have it. The AI assistant reads it with the
+  tool `list_indicators` (assistant section 25.4.3),
 - the number of daily bars that a screen reads (section 23.4).
 
 `screen` uses the catalog to check a screen (section 24.6). The rule builder
@@ -181,7 +184,7 @@ uses it for its condition lists.
 Decided (#163): the catalog is `INDICATOR_CATALOG`
 (`indicator/indicator_catalog.py`), a mapping from the key to an
 `IndicatorDefinition` (`key`, `name`, `short_name`, `chart_placement`,
-`parameters`, `outputs`, `display_name(parameters)`,
+`parameters`, `outputs`, `value_description`, `display_name(parameters)`,
 `screen_look_back_bars(parameters)`). `short_name` and `chart_placement`
 are the fields for charts of section 23.9.2 (#327). Each
 `IndicatorParameter` has `name`, `value_type` (`int` or `float`), `default`,
@@ -551,7 +554,7 @@ section 6.2).
 
 | Route | Behavior |
 |---|---|
-| `GET /api/market-data/indicators` | `200` with the catalog in its order: the body of `GET /api/screen-indicators` (screen.md section 24.7), and `short_name` and `chart_placement` for each indicator. `GET /api/screen-indicators` gets the 2 fields too. |
+| `GET /api/market-data/indicators` | `200` with the catalog in its order: the body of `GET /api/screen-indicators` (screen.md section 24.7), and `short_name` and `chart_placement` for each indicator. `GET /api/screen-indicators` gets the 2 fields too. Both routes also give `value_description` (section 23.3). |
 | `POST /api/market-data/indicator-series` | Body `{"symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "source_order", "indicators": [{"indicator", "parameters"}, ...]}`. `source_order` is optional: without it, the route uses the global source order. The route reads only, and changes no data. `200` with `{"times": [...], "series": [{"indicator", "parameters", "outputs": {"<output>": [...]}}, ...]}`. |
 | | `times` holds the start (UNIX seconds) of each saved bar of the range, oldest first, the same as `GET /api/market-data/bars` gives for the range. Each output list has one value for each time: a number, or `null` for "no value". `parameters` holds all parameters, with the defaults. |
 | | `422` for the time and range problems of the bars route and for an unknown bar period. `422` for a source order that `PUT /api/market-data/source-order` refuses. `422` for each problem of `check_indicator_reference`. Its location starts with `indicators` and the index. |

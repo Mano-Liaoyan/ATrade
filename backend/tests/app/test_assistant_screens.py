@@ -29,6 +29,18 @@ async def start_conversation(browser: httpx.AsyncClient, strategy_name: str = "M
 
 
 @pytest.mark.anyio
+async def test_the_indicator_catalog_on_port_8001_is_the_catalog_of_the_web_port(
+    database_url: str, clock: FixedClock, frontend_build_dir: Any
+) -> None:
+    async with open_both_clients(database_url, clock, frontend_build_dir) as (browser, assistant):
+        web_port_catalog = await browser.get("/api/screen-indicators")
+        assistant_catalog = await assistant.get("/api/screen-indicators")
+
+    assert assistant_catalog.status_code == httpx.codes.OK
+    assert assistant_catalog.json() == web_port_catalog.json()
+
+
+@pytest.mark.anyio
 async def test_a_new_screen_on_port_8001_records_the_conversation_and_is_not_kept(
     database_url: str, clock: FixedClock, frontend_build_dir: Any
 ) -> None:

@@ -1,7 +1,8 @@
 """The catalog of the first indicator set (docs/architecture/indicator.md sections 23.3 and 23.4, #163).
 
 Screens and the rule builder use the same catalog. It gives for each indicator the key that they store, the name
-that the UI shows, the parameters, the outputs, and the number of daily bars that a screen reads.
+that the UI shows, the parameters, the outputs, the meaning and the unit of the value, and the number of daily bars
+that a screen reads.
 """
 
 from collections.abc import Callable, Mapping
@@ -86,6 +87,8 @@ class IndicatorDefinition:
     outputs: tuple[str, ...]
     indicator_class: Callable[..., CatalogIndicator]
     look_back: ScreenLookBack
+    # The meaning, the range, and the unit of the value. The AI assistant reads it to write a condition (#373).
+    value_description: str
     orders: tuple[ParameterOrder, ...] = ()
 
     def with_defaults(self, parameters: ParameterValues) -> dict[str, ParameterValue]:
@@ -118,10 +121,31 @@ VALUE = ("value",)
 THREE_LINES = ("upper", "middle", "lower")
 PERIOD_BARS = ScreenLookBack(("period",))
 RECURSIVE_PERIOD_BARS = ScreenLookBack(("period",), factor=RECURSIVE_LOOK_BACK_FACTOR)
+PRICE_UNIT = "In the currency of the instrument, per share. It is not a percent."
 
 INDICATOR_DEFINITIONS = (
-    IndicatorDefinition("sma", "SMA", "SMA", "price", (make_period_parameter(default=50),), VALUE, SMA, PERIOD_BARS),
-    IndicatorDefinition("ema", "EMA", "EMA", "price", (make_period_parameter(),), VALUE, EMA, RECURSIVE_PERIOD_BARS),
+    IndicatorDefinition(
+        "sma",
+        "SMA",
+        "SMA",
+        "price",
+        (make_period_parameter(default=50),),
+        VALUE,
+        SMA,
+        PERIOD_BARS,
+        f"The mean close of the last `period` bars. {PRICE_UNIT}",
+    ),
+    IndicatorDefinition(
+        "ema",
+        "EMA",
+        "EMA",
+        "price",
+        (make_period_parameter(),),
+        VALUE,
+        EMA,
+        RECURSIVE_PERIOD_BARS,
+        f"The exponential average of the close with the period `period`. {PRICE_UNIT}",
+    ),
     IndicatorDefinition(
         "momentum_12_1",
         "12-1 momentum",
@@ -134,6 +158,10 @@ INDICATOR_DEFINITIONS = (
         VALUE,
         Momentum12_1,
         ScreenLookBack(("look_back",), extra_bars=1),
+        "The return close(t - skip) / close(t - look_back) - 1, as a fraction: 0.2 is +20%. Both parameters are counts "
+        "of bars, and a screen uses daily bars. The defaults give the 12-month return without the last month. With "
+        "skip 0 and look_back 21, 63, or 126, the value is the 1, 3, or 6 month return. Use a `rank` condition to get "
+        "a ranking of it.",
         (ParameterOrder("skip", "look_back"),),
     ),
     IndicatorDefinition(
@@ -145,6 +173,8 @@ INDICATOR_DEFINITIONS = (
         VALUE,
         DistanceTo52WeekHigh,
         PERIOD_BARS,
+        "close / the highest high of the last `period` bars, from 0 to 1. 1 is at the high. It is a ratio, not a "
+        'percent: "within 15% of the high" is `>= 0.85`, not `<= 15`.',
     ),
     IndicatorDefinition(
         "realized_volatility",
@@ -158,9 +188,19 @@ INDICATOR_DEFINITIONS = (
         VALUE,
         RealizedVolatility,
         ScreenLookBack(("period",), extra_bars=1),
+        "The annualized standard deviation of the last `period` log returns of the close, as a fraction: 0.3 is 30% a "
+        "year. `bars_per_year` annualizes it. Daily bars use 252.",
     ),
     IndicatorDefinition(
-        "atr", "ATR", "ATR", "own", (make_period_parameter(default=14),), VALUE, ATR, RECURSIVE_PERIOD_BARS
+        "atr",
+        "ATR",
+        "ATR",
+        "own",
+        (make_period_parameter(default=14),),
+        VALUE,
+        ATR,
+        RECURSIVE_PERIOD_BARS,
+        f"The Wilder average of the true range. {PRICE_UNIT}",
     ),
     IndicatorDefinition(
         "average_trading_value",
@@ -171,9 +211,19 @@ INDICATOR_DEFINITIONS = (
         VALUE,
         AverageTradingValue,
         PERIOD_BARS,
+        "The mean of close x volume of the last `period` bars, in the currency of the instrument. 5000000 is 5 million "
+        "of that currency for each bar.",
     ),
     IndicatorDefinition(
-        "rsi", "RSI", "RSI", "own", (make_period_parameter(default=14),), VALUE, RSI, RECURSIVE_PERIOD_BARS
+        "rsi",
+        "RSI",
+        "RSI",
+        "own",
+        (make_period_parameter(default=14),),
+        VALUE,
+        RSI,
+        RECURSIVE_PERIOD_BARS,
+        "The Wilder relative strength index, from 0 to 100. The usual levels are 30 and 70.",
     ),
     IndicatorDefinition(
         "macd",
@@ -189,6 +239,8 @@ INDICATOR_DEFINITIONS = (
         MACD,
         # The signal line is an EMA of the MACD line, so its period adds to the slow period.
         ScreenLookBack(("slow_period", "signal_period"), factor=RECURSIVE_LOOK_BACK_FACTOR),
+        "`value` is the fast EMA minus the slow EMA of the close. `signal` is the EMA of `value`. `histogram` is "
+        f"`value` minus `signal`. {PRICE_UNIT}",
         (ParameterOrder("fast_period", "slow_period"),),
     ),
     IndicatorDefinition(
@@ -200,6 +252,8 @@ INDICATOR_DEFINITIONS = (
         THREE_LINES,
         BollingerBands,
         PERIOD_BARS,
+        "`middle` is the mean close of the last `period` bars. `upper` and `lower` are `middle` plus and minus `k` "
+        f"standard deviations of the close. {PRICE_UNIT}",
     ),
     IndicatorDefinition(
         "donchian_channel",
@@ -210,6 +264,8 @@ INDICATOR_DEFINITIONS = (
         THREE_LINES,
         DonchianChannel,
         PERIOD_BARS,
+        "`upper` is the highest high and `lower` is the lowest low of the last `period` bars. `middle` is their mean. "
+        f"{PRICE_UNIT}",
     ),
 )
 

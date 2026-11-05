@@ -2046,6 +2046,8 @@ export interface components {
             parameters: components["schemas"]["IndicatorParameterResponse"][];
             /** Outputs */
             outputs: string[];
+            /** Value Description */
+            value_description: string;
         };
         /** IndicatorSeries */
         IndicatorSeries: {

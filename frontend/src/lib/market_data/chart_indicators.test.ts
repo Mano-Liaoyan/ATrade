@@ -29,6 +29,7 @@ const SMA: ChartIndicatorDefinition = {
   chart_placement: 'price',
   parameters: [period(50)],
   outputs: ['value'],
+  value_description: '',
 };
 const BOLLINGER_BANDS: ChartIndicatorDefinition = {
   key: 'bollinger_bands',
@@ -37,6 +38,7 @@ const BOLLINGER_BANDS: ChartIndicatorDefinition = {
   chart_placement: 'price',
   parameters: [period(20), { name: 'k', value_type: 'float', default: 2, minimum: 0.1, maximum: 10, is_in_name: true }],
   outputs: ['upper', 'middle', 'lower'],
+  value_description: '',
 };
 const MACD: ChartIndicatorDefinition = {
   key: 'macd',
@@ -49,6 +51,7 @@ const MACD: ChartIndicatorDefinition = {
     { ...period(9), name: 'signal_period' },
   ],
   outputs: ['value', 'signal', 'histogram'],
+  value_description: '',
 };
 const REALIZED_VOLATILITY: ChartIndicatorDefinition = {
   key: 'realized_volatility',
@@ -57,6 +60,7 @@ const REALIZED_VOLATILITY: ChartIndicatorDefinition = {
   chart_placement: 'own',
   parameters: [period(60), { name: 'bars_per_year', value_type: 'int', default: 252, minimum: 1, maximum: 10000, is_in_name: false }],
   outputs: ['value'],
+  value_description: '',
 };
 const RSI: ChartIndicatorDefinition = { ...SMA, key: 'rsi', name: 'RSI', short_name: 'RSI', chart_placement: 'own', parameters: [period(14)] };
 

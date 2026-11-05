@@ -23,6 +23,7 @@ const SMA: ChartIndicatorDefinition = {
   chart_placement: 'price',
   parameters: [period(50)],
   outputs: ['value'],
+  value_description: '',
 };
 const BOLLINGER_BANDS: ChartIndicatorDefinition = {
   key: 'bollinger_bands',
@@ -31,6 +32,7 @@ const BOLLINGER_BANDS: ChartIndicatorDefinition = {
   chart_placement: 'price',
   parameters: [period(20), { name: 'k', value_type: 'float', default: 2, minimum: 0.1, maximum: 10, is_in_name: true }],
   outputs: ['upper', 'middle', 'lower'],
+  value_description: '',
 };
 const MACD: ChartIndicatorDefinition = {
   key: 'macd',
@@ -43,6 +45,7 @@ const MACD: ChartIndicatorDefinition = {
     { ...period(9), name: 'signal_period' },
   ],
   outputs: ['value', 'signal', 'histogram'],
+  value_description: '',
 };
 const MOMENTUM: ChartIndicatorDefinition = {
   key: 'momentum_12_1',
@@ -54,6 +57,7 @@ const MOMENTUM: ChartIndicatorDefinition = {
     { ...period(21), name: 'skip', minimum: 0, maximum: 999 },
   ],
   outputs: ['value'],
+  value_description: '',
 };
 
 const smaIndicator: ChartIndicator = {

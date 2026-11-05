@@ -126,3 +126,30 @@ def test_each_parameter_range_end_makes_a_class(key: str) -> None:
             if atrade.indicator.check_indicator_reference(reference):
                 continue  # A range end can break a rule between 2 parameters, for example skip < look_back.
             atrade.indicator.create_indicator(reference)
+
+
+@pytest.mark.parametrize("key", CATALOG_KEYS)
+def test_each_indicator_says_what_its_value_means(key: str) -> None:
+    assert INDICATOR_CATALOG[key].value_description.strip()
+
+
+def test_the_distance_to_the_high_says_its_range_and_how_to_write_a_condition() -> None:
+    description = INDICATOR_CATALOG["distance_to_52_week_high"].value_description
+
+    assert "from 0 to 1" in description
+    assert "`>= 0.85`" in description
+
+
+def test_the_momentum_says_how_its_parameters_give_other_return_periods() -> None:
+    description = INDICATOR_CATALOG["momentum_12_1"].value_description
+
+    assert "skip 0 and look_back 21, 63, or 126" in description
+    assert "fraction" in description
+    assert "`rank`" in description
+
+
+def test_the_realized_volatility_says_that_it_is_an_annualized_fraction() -> None:
+    description = INDICATOR_CATALOG["realized_volatility"].value_description
+
+    assert "annualized" in description
+    assert "fraction" in description

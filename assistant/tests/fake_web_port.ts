@@ -28,6 +28,8 @@ export interface FakeWebPort {
   backtestList: unknown[];
   /** The answers of the screen creates, changes, and runs, in order. After the last: the success answer. */
   screenAnswers: FakeAnswer[];
+  /** The answer of GET /api/screen-indicators. */
+  indicatorCatalog: unknown[];
   close: () => Promise<void>;
 }
 
@@ -48,6 +50,27 @@ export const SCREEN = {
 /** The screen of the user that create_screen names as its source screen. */
 export const SOURCE_SCREEN = { ...SCREEN, id: 4, name: 'Momentum leaders', definition: { start: 'watchlist' }, kept: true };
 export const SCREEN_LIST = [{ id: 5, name: 'Momentum leaders (AI)', market: 'US', kept: false }];
+/** Two indicators of GET /api/screen-indicators. */
+export const INDICATOR_CATALOG = [
+  {
+    key: 'distance_to_52_week_high',
+    name: 'Distance to 52-week high',
+    short_name: '52W HIGH',
+    chart_placement: 'own',
+    parameters: [{ name: 'period', value_type: 'int', default: 252, minimum: 1, maximum: 1000, is_in_name: true }],
+    outputs: ['value'],
+    value_description: 'close / the highest high of the last `period` bars, from 0 to 1.',
+  },
+  {
+    key: 'rsi',
+    name: 'RSI',
+    short_name: 'RSI',
+    chart_placement: 'own',
+    parameters: [{ name: 'period', value_type: 'int', default: 14, minimum: 1, maximum: 1000, is_in_name: true }],
+    outputs: ['value'],
+    value_description: 'The Wilder RSI, from 0 to 100.',
+  },
+];
 export const SCREEN_ROW_COUNT = 120;
 export const SCREEN_SUMMARY = {
   row_count: SCREEN_ROW_COUNT,
@@ -167,6 +190,7 @@ class FakeRoutes {
       'POST /api/backtests': () => this.startBacktest(),
       'GET /api/backtests': () => ({ status: 200, body: this.port.backtestList }),
       'GET /api/backtests/11/comparison/12': () => ({ status: 200, body: COMPARISON }),
+      'GET /api/screen-indicators': () => ({ status: 200, body: this.port.indicatorCatalog }),
       'GET /api/screens': () => ({ status: 200, body: SCREEN_LIST }),
       'GET /api/screens/5': () => ({ status: 200, body: SCREEN }),
       'GET /api/screens/4': () => ({ status: 200, body: SOURCE_SCREEN }),
@@ -216,6 +240,7 @@ export async function startFakeWebPort(): Promise<FakeWebPort> {
     hasNoSavedBars: false,
     backtestList: [backtestBody(11, 'finished')],
     screenAnswers: [] as FakeAnswer[],
+    indicatorCatalog: INDICATOR_CATALOG as unknown[],
   };
   const routes = new FakeRoutes(state);
   const server: Server = createServer((request, response) => {
