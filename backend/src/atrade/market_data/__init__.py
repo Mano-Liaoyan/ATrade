@@ -1,8 +1,9 @@
 """Public entry of the market_data capability: instrument search, the instrument lookup, bars, bar sources and the
 source order, saved bars, the indicator catalog and indicator series of bar charts, received bars to save, the daily bars of many instruments, the daily
 bar summary and the daily bar update, the Databento import, its user check, and the IBKR stock split check, the hourly bar purchase list, the
-quarterly US universe, live bars, and daily exchange rates in USD."""
+quarterly US universe, live bars, the shared live daily bars of the watchlist, and daily exchange rates in USD."""
 
+from atrade.market_data.bar_models import BarResponse, to_bar_response
 from atrade.market_data.bar_reading import (
     BarRequest,
     SavedBars,
@@ -63,6 +64,7 @@ from atrade.market_data.instrument_lookup import (
     InstrumentLookupFailedError,
 )
 from atrade.market_data.live_bar_socket import MARKET_DATA_SOCKET_MESSAGE_MODELS
+from atrade.market_data.live_daily_bars import LiveDailyBarHub, LiveDailyBarListener
 from atrade.market_data.stock_split_change import (
     SplitConfirmation,
     StockSplitChange,
@@ -90,6 +92,7 @@ from atrade.market_data.us_universe_update import UsUniverseUpdate
 __all__ = [
     "MARKET_DATA_SOCKET_MESSAGE_MODELS",
     "BarRequest",
+    "BarResponse",
     "BarSource",
     "DailyBarSummary",
     "DailyBarUpdate",
@@ -110,6 +113,8 @@ __all__ = [
     "InstrumentLookup",
     "InstrumentLookupError",
     "InstrumentLookupFailedError",
+    "LiveDailyBarHub",
+    "LiveDailyBarListener",
     "ReportedSplit",
     "SavedBarCoverage",
     "SavedBars",
@@ -161,4 +166,5 @@ __all__ = [
     "save_received_bars",
     "save_received_bars_blocking",
     "save_us_universe",
+    "to_bar_response",
 ]

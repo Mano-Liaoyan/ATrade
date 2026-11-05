@@ -45,7 +45,13 @@ from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.settings import Settings
 from atrade.foundation.table_changes import TableChangeFeed, create_change_socket_router
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
-from atrade.market_data import DailyBarUpdate, ExchangeRateReader, InstrumentLookup, create_market_data_router
+from atrade.market_data import (
+    DailyBarUpdate,
+    ExchangeRateReader,
+    InstrumentLookup,
+    LiveDailyBarHub,
+    create_market_data_router,
+)
 from atrade.paper_trading import PaperAccountMonitor, create_paper_trading_router
 from atrade.screen import SCREEN_CHANGE_SOCKET, create_screen_router
 from atrade.strategy import (
@@ -55,7 +61,12 @@ from atrade.strategy import (
     create_strategy_router,
     read_strategy_outline,
 )
-from atrade.watchlist import WATCHLIST_CHANGE_SOCKET, create_watchlist_router, read_watchlist_instruments
+from atrade.watchlist import (
+    WATCHLIST_CHANGE_SOCKET,
+    create_watchlist_live_bar_router,
+    create_watchlist_router,
+    read_watchlist_instruments,
+)
 
 # The container must accept connections from the Compose network.
 LISTEN_HOST = "0.0.0.0"
@@ -97,8 +108,12 @@ def create_web_app(
     clock: Clock,
     gateway_connection: GatewayConnection,
     assistant_service: AssistantService | None = None,
+    live_daily_bar_hub: LiveDailyBarHub | None = None,
 ) -> FastAPI:
-    """assistant_service: the connection to the assistant service. Default: HTTP to the Compose service assistant."""
+    """assistant_service: the connection to the assistant service. Default: HTTP to the Compose service assistant.
+
+    live_daily_bar_hub: the shared live daily bars of the watchlist. Default: the IBKR limits of a real account.
+    """
     paper_account_monitor = PaperAccountMonitor(settings=settings, gateway_connection=gateway_connection)
     backtest_runner = BacktestRunner(
         database_url=settings.database_url,
@@ -113,6 +128,7 @@ def create_web_app(
         read_watchlist_instruments=lambda: read_watchlist_instruments(database_url=settings.database_url),
     )
     table_change_feed = TableChangeFeed(settings.database_url)
+    live_daily_bar_hub = live_daily_bar_hub or LiveDailyBarHub(gateway_connection)
 
     @asynccontextmanager
     async def keep_gateway_connected(_app: FastAPI) -> AsyncGenerator[None]:
@@ -128,6 +144,7 @@ def create_web_app(
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
+        live_daily_bar_hub.stop()
         gateway_connection.disconnect()
 
     app = FastAPI(title="ATrade", lifespan=keep_gateway_connected)
@@ -184,6 +201,13 @@ def create_web_app(
     app.include_router(create_screen_router(database_url=settings.database_url, clock=clock))
     app.include_router(
         create_watchlist_router(database_url=settings.database_url, clock=clock, instrument_lookup=instrument_lookup)
+    )
+    app.include_router(
+        create_watchlist_live_bar_router(
+            database_url=settings.database_url,
+            table_change_feed=table_change_feed,
+            live_daily_bar_hub=live_daily_bar_hub,
+        )
     )
     app.include_router(
         create_assistant_router(

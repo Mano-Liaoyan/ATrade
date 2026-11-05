@@ -22,6 +22,7 @@ from atrade.foundation.table_changes import CHANGE_SOCKET_MESSAGE_MODELS
 from atrade.ibkr import IbAsyncGatewayConnection
 from atrade.market_data import MARKET_DATA_SOCKET_MESSAGE_MODELS
 from atrade.paper_trading import PAPER_TRADING_SOCKET_MESSAGE_MODELS
+from atrade.watchlist import WATCHLIST_SOCKET_MESSAGE_MODELS
 
 # The document needs only the routes. The app does not start, so it opens no database or Gateway connection.
 UNUSED_DATABASE_URL = "postgresql://unused/atrade"
@@ -35,6 +36,7 @@ SOCKET_MESSAGE_MODEL_LISTS: list[list[type[BaseModel]]] = [
     CHANGE_SOCKET_MESSAGE_MODELS,
     PAPER_TRADING_SOCKET_MESSAGE_MODELS,
     ASSISTANT_SOCKET_MESSAGE_MODELS,
+    WATCHLIST_SOCKET_MESSAGE_MODELS,
 ]
 SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = list(
     dict.fromkeys(model for models in SOCKET_MESSAGE_MODEL_LISTS for model in models)

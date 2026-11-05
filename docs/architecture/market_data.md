@@ -129,6 +129,11 @@ Source: [Watchlist](https://github.com/Mano-Liaoyan/ATrade/issues/67).
 - Each watchlist instrument is a link to
   `/instruments/<exchange>/<symbol>?currency=<currency>`. This page shows
   the bar chart (section 8.4).
+- Each row shows the last price and the change from the previous close:
+  `readDayQuote(daily bars, live daily bar)` of `#lib/market_data`, the same
+  rule as the chart header. The live daily bar comes from
+  `/ws/watchlist-live-bars` (section 8.5.1). Without it, the row shows the
+  values of the daily bars.
 
 ## 8.4 Bars and the bar chart
 
@@ -319,6 +324,55 @@ Source: [Live bars on the chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
 - Tests: `tests/market_data/test_live_bar_socket.py` (through the WebSocket
   route with the fake), the contract test (section 7.5), the Vitest tests of
   `live_socket` and `live_bars`, and the last test of `e2e/bar_chart.spec.ts`.
+
+### 8.5.1 Live daily bars of the watchlist
+
+Source: [Live last price in each watchlist row](https://github.com/Mano-Liaoyan/ATrade/issues/365).
+
+- `LiveDailyBarHub(gateway_connection, max_instruments=40,
+  release_delay_seconds=30, retry_delay_seconds=60)` in `market_data` shares
+  one `stream_live_bars(instrument, 1-DAY)` stream for each instrument among
+  all sockets (all browser tabs). Each IBKR `keepUpToDate` request uses one
+  market data line (about 100 by default) and one open historical data
+  request (50 at most), and the chart live bars and the forward tests need
+  some too. So the hub streams at most 40 instruments. An instrument above
+  the limit gets no live bar; it gets one when a place is free at the next
+  watchlist change.
+- `hub.listen()` gives a listener for one socket. `listener.follow(instruments)`
+  starts the missing streams and leaves the streams of the other instruments.
+  A stream without a listener ends after the release delay (the task closes
+  the generator, which cancels the IBKR subscription), so a page change
+  (home page to instrument page) does not request the bars again. A stream
+  in its release delay gives its place to a new instrument.
+- A failed stream (no connection, no market data permission, a lost
+  connection) gives "no live bar" and starts again after the retry delay.
+  The lifespan of port 8000 calls `hub.stop()`.
+- `/ws/watchlist-live-bars` is in `watchlist/live_bar_socket.py`. The socket
+  reads the watchlist at the start and after each change of
+  `watchlist_instrument` (the table change feed, section 13 of
+  `docs/architecture.md`), and follows these instruments. So it never
+  subscribes to an instrument outside the watchlist. The browser sends
+  nothing. Outside the trading hours IBKR gives the last daily bar, and the
+  row shows the same values as without a live bar.
+
+| `/ws/watchlist-live-bars` message | When |
+|---|---|
+| `{"type": "live_bars", "live_bars": [{"symbol", "exchange", "currency", "bar"}, ...]}` | After a change of the live bar of a followed instrument, at most once each second. One item for each changed instrument. The first message has all followed instruments. `bar` has the fields of the bars route, or is `null` when the instrument has no live bar (no IB Gateway, a failed subscription, or the instrument left the watchlist). |
+| `{"type": "heartbeat"}` | After 10 seconds without another message. |
+
+- There is no error message. The page shows the daily bar values for an
+  instrument without a live bar.
+- `watchlist` exports `WATCHLIST_SOCKET_MESSAGE_MODELS`; the frontend types
+  `WatchlistLiveBarsMessage` and `WatchlistLiveBar` come from `#lib/api`.
+- Frontend: `#lib/watchlist` has `applyWatchlistLiveBars` and
+  `findWatchlistLiveBar`. `InstrumentWatchlist.svelte` opens the socket with
+  `foundation/live_socket` and gives the live bar of each row to
+  `readDayQuote`.
+- Tests: `tests/market_data/test_live_daily_bars.py` (the hub with the IBKR
+  fake), `tests/watchlist/test_watchlist_live_bar_socket.py` (the socket with
+  PostgreSQL), the Vitest tests of `live_bars`, and the last test of
+  `e2e/watchlist.spec.ts`. The e2e server sets the limit to 200, because the
+  Playwright projects share one watchlist.
 
 ## 8.6 Daily exchange rates
 

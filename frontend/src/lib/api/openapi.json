@@ -11130,6 +11130,64 @@
         ],
         "title": "ToolStepMessage",
         "type": "object"
+      },
+      "WatchlistLiveBar": {
+        "description": "The live daily bar of one watchlist instrument. `bar` is null when there is no live bar.",
+        "properties": {
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "exchange": {
+            "title": "Exchange",
+            "type": "string"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "bar": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BarResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "symbol",
+          "exchange",
+          "currency",
+          "bar"
+        ],
+        "title": "WatchlistLiveBar",
+        "type": "object"
+      },
+      "WatchlistLiveBarsMessage": {
+        "description": "The instruments with a change since the last message. The first message has all followed instruments.",
+        "properties": {
+          "type": {
+            "const": "live_bars",
+            "default": "live_bars",
+            "title": "Type",
+            "type": "string"
+          },
+          "live_bars": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistLiveBar"
+            },
+            "title": "Live Bars",
+            "type": "array"
+          }
+        },
+        "required": [
+          "live_bars"
+        ],
+        "title": "WatchlistLiveBarsMessage",
+        "type": "object"
       }
     }
   }
