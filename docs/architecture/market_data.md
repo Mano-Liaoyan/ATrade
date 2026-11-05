@@ -224,6 +224,28 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   list changes `bar_period` in the page address. The page shows the bar
   count (`role="status"`, name `Bar count`) or the `detail` text of the
   backend.
+- Older bars on the instrument page chart: the first read has no
+  `start_utc`, so it gets the default range of the bar period. When the
+  user scrolls or drags the chart to the left and the visible range comes
+  within 10 bars of the first bar, the page reads the next older range of
+  the same instrument and bar period with an explicit `start_utc` and
+  `end_utc`: it ends at the start of the first bar and has the default
+  length of the bar period, but 7 days for 1 minute bars (a 3-day range can
+  have no trading day). Each range has at most 20000 bars. The bars before
+  the first bar go before the chart bars, each bar time 1 time, and the
+  chart keeps the visible range. The bar count and the indicator values
+  include the older bars; the page reads the indicator values in windows of
+  at most 20000 bar lengths (`readRunIndicatorSeries`, indicator.md section
+  23.9.8). The live bar stays the last bar.
+  - Only a move of the user reads older bars: the first fit of a new bar
+    list shows the first bar too, and it reads nothing.
+  - One read at a time. An empty answer ends the history of the chart
+    request: the page reads no more older bars until the bar period or the
+    instrument changes. A failed read shows the `detail` text over the
+    chart, and the next move to the left reads again.
+  - Code: `older_bars.ts` (range, join, trigger) and `BarChart.svelte`
+    (`onNeedOlderBars`). Backtest and forward test charts have a fixed range
+    and read no older bars.
 - TradingView attribution: the chart shows the TradingView logo link
   (`attributionLogo`), the text under the chart links to
   `https://www.tradingview.com/`, and `BarChart.svelte` holds the
