@@ -89,6 +89,8 @@ jobs:
           cache: true
       - run: vp exec playwright install --with-deps ${{ matrix.browser }}
         working-directory: frontend
+        # A normal install takes from 19 seconds to 11 minutes. A hang stops here, not at the job timeout.
+        timeout-minutes: 15
       - run: ./scripts/check e2e
         # The step stops before the job does, so the artifact step below still runs.
         timeout-minutes: 25
