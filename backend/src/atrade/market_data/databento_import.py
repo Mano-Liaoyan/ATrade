@@ -110,9 +110,7 @@ def create_daily_row(dataset: str, record: databento_dbn.OHLCVMsg, instrument_ma
     # An ohlcv-1d bar starts at 00:00 UTC of its trading day (section 8.4).
     trading_day = to_day(record.ts_event)
     symbol = instrument_map.resolve(record.instrument_id, trading_day)
-    # EQUS.SUMMARY has records with all prices 0, also with a volume. The day has no price, so it has no bar (section
-    # 8.8.2).
-    if symbol is None or record.close <= 0:
+    if symbol is None:
         return ()
     prices = (to_price(record.open), to_price(record.high), to_price(record.low), to_price(record.close))
     return (dataset, symbol, trading_day, *prices, record.volume)
