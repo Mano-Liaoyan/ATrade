@@ -197,7 +197,7 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
   ];
 }
 
-/** The 9 tools of 25.4.1 and the 6 screen tools of 25.4.3 for one run of one conversation. */
+/** The 9 tools of 25.4.1 and the 7 screen tools of 25.4.3 for one run of one conversation. */
 export function createAssistantTools(context: AssistantToolsContext): ToolDefinition[] {
   return [...createStrategyTools(context), ...createBacktestTools(context), ...createScreenTools(context.client)];
 }
