@@ -85,6 +85,42 @@ test('the chart receives live bar updates over the WebSocket', async ({ page }) 
   await expect(liveBar).toHaveText(/^Live bar 2026-01-02 03:00 UTC: close 12[34]\.\d+$/);
 });
 
+test('the header and the watchlist row show the live last price and its change from the previous close', async ({ page, request }) => {
+  // The browser projects share one database: another project can add AAPL first (409).
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const response = await request.post('/api/watchlist', { data: { symbol: 'AAPL', exchange: 'NASDAQ', currency: 'USD' } });
+  expect([201, 409]).toContain(response.status());
+  await page.goto('/instruments/NASDAQ/AAPL?currency=USD&bar_period=1-DAY');
+
+  // The last complete daily bar is 2026-01-01 (close 104.50; the day before closed at 103.50). The fake updates the
+  // daily bar of 2026-01-02: the close moves from 105 to 106.75. The change is from 104.50, not from 103.50.
+  await expect(page.getByRole('status', { name: 'Live bar' })).toHaveText(/^Live bar 2026-01-02 00:00 UTC/);
+  const lastPrice = page.getByLabel('Last price', { exact: true });
+  const change = page.getByLabel('Change from the previous close', { exact: true });
+  const row = page
+    .getByRole('complementary', { name: 'Watchlist' })
+    .getByRole('row')
+    .filter({ has: page.getByRole('link', { name: 'AAPL', exact: true }) });
+  await expect(lastPrice).toHaveText(/^10[56]\.\d\d$/);
+  await expect(change).toHaveText(/\+\d/);
+  await expect(row.getByRole('cell').first()).toHaveText(/^10[56]\.\d\d$/);
+
+  // One read of all texts: the live bar changes a few times each second.
+  const texts = await page.evaluate(
+    ([lastElement, changeElement, rowElement]) => ({
+      last: lastElement?.textContent.trim() ?? '',
+      change: changeElement?.textContent.trim() ?? '',
+      rowCells: Array.from(rowElement?.querySelectorAll('td') ?? [], (cell) => cell.textContent.trim()),
+    }),
+    [await lastPrice.elementHandle(), await change.elementHandle(), await row.elementHandle()],
+  );
+  const previousClose = 104.5;
+  const last = Number(texts.last);
+  const changePercent = ((last - previousClose) / previousClose) * 100;
+  expect(texts.change).toBe(`+${(last - previousClose).toFixed(2)} (+${changePercent.toFixed(2)} %)`);
+  expect(texts.rowCells.slice(0, 2)).toEqual([texts.last, `+${changePercent.toFixed(2)} %`]);
+});
+
 test('the chart takes the new color scheme without a page reload', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('/instruments/SEHK/700?currency=HKD&bar_period=1-HOUR');

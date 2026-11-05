@@ -852,11 +852,18 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - The instrument page (`/instruments/<exchange>/<symbol>`) is a workbench.
   The left `SideColumn` "Watchlist" lists the watchlist instruments in 32px
   rows: symbol, last price, and change from the previous close (from the
-  daily bars). A row opens its instrument page with the same bar period. The
+  daily bars). The row of the open instrument shows the quote of the chart
+  header (`openQuote`). A row opens its instrument page with the same bar
+  period. The
   center `PanelSplit` has the chart panel and the "Paper account" panel. The
   chart panel header line has the instrument name, the last price, the change
   from the previous close, and the bar periods as a compact Carbon `sm`
-  content switcher with short names (1m, 5m, 15m, 30m, 1h, 1D). The switcher
+  content switcher with short names (1m, 5m, 15m, 30m, 1h, 1D). The last
+  price and the change come from one quote, `readDayQuote(daily bars, live
+  bar)`: the close of the live bar of the chart (any bar period) is the last
+  price, and the previous close is the close of the last daily bar before the
+  day of the live bar. Without a live bar, the last daily close is the last
+  price. The limit price starts with this last price. The switcher
   is 24px high and centered in the 32px header line, with space to the line
   edges and to the panel buttons. The arrow keys, Home,
   and End select a bar period at once. The page address keeps the bar period,
