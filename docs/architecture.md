@@ -854,8 +854,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   The left `SideColumn` "Watchlist" lists the watchlist instruments in 32px
   rows: symbol, last price, and change from the previous close (from the
   daily bars and the live daily bar of `/ws/watchlist-live-bars`, with
-  `readDayQuote`; `docs/architecture/market_data.md` section 8.5.1). The row
-  of the open instrument shows the quote of the chart header (`openQuote`). A row opens its instrument page with the same bar
+  `readDayQuote`; `docs/architecture/market_data.md` section 8.5.1). Each
+  row shows the latest quote of its instrument (`readLatestQuote`), the same
+  quote as the chart header. A row opens its instrument page with the same bar
   period. The
   center `PanelSplit` has the chart panel and the "Paper account" panel. The
   chart panel header line has the instrument name, the last price, the change
@@ -865,7 +866,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   bar)`: the close of the live bar of the chart (any bar period) is the last
   price, and the previous close is the close of the last daily bar before the
   day of the live bar. Without a live bar, the last daily close is the last
-  price. The limit price starts with this last price. The switcher
+  price. One map in `#lib/market_data` holds the latest quote of each
+  instrument: the live bars of the chart and of the watchlist write it
+  (`writeLatestQuote`), and a quote of the daily bars only is written only
+  when the instrument has no quote. The header and the watchlist rows read
+  it, so a click on a row never shows an older quote. The limit price starts
+  with this last price. The switcher
   is 24px high and centered in the 32px header line, with space to the line
   edges and to the panel buttons. The arrow keys, Home,
   and End select a bar period at once. The page address keeps the bar period,
