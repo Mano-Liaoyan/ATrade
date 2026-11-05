@@ -10,10 +10,11 @@
      stock split check shows its warning there too.
      The list reads again after each backtest change that /ws/backtests pushes; the open backtest reads again when its
      list row changes. The address #start-backtest (command palette) opens the New backtest dialog.
-     A single-instrument backtest has the "Equity" / "Bars" switcher (?chart=bars): "Bars" shows the bar chart of the
-     backtest range with the strategy indicators (docs/architecture/indicator.md section 23.9.8) and a mark for each
-     trade (section 23.9.9). Then the pointer or the focus on a Trades row gives its mark the focus ring, and a click
-     on a row selects it, shows "Bars", and scrolls the chart to the bar of the trade.
+     The "Equity" / "Bars" switcher (?chart=bars): "Bars" shows the bar chart of the backtest range with the strategy
+     indicators (docs/architecture/indicator.md section 23.9.8) and a mark for each trade (section 23.9.9). Then the
+     pointer or the focus on a Trades row gives its mark the focus ring, and a click on a row selects it, shows "Bars",
+     and scrolls the chart to the bar of the trade. A multi-instrument backtest shows one universe member: the
+     "Instrument" select, a Trades row, or an Instruments row selects it.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import { untrack } from 'svelte';
@@ -25,6 +26,7 @@
   import { navigating, page } from '$app/state';
   import {
     BACKTESTS_SOCKET_PATH,
+    ChartInstrumentSelect,
     ChartViewSwitcher,
     formatChartViewSearch,
     readChartView,
@@ -40,6 +42,7 @@
     isFinalStatus,
     KeyMetricRow,
     listBacktests,
+    listChartInstruments,
     readBacktest,
     readBacktestInstrument,
     UniverseInstrumentTable,
@@ -111,11 +114,24 @@
     runChart.load(fetch);
   });
 
-  function selectTradeRow(row: number): void {
-    if (backtestId === null) {
-      return;
+  function selectTradeRow(detail: BacktestDetail, row: number): void {
+    const { symbol, exchange } = detail.trades[row] ?? {};
+    if (symbol !== undefined && symbol !== null && exchange !== undefined && exchange !== null) {
+      runChart.selectInstrument(String(detail.id), { symbol, exchange });
     }
-    runChart.selectRow(String(backtestId), row);
+    runChart.selectRow(String(detail.id), row);
+    showBars();
+  }
+
+  function selectInstrumentRow(detail: BacktestDetail, row: number): void {
+    const member = detail.instruments[row];
+    if (member !== undefined) {
+      runChart.selectInstrument(String(detail.id), member);
+      showBars();
+    }
+  }
+
+  function showBars(): void {
     if (chartView !== 'bars') {
       changeChartView('bars');
     }
@@ -294,6 +310,8 @@
     {@const instrument = readBacktestInstrument(detail)}
     {@const universeLabel = formatUniverseLabel(detail, detail.instruments.length)}
     {@const chartKey = String(detail.id)}
+    {@const chartInstruments = listChartInstruments(detail)}
+    {@const chartInstrument = runChart.findInstrument(chartKey, chartInstruments)}
     <PanelSplit storageKey="atrade.backtest-page.panel-split" panels={PANELS}>
       {#snippet panel(id, state)}
         {#if id === 'chart'}
@@ -321,10 +339,19 @@
                 {/if}
               </h1>
               <span class="run-actions">
-                {#if instrument !== undefined}
+                {#if chartInstrument !== undefined}
                   <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
                 {/if}
-                {#if chartView === 'bars' && instrument !== undefined}
+                {#if chartView === 'bars' && chartInstrument !== undefined}
+                  {#if instrument === undefined}
+                    <ChartInstrumentSelect
+                      instruments={chartInstruments}
+                      value={chartInstrument}
+                      onValueChange={(selected: BacktestInstrument) => {
+                        runChart.selectInstrument(chartKey, selected);
+                      }}
+                    />
+                  {/if}
                   <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={detail.strategy_indicators} />
                 {/if}
                 <IconButton
@@ -360,13 +387,14 @@
             {#if detail.metrics !== null}
               <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} />
             {/if}
-            {#if chartView === 'bars' && instrument !== undefined}
+            {#if chartView === 'bars' && chartInstrument !== undefined}
               <div class="chart">
                 <RunBarChart
-                  {instrument}
+                  instrument={chartInstrument}
+                  isUniverseMember={instrument === undefined}
                   barPeriod={detail.bar_period}
                   range={{ startUtc: detail.start_utc, endUtc: detail.end_utc, sourceOrder: detail.source_order }}
-                  label="Bar chart of {formatInstrument(instrument)}, {detail.bar_period} bars"
+                  label="Bar chart of {formatInstrument(chartInstrument)}, {detail.bar_period} bars"
                   chart={runChart}
                   runKey={chartKey}
                   strategyIndicators={detail.strategy_indicators}
@@ -397,7 +425,7 @@
             }}
           >
             {#if selectedTable === 'trades'}
-              {#if instrument === undefined}
+              {#if chartInstrument === undefined}
                 <BacktestTradeTable trades={detail.trades} />
               {:else}
                 <BacktestTradeTable
@@ -406,11 +434,22 @@
                   onRowPoint={(row: number | null) => {
                     runChart.pointedRow = row;
                   }}
-                  onRowSelect={selectTradeRow}
+                  onRowSelect={(row: number) => {
+                    selectTradeRow(detail, row);
+                  }}
                 />
               {/if}
             {:else if selectedTable === 'instruments'}
-              <UniverseInstrumentTable instruments={detail.instruments} periodHeader={formatPeriodCountHeader(detail)} />
+              <UniverseInstrumentTable
+                instruments={detail.instruments}
+                periodHeader={formatPeriodCountHeader(detail)}
+                selectedIndex={chartView === 'bars' && instrument === undefined && chartInstrument !== undefined
+                  ? detail.instruments.findIndex((member) => member.symbol === chartInstrument.symbol && member.exchange === chartInstrument.exchange)
+                  : null}
+                onRowSelect={(row: number) => {
+                  selectInstrumentRow(detail, row);
+                }}
+              />
             {:else if selectedTable === 'orders'}
               <EmptyText text="No orders" />
             {:else if selectedTable === 'metrics'}

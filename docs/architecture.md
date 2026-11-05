@@ -1103,11 +1103,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   the AI assistant column and sends it when the conversation socket is open.
   Without an open conversation, the message stays in the input. The AI
   assistant reads the error itself (`read_backtest`, assistant section
-  25.4.1). A single-instrument backtest tab has the "Equity" / "Bars"
-  switcher of the backtest page (indicator section 23.9.8) in a line over
-  its body. "Bars" shows `RunBarChart` with the strategy indicators, "Add
-  indicator" (`RunAddIndicatorButton`), and the trade marks; its legend and
-  pane menus work as on the backtest page. The choice is not in the page
+  25.4.1). A backtest tab has the "Equity" / "Bars" switcher of the backtest
+  page (indicator section 23.9.8) in a line over its body. "Bars" shows
+  `RunBarChart` with the strategy indicators, "Add indicator"
+  (`RunAddIndicatorButton`), and the trade marks; its legend and pane menus
+  work as on the backtest page. A multi-instrument backtest also has the
+  "Instrument" select (`ChartInstrumentSelect`). The choice is not in the page
   address and stays while the page is open. A backtest
   of the strategy that ends opens in its tab. While the forward test socket is
   not connected, `LiveUpdatesNotification` shows under the toolbar. The editor panel has the file

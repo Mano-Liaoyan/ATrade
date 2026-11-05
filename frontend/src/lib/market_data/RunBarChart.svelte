@@ -2,7 +2,8 @@
      one instrument and bar period in a fixed range, read with the source order of the run (a long range in windows,
      `run_bars.ts`), and the run panes of `chart` (the strategy indicators and the changes of the user, not saved).
      `records` (the trades or the fills of the table) give the trade marks (section 23.9.9). The table row under the
-     pointer or the focus and the selected row (`chart`) ring their marks; the selected row centers its mark. -->
+     pointer or the focus and the selected row (`chart`) ring their marks; the selected row centers its mark. With
+     `isUniverseMember`, `instrument` is one member of a multi-instrument run: only its records get marks. -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { InlineNotification } from '#lib/foundation/carbon';
@@ -26,12 +27,13 @@
     runKey: string;
     strategyIndicators: readonly StrategyIndicator[];
     records: readonly TradeRecord[];
+    isUniverseMember?: boolean;
   }
 
-  const { instrument, barPeriod, range, label, chart, runKey, strategyIndicators, records }: Props = $props();
+  const { instrument, barPeriod, range, label, chart, runKey, strategyIndicators, records, isUniverseMember = false }: Props = $props();
 
   const panes = $derived(chart.indicators.readPanes(runKey, strategyIndicators));
-  const chartTrades = $derived(listChartTrades(records));
+  const chartTrades = $derived(listChartTrades(records, isUniverseMember ? instrument : undefined));
   const selectedRow = $derived(chart.readSelectedRow(runKey));
   const ringTrades = $derived(findRingTrades(chartTrades.tradeIndexByRow, chart.pointedRow, selectedRow));
   const centerTrade = $derived(findRowTrade(chartTrades.tradeIndexByRow, selectedRow));

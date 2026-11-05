@@ -1,6 +1,14 @@
 // Calls the backtest HTTP routes and turns each answer into a result that the backtest pages can show.
 import { describe, expect, it } from 'vite-plus/test';
-import { changeBacktestLimits, deleteBacktest, readBacktestLimits, startBacktest, type BacktestRequest } from './index';
+import {
+  changeBacktestLimits,
+  deleteBacktest,
+  listChartInstruments,
+  readBacktestLimits,
+  startBacktest,
+  type BacktestDetail,
+  type BacktestRequest,
+} from './index';
 
 const REQUEST: BacktestRequest = {
   strategy_version_id: 7,
@@ -105,5 +113,37 @@ describe('deleteBacktest', () => {
     const result = await deleteBacktest(refusingFetch, 21);
 
     expect(result).toEqual({ kind: 'failed', message: 'Backtest #21 is running. Wait for its end.' });
+  });
+});
+
+describe('listChartInstruments', () => {
+  const member = (symbol: string, trade_count: number): BacktestDetail['instruments'][number] => ({
+    symbol,
+    exchange: 'NASDAQ',
+    trade_count,
+    net_profit_usd: '0',
+    quarter_count: 1,
+  });
+  const backtest = (fields: Partial<BacktestDetail>): BacktestDetail =>
+    ({ symbol: null, exchange: null, currency: 'USD', instruments: [], ...fields }) as BacktestDetail;
+
+  it('gives the one instrument of a single-instrument backtest', () => {
+    expect(listChartInstruments(backtest({ symbol: 'AAPL', exchange: 'NASDAQ' }))).toEqual([
+      { symbol: 'AAPL', exchange: 'NASDAQ', currency: 'USD' },
+    ]);
+  });
+
+  it('gives the universe members with the backtest currency, the members with trades first', () => {
+    const instruments = [member('AAPL', 0), member('MSFT', 2), member('NVDA', 0)];
+
+    expect(listChartInstruments(backtest({ instruments })).map(({ symbol, currency }) => [symbol, currency])).toEqual([
+      ['MSFT', 'USD'],
+      ['AAPL', 'USD'],
+      ['NVDA', 'USD'],
+    ]);
+  });
+
+  it('gives no instrument without a currency', () => {
+    expect(listChartInstruments(backtest({ currency: null, instruments: [member('AAPL', 1)] }))).toEqual([]);
   });
 });
