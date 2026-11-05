@@ -270,3 +270,37 @@ async def test_still_trading_keeps_the_instruments_with_a_daily_bar_in_the_last_
 
     assert symbols(outcome) == ["WEEK", "NOW"]
     assert reasons(outcome) == {"GONE": "filters[0]: Still trading", "NONE": "No daily bars"}
+
+
+def custom(expression: str, name: str = "Custom") -> dict[str, Any]:
+    formula = {"name": name, "expression": expression, "chart_placement": "own"}
+    return {"indicator": "custom_1", "parameters": {}, "output": "value", "formula": formula}
+
+
+@pytest.mark.anyio
+async def test_a_custom_indicator_runs_from_the_expression_of_the_reference_and_a_no_value_excludes_one_instrument() -> (
+    None
+):
+    reference = custom("1 / (close - 10) + mean(close, 3) - mean(close, 3)")
+    good, zero = stock("GOOD"), stock("ZERO")
+    definition = make_definition(
+        conditions=[compare(reference, ">", "0")], order={"indicator": reference, "direction": "descending"}
+    )
+
+    outcome = await run(definition, {good: make_bars("11", 3), zero: make_bars("10", 3)})
+
+    assert symbols(outcome) == ["GOOD"]
+    assert outcome.rows[0].indicator_values == {"Custom": 1.0}
+    assert reasons(outcome) == {"ZERO": "No value: Custom"}
+
+
+@pytest.mark.anyio
+async def test_a_custom_indicator_reads_the_bars_of_its_look_back() -> None:
+    reference = custom("lag(mean(close, 4), 2)")
+    too_short, long_enough = stock("SHORT"), stock("LONG")
+    definition = make_definition(order={"indicator": reference, "direction": "descending"})
+
+    outcome = await run(definition, {too_short: make_bars("5", 5), long_enough: make_bars("5", 6)})
+
+    assert symbols(outcome) == ["LONG"]
+    assert reasons(outcome) == {"SHORT": "No value: Custom"}

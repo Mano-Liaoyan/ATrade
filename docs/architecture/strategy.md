@@ -503,7 +503,7 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
 | `universe` | Only in the universe mode (section 9.8.6). `{"rank_indicator": <indicator operand>, "rank_direction": "high_to_low" or "low_to_high", "hold_count": <int, 1 or more>, "rebalance_period": "weekly", "monthly", or "quarterly"}`. Single-instrument rules do not have the field. |
 | Group | `{"type": "group", "match": "all_of" or "any_of", "items": [...]}`. The items of the top group are conditions and groups. The items of a group in a group are conditions only. |
 | Condition | `{"type": "condition", "left", "comparison", "right"}`. `comparison` is `above`, `below`, `at_or_above`, `at_or_below`, `crosses_above`, or `crosses_below`. |
-| Operand | `{"type": "price", "price": "close" / "open" / "high" / "low"}`, `{"type": "number", "value": <int or float>}` (right side only), or `{"type": "indicator", ...}` with the fields of a stored indicator reference ([`indicator.md`](indicator.md) section 23.6). `check_indicator_reference` checks the reference. |
+| Operand | `{"type": "price", "price": "close" / "open" / "high" / "low"}`, `{"type": "number", "value": <int or float>}` (right side only), or `{"type": "indicator", ...}` with the fields of a stored indicator reference ([`indicator.md`](indicator.md) section 23.6). `check_indicator_reference` checks the reference. A custom indicator also has `formula`, and the code holds its expression ([`indicator.md`](indicator.md) section 23.10.2). |
 | `exits` | Each item is not selected when it is null (or `false`). `stop_loss_percent`: more than 0, less than 100. `take_profit_percent`: more than 0. `exit_after_bars`: an int, 1 or more. `exit_group`: a group, as the entry group. |
 
 - A rules body that does not match the format gets the FastAPI `422`
@@ -665,7 +665,8 @@ Decided (#201):
 - The rules hold the universe mode in `settings.universe` (section 9.8.2).
   When it is set, `make_rules_code` makes multi-instrument code, and
   `settings.position_size` is not used.
-- The rank indicator is an indicator operand (one of the 12 indicators).
+- The rank indicator is an indicator operand (one of the 12 indicators, or a
+  custom indicator).
   A wrong indicator, `hold_count` less than 1, or an unknown direction or
   period gives `422`.
 - The code gets the members from `UniverseUpdate` (section 9.8.7). Each

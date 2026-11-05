@@ -6,7 +6,7 @@ it. It walks the rules in a fixed order (entry group, then exit items), so the s
 
 from dataclasses import dataclass, field
 
-from atrade.indicator import INDICATOR_CATALOG, IndicatorDefinition
+from atrade.indicator import IndicatorDefinition, find_indicator_definition
 from atrade.strategy.strategy_rules import (
     IndicatorOperand,
     InnerRuleGroup,
@@ -52,10 +52,14 @@ class CodeParts:
         return f"self.settings.{name}"
 
     def find_indicator(self, operand: IndicatorOperand) -> IndicatorUse:
-        definition = INDICATOR_CATALOG[operand.indicator]
+        definition = find_indicator_definition(operand.model_dump(exclude={"type"}, exclude_none=True))
         parameters = definition.with_defaults(operand.parameters)
         for indicator in self.indicators:
-            if indicator.definition.key == definition.key and indicator.parameters == parameters:
+            is_same_definition = (indicator.definition.key, indicator.definition.expression) == (
+                definition.key,
+                definition.expression,
+            )
+            if is_same_definition and indicator.parameters == parameters:
                 return indicator
         indicator = IndicatorUse(f"{definition.key}_{len(self.indicators) + 1}", definition, parameters)
         self.indicators.append(indicator)
@@ -245,29 +249,43 @@ def write_chart_indicators(parts: CodeParts) -> list[str]:
     its configuration fields as parameters."""
     if not parts.indicators:
         return ["CHART_INDICATORS = []", "", ""]
-    items = [
-        f'    {{"indicator": "{indicator.definition.key}", "parameters": {{'
-        + ", ".join(f'"{name}": "{indicator.name}_{name}"' for name in indicator.parameters)
-        + "}},"
-        for indicator in parts.indicators
-    ]
     return [
         "# The bar chart of a backtest or a forward test shows these indicators. It has no effect on the run.",
         "CHART_INDICATORS = [",
-        *items,
+        *[write_chart_indicator(indicator) for indicator in parts.indicators],
         "]",
         "",
         "",
     ]
 
 
-def write_strategy(parts: CodeParts, entry: str, exit_checks: list[str], buy: list[str]) -> list[str]:
-    indicators = [
+def write_chart_indicator(indicator: IndicatorUse) -> str:
+    definition = indicator.definition
+    parameters = ", ".join(f'"{name}": "{indicator.name}_{name}"' for name in indicator.parameters)
+    if definition.expression is None:
+        return f'    {{"indicator": "{definition.key}", "parameters": {{{parameters}}}}},'
+    formula = {
+        "name": definition.name,
+        "expression": definition.expression,
+        "chart_placement": definition.chart_placement,
+    }
+    return f'    {{"indicator": "{definition.key}", "parameters": {{}}, "formula": {formula!r}}},'
+
+
+def write_indicator_object(indicator: IndicatorUse) -> str:
+    """The class with its configuration fields. A custom indicator holds the text of its expression (ADR 0009)."""
+    definition = indicator.definition
+    if definition.expression is not None:
+        return f"        self.{indicator.name} = atrade.indicator.FormulaIndicator({definition.expression!r})"
+    return (
         f"        self.{indicator.name} = atrade.indicator.{type_name(indicator)}("
         + ", ".join(f"{name}=config.{indicator.name}_{name}" for name in indicator.parameters)
         + ")"
-        for indicator in parts.indicators
-    ]
+    )
+
+
+def write_strategy(parts: CodeParts, entry: str, exit_checks: list[str], buy: list[str]) -> list[str]:
+    indicators = [write_indicator_object(indicator) for indicator in parts.indicators]
     values = [f'            "{key}": {expression},' for key, expression in parts.values.items()]
     exits = [line for check in exit_checks for line in (f"        if {check}:", "            return True")]
     return [
@@ -390,12 +408,7 @@ def write_universe_config(parts: CodeParts) -> list[str]:
 
 
 def write_member_indicators(parts: CodeParts) -> list[str]:
-    indicators = [
-        f"        self.{indicator.name} = atrade.indicator.{type_name(indicator)}("
-        + ", ".join(f"{name}=config.{indicator.name}_{name}" for name in indicator.parameters)
-        + ")"
-        for indicator in parts.indicators
-    ]
+    indicators = [write_indicator_object(indicator) for indicator in parts.indicators]
     return [
         "class MemberIndicators:",
         '    """The indicator objects of one member."""',

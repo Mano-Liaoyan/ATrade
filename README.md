@@ -95,6 +95,13 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   first. See
   [`docs/architecture/indicator.md`](docs/architecture/indicator.md)
   section 23.9.
+- Custom indicators: the Settings page creates, changes, and deletes indicators
+  from a formula expression, for example `close / sma(50) - 1`. They are in
+  "Add indicator", the screen conditions, and the rule builder. A saved screen,
+  strategy version, or backtest keeps its expression after a change or a delete.
+  Routes are under `/api/custom-indicators`. See
+  [`docs/architecture/indicator.md`](docs/architecture/indicator.md)
+  section 23.10.
 - Bars of a backtest or forward test: the "Bars" switch of the backtest
   page and the forward test page shows the bar chart of a single-instrument
   run, with the indicators of `CHART_INDICATORS` in the strategy code and a

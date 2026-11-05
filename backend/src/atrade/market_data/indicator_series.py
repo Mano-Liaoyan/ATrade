@@ -1,4 +1,4 @@
-"""Indicators on bar charts: the catalog route and the indicator series route (indicator.md section 23.9.6).
+"""Indicators on bar charts: the indicator series route (indicator.md section 23.9.6).
 
 The series route reads only saved bars and never calls IBKR. The chart first reads its bars with the bars route,
 which saves them. For each indicator the route also reads the last `screen_look_back_bars(parameters)` saved bars
@@ -12,12 +12,18 @@ from typing import Any, Literal, cast
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
-from pydantic import AwareDatetime, BaseModel, JsonValue
+from pydantic import AwareDatetime, BaseModel, Field, JsonValue
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
-from atrade.indicator import INDICATOR_CATALOG, IndicatorProblem, check_indicator_reference, create_indicator
+from atrade.indicator import (
+    INDICATOR_CATALOG,
+    IndicatorProblem,
+    check_indicator_reference,
+    create_indicator,
+    find_indicator_definition,
+)
 from atrade.market_data.bar_models import InstrumentField, find_range_problem
 from atrade.market_data.bar_reading import BarRequest, limit_to_complete_bars, read_saved_bars
 from atrade.market_data.bar_source import BarSource, check_source_order, read_source_order
@@ -39,8 +45,17 @@ class IndicatorParameterResponse(BaseModel):
     is_in_name: bool
 
 
+class IndicatorFormulaBody(BaseModel):
+    """The `formula` of a reference to a custom indicator (indicator.md section 23.10). A stored reference holds it, so
+    the reference keeps working after a change or a delete of the custom indicator (ADR 0009)."""
+
+    name: str
+    expression: str
+    chart_placement: str
+
+
 class IndicatorResponse(BaseModel):
-    """One indicator of the catalog (indicator.md sections 23.3 and 23.9.2)."""
+    """One indicator of the catalog (indicator.md sections 23.3 and 23.9.2), built-in or custom."""
 
     key: str
     name: str
@@ -52,10 +67,12 @@ class IndicatorResponse(BaseModel):
     outputs: list[str]
     # The meaning, the range, and the unit of the value.
     value_description: str
+    # A custom indicator only. A new reference to this indicator copies it.
+    formula: IndicatorFormulaBody | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
-def list_indicator_catalog() -> list[IndicatorResponse]:
-    """The indicator catalog in its own order. The screen page and the bar charts read it."""
+def list_built_in_indicators() -> list[IndicatorResponse]:
+    """The built-in indicators in the order of the catalog."""
     return [
         IndicatorResponse(
             key=definition.key,
@@ -89,7 +106,7 @@ class IndicatorSeriesBody(BaseModel):
     end_utc: AwareDatetime
     # Without source_order, the route reads through the global source order.
     source_order: list[BarSource] | None = None
-    # Each item is `{"indicator", "parameters"}`. The route checks them with `check_indicator_reference`, so that each
+    # Each item is `{"indicator", "parameters"}`, and `formula` for a custom indicator. The route checks them with `check_indicator_reference`, so that each
     # problem has its location.
     indicators: list[JsonValue]
 
@@ -98,6 +115,7 @@ class IndicatorSeries(BaseModel):
     indicator: str
     # All parameters, with the defaults.
     parameters: dict[str, int | float]
+    formula: IndicatorFormulaBody | None = Field(default=None, exclude_if=lambda value: value is None)
     # One value for each time of the answer. None is "no value".
     outputs: dict[str, list[float | None]]
 
@@ -138,9 +156,9 @@ def check_indicator_list(indicators: list[JsonValue]) -> list[IndicatorProblemRe
 def calculate_series(reference: Mapping[str, Any], warm_up_bars: list[Bar], bars: list[Bar]) -> IndicatorSeries:
     """Gives the last `screen_look_back_bars` warm-up bars and then the bars to `update(bar)` of a new indicator.
     Returns the outputs at the bars only."""
-    definition = INDICATOR_CATALOG[reference["indicator"]]
+    definition = find_indicator_definition(reference)
     parameters = definition.with_defaults(reference.get("parameters", {}))
-    indicator = create_indicator({"indicator": definition.key, "parameters": parameters}, has_output=False)
+    indicator = create_indicator({**reference, "parameters": parameters}, has_output=False)
     warm_up_count = definition.screen_look_back_bars(parameters)
     for bar in warm_up_bars[-warm_up_count:]:
         indicator.update(bar)
@@ -150,16 +168,13 @@ def calculate_series(reference: Mapping[str, Any], warm_up_bars: list[Bar], bars
         for output, values in outputs.items():
             value = cast("float | None", getattr(indicator, output))
             values.append(None if value is None else float(value))
-    return IndicatorSeries(indicator=definition.key, parameters=parameters, outputs=outputs)
+    return IndicatorSeries(
+        indicator=definition.key, parameters=parameters, formula=reference.get("formula"), outputs=outputs
+    )
 
 
 def create_indicator_series_router(*, database_url: str, clock: Clock) -> APIRouter:
     router = APIRouter()
-
-    @router.get("/api/market-data/indicators")
-    async def list_indicators(  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.
-    ) -> list[IndicatorResponse]:
-        return list_indicator_catalog()
 
     @router.post(
         "/api/market-data/indicator-series",
@@ -191,7 +206,7 @@ def create_indicator_series_router(*, database_url: str, clock: Clock) -> APIRou
         references = [cast("Mapping[str, Any]", reference) for reference in body.indicators]
         warm_up_count = max(
             (
-                INDICATOR_CATALOG[reference["indicator"]].screen_look_back_bars(reference.get("parameters", {}))
+                find_indicator_definition(reference).screen_look_back_bars(reference.get("parameters", {}))
                 for reference in references
             ),
             default=0,

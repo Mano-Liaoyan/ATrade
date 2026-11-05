@@ -118,7 +118,7 @@ export function referenceOf(catalog: ScreenIndicator[], key: string, kind: Indic
   const indicator = catalog.find((candidate) => candidate.key === key);
   const parameters = Object.fromEntries((indicator?.parameters ?? []).map((parameter) => [parameter.name, parameter.default]));
   const output = kind === 'close_versus_line' ? (LINE_OUTPUTS[key] ?? 'value') : (indicator?.outputs[0] ?? 'value');
-  return { indicator: key, parameters, output };
+  return { indicator: key, parameters, output, ...(indicator?.formula === undefined || indicator.formula === null ? {} : { formula: indicator.formula }) };
 }
 
 function formatParameter(value: unknown): string {
@@ -128,6 +128,10 @@ function formatParameter(value: unknown): string {
 /** The UI name of an indicator reference, as the backend makes it (indicator.md section 23.3), for example RSI(14). */
 export function nameIndicator(catalog: ScreenIndicator[], value: unknown): string {
   const indicatorReference = (value ?? {}) as Item;
+  const formula = indicatorReference['formula'] as { name: string } | undefined;
+  if (formula !== undefined) {
+    return formula.name;
+  }
   const indicator = catalog.find((candidate) => candidate.key === indicatorReference['indicator']);
   if (indicator === undefined) {
     return formatParameter(indicatorReference['indicator']);

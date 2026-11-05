@@ -1,7 +1,7 @@
-<!-- Settings page (docs/architecture.md section 13): the HK instrument list editor and the source order of the bar
-     sources. -->
+<!-- Settings page (docs/architecture.md section 13): the HK instrument list editor, the source order of the bar
+     sources, and the custom indicators. -->
 <script lang="ts">
-  import { HkInstrumentListEditor, SourceOrderList } from '#lib/market_data';
+  import { CustomIndicatorEditor, HkInstrumentListEditor, SourceOrderList } from '#lib/market_data';
 </script>
 
 <div class="settings">
@@ -11,6 +11,7 @@
     <HkInstrumentListEditor />
   </section>
   <SourceOrderList />
+  <CustomIndicatorEditor />
 </div>
 
 <style>

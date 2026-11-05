@@ -35,6 +35,14 @@ class NumberOperand(RuleModel):
     value: Annotated[Number, Field(allow_inf_nan=False)]
 
 
+class IndicatorFormula(RuleModel):
+    """The `formula` of a reference to a custom indicator (indicator.md section 23.10)."""
+
+    name: str
+    expression: str
+    chart_placement: str
+
+
 class IndicatorOperand(RuleModel):
     """A stored indicator reference. A single-line indicator without `output` uses `value`."""
 
@@ -42,6 +50,8 @@ class IndicatorOperand(RuleModel):
     indicator: str
     parameters: dict[str, Number] = Field(default_factory=dict[str, Number])
     output: str | None = None
+    # Rules without a custom indicator do not hold the field, so their saved JSON stays the same as before #372.
+    formula: IndicatorFormula | None = Field(default=None, exclude_if=lambda value: value is None)
 
     @model_validator(mode="after")
     def check_reference(self) -> IndicatorOperand:

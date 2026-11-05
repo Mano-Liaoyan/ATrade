@@ -81,6 +81,7 @@ export {
   type BarsResult,
   type ChartRequest,
 } from './bars';
+export { default as CustomIndicatorEditor } from './CustomIndicatorEditor.svelte';
 export { default as HkInstrumentListEditor } from './HkInstrumentListEditor.svelte';
 export {
   addToHkInstrumentList,

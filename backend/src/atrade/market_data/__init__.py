@@ -16,6 +16,7 @@ from atrade.market_data.bar_reading import (
 )
 from atrade.market_data.bar_source import BarSource, check_source_order, read_source_order
 from atrade.market_data.bar_store import SavedBarCoverage
+from atrade.market_data.custom_indicators import list_indicator_catalog
 from atrade.market_data.daily_bar_summary import (
     DailyBarSummary,
     read_daily_bar_summaries,
@@ -56,7 +57,7 @@ from atrade.market_data.import_check import (
     check_import_detections,
     read_unchecked_import_detections,
 )
-from atrade.market_data.indicator_series import IndicatorResponse, list_indicator_catalog
+from atrade.market_data.indicator_series import IndicatorResponse
 from atrade.market_data.instrument_lookup import (
     GatewayNotReachableError,
     InstrumentLookup,

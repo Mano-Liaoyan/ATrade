@@ -2,7 +2,14 @@
 
 import pytest
 
-from atrade.indicator import MACD, RSI, IndicatorProblem, check_indicator_reference, create_indicator
+from atrade.indicator import (
+    MACD,
+    RSI,
+    IndicatorProblem,
+    check_indicator_reference,
+    create_indicator,
+    find_indicator_definition,
+)
 
 
 def test_a_correct_reference_has_no_problems() -> None:
@@ -112,3 +119,45 @@ def test_a_chart_reference_has_no_output_and_names_all_outputs() -> None:
         IndicatorProblem(("output",), "Unknown field 'output'. Known fields: indicator, parameters.")
     ]
     assert create_indicator(reference, has_output=False).initialized is False
+
+
+FORMULA = {"name": "Ratio", "expression": "close / sma(5)", "chart_placement": "own"}
+CUSTOM_REFERENCE = {"indicator": "custom_3", "parameters": {}, "output": "value", "formula": FORMULA}
+
+
+def test_a_reference_to_a_custom_indicator_holds_its_formula() -> None:
+    assert check_indicator_reference(CUSTOM_REFERENCE) == []
+    assert create_indicator(CUSTOM_REFERENCE).initialized is False
+
+
+def test_a_chart_reference_to_a_custom_indicator_has_no_output() -> None:
+    reference = {"indicator": "custom_3", "formula": FORMULA}
+    assert check_indicator_reference(reference, has_output=False) == []
+
+
+def test_the_definition_of_a_formula_has_the_look_back_of_the_expression() -> None:
+    definition = find_indicator_definition(CUSTOM_REFERENCE)
+    assert definition.display_name({}) == "Ratio"
+    assert definition.screen_look_back_bars({}) == 5
+    assert definition.outputs == ("value",)
+
+
+@pytest.mark.parametrize(
+    ("reference", "location"),
+    [
+        ({"indicator": "custom_3"}, ("formula",)),
+        ({"indicator": "custom_3", "formula": {**FORMULA, "expression": "foo"}}, ("formula", "expression")),
+        ({"indicator": "custom_3", "formula": {**FORMULA, "expression": 3}}, ("formula", "expression")),
+        ({"indicator": "custom_3", "formula": {**FORMULA, "name": ""}}, ("formula", "name")),
+        ({"indicator": "custom_3", "formula": {**FORMULA, "chart_placement": "x"}}, ("formula", "chart_placement")),
+        ({"indicator": "custom_3", "formula": {**FORMULA, "extra": 1}}, ("formula", "extra")),
+        ({"indicator": "custom_3", "formula": FORMULA, "parameters": {"period": 1}}, ("parameters", "period")),
+        ({"indicator": "custom_3", "formula": FORMULA, "output": "upper"}, ("output",)),
+        ({"indicator": "sma", "formula": FORMULA}, ("formula",)),
+        ({"indicator": "custom_x", "formula": FORMULA}, ("formula",)),
+    ],
+)
+def test_refuses_a_wrong_reference_to_a_custom_indicator(
+    reference: dict[str, object], location: tuple[str, ...]
+) -> None:
+    assert location in [problem.location for problem in check_indicator_reference(reference)]

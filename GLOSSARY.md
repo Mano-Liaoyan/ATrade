@@ -68,9 +68,25 @@ high / low of the last n daily bars − 1). The catalog key is `adr_percent`.
 The value 5.2 is 5.2 %. In Chinese, write 平均日波幅.
 _Avoid_: ATR
 
+**Custom indicator**:
+An indicator that the user adds as a formula expression, for example
+`close / sma(50) - 1`. It has a name, an expression, a chart placement, and a
+value description. Screens, strategies, and bar charts use it as a built-in
+indicator of the catalog. Each stored reference holds a copy of its expression.
+In Chinese, write 自定义指标.
+_Avoid_: user indicator, script indicator, formula indicator
+
+**Formula expression**:
+The text that calculates a custom indicator. It uses numbers, `+ - * / **`, bar
+fields, the functions `mean max min sum std lag abs log`, and built-in
+indicators. It is not Python code. In Chinese, write 公式表达式.
+_Avoid_: script, code
+
 **No value**:
 The state of an indicator at a time when the instrument does not have
-enough bars to calculate it, or its bars have no usable value. It is not 0. A screen excludes the instrument
+enough bars to calculate it, when its bars have no usable value, or when a
+formula has no finite number, for example after a divide by zero. It is not 0.
+A screen excludes the instrument
 with this reason. In Chinese, write 无值.
 _Avoid_: null, NaN, empty, 0
 

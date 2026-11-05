@@ -16,7 +16,7 @@ from typing import Any, cast
 
 from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
-from atrade.indicator import INDICATOR_CATALOG, create_indicator
+from atrade.indicator import create_indicator, find_indicator_definition
 from atrade.market_data import DailyBarSummary
 
 type DailyBarsReader = Callable[[list[Instrument], datetime, int], Awaitable[dict[Instrument, list[Bar]]]]
@@ -81,14 +81,14 @@ class IndicatorColumn:
 
 def name_indicator(reference: Mapping[str, object]) -> str:
     """For example "RSI(14)", or "Donchian channel(20) upper" for an output that is not `value`."""
-    definition = INDICATOR_CATALOG[cast("str", reference["indicator"])]
+    definition = find_indicator_definition(reference)
     name = definition.display_name(cast("Mapping[str, int | float]", reference.get("parameters", {})))
     output = cast("str", reference.get("output", "value"))
     return name if output == "value" else f"{name} {output}"
 
 
 def make_column(reference: Mapping[str, object]) -> IndicatorColumn:
-    definition = INDICATOR_CATALOG[cast("str", reference["indicator"])]
+    definition = find_indicator_definition(reference)
     parameters = cast("Mapping[str, int | float]", reference.get("parameters", {}))
     return IndicatorColumn(
         name=name_indicator(reference),

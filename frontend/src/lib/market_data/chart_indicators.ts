@@ -7,6 +7,8 @@ import type { IndicatorSeriesResult } from './indicator_series';
 
 /** One indicator of `GET /api/market-data/indicators`. */
 export type ChartIndicatorDefinition = components['schemas']['IndicatorResponse'];
+/** A reference to a custom indicator holds it, so the reference works after a change or a delete (section 23.10). */
+export type IndicatorFormula = components['schemas']['IndicatorFormulaBody'];
 export type ChartLineStyle = 'solid' | 'dashed' | 'dotted';
 
 /** One line of an indicator. `color` is a palette index from 1 to 14. `width` is 1 to 4 pixels. */
@@ -23,6 +25,8 @@ export interface ChartIndicator {
   parameters: Record<string, number>;
   hidden: boolean;
   lines: ChartIndicatorLine[];
+  /** A custom indicator only. */
+  formula?: IndicatorFormula | null;
 }
 
 /** The first pane is the price pane. The others are own panes, in the order on the chart. */
@@ -72,6 +76,31 @@ export const MAX_OWN_PANES = 3;
 const NEW_LINE_STYLE: ChartLineStyle = 'solid';
 const NEW_LINE_WIDTH = 2;
 
+/**
+ * The definition of a reference: the definition of its `formula` when it has one, else the catalog item. A deleted
+ * custom indicator is not in the catalog, and a changed one has another expression there.
+ */
+export function findChartDefinition(
+  catalog: readonly ChartIndicatorDefinition[],
+  reference: { indicator: string; formula?: IndicatorFormula | null },
+): ChartIndicatorDefinition | undefined {
+  const { indicator, formula } = reference;
+  const catalogItem = catalog.find((item) => item.key === indicator);
+  if (formula === undefined || formula === null) {
+    return catalogItem;
+  }
+  return {
+    key: indicator,
+    name: formula.name,
+    short_name: formula.name,
+    chart_placement: formula.chart_placement === 'price' ? 'price' : 'own',
+    parameters: [],
+    outputs: ['value'],
+    value_description: catalogItem?.value_description ?? '',
+    formula,
+  };
+}
+
 /** The parameters of the indicator with the catalog defaults for the missing ones, in the catalog order. */
 export function withDefaults(definition: ChartIndicatorDefinition, parameters: Record<string, number>): Record<string, number> {
   return Object.fromEntries(definition.parameters.map((parameter) => [parameter.name, parameters[parameter.name] ?? parameter.default]));
@@ -118,6 +147,7 @@ export function createChartIndicator(definition: ChartIndicatorDefinition, panes
       style: NEW_LINE_STYLE,
       width: NEW_LINE_WIDTH,
     })),
+    ...(definition.formula === undefined || definition.formula === null ? {} : { formula: definition.formula }),
   };
 }
 
@@ -265,21 +295,22 @@ export function isAddIndicatorShortcut(keys: ShortcutKeys): boolean {
 
 type IndicatorSeries = IndicatorSeriesResult['series'][number];
 
-function formatParametersKey(indicator: string, parameters: Record<string, number>): string {
+// 2 references to one custom indicator can have 2 expressions (section 23.10).
+function formatParametersKey(indicator: string, parameters: Record<string, number>, formula: IndicatorFormula | null | undefined): string {
   const entries = Object.entries(parameters).sort(([first], [second]) => first.localeCompare(second));
-  return JSON.stringify([indicator, entries]);
+  return JSON.stringify([indicator, entries, formula?.expression ?? null]);
 }
 
 /** The series of the answer for the indicator: the same key and parameters. Null while the answer has none. */
 export function findIndicatorSeries(
   result: IndicatorSeriesResult | null,
-  indicator: Pick<ChartIndicator, 'indicator' | 'parameters'> | undefined,
+  indicator: Pick<ChartIndicator, 'indicator' | 'parameters' | 'formula'> | undefined,
 ): IndicatorSeries | null {
   if (result === null || indicator === undefined) {
     return null;
   }
-  const key = formatParametersKey(indicator.indicator, indicator.parameters);
-  return result.series.find((series) => formatParametersKey(series.indicator, series.parameters) === key) ?? null;
+  const key = formatParametersKey(indicator.indicator, indicator.parameters, indicator.formula);
+  return result.series.find((series) => formatParametersKey(series.indicator, series.parameters, series.formula) === key) ?? null;
 }
 
 /**
@@ -294,7 +325,7 @@ export function buildLegendRows(
   dark: boolean,
 ): LegendRow[] {
   return indicators.flatMap((indicator, indicatorIndex) => {
-    const definition = catalog.find((item) => item.key === indicator.indicator);
+    const definition = findChartDefinition(catalog, indicator);
     if (definition === undefined) {
       return [];
     }

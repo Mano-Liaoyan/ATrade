@@ -161,3 +161,26 @@ describe('screen draft', () => {
     expect(switchMarket(definition, 'US').start).toBe('quarter_universe');
   });
 });
+
+describe('custom indicators', () => {
+  const formula = { name: 'Ratio', expression: 'close / sma(5)', chart_placement: 'own' };
+  const custom: ScreenIndicator = {
+    key: 'custom_1',
+    name: 'Ratio',
+    short_name: 'Ratio',
+    chart_placement: 'own',
+    parameters: [],
+    outputs: ['value'],
+    value_description: '',
+    formula,
+  };
+
+  it('a new reference holds the formula', () => {
+    expect(referenceOf([custom], 'custom_1', 'compare')).toEqual({ indicator: 'custom_1', parameters: {}, output: 'value', formula });
+  });
+
+  it('a reference gets its name from its formula, also after a delete', () => {
+    const order = { indicator: { indicator: 'custom_1', parameters: {}, output: 'value', formula }, direction: 'descending' };
+    expect(nameDefinitionIndicators({ ...definition, order }, []).order).toBe('Ratio');
+  });
+});

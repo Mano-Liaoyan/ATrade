@@ -1,14 +1,14 @@
 // The strategy indicators of a backtest or forward test bar chart (docs/architecture/indicator.md section 23.9.8):
 // `strategy_indicators` of the detail route, from CHART_INDICATORS of the strategy version code.
 import type { components } from '#lib/api';
-import { addChartIndicator, withDefaults, type ChartIndicatorDefinition, type ChartPane } from './chart_indicators';
+import { addChartIndicator, findChartDefinition, withDefaults, type ChartIndicatorDefinition, type ChartPane } from './chart_indicators';
 
 export type StrategyIndicator = components['schemas']['ChartIndicator'];
 
 /**
  * The panes of the strategy indicators: each indicator is added as a new indicator (section 23.9.3: placement and the
  * next free colors), with its parameters and the catalog defaults of the others. An indicator that is not in the
- * catalog is left out.
+ * catalog and has no formula is left out.
  */
 export function placeStrategyIndicators(
   strategyIndicators: readonly StrategyIndicator[],
@@ -16,7 +16,7 @@ export function placeStrategyIndicators(
 ): ChartPane[] {
   let panes: ChartPane[] = [{ indicators: [] }];
   for (const item of strategyIndicators) {
-    const definition = catalog.find((entry) => entry.key === item.indicator);
+    const definition = findChartDefinition(catalog, item);
     if (definition === undefined) {
       continue;
     }

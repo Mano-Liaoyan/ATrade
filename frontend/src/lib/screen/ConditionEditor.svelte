@@ -9,6 +9,7 @@
     LINE_OUTPUTS,
     MARKET_EXCHANGES,
     START_CHOICES,
+    nameIndicator,
     referenceOf,
     type IndicatorConditionKind,
     type ScreenIndicator,
@@ -65,11 +66,16 @@
   );
   const reference = $derived((item['indicator'] ?? {}) as Item);
   const indicator = $derived(catalog.find((candidate) => candidate.key === reference['indicator']));
-  const indicatorItems = $derived(
-    (kind === 'close_versus_line' ? catalog.filter((candidate) => candidate.key in LINE_OUTPUTS) : catalog).map(
-      (candidate) => ({ value: candidate.key, label: candidate.name }),
-    ),
-  );
+  const indicatorItems = $derived([
+    ...(kind === 'close_versus_line'
+      ? catalog.filter((candidate) => candidate.key in LINE_OUTPUTS || candidate.formula?.chart_placement === 'price')
+      : catalog
+    ).map((candidate) => ({ value: candidate.key, label: candidate.name })),
+    // A deleted custom indicator stays selectable: the reference holds its expression.
+    ...(indicator === undefined && reference['formula'] !== undefined
+      ? [{ value: text(reference['indicator']), label: nameIndicator(catalog, reference) }]
+      : []),
+  ]);
 
   function text(value: unknown): string {
     return typeof value === 'string' || typeof value === 'number' ? String(value) : '';
