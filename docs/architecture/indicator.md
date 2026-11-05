@@ -830,9 +830,10 @@ section 6.2).
   `foundation/carbon` gets `NumberInput`. `foundation` gets the `Command`
   dialog.
 - Done in #327:
-  - `market_data/indicator_series.py`: `list_indicator_catalog()` (also the
-    body of `GET /api/screen-indicators`), the series route, and the
-    warm-up.
+  - `market_data/indicator_series.py`: the series route and the warm-up.
+    `market_data/custom_indicators.py`: the async
+    `list_indicator_catalog(database_url)` (also the body of
+    `GET /api/screen-indicators`).
   - `foundation/command_dialog`: `CommandDialog` (Carbon modal, Bits UI
     Command, one list, an optional action button on each item).
   - `#lib/market_data`: `AddIndicatorButton` (the header button, the `/`
@@ -917,6 +918,13 @@ that is not in the table, a comparison, a list, or a text outside `output`.
 An expression has at most 500 characters and 20 levels, and reads at most 20000
 bars. `check_expression(expression)` returns the problem with its column.
 
+The window bars x the bars read of an expression must be at most 10000000. The
+window bars are the sum of each `n` of a rolling function and of `lag`, and the
+look-back of each built-in indicator without a look-back factor. An exponential
+average has a look-back factor and keeps one number, so it counts 0. The bars
+read are the look-back of section 23.10.3. So `std(close, 1000) / ema(1000)`
+passes, and 11 windows of 1000 bars are refused.
+
 An expression cannot call a custom indicator. A custom indicator has no
 parameters and has one output, `value`.
 
@@ -943,13 +951,20 @@ A stored reference holds a copy of the expression (ADR 0009):
   `formula`. No database read is necessary, so a saved reference works after
   a change or a delete of the custom indicator.
 - A change does not reach saved references, also not the chart indicator set.
-  To use the new expression, the user selects the indicator again.
+  A screen condition and a rule builder operand with a formula that is not
+  equal to the catalog show the button "Use current expression". It copies
+  `formula` of the catalog into the reference. The Select cannot do this: a
+  click on the selected item changes nothing. A `close_versus_line` condition
+  does not show the button when the catalog chart placement is not `price`. On
+  a chart, the user removes the indicator and adds it again.
 - Strategy code has `FormulaIndicator(<expression>)`. `CHART_INDICATORS` has
   `formula` as a dict literal of string literals.
   A backtest child and a forward test child read no custom indicator row.
 - A screen with 1 name and 2 expressions is refused (`check_screen`), because
-  a result names its columns by the indicator name. A name has no parentheses,
-  so it cannot be equal to the UI name of a built-in indicator.
+  a result names its columns by the indicator name. The problem tells the user
+  to click "Use current expression" in each place or to select another
+  indicator. A name has no parentheses, so it cannot be equal to the UI name of
+  a built-in indicator.
 
 ### 23.10.3 Values
 
@@ -964,6 +979,13 @@ expression gets each bar. `initialized` is `True` while `value` is a number.
   NaN, and infinity give "no value" at that bar. A rolling function has "no value"
   while a value of its window has none. The class raises no exception for a bar,
   so one instrument cannot stop a screen run.
+- Rolling calculation: each bar adds one value and removes one value. `mean`,
+  `sum`, and `std` keep integer totals, so they keep no rounding error of a value
+  that left the window. `max` and `min` keep the values that can become the
+  extreme.
+- Thread: a screen run and the series route calculate in a thread
+  (`asyncio.to_thread`), so the event loop serves other requests. A screen run
+  keeps the order of the instruments.
 
 ### 23.10.4 Table and routes
 
@@ -982,8 +1004,9 @@ Table `custom_indicator`: `custom_indicator_id`, `name` (unique, without case),
 
 The problems are: a name with less than 1 or more than 60 characters, a name
 with parentheses, a name that another custom indicator has, a problem of the
-expression, an unknown chart placement, and a value description with less than
-1 or more than 1000 characters.
+expression, an unknown chart placement, a value description with less than 1 or
+more than 1000 characters, and a NUL or a lone surrogate character in a name or
+a value description.
 
 `GET /api/market-data/indicators` and `GET /api/screen-indicators` give the
 built-in indicators, then the custom indicators by name. A custom indicator has
@@ -1004,6 +1027,6 @@ The routes are methods of `CustomIndicatorRoutes` in
   select of the rule builder show the custom indicators after the built-in
   indicators. A custom indicator with the chart placement `price` is also a
   line of a `close_versus_line` condition.
-- A reference to a deleted custom indicator shows its name from `formula`, and
-  stays selected.
+- A reference to a deleted custom indicator, or to a line that is no longer on
+  the price scale, shows its name from `formula`, and stays selected.
 - A chart shows a custom indicator with the price number format.

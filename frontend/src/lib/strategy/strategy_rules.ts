@@ -187,6 +187,21 @@ export function createOperand(choice: OperandChoice, customIndicators: readonly 
   return firstLine === undefined ? operand : { ...operand, output: firstLine[0] };
 }
 
+/**
+ * The operand with the formula of the catalog. Null when the operand already has it or the indicator is deleted. The
+ * Select cannot do this: a click on the selected item changes nothing.
+ */
+export function readCurrentOperand(operand: RightOperand, customIndicators: readonly CustomIndicatorChoice[]): IndicatorOperand | null {
+  const formula = operand.type === 'indicator' ? operand.formula : null;
+  const current = operand.type === 'indicator' ? customIndicators.find((item) => item.key === operand.indicator)?.formula : null;
+  if (operand.type !== 'indicator' || !formula || !current) {
+    return null;
+  }
+  const isSame =
+    formula.name === current.name && formula.expression === current.expression && formula.chart_placement === current.chart_placement;
+  return isSame ? null : { ...operand, formula: current };
+}
+
 export function createCondition(): RuleCondition {
   return {
     type: 'condition',

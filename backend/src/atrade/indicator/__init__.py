@@ -25,6 +25,7 @@ from atrade.indicator.formula_reference import (
     check_chart_placement,
     check_formula,
     check_name,
+    has_unstorable_character,
     is_custom_key,
 )
 from atrade.indicator.indicator_catalog import (
@@ -76,5 +77,6 @@ __all__ = [
     "count_formula_bars",
     "create_indicator",
     "find_indicator_definition",
+    "has_unstorable_character",
     "is_custom_key",
 ]

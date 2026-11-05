@@ -6,6 +6,7 @@ before the range (the warm-up), gives all bars to `update(bar)` of the indicator
 range. So a chart value is equal to the screen value at the same daily bar.
 """
 
+import asyncio
 from collections.abc import Mapping
 from datetime import datetime, timedelta
 from typing import Any, Literal, cast
@@ -173,6 +174,12 @@ def calculate_series(reference: Mapping[str, Any], warm_up_bars: list[Bar], bars
     )
 
 
+def calculate_all_series(
+    references: list[Mapping[str, Any]], warm_up_bars: list[Bar], bars: list[Bar]
+) -> list[IndicatorSeries]:
+    return [calculate_series(reference, warm_up_bars, bars) for reference in references]
+
+
 def create_indicator_series_router(*, database_url: str, clock: Clock) -> APIRouter:
     router = APIRouter()
 
@@ -214,10 +221,9 @@ def create_indicator_series_router(*, database_url: str, clock: Clock) -> APIRou
         warm_up_bars = await read_warm_up_bars(
             database_url, source_order, BarRequest(instrument, body.bar_period, complete_range), warm_up_count
         )
-        return IndicatorSeriesResponse(
-            times=[int(bar.start_utc.timestamp()) for bar in bars],
-            series=[calculate_series(reference, warm_up_bars, bars) for reference in references],
-        )
+        # In a thread, so the event loop serves other requests during a long calculation.
+        series = await asyncio.to_thread(calculate_all_series, references, warm_up_bars, bars)
+        return IndicatorSeriesResponse(times=[int(bar.start_utc.timestamp()) for bar in bars], series=series)
 
     return router
 

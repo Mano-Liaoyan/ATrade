@@ -1,6 +1,11 @@
 """Formula expressions: the parser, the values, "no value", and the look-back (indicator.md section 23.10)."""
 
+import math
+import random
 import re
+import statistics
+import time
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -251,6 +256,42 @@ def test_refuses_an_expression_that_reads_too_many_bars() -> None:
     assert [problem.message for problem in problems] == ["Column 1: An expression reads at most 20000 bars, not 21000."]
 
 
+def test_refuses_an_expression_that_calculates_too_many_window_values() -> None:
+    """The expression of the review of #378: it passed the check, and 3 instruments took 70 seconds."""
+    four_windows = f"({'+'.join(['std(close,1000)'] * 4)})"
+    expression = "+".join(
+        [*[four_windows] * 5, "std(close,1000)", "std(close,1000)", "lag(lag(lag(lag(close,1000),1000),1000),1000)"]
+    )
+
+    problems = check_expression(expression)
+
+    assert len(expression) <= 500
+    assert [(problem.location, problem.message) for problem in problems] == [
+        (
+            ("expression",),
+            (
+                "Column 1: The windows of the expression have 26000 bars, and the expression reads 4001 bars. "
+                "Window bars x bars read must be at most 10000000, not 104026000. Use fewer or shorter windows."
+            ),
+        )
+    ]
+
+
+@pytest.mark.parametrize(
+    "expression",
+    [
+        "std(close, 252) / mean(close, 252)",
+        "mean(close, 1000) + mean(close, 500) + mean(close, 252) + mean(close, 200)",
+        "std(close, 1000) / mean(close, 1000) * lag(close, 1000)",
+        "std(close, 1000) / ema(1000)",
+        "macd(999, 1000, 1000, output='value')",
+        "realized_volatility(252) / realized_volatility(20)",
+    ],
+)
+def test_accepts_the_long_windows_of_a_normal_expression(expression: str) -> None:
+    assert check_expression(expression) == []
+
+
 def test_a_problem_gives_its_column() -> None:
     assert [problem.message for problem in check_expression("close + foo")] == [
         "Column 9: Unknown name 'foo'. Known names: open, high, low, close, volume."
@@ -282,6 +323,74 @@ def test_no_catalog_key_is_a_formula_function_or_a_bar_field() -> None:
 
 def test_no_catalog_key_uses_the_custom_key_form() -> None:
     assert not [key for key in INDICATOR_CATALOG if key.startswith("custom_")]
+
+
+@pytest.mark.parametrize(
+    ("name", "function"),
+    [
+        ("mean", statistics.fmean),
+        ("sum", math.fsum),
+        ("std", statistics.stdev),
+        ("max", max),
+        ("min", min),
+    ],
+)
+@pytest.mark.parametrize("window", [2, 3, 50])
+@pytest.mark.parametrize("spike", [1.0, 1e8])
+def test_a_rolling_value_is_equal_to_the_function_of_the_full_window(
+    name: str, function: Callable[[Sequence[float]], float], window: int, spike: float
+) -> None:
+    """A very large value that leaves the window leaves no rounding error in the later values."""
+    generator = random.Random(378)
+    closes = [round(generator.uniform(90, 110), 2) for _ in range(300)]
+    closes[100] *= spike
+    indicator = FormulaIndicator(f"{name}(close ** 4, {window})")
+    for index, close in enumerate(closes):
+        indicator.update(make_bar(close, index=index))
+        if index + 1 < window:
+            assert indicator.value is None
+            continue
+        expected = function([value**4 for value in closes[index + 1 - window : index + 1]])
+        assert indicator.value == pytest.approx(expected, rel=1e-13, abs=0)
+
+
+@pytest.mark.parametrize(
+    ("expression", "expected"),
+    [
+        ("mean(1 / (close - 2), 2)", [None, None, None, None, 1.0]),
+        ("max(1 / (close - 2), 2)", [None, None, None, None, 1.0]),
+        ("std(1 / (close - 2), 2)", [None, None, None, None, 0.0]),
+    ],
+)
+def test_a_rolling_value_has_no_value_until_the_no_value_leaves_the_window(
+    expression: str, expected: list[float | None]
+) -> None:
+    indicator = FormulaIndicator(expression)
+    values: list[float | None] = []
+    for index, close in enumerate([3, 2, 2, 3, 3]):
+        indicator.update(make_bar(close, index=index))
+        values.append(indicator.value)
+    assert values == expected
+
+
+def test_a_rolling_sum_that_overflows_has_no_value_and_a_later_window_has_a_value() -> None:
+    indicator = FormulaIndicator("sum(close * 1e308, 2)")
+    values: list[float | None] = []
+    for index, close in enumerate([1.5, 1.5, 0.001, 0.001]):
+        indicator.update(make_bar(close, index=index))
+        values.append(indicator.value)
+    assert values[:2] == [None, None]
+    assert values[3] == pytest.approx(2e305)
+
+
+def test_a_long_rolling_standard_deviation_does_not_read_the_window_for_each_bar() -> None:
+    bars = [make_bar(100 + index % 7, index=index) for index in range(4000)]
+    indicator = FormulaIndicator("std(close, 1000)")
+    started = time.perf_counter()
+    for bar in bars:
+        indicator.update(bar)
+    assert indicator.value is not None
+    assert time.perf_counter() - started < 2
 
 
 EXPRESSION_OF_THE_PATH_TEST = "mean(close / lag(close, 3), 10) * rsi(14) + sma(5) / (close - 100)"

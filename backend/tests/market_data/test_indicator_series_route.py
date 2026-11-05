@@ -3,7 +3,9 @@
 Real PostgreSQL and the IBKR fake. The tests save the bars directly in the bar tables, as a bar source writer does.
 """
 
+import asyncio
 import math
+import time
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -20,6 +22,7 @@ from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from atrade.indicator import INDICATOR_CATALOG, create_indicator
+from atrade.market_data import indicator_series
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection
 
@@ -212,6 +215,34 @@ async def test_each_series_value_is_equal_to_the_screen_value(client: httpx.Asyn
         expected = calculate_screen_values(series["indicator"], bars, first_index)
         assert series["outputs"] == expected, series["indicator"]
         assert all(value is not None for values in expected.values() for value in values), series["indicator"]
+
+
+@pytest.mark.anyio
+async def test_the_event_loop_keeps_running_while_the_route_calculates(
+    client: httpx.AsyncClient, database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    save_bars(database_url, "ibkr", make_wave_bars(5))
+    calculate = indicator_series.calculate_series
+
+    def calculate_slowly(reference: Any, warm_up_bars: list[Bar], bars: list[Bar]) -> indicator_series.IndicatorSeries:
+        time.sleep(0.1)
+        return calculate(reference, warm_up_bars, bars)
+
+    monkeypatch.setattr(indicator_series, "calculate_series", calculate_slowly)
+    ticks = 0
+
+    async def count_ticks() -> None:
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.001)
+            ticks += 1
+
+    counter = asyncio.create_task(count_ticks())
+    response = await read_series(client, day(0), day(5), [{"indicator": "sma", "parameters": {"period": 2}}])
+    counter.cancel()
+
+    assert response.status_code == httpx.codes.OK
+    assert ticks >= 10
 
 
 @pytest.mark.anyio

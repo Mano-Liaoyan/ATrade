@@ -8,9 +8,9 @@ use the same code (ADR 0001).
 
 import ast
 import math
-import statistics
+import operator
 from collections import deque
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, cast
 
@@ -32,12 +32,18 @@ MAX_DEPTH = 20
 MAX_EXPONENT = 10
 # The largest look-back of a catalog indicator is 8 x (1000 + 1000): MACD. A formula must not read more.
 MAX_LOOK_BACK_BARS = 20_000
+# The window bars of all nodes x the bars of the look-back. 10 windows of 1000 bars reach it, so a screen of many
+# instruments or a long chart stays a short calculation.
+MAX_CALCULATION_BARS = 10_000_000
 MIN_STD_WINDOW = 2
 BAR_FIELDS = ("open", "high", "low", "close", "volume")
 OUTPUT_KEYWORD = "output"
 FORMULA_ARGUMENT_COUNT = 2
-
-type Series = Sequence[float]
+# Each finite float is an integer multiple of 2^-1074, so a window sum in this unit has no rounding error.
+EXACT_UNIT_BITS = 1074
+EXACT_ONE = 1 << EXACT_UNIT_BITS
+# The extra bits of the square root of a variance: more than the 53 bits of a float.
+SQUARE_ROOT_BITS = 64
 
 
 def calculate(function: Callable[[], float | None]) -> float | None:
@@ -56,6 +62,11 @@ class FormulaNode(Protocol):
     @property
     def look_back(self) -> int: ...
 
+    @property
+    def window_bars(self) -> int:
+        """The sum of the windows of this node and its children (`MAX_CALCULATION_BARS`)."""
+        ...
+
     def update(self, bar: NautilusBar) -> float | None: ...
 
 
@@ -63,6 +74,7 @@ class FormulaNode(Protocol):
 class NumberNode:
     number: float
     look_back: int = 1
+    window_bars: int = 0
 
     def update(self, bar: NautilusBar) -> float | None:
         return self.number
@@ -72,6 +84,7 @@ class NumberNode:
 class BarFieldNode:
     name: str
     look_back: int = 1
+    window_bars: int = 0
 
     def update(self, bar: NautilusBar) -> float | None:
         return cast("float", getattr(bar, self.name).as_double())
@@ -88,6 +101,10 @@ class ScalarNode:
     def look_back(self) -> int:
         return max(child.look_back for child in self.children)
 
+    @property
+    def window_bars(self) -> int:
+        return sum(child.window_bars for child in self.children)
+
     def update(self, bar: NautilusBar) -> float | None:
         values = [child.update(bar) for child in self.children]
         if any(value is None for value in values):
@@ -95,25 +112,114 @@ class ScalarNode:
         return calculate(lambda: self.function(*values))
 
 
+def to_exact(value: float) -> int:
+    """A finite float as an integer number of `EXACT_ONE` parts."""
+    numerator, denominator = value.as_integer_ratio()
+    return numerator << (EXACT_UNIT_BITS + 1 - denominator.bit_length())
+
+
+class WindowMeasure(Protocol):
+    """A function of a window. Each bar adds one value and removes one value, so no bar reads the full window."""
+
+    def add(self, value: float) -> None: ...
+
+    def remove(self, value: float) -> None: ...
+
+    def read(self, count: int) -> float: ...
+
+
+class WindowSum:
+    """`math.fsum` of the window. Integers keep each digit, so a large value that leaves the window leaves no error."""
+
+    def __init__(self) -> None:
+        self.total = 0
+
+    def add(self, value: float) -> None:
+        self.total += to_exact(value)
+
+    def remove(self, value: float) -> None:
+        self.total -= to_exact(value)
+
+    def read(self, count: int) -> float:
+        return self.total / EXACT_ONE
+
+
+class WindowMean(WindowSum):
+    def read(self, count: int) -> float:
+        return super().read(count) / count
+
+
+class WindowDeviation(WindowSum):
+    """The sample standard deviation: sqrt((n x sum of squares - sum x sum) / (n x (n - 1)))."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.squares = 0
+
+    def add(self, value: float) -> None:
+        super().add(value)
+        self.squares += to_exact(value) ** 2
+
+    def remove(self, value: float) -> None:
+        super().remove(value)
+        self.squares -= to_exact(value) ** 2
+
+    def read(self, count: int) -> float:
+        spread = count * self.squares - self.total * self.total
+        scaled_variance = (spread << (2 * SQUARE_ROOT_BITS)) // (count * (count - 1))
+        return math.isqrt(scaled_variance) / (EXACT_ONE << SQUARE_ROOT_BITS)
+
+
+class WindowExtreme:
+    """`max` or `min` of the window. `kept` holds the values that can become the extreme, the extreme first."""
+
+    def __init__(self, is_beaten_by: Callable[[float, float], bool]) -> None:
+        self.is_beaten_by = is_beaten_by
+        self.kept: deque[float] = deque()
+
+    def add(self, value: float) -> None:
+        while self.kept and self.is_beaten_by(self.kept[-1], value):
+            self.kept.pop()
+        self.kept.append(value)
+
+    def remove(self, value: float) -> None:
+        if self.kept[0] == value:
+            self.kept.popleft()
+
+    def read(self, count: int) -> float:
+        return self.kept[0]
+
+
 class RollingNode:
     """A function of the last `window` values of its child. A value is "no value" while one value of the window is."""
 
-    def __init__(self, function: Callable[[Series], float], child: FormulaNode, window: int) -> None:
-        self.function = function
+    def __init__(self, measure: WindowMeasure, child: FormulaNode, window: int) -> None:
+        self.measure = measure
         self.child = child
         self.window = window
         self.values: deque[float | None] = deque(maxlen=window)
+        self.known_count = 0
 
     @property
     def look_back(self) -> int:
         return self.child.look_back + self.window - 1
 
+    @property
+    def window_bars(self) -> int:
+        return self.child.window_bars + self.window
+
     def update(self, bar: NautilusBar) -> float | None:
-        self.values.append(self.child.update(bar))
-        known = [value for value in self.values if value is not None]
-        if len(known) < self.window:
+        if len(self.values) == self.window and self.values[0] is not None:
+            self.measure.remove(self.values[0])
+            self.known_count -= 1
+        value = self.child.update(bar)
+        self.values.append(value)
+        if value is not None:
+            self.measure.add(value)
+            self.known_count += 1
+        if self.known_count < self.window:
             return None
-        return calculate(lambda: self.function(known))
+        return calculate(lambda: self.measure.read(self.window))
 
 
 class LagNode:
@@ -128,6 +234,10 @@ class LagNode:
     def look_back(self) -> int:
         return self.child.look_back + self.bars
 
+    @property
+    def window_bars(self) -> int:
+        return self.child.window_bars + self.bars
+
     def update(self, bar: NautilusBar) -> float | None:
         self.values.append(self.child.update(bar))
         return self.values[0] if len(self.values) > self.bars else None
@@ -136,10 +246,11 @@ class LagNode:
 class CatalogNode:
     """One output of a class of the indicator catalog."""
 
-    def __init__(self, indicator: CatalogIndicator, output: str, look_back: int) -> None:
+    def __init__(self, indicator: CatalogIndicator, output: str, look_back: int, window_bars: int) -> None:
         self.indicator = indicator
         self.output = output
         self.look_back = look_back
+        self.window_bars = window_bars
 
     def update(self, bar: NautilusBar) -> float | None:
         self.indicator.handle_bar(bar)
@@ -180,12 +291,22 @@ BINARY_OPERATORS: dict[type[ast.operator], Callable[..., float]] = {
     ast.Mult: multiply,
     ast.Div: divide,
 }
-ROLLING_FUNCTIONS: dict[str, Callable[[Series], float]] = {
-    "mean": statistics.fmean,
-    "max": max,
-    "min": min,
-    "sum": math.fsum,
-    "std": statistics.stdev,
+
+
+def make_maximum() -> WindowExtreme:
+    return WindowExtreme(operator.lt)
+
+
+def make_minimum() -> WindowExtreme:
+    return WindowExtreme(operator.gt)
+
+
+ROLLING_FUNCTIONS: dict[str, Callable[[], WindowMeasure]] = {
+    "mean": WindowMean,
+    "max": make_maximum,
+    "min": make_minimum,
+    "sum": WindowSum,
+    "std": WindowDeviation,
 }
 SCALAR_FUNCTIONS: dict[str, Callable[..., float]] = {"abs": find_absolute, "log": find_log}
 OPERATOR_SYMBOLS: dict[type[ast.AST], str] = {
@@ -239,6 +360,14 @@ def parse_expression(expression: str) -> FormulaNode:
     root = parse_node(tree, 1)
     if root.look_back > MAX_LOOK_BACK_BARS:
         message = f"An expression reads at most {MAX_LOOK_BACK_BARS} bars, not {root.look_back}."
+        raise FormulaProblem(1, message)
+    calculation_bars = root.window_bars * root.look_back
+    if calculation_bars > MAX_CALCULATION_BARS:
+        message = (
+            f"The windows of the expression have {root.window_bars} bars, and the expression reads {root.look_back} "
+            f"bars. Window bars x bars read must be at most {MAX_CALCULATION_BARS}, not {calculation_bars}. "
+            "Use fewer or shorter windows."
+        )
         raise FormulaProblem(1, message)
     return root
 
@@ -347,7 +476,7 @@ def parse_window_call(node: ast.Call, name: str, depth: int) -> FormulaNode:
         raise refuse(node, f"{name} needs 2 arguments: a value and a number of bars.")
     child = parse_node(node.args[0], depth + 1)
     size = read_window(node.args[1], MIN_STD_WINDOW if name == "std" else 1)
-    return LagNode(child, size) if name == "lag" else RollingNode(ROLLING_FUNCTIONS[name], child, size)
+    return LagNode(child, size) if name == "lag" else RollingNode(ROLLING_FUNCTIONS[name](), child, size)
 
 
 def read_window(node: ast.expr, minimum: int) -> int:
@@ -385,7 +514,9 @@ def parse_catalog_call(node: ast.Call, definition: IndicatorDefinition) -> Formu
         raise refuse(node, problems[0].message)
     values = definition.with_defaults(parameters)
     indicator = definition.indicator_class(**values)
-    return CatalogNode(indicator, output or "value", definition.screen_look_back_bars(values))
+    look_back = definition.screen_look_back_bars(values)
+    # A look-back factor marks an exponential average: it keeps one number for each bar, and has no window.
+    return CatalogNode(indicator, output or "value", look_back, 0 if definition.look_back.factor > 1 else look_back)
 
 
 def read_output_name(node: ast.expr) -> str:

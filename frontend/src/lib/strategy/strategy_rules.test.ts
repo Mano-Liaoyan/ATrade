@@ -9,6 +9,7 @@ import {
   describeRulesWarning,
   findRulesVersionNumber,
   listOperandChoices,
+  readCurrentOperand,
   readOperandChoice,
   type RuleCondition,
 } from './strategy_rules';
@@ -156,5 +157,25 @@ describe('listOperandChoices', () => {
       parameters: {},
       formula: FORMULA,
     });
+  });
+});
+
+describe('readCurrentOperand', () => {
+  const formula = { name: 'Ratio', expression: 'close / sma(5)', chart_placement: 'own' };
+  const changed = { key: 'custom_1', name: 'Ratio', formula: { ...formula, expression: 'close / sma(9)' } };
+  const operand = { type: 'indicator', indicator: 'custom_1', parameters: {}, formula } as const;
+
+  it('copies the formula of the catalog into an operand with another formula', () => {
+    expect(readCurrentOperand(operand, [changed])).toEqual({ ...operand, formula: changed.formula });
+  });
+
+  it('gives null when the operand has the formula of the catalog', () => {
+    expect(readCurrentOperand(operand, [{ key: 'custom_1', name: 'Ratio', formula }])).toBeNull();
+  });
+
+  it('gives null for a deleted indicator and for an operand without a formula', () => {
+    expect(readCurrentOperand(operand, [])).toBeNull();
+    expect(readCurrentOperand({ type: 'number', value: 1 }, [changed])).toBeNull();
+    expect(readCurrentOperand({ type: 'indicator', indicator: 'custom_1', parameters: {} }, [changed])).toBeNull();
   });
 });

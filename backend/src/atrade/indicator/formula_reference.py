@@ -18,10 +18,16 @@ CUSTOM_KEY_FORM = re.compile(rf"{CUSTOM_KEY_PREFIX}[0-9]+")
 FORMULA_FIELDS = ("name", "expression", "chart_placement")
 CHART_PLACEMENTS = ("price", "own")
 MAX_NAME_LENGTH = 60
+UNSTORABLE_CHARACTER = re.compile("[\x00\ud800-\udfff]")
 
 
 def is_custom_key(key: object) -> bool:
     return isinstance(key, str) and CUSTOM_KEY_FORM.fullmatch(key) is not None
+
+
+def has_unstorable_character(text: str) -> bool:
+    """PostgreSQL text has no NUL, and UTF-8 has no lone surrogate."""
+    return UNSTORABLE_CHARACTER.search(text) is not None
 
 
 def check_formula(formula: object) -> list[IndicatorProblem]:
@@ -54,6 +60,8 @@ def check_name(name: object, location: tuple[str, ...]) -> list[IndicatorProblem
     """The UI name of a built-in indicator has parentheses, so a custom name without them cannot be equal to it."""
     if not isinstance(name, str) or not 1 <= len(name.strip()) <= MAX_NAME_LENGTH:
         return [IndicatorProblem(location, f"The name must have 1 to {MAX_NAME_LENGTH} characters.")]
+    if has_unstorable_character(name):
+        return [IndicatorProblem(location, "The name has a character that is not allowed.")]
     if "(" in name or ")" in name:
         return [IndicatorProblem(location, "The name must not have parentheses.")]
     return []

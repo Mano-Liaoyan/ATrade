@@ -226,8 +226,8 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   `BarChart` uses `createChart` and `addSeries(CandlestickSeries)` of
   `lightweight-charts` 5.2.1 with `autoSize`. The times are UNIX timestamps.
 - Indicators on the bar chart (#327): `POST /api/market-data/indicator-series`
-  and `GET /api/market-data/indicators` are in
-  `market_data/indicator_series.py`. `GET`/`PUT
+  is in `market_data/indicator_series.py`. `GET /api/market-data/indicators` is
+  in `market_data/custom_indicators.py`. `GET`/`PUT
   /api/market-data/chart-indicators` and the table `chart_indicator_set`
   are in `market_data/chart_indicator_set.py` (#330). The routes, the
   warm-up, and the frontend parts are in `docs/architecture/indicator.md`

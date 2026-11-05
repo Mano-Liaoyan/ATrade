@@ -1,11 +1,13 @@
 """The custom indicator routes and the catalog routes (docs/architecture/indicator.md section 23.10)."""
 
+import json
 from typing import Any
 
 import httpx
 import pytest
 
 BASE_PATH = "/api/custom-indicators"
+JSON_HEADERS = {"content-type": "application/json"}
 RATIO_EXPRESSION = "close / sma(50) - 1"
 RATIO = {
     "name": "Distance to SMA",
@@ -175,6 +177,43 @@ async def test_the_chart_set_refuses_a_custom_indicator_in_the_wrong_pane(web_cl
     response = await web_client.put("/api/market-data/chart-indicators", json=chart_set)
     assert response.status_code == 422
     assert "chart placement" in response.json()["problems"][0]["message"]
+
+
+@pytest.mark.parametrize("text", ["A\x00B", "A\ud800B"])
+@pytest.mark.parametrize(("field", "message"), [("name", "name"), ("value_description", "value description")])
+@pytest.mark.anyio
+async def test_a_character_that_postgresql_cannot_store_is_a_problem_of_its_field(
+    web_client: httpx.AsyncClient, text: str, field: str, message: str
+) -> None:
+    content = json.dumps({**RATIO, field: text})
+    for method, path in (("POST", BASE_PATH), ("POST", f"{BASE_PATH}/check")):
+        response = await web_client.request(method, path, content=content, headers=JSON_HEADERS)
+        problems = response.json()["problems"]
+        assert [problem["location"] for problem in problems] == [[field]], response.text
+        assert message in problems[0]["message"]
+    assert (await web_client.get(BASE_PATH)).json() == []
+
+
+@pytest.mark.anyio
+async def test_a_change_with_a_character_that_postgresql_cannot_store_is_refused(
+    web_client: httpx.AsyncClient,
+) -> None:
+    created = await create(web_client)
+    path = f"{BASE_PATH}/{created['custom_indicator_id']}"
+    response = await web_client.put(path, content=json.dumps({**RATIO, "name": "A\x00B"}), headers=JSON_HEADERS)
+    assert response.status_code == 422, response.text
+    assert response.json()["problems"][0]["location"] == ["name"]
+
+
+@pytest.mark.parametrize("text", ["close\x00", "close\ud800"])
+@pytest.mark.anyio
+async def test_a_character_outside_the_expression_syntax_is_a_problem_of_the_expression(
+    web_client: httpx.AsyncClient, text: str
+) -> None:
+    content = json.dumps({**RATIO, "expression": text})
+    response = await web_client.post(BASE_PATH, content=content, headers=JSON_HEADERS)
+    assert response.status_code == 422, response.text
+    assert response.json()["problems"][0]["location"] == ["expression"]
 
 
 @pytest.mark.anyio

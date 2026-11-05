@@ -41,9 +41,9 @@ Decision: [#372](https://github.com/Mano-Liaoyan/ATrade/issues/372).
 - A delete is always allowed. A deleted custom indicator stays in its saved
   references.
 - A change does not reach saved references, also not the chart indicator set.
-  To use the new expression, the user selects the indicator again. So one screen
-  can hold 2 expressions with 1 name. The screen check refuses this, because a
-  result names its columns by the indicator name.
+  To use the new expression, the user clicks "Use current expression" at the
+  reference. So one screen can hold 2 expressions with 1 name. The screen check
+  refuses this, because a result names its columns by the indicator name.
 - A custom indicator has no parameters and one output, `value`. Its catalog key
   is `custom_<id>`. No built-in key can start with `custom_`, and the database
   does not give a deleted id again.

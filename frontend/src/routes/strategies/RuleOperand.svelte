@@ -1,11 +1,12 @@
 <!-- One side of a rule condition: a price, an indicator with its parameters (and its line for a multi-line
      indicator), or a number (right side only). -->
 <script lang="ts">
-  import { Select } from '#lib/foundation/carbon';
+  import { Button, Select } from '#lib/foundation/carbon';
   import {
     createOperand,
     findIndicatorChoice,
     listOperandChoices,
+    readCurrentOperand,
     readOperandChoice,
     type OperandChoice,
     type RightOperand,
@@ -25,6 +26,7 @@
   const customIndicators = readCustomIndicators();
   const choices = $derived(listOperandChoices(side, customIndicators(), operand));
   const indicator = $derived(operand.type === 'indicator' ? findIndicatorChoice(operand.indicator) : undefined);
+  const currentOperand = $derived(readCurrentOperand(operand, customIndicators()));
 </script>
 
 <span class="rule-operand">
@@ -40,6 +42,19 @@
       }}
     />
   </span>
+  {#if currentOperand !== null}
+    {@const newOperand = currentOperand}
+    <Button
+      kind="ghost"
+      size="sm"
+      aria-label="Use current expression in {label}"
+      onclick={() => {
+        onOperandChange(newOperand);
+      }}
+    >
+      Use current expression
+    </Button>
+  {/if}
   {#if operand.type === 'indicator' && indicator !== undefined}
     {@const indicatorOperand = operand}
     <span class="rule-operand__paren" aria-hidden="true">(</span>

@@ -121,6 +121,22 @@ export function referenceOf(catalog: ScreenIndicator[], key: string, kind: Indic
   return { indicator: key, parameters, output, ...(indicator?.formula === undefined || indicator.formula === null ? {} : { formula: indicator.formula }) };
 }
 
+/**
+ * The reference with the formula of the catalog. Null when the reference already has it, when the indicator is not in
+ * the catalog, or when a line cannot use it. The Select cannot do this: a click on the selected item changes nothing.
+ */
+export function readCurrentReference(catalog: ScreenIndicator[], value: unknown, kind: IndicatorConditionKind | 'order'): Item | null {
+  const held = value as Item;
+  const formula = held['formula'] as ScreenIndicator['formula'];
+  const current = catalog.find((candidate) => candidate.key === held['indicator'])?.formula;
+  if (!formula || !current || (kind === 'close_versus_line' && current.chart_placement !== 'price')) {
+    return null;
+  }
+  const isSame =
+    formula.name === current.name && formula.expression === current.expression && formula.chart_placement === current.chart_placement;
+  return isSame ? null : { ...held, formula: current };
+}
+
 function formatParameter(value: unknown): string {
   return typeof value === 'number' || typeof value === 'string' ? String(value) : '';
 }

@@ -46,6 +46,7 @@ export {
   findRulesVersionNumber,
   listOperandChoices,
   RANK_DIRECTION_CHOICES,
+  readCurrentOperand,
   readOperandChoice,
   REBALANCE_CHOICES,
   type Comparison,

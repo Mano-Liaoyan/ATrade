@@ -82,7 +82,10 @@ def check_formula_names(fields: Mapping[str, object], location: Location) -> lis
             continue
         name, expression = read_key(formula, "name"), read_key(formula, "expression")
         if expressions.setdefault(name, expression) != expression:
-            message = f"The indicator name {name!r} has 2 expressions. Select the indicator again in each place."
+            message = (
+                f"The indicator name {name!r} has 2 expressions. "
+                'Click "Use current expression" in each place, or select another indicator.'
+            )
             problems.append(ScreenProblem(place, message))
     return problems
 

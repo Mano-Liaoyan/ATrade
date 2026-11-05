@@ -19,6 +19,7 @@ from atrade.indicator import (
     check_expression,
     check_name,
     count_formula_bars,
+    has_unstorable_character,
 )
 from atrade.market_data.indicator_series import (
     IndicatorCheckFailedResponse,
@@ -93,6 +94,9 @@ def check_fields(body: CustomIndicatorBody) -> list[IndicatorProblem]:
     if not 1 <= len(body.value_description.strip()) <= MAX_VALUE_DESCRIPTION_LENGTH:
         message = f"The value description must have 1 to {MAX_VALUE_DESCRIPTION_LENGTH} characters."
         problems.append(IndicatorProblem(("value_description",), message))
+    elif has_unstorable_character(body.value_description):
+        message = "The value description has a character that is not allowed."
+        problems.append(IndicatorProblem(("value_description",), message))
     return problems
 
 
@@ -101,16 +105,17 @@ async def check_custom_indicator(
 ) -> list[IndicatorProblemResponse]:
     """The problems of the fields, and of a name that another custom indicator has. Empty means correct."""
     problems = check_fields(body)
-    async with connection.cursor() as cursor:
-        await cursor.execute(
-            """
-            SELECT 1 FROM custom_indicator
-            WHERE lower(name) = lower(%s) AND custom_indicator_id IS DISTINCT FROM %s
-            """,
-            (body.name.strip(), custom_indicator_id),
-        )
-        if await cursor.fetchone() is not None:
-            problems.append(IndicatorProblem(("name",), f"A custom indicator with the name {body.name!r} exists."))
+    if not has_unstorable_character(body.name):
+        async with connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT 1 FROM custom_indicator
+                WHERE lower(name) = lower(%s) AND custom_indicator_id IS DISTINCT FROM %s
+                """,
+                (body.name.strip(), custom_indicator_id),
+            )
+            if await cursor.fetchone() is not None:
+                problems.append(IndicatorProblem(("name",), f"A custom indicator with the name {body.name!r} exists."))
     return [IndicatorProblemResponse(location=list(item.location), message=item.message) for item in problems]
 
 

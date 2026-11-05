@@ -3,6 +3,8 @@
 Each instrument has daily bars with one constant close, so SMA(n) is the close when the instrument has n bars.
 """
 
+import asyncio
+import time
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -304,3 +306,28 @@ async def test_a_custom_indicator_reads_the_bars_of_its_look_back() -> None:
 
     assert symbols(outcome) == ["LONG"]
     assert reasons(outcome) == {"SHORT": "No value: Custom"}
+
+
+@pytest.mark.anyio
+async def test_the_event_loop_keeps_running_while_a_screen_run_calculates(monkeypatch: pytest.MonkeyPatch) -> None:
+    def calculate_slowly(_column: object, _bars: object) -> float:
+        time.sleep(0.05)
+        return 1.0
+
+    monkeypatch.setattr("atrade.screen.screen_run.calculate_value", calculate_slowly)
+    instruments = [stock(f"S{index}") for index in range(3)]
+    definition = make_definition(order={"indicator": sma(2), "direction": "descending"})
+    ticks = 0
+
+    async def count_ticks() -> None:
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.001)
+            ticks += 1
+
+    counter = asyncio.create_task(count_ticks())
+    outcome = await run(definition, {instrument: make_bars("5", 2) for instrument in instruments})
+    counter.cancel()
+
+    assert symbols(outcome) == ["S0", "S1", "S2"]
+    assert ticks >= 10

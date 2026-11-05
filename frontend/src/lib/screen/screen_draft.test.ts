@@ -5,6 +5,7 @@ import {
   isDraftChanged,
   nameDefinitionIndicators,
   newCondition,
+  readCurrentReference,
   readTarget,
   referenceOf,
   removeCondition,
@@ -174,6 +175,36 @@ describe('custom indicators', () => {
     value_description: '',
     formula,
   };
+
+  describe('readCurrentReference', () => {
+    const changed = { ...custom, formula: { ...formula, expression: 'close / sma(9)' } };
+    const held = { indicator: 'custom_1', parameters: {}, output: 'value', formula };
+
+    it('copies the formula of the catalog into a reference with another formula', () => {
+      expect(readCurrentReference([changed], held, 'compare')).toEqual({ ...held, formula: changed.formula });
+    });
+
+    it('gives null when the reference has the formula of the catalog', () => {
+      expect(readCurrentReference([custom], held, 'compare')).toBeNull();
+    });
+
+    it('gives null when the catalog has no such indicator, or the reference has no formula', () => {
+      expect(readCurrentReference([], held, 'compare')).toBeNull();
+      expect(readCurrentReference([changed], { indicator: 'custom_1', parameters: {} }, 'compare')).toBeNull();
+    });
+
+    it('sees a change of the name and of the chart placement', () => {
+      const renamed = { ...custom, formula: { ...formula, name: 'Other' } };
+      expect(readCurrentReference([renamed], held, 'order')).toEqual({ ...held, formula: renamed.formula });
+    });
+
+    it('gives null for a line when the current chart placement is not price', () => {
+      const line = { ...held, formula: { ...formula, chart_placement: 'price' } };
+      expect(readCurrentReference([changed], line, 'close_versus_line')).toBeNull();
+      const onPrice = { ...custom, formula: { ...formula, expression: 'sma(9)', chart_placement: 'price' } };
+      expect(readCurrentReference([onPrice], line, 'close_versus_line')).toEqual({ ...line, formula: onPrice.formula });
+    });
+  });
 
   it('a new reference holds the formula', () => {
     expect(referenceOf([custom], 'custom_1', 'compare')).toEqual({ indicator: 'custom_1', parameters: {}, output: 'value', formula });
