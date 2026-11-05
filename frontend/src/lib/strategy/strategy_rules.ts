@@ -106,6 +106,7 @@ export const INDICATOR_CHOICES: IndicatorChoice[] = [
     lines: THREE_LINES,
   },
   { key: 'donchian_channel', label: 'Donchian channel', parameters: [period({ default: 20 })], lines: THREE_LINES },
+  { key: 'adr_percent', label: 'ADR%', parameters: [period({ default: 20 })], lines: [] },
 ];
 
 export const PRICE_CHOICES: [PriceName, string][] = [

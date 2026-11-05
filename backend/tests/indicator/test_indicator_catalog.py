@@ -10,6 +10,7 @@ from atrade.indicator import (
     MACD,
     RSI,
     SMA,
+    ADRPercent,
     AverageTradingValue,
     BollingerBands,
     CatalogIndicator,
@@ -32,6 +33,7 @@ CATALOG_KEYS = [
     "macd",
     "bollinger_bands",
     "donchian_channel",
+    "adr_percent",
 ]
 
 
@@ -50,6 +52,7 @@ def read_outputs(indicator: CatalogIndicator) -> list[float | None]:
             | DistanceTo52WeekHigh()
             | RealizedVolatility()
             | AverageTradingValue()
+            | ADRPercent()
         ):
             return [indicator.value]
         case _:
@@ -57,7 +60,7 @@ def read_outputs(indicator: CatalogIndicator) -> list[float | None]:
             raise AssertionError(message)
 
 
-def test_the_catalog_has_the_11_keys_of_section_23_6() -> None:
+def test_the_catalog_has_the_12_keys_of_section_23_6() -> None:
     assert list(INDICATOR_CATALOG) == CATALOG_KEYS
 
 
@@ -68,6 +71,7 @@ def test_the_catalog_has_the_11_keys_of_section_23_6() -> None:
         ("average_trading_value", {"period": 60}, 60),
         ("bollinger_bands", {"period": 30}, 30),
         ("donchian_channel", {"period": 55}, 55),
+        ("adr_percent", {"period": 30}, 30),
         ("distance_to_52_week_high", {}, 252),
         ("momentum_12_1", {"look_back": 126}, 127),
         ("realized_volatility", {"period": 252}, 253),
@@ -95,6 +99,7 @@ def test_the_screen_look_back_follows_section_23_4(
         ("momentum_12_1", {"skip": 0}, "12-1 momentum(252, 0)"),
         ("realized_volatility", {}, "Realized volatility(60)"),
         ("distance_to_52_week_high", {}, "Distance to 52-week high(252)"),
+        ("adr_percent", {}, "ADR%(20)"),
     ],
 )
 def test_the_ui_name_shows_the_parameters(key: str, parameters: dict[str, int | float], name: str) -> None:

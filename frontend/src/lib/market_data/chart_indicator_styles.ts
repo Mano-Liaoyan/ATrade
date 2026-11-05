@@ -95,17 +95,18 @@ export function readPaletteColorName(color: number, dark: boolean): string {
 /** The legend text of a bar without a value. */
 export const NO_VALUE_TEXT = 'No value';
 
-type ValueFormat = 'price' | 'decimal' | 'percent' | 'short_amount';
+type ValueFormat = 'price' | 'decimal' | 'percent' | 'percent_number' | 'short_amount';
 
 const VALUE_FORMATS: Record<string, ValueFormat> = {
   rsi: 'decimal',
   momentum_12_1: 'percent',
   distance_to_52_week_high: 'percent',
   realized_volatility: 'percent',
+  adr_percent: 'percent_number',
   average_trading_value: 'short_amount',
 };
 
-// A percent indicator gives a fraction: 0.968 is "96.80 %".
+// A `percent` indicator gives a fraction: 0.968 is "96.80 %". A `percent_number` indicator gives percent: 5.2 is "5.20 %".
 const PERCENT_FACTOR = 100;
 const DECIMAL_FORMAT = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -130,6 +131,8 @@ function formatNumber(format: ValueFormat, value: number): string {
       return DECIMAL_FORMAT.format(value);
     case 'percent':
       return `${formatPrice(value * PERCENT_FACTOR)} %`;
+    case 'percent_number':
+      return `${formatPrice(value)} %`;
     case 'short_amount':
       return formatShortAmount(value);
     case 'price':

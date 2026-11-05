@@ -48,7 +48,7 @@ test('/ opens Add indicator, the search finds Bollinger Bands, and Enter adds it
   const dialog = page.getByRole('dialog', { name: 'Add indicator' });
   await expect(dialog).toBeVisible();
   const options = dialog.getByRole('option');
-  await expect(options).toHaveCount(11);
+  await expect(options).toHaveCount(12);
   await expect(options.first()).toHaveText('SMA');
   await expect(options.nth(9)).toHaveText(/^Bollinger Bands\s*BB$/);
   await page.keyboard.type('boll');
@@ -548,6 +548,8 @@ test('the price axis label of a line follows the crosshair and shows no label at
   // The fake bars give SMA 50 one value at all bars; the upper Bollinger band (the first color) changes.
   await addIndicator(page, /Bollinger Bands/);
   await expect(legendRow(page, 'BB 20 2').locator('.legend-value')).toHaveText([NUMBER_PATTERN, NUMBER_PATTERN, NUMBER_PATTERN]);
+  // The click on the dialog option leaves the pointer over the chart. The label must show the last bar, so move it off.
+  await page.mouse.move(0, 0);
   await expect.poll(() => readAxisLabelY(page, LIGHT_COLOR_1)).not.toBeNull();
   const lastBarY = (await readAxisLabelY(page, LIGHT_COLOR_1)) ?? 0;
 

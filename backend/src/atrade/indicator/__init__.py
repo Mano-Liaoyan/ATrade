@@ -6,6 +6,7 @@ indicator references with `check_indicator_reference`.
 """
 
 from atrade.indicator.atrade_indicators import (
+    ADRPercent,
     AverageTradingValue,
     DistanceTo52WeekHigh,
     Momentum12_1,
@@ -32,6 +33,7 @@ __all__ = [
     "MACD",
     "RSI",
     "SMA",
+    "ADRPercent",
     "AverageTradingValue",
     "BarClose",
     "BollingerBands",

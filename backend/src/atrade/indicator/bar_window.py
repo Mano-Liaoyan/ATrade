@@ -13,6 +13,7 @@ from nautilus_trader.model import Bar as NautilusBar
 @dataclass(frozen=True)
 class WindowBar:
     high: float
+    low: float
     close: float
     volume: float
 
@@ -36,7 +37,12 @@ class BarWindow:
 
     def add(self, bar: NautilusBar) -> None:
         self._bars.append(
-            WindowBar(high=bar.high.as_double(), close=bar.close.as_double(), volume=bar.volume.as_double())
+            WindowBar(
+                high=bar.high.as_double(),
+                low=bar.low.as_double(),
+                close=bar.close.as_double(),
+                volume=bar.volume.as_double(),
+            )
         )
 
     def clear(self) -> None:

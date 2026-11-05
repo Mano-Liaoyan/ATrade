@@ -32,6 +32,7 @@ ALL_LEFT_SIDES = [price(name) for name in PRICES] + [
         "atr",
         "average_trading_value",
         "rsi",
+        "adr_percent",
     )
 ]
 MULTI_LINE_OUTPUTS = [("macd", output) for output in ("value", "signal", "histogram")] + [

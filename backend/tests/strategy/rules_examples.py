@@ -72,6 +72,7 @@ def make_full_rules() -> Json:
             "atr",
             "average_trading_value",
             "rsi",
+            "adr_percent",
         )
     ]
     lefts = [price(name) for name in PRICES] + single_line + lines
