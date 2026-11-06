@@ -1,5 +1,6 @@
 // Unsaved edits of a strategy version stay only in the browser storage (docs/architecture/strategy.md section 9.1).
-// A private window or blocked storage gives no draft, and a full storage keeps no new draft. Editing continues.
+// A private window or blocked storage gives no draft. A full storage keeps no draft, also not the older one, so a
+// reload cannot show older edits. Editing continues, and a write returns false.
 
 import type { StrategyRules } from './strategy_rules';
 
@@ -23,14 +24,6 @@ function readStorage(storageKey: string): string | null {
   }
 }
 
-function writeStorage(storageKey: string, text: string): void {
-  try {
-    localStorage.setItem(storageKey, text);
-  } catch {
-    // Blocked or full storage: the edit stays only until the page reloads.
-  }
-}
-
 function clearStorage(storageKey: string): void {
   try {
     localStorage.removeItem(storageKey);
@@ -39,12 +32,23 @@ function clearStorage(storageKey: string): void {
   }
 }
 
+function writeStorage(storageKey: string, text: string): boolean {
+  try {
+    localStorage.setItem(storageKey, text);
+    return true;
+  } catch {
+    clearStorage(storageKey);
+    return false;
+  }
+}
+
 export function readDraft(key: DraftKey): string | null {
   return readStorage(createStorageKey(key));
 }
 
-export function writeDraft(key: DraftKey, code: string): void {
-  writeStorage(createStorageKey(key), code);
+/** Returns false when the storage keeps no draft. */
+export function writeDraft(key: DraftKey, code: string): boolean {
+  return writeStorage(createStorageKey(key), code);
 }
 
 export function clearDraft(key: DraftKey): void {
@@ -69,8 +73,9 @@ export function readRulesDraft(key: DraftKey): StrategyRules | null {
   }
 }
 
-export function writeRulesDraft(key: DraftKey, rules: StrategyRules): void {
-  writeStorage(createRulesStorageKey(key), JSON.stringify(rules));
+/** Returns false when the storage keeps no draft. */
+export function writeRulesDraft(key: DraftKey, rules: StrategyRules): boolean {
+  return writeStorage(createRulesStorageKey(key), JSON.stringify(rules));
 }
 
 export function clearRulesDraft(key: DraftKey): void {

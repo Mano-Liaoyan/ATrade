@@ -89,15 +89,23 @@ describe('strategy drafts without browser storage', () => {
     }).not.toThrow();
   });
 
-  it('throws no error when a write exceeds the quota', () => {
+  it('removes the older draft and reports the failed write when a write exceeds the quota', () => {
+    writeDraft(key, 'older code\n');
+    writeRulesDraft(key, BLANK_RULES);
     vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
       throw new DOMException('The quota is exceeded.', 'QuotaExceededError');
     });
 
-    expect(() => {
-      writeDraft(key, 'x = 1\n');
-      writeRulesDraft(key, BLANK_RULES);
-    }).not.toThrow();
+    expect(writeDraft(key, 'newer code\n')).toBe(false);
+    expect(writeRulesDraft(key, BLANK_RULES)).toBe(false);
+
+    expect(readDraft(key)).toBeNull();
+    expect(readRulesDraft(key)).toBeNull();
+  });
+
+  it('reports a write that the storage keeps', () => {
+    expect(writeDraft(key, 'x = 1\n')).toBe(true);
+    expect(writeRulesDraft(key, BLANK_RULES)).toBe(true);
   });
 });
 

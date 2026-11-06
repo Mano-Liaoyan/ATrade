@@ -143,6 +143,7 @@
   // "Show discarded versions": the version Select hides the discarded versions until the user turns it on.
   let showDiscarded = $state(false);
   let editorCode = $state('');
+  let draftNotSaved = $state(false);
   let fileTab = $state<'rules' | 'strategy'>('strategy');
   // The rules of the "Rules" tab, and the version that they come from (0: the blank rules, no version has rules).
   let rules = $state<StrategyRules | null>(null);
@@ -314,6 +315,7 @@
     await loadRules(id, result.value);
     openVersion = result.value;
     editorCode = draft ?? result.value.code;
+    draftNotSaved = false;
     problems = [];
     // On a version address, the address names the open version, so that a reload opens it again. The shallow route
     // change keeps the workbench state.
@@ -356,8 +358,9 @@
     const draftKey = { strategyId: strategy.id, versionNumber: rulesVersionNumber };
     if (JSON.stringify(changed) === JSON.stringify(savedRules)) {
       clearRulesDraft(draftKey);
+      draftNotSaved = false;
     } else {
-      writeRulesDraft(draftKey, changed);
+      draftNotSaved = !writeRulesDraft(draftKey, changed);
     }
   }
 
@@ -369,8 +372,9 @@
     const draftKey = { strategyId: openVersion.strategy_id, versionNumber: openVersion.version_number };
     if (code === openVersion.code) {
       clearDraft(draftKey);
+      draftNotSaved = false;
     } else {
-      writeDraft(draftKey, code);
+      draftNotSaved = !writeDraft(draftKey, code);
     }
   }
 
@@ -757,6 +761,9 @@
                 },
               }}
             >
+              {#if draftNotSaved}
+                <InlineNotification kind="warning" title="Draft not saved. A reload loses your edits." lowContrast />
+              {/if}
               {#if assistantDiff.diff !== null && assistantDiff.isSelected}
                 {@const diff = assistantDiff.diff}
                 <CodeDiff

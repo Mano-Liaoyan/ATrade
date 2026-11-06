@@ -327,7 +327,9 @@ them by ID. A missing ID is not in the result. The forward test list uses it
 - One draft exists for each strategy version. The `localStorage` key is
   `atrade.strategy-draft.<strategy id>.v<version number>`. A save removes the
   draft of the version that the user edited. With blocked or full storage,
-  the editor keeps working and the page keeps no draft.
+  the editor keeps working and the page keeps no draft. A failed write also
+  removes the older draft, and the editor panel shows the warning "Draft not
+  saved".
 - Unsaved rules of the "Rules" tab (section 9.8.5) have their own draft. The
   key is `atrade.strategy-rules-draft.<strategy id>.v<version number>`, with
   the number of the version that the rules come from (0 for the blank

@@ -229,6 +229,7 @@ test('shows the code and keeps edits when the browser storage is not available',
 
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
   await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'Draft not saved' })).toBeVisible();
 });
 
 test('opens an older version from the version list', async ({ page }, currentTest) => {
