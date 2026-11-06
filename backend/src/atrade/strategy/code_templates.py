@@ -94,9 +94,11 @@ class RankedUniverseStrategy(Strategy):
         self.venue: Venue | None = None
 
     def on_start(self) -> None:
-        # A forward test restart restores the positions, and the new strategy object must know them.
+        # A forward test restart restores the positions, and the new strategy object must know them. A position can
+        # be outside the universe. Its bars give its sell a price.
         for position in self.cache.positions_open(strategy_id=self.strategy_id):
             self.shares[str(position.instrument_id)] = int(position.quantity.as_double())
+            self.add_instrument(BarType.from_str(f"{position.instrument_id}-1-DAY-LAST-EXTERNAL"))
         self.subscribe_data(DataType("UniverseUpdate"))
 
     def on_data(self, data: object) -> None:
@@ -112,12 +114,15 @@ class RankedUniverseStrategy(Strategy):
             instrument = str(bar_type.instrument_id)
             self.venue = bar_type.instrument_id.venue
             self.members.add(instrument)
-            if instrument in self.closes:
-                continue
-            self.closes[instrument] = deque(maxlen=LOOK_BACK_BARS + 1)
-            self.highs[instrument] = deque(maxlen=LOOK_BACK_BARS)
-            self.request_bars(bar_type, start=self.clock.utc_now() - WARM_UP_LENGTH)
-            self.subscribe_bars(bar_type)
+            if instrument not in self.closes:
+                self.add_instrument(bar_type)
+
+    def add_instrument(self, bar_type: BarType) -> None:
+        instrument = str(bar_type.instrument_id)
+        self.closes[instrument] = deque(maxlen=LOOK_BACK_BARS + 1)
+        self.highs[instrument] = deque(maxlen=LOOK_BACK_BARS)
+        self.request_bars(bar_type, start=self.clock.utc_now() - WARM_UP_LENGTH)
+        self.subscribe_bars(bar_type)
 
     def on_historical_bars(self, bars: Sequence[Bar]) -> None:
         for bar in bars:
@@ -131,6 +136,7 @@ class RankedUniverseStrategy(Strategy):
         if day != self.last_day:
             self.last_day = day
             self.equity_values.append(self.find_equity())
+            self.retry_lost_sells()
         self.add_bar(bar)
         if self.buy_after_sells:
             self.buy_after_sells = False
@@ -141,6 +147,15 @@ class RankedUniverseStrategy(Strategy):
             self.last_rebalance_month = month
             self.rank_again = False
             self.rebalance()
+
+    def retry_lost_sells(self) -> None:
+        """A denied, rejected, or ended sell gives no fill, and the sell count stops the rebalance. The check runs
+        once a day, so that a sell that fails again does not repeat on each bar of the day."""
+        inflight_count = self.cache.orders_inflight_count(strategy_id=self.strategy_id)
+        open_count = self.cache.orders_open_count(strategy_id=self.strategy_id)
+        if self.open_sell_count > 0 and inflight_count == 0 and open_count == 0:
+            self.open_sell_count = 0
+            self.rank_again = True
 
     def waiting_for_member(self, bar: Bar) -> bool:
         return str(bar.bar_type.instrument_id) in self.members

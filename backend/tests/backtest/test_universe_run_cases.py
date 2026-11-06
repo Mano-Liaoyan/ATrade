@@ -108,3 +108,59 @@ def test_the_equity_of_a_last_period_without_members_counts_the_sell_at_the_next
     assert [trade.side for trade in trades] == ["BUY", "SELL"]
     # 95% of 100000 buys 950 shares at 100. They sell at 130.
     assert equity_curve[-1].equity_usd == Decimal(128500)
+
+
+def find_sides(trades: list[BacktestTrade], instrument: Instrument) -> list[str]:
+    return [trade.side for trade in trades if trade.symbol == instrument.symbol]
+
+
+def test_a_member_that_comes_back_gets_a_new_rank(tmp_path: Path) -> None:
+    periods = [
+        UniversePeriod(START_UTC, [AAA, BBB]),
+        UniversePeriod(SECOND_QUARTER_UTC, [BBB]),
+        UniversePeriod(THIRD_QUARTER_UTC, [AAA, BBB]),
+    ]
+    # AAA has the best rank in the first quarter. Its close falls below BBB while it is out of the universe.
+    members = [
+        make_member(AAA, periods, {SECOND_QUARTER_UTC: 50}, first_close=200),
+        make_member(BBB, periods, {}, first_close=100),
+    ]
+
+    trades, _ = run_case(tmp_path, rank_rules(hold_count=1), periods, members)
+
+    assert find_sides(trades, AAA) == ["BUY", "SELL"]
+    # BBB replaces AAA at the second quarter and stays. The old rank of AAA must not buy AAA again.
+    assert find_sides(trades, BBB) == ["BUY"]
+
+
+def test_a_rebalance_sells_a_buy_that_filled_after_its_instrument_left_the_universe(tmp_path: Path) -> None:
+    periods = [UniversePeriod(START_UTC, [AAA, BBB]), UniversePeriod(SECOND_QUARTER_UTC, [AAA, CCC])]
+    switch_utc = datetime(2026, 3, 25, tzinfo=UTC)
+    members = [
+        make_member(AAA, periods, {}, first_close=200),
+        # The rebalance of 2026-03-31 sells AAA. The buy of BBB goes at the next bar, 2026-04-01 00:00, and it fills
+        # after the list of the second quarter removes BBB.
+        make_member(BBB, periods, {switch_utc: 300}, first_close=100),
+        make_member(CCC, periods, {}, first_close=100),
+    ]
+
+    trades, equity_curve = run_case(tmp_path, rank_rules(hold_count=1, period="weekly"), periods, members)
+
+    assert find_sides(trades, BBB) == ["BUY", "SELL"]
+    # After the sell of BBB, the blocked buy of the best member can go.
+    assert find_sides(trades, AAA) == ["BUY", "SELL", "BUY"]
+    assert equity_curve[-1].equity_usd == STARTING_CASH
+
+
+def test_a_rebalance_does_not_sell_a_position_with_an_open_sell_order_again(tmp_path: Path) -> None:
+    periods = [UniversePeriod(START_UTC, [AAA, BBB]), UniversePeriod(SECOND_QUARTER_UTC, [BBB])]
+    members = [
+        make_member(AAA, periods, {}, first_close=200),
+        make_member(BBB, periods, {}, first_close=100),
+    ]
+    rules = rank_rules(hold_count=1, period="quarterly")
+
+    trades, _ = run_case(tmp_path, rules, periods, members)
+
+    # The list sells AAA at the period start, in the same bar time as the mark of the rebalance.
+    assert find_sides(trades, AAA) == ["BUY", "SELL"]
