@@ -118,7 +118,9 @@ This replaces the rules above:
 - The LiveNode of a forward test uses the ATrade execution client
   (section 12.19), not the IB execution client. The execution client reports
   the owner position and the owner cash for reconciliation, not the account
-  values.
+  values. After each fill it reports the owner cash again, so the account
+  balance of the strategy is the ledger cash. The balance shows 0 when the
+  owner cash is below 0, because NautilusTrader refuses a negative balance.
 - The migration drops the partial unique index
   `forward_test_one_per_instrument`. `find_forward_test_on_instrument()` and
   the `409` "already runs on" refusal of `POST /api/forward-tests` go away.

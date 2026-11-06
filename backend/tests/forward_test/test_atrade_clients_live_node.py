@@ -96,6 +96,51 @@ async def test_the_restarted_strategy_gets_its_position_from_the_owner_ledger_an
 
 
 @pytest.mark.anyio
+async def test_the_account_balance_follows_the_owner_ledger_cash_after_each_fill_and_at_a_restart(
+    database_url: str,
+) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        fill_open_order(world, "100")
+        await wait_until(lambda: strategy.read_cash() == Decimal(9000))
+
+    restored_strategy = make_strategy(claims_external_orders=True, sell_quantity=BUY_QUANTITY)
+    async with run_node(world, restored_strategy, 2) as data_factory:
+        assert restored_strategy.read_cash() == Decimal(9000)
+        await send_today_bar(world, data_factory, "150")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        fill_open_order(world, "150")
+        await wait_until(lambda: restored_strategy.read_cash() == Decimal(10500))
+
+    assert world.ledger.cash_usd == Decimal(10500)
+    assert world.ledger.read_quantity(FORWARD_TEST_ID, APPLE) == 0
+
+
+@pytest.mark.anyio
+async def test_a_fill_above_the_cash_gives_a_balance_of_0_also_at_a_restart(database_url: str) -> None:
+    """A market order can fill above the price of the ledger check. The engine refuses a negative balance."""
+    world = make_world(database_url)
+    world.ledger.cash_usd = Decimal(100)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "10")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        fill_open_order(world, "11")
+        await wait_until(lambda: strategy.read_cash() == 0)
+
+    restarted_strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, restarted_strategy, 2):
+        assert restarted_strategy.read_cash() == 0
+
+    assert world.ledger.cash_usd == Decimal(-10)
+
+
+@pytest.mark.anyio
 async def test_without_external_order_claims_the_restored_position_is_not_the_strategy_position(
     database_url: str,
 ) -> None:

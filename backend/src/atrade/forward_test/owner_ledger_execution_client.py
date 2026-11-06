@@ -170,12 +170,19 @@ class OwnerLedgerExecutionClient(ExecutionClient):
     @override
     async def _connect(self) -> None:
         await self.gateway.connect()
-        cash = Money.from_str(
-            f"{await self.ledger.read_cash_usd(self.ledger_input.forward_test_id)} {ACCOUNT_CURRENCY}"
-        )
+        await self.send_account_state()
+        self.fill_check_task = asyncio.get_running_loop().create_task(self.check_fills())
+
+    async def send_account_state(self) -> None:
+        """The account of the strategy shows the owner cash of the ledger. The engine does not change it at a fill.
+
+        A market order can fill above the price of the ledger check, so the owner cash can go below 0. The engine
+        refuses a negative balance and keeps the old balance. So the account then shows 0.
+        """
+        owner_cash = await self.ledger.read_cash_usd(self.ledger_input.forward_test_id)
+        cash = Money.from_str(f"{max(owner_cash, Decimal(0))} {ACCOUNT_CURRENCY}")
         no_cash = Money.from_str(f"0 {ACCOUNT_CURRENCY}")
         self.generate_account_state([AccountBalance(cash, no_cash, cash)], [], True, self.clock.timestamp_ns())
-        self.fill_check_task = asyncio.get_running_loop().create_task(self.check_fills())
 
     @override
     async def _disconnect(self) -> None:
@@ -257,6 +264,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             LiquiditySide.NO_LIQUIDITY_SIDE,
             int(execution.time_utc.timestamp() * NANOSECONDS_PER_SECOND),
         )
+        await self.send_account_state()
 
     @override
     async def _submit_order(self, command: SubmitOrder) -> None:

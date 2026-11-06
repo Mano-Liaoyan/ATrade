@@ -31,6 +31,7 @@ from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import format_forward_test_order_tag
 from atrade.market_data import BarRequest, save_received_bars
 from atrade.paper_trading import ForwardTestLedger
+from atrade.strategy import find_account
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection
 from tests.fakes.owner_ledger import FakeOwnerLedger
@@ -69,6 +70,12 @@ class BuyOnceStrategy(Strategy):
             for position in self.cache.positions_open(instrument_id=APPLE_ID)  # pyright: ignore[reportUnknownMemberType]
             if str(position.strategy_id) == str(self.strategy_id)
         ]
+
+    def read_cash(self) -> Decimal | None:
+        """The balance that generated code reads for its order size (docs/architecture/strategy.md section 9.8.2)."""
+        account = find_account(self, APPLE_ID.venue)
+        balance = None if account is None else account.balance_total()
+        return None if balance is None else balance.as_decimal()
 
     def on_start(self) -> None:
         self.positions_at_start = self.own_positions()
