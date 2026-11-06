@@ -36,13 +36,14 @@ export function readOnChange<T>(options: ReadOnChangeOptions<T>): () => void {
     }
     isReading = true;
     let readRequestCount = 0;
-    while (readRequestCount !== requestCount && !isStopped) {
+    while (readRequestCount !== requestCount) {
       readRequestCount = requestCount;
       try {
         const value = await options.read();
-        if (!isStopped) {
-          options.onResult(value);
+        if (isStopped) {
+          break;
         }
+        options.onResult(value);
       } catch (error) {
         // An error must not stop the live updates: the next change reads again.
         console.error(error);
