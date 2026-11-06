@@ -1,4 +1,4 @@
-// The state that the run pages (backtests, parameter sweeps, forward tests) share: the list, the open run, and the
+// The state that the run pages (backtests, parameter sweeps, forward tests, screens) share: the list, the open run, and the
 // New dialog. The constructor adds the $effects, so call it while the page component starts.
 import { untrack } from 'svelte';
 import { goto } from '$app/navigation';
@@ -15,6 +15,8 @@ export interface RunWorkbenchOptions<Item, Detail> {
   href: (id: number) => string;
   /** The run id in the address, or null. */
   openId: () => number | null;
+  /** The id that the address without an id opens. Undefined: the newest run. */
+  defaultId?: (items: Item[]) => number | undefined;
   /** True: the shown detail of this id does not change any more, so a list row change does not read it again. */
   isFinal?: (detail: Detail, id: number) => boolean;
   /**
@@ -59,7 +61,7 @@ export class RunWorkbench<Item extends { id: number }, Detail> {
       }),
     );
 
-    // The address without an id opens the newest run. `reset: false` keeps the page state, so an open dialog stays
+    // The address without an id opens defaultId or the newest run. `reset: false` keeps the page state, so an open dialog stays
     // open. A navigation that runs (for example a click on a header link) wins.
     $effect(() => {
       if (navigating.to !== null) {
@@ -69,9 +71,10 @@ export class RunWorkbench<Item extends { id: number }, Detail> {
         (found, item) => (found === undefined || item.id > found.id ? item : found),
         undefined,
       );
-      if (options.openId() === null && newest !== undefined) {
+      const target = options.defaultId?.(this.items) ?? newest?.id;
+      if (options.openId() === null && target !== undefined) {
         // eslint-disable-next-line svelte/no-navigation-without-resolve -- options.href resolves the path.
-        void goto(options.href(newest.id), { replace: true, reset: false });
+        void goto(options.href(target), { replace: true, reset: false });
       }
     });
 

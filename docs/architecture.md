@@ -474,8 +474,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   pages (backtest, forward test, parameter sweep, comparison, and strategy pages):
   the empty main area, the title line, the status, the actions, and the log text.
 - `routes/run_workbench.svelte.ts` (`RunWorkbench`) holds the state of the
-  backtest, forward test, and parameter sweep pages: the list, the navigation
-  to the newest run, the read of the open run, and the New dialog.
+  backtest, forward test, parameter sweep, and screen pages: the list, the
+  navigation to the newest run or to `defaultId`, the read of the open run, and
+  the New dialog.
 - While a button action runs, the button is disabled and its text says why,
   for example "Saving…", "Creating…", or "Starting…".
 - UI rule: a status icon stands alone, with no word next to it, before the

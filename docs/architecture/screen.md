@@ -568,7 +568,11 @@ Behavior:
   "<name> copy" (or "<name> copy N" when that name is in use).
 - Decided (#212): how the user runs a screen again after new daily bars:
   "Apply" in any edit popover runs the screen again, also without a change.
-  The page adds no "Run screen" button (#145).
+  Only a screen without a run shows a "Run screen" button. A failed first
+  run and a screen that the AI assistant did not run need it, because the
+  edit popovers need a screen result (#145).
+- A failed run or save keeps the condition bar. The error notification
+  "Screen not run" or "Screen not saved" shows the reason above the bar.
 - Decided (#206): what the result does when more than 500 instruments
   pass (section 24.5).
 - Decided (#206): the rank method for ties in a percentile (section 24.5).
