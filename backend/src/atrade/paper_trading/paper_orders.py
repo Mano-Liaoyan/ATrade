@@ -4,6 +4,7 @@ Each order and each cancel runs the paper account check first and fails closed (
 source of order status. ATrade stores only its orders by hand, without status (section 11.4).
 """
 
+import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Self
@@ -237,6 +238,9 @@ class PaperOrderRoutes:
         self.ledger = ManualOrderLedger(
             paper_account_monitor=paper_account_monitor, database_url=database_url, clock=clock
         )
+        # The check reads the open orders of IBKR, so the next check must start after the order is at IBKR. One Web
+        # process sends the orders by hand.
+        self.send_lock = asyncio.Lock()
 
     async def send_order(self, request: SendOrderRequest) -> ManualOrderResponse | JSONResponse:
         try:
@@ -247,26 +251,28 @@ class PaperOrderRoutes:
         order_by_hand = OrderByHand(
             instrument=instrument, side=request.side, quantity=request.quantity, limit_price=request.limit_price
         )
-        try:
-            refusal = await self.ledger.check_order(account_id, order_by_hand)
-        except GatewayRequestError as error:
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
-        if refusal is not None:
-            return refuse_by_ledger(refusal)
-        order_request = OrderRequest(
-            account=account_id,
-            instrument=instrument,
-            side=request.side,
-            quantity=request.quantity,
-            order_type=request.order_type,
-            limit_price=request.limit_price,
-            time_in_force=request.time_in_force,
-            order_ref=MANUAL_ORDER_REF,
-        )
-        try:
-            ibkr_order_id = await self.paper_account_monitor.gateway_connection.place_order(order_request)
-        except GatewayRequestError as error:
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=f"IB Gateway refused the order: {error}") from error
+        async with self.send_lock:
+            try:
+                refusal = await self.ledger.check_order(account_id, order_by_hand)
+            except GatewayRequestError as error:
+                raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+            if refusal is not None:
+                return refuse_by_ledger(refusal)
+            order_request = OrderRequest(
+                account=account_id,
+                instrument=instrument,
+                side=request.side,
+                quantity=request.quantity,
+                order_type=request.order_type,
+                limit_price=request.limit_price,
+                time_in_force=request.time_in_force,
+                order_ref=MANUAL_ORDER_REF,
+            )
+            try:
+                ibkr_order_id = await self.paper_account_monitor.gateway_connection.place_order(order_request)
+            except GatewayRequestError as error:
+                message = f"IB Gateway refused the order: {error}"
+                raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=message) from error
         new_order = manual_order_store.NewManualOrder(
             created_at_utc=self.clock.read_now_utc(),
             account=account_id,

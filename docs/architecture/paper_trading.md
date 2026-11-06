@@ -83,7 +83,8 @@ orders only when all 4 conditions are true:
   "By hand". Before it sends the order, the Web process checks the order
   rules of the owner ledger (section 11.10) for "By hand". When a rule
   fails, the response is `409` with the reason. ATrade sends nothing and
-  stores nothing.
+  stores nothing. One lock of the Web process holds from the check to the
+  send, so 2 orders at the same time cannot both pass one check.
 - Implemented (#214): the ledger rules for orders by hand run after the
   paper account check.
 - Implemented (#215): the forward test refusal and `OrderBlockedResponse`

@@ -3,6 +3,7 @@
 ATrade runs the paper account check before each order (docs/architecture/paper_trading.md sections 11.2-11.4).
 """
 
+import asyncio
 import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -14,6 +15,7 @@ import pytest
 
 from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
+from atrade.ibkr import OpenOrder
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import (
     FakeGatewayConnection,
@@ -27,6 +29,7 @@ ACCOUNT_ID = "DU1234567"
 ORDERS_PATH = "/api/paper-trading/orders"
 MANUAL_ORDERS_PATH = "/api/paper-trading/manual-orders"
 FORWARD_TEST_CLIENT_ID = 10
+OPEN_ORDERS_READ_SECONDS = 0.05
 
 type JsonObject = dict[str, Any]
 
@@ -116,6 +119,34 @@ async def test_sends_a_limit_order_to_the_paper_account_and_lists_it_as_an_order
     sent_order = gateway_connection.open_orders[0]
     assert sent_order.account == ACCOUNT_ID
     assert sent_order.order_ref == "ATRADE-BY-HAND"
+
+
+@pytest.mark.anyio
+async def test_of_2_sell_orders_at_the_same_time_only_the_one_that_the_position_covers_goes_to_ibkr(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each order sells 60 of the 100 shares of "By hand". IBKR answers each read after a short time."""
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    read_open_orders = gateway_connection.read_open_orders
+
+    async def read_open_orders_with_delay() -> list[OpenOrder]:
+        orders = await read_open_orders()
+        await asyncio.sleep(OPEN_ORDERS_READ_SECONDS)
+        return orders
+
+    monkeypatch.setattr(gateway_connection, "read_open_orders", read_open_orders_with_delay)
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        responses = await asyncio.gather(
+            *[client.post(ORDERS_PATH, json={**MARKET_ORDER, "quantity": 60}) for _ in range(2)]
+        )
+
+    assert sorted(response.status_code for response in responses) == [201, 409], [r.text for r in responses]
+    assert len(gateway_connection.open_orders) == 1
 
 
 @pytest.mark.anyio
