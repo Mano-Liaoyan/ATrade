@@ -328,10 +328,8 @@ Implementation (#77):
   - The bar end is the bar `ts_event`. The backtest engine gives the actor a
     bar before the strategy, so a fill at a bar close counts in the equity
     from the next bar on.
-  - The equity starts at `start_balance_usd`, not at the paper account
-    balance. Other positions of the paper account do not change it. The
-    start balance is `NetLiquidation` converted to USD (section 11.9 of
-    `paper_trading.md`).
+  - The equity starts at `allocated_capital_usd`, not at the paper account
+    balance. Other positions of the paper account do not change it.
 - Tables (migration `3e7a1c5d9b78_forward_test_create_record_tables.py`,
   `ON DELETE CASCADE` from `forward_test`). Each insert has
   `ON CONFLICT DO NOTHING`, so a restart that reads a fill or a bar again
