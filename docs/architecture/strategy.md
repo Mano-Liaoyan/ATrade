@@ -44,8 +44,9 @@ puts the new parts of this section in phases.
 - Unsaved edits exist only in the browser `localStorage`.
 - The backtest table and the forward test table each have a
   `strategy_version_id` foreign key. It must not be null.
-- Strategy versions cannot be deleted. A strategy that no backtest or forward
-  test uses can be deleted. A strategy in use cannot be deleted.
+- Strategy versions cannot be deleted. A strategy that no backtest, parameter
+  sweep, or forward test uses can be deleted. A strategy in use cannot be
+  deleted.
 
 ### 9.1.1 Tables
 

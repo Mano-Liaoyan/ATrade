@@ -1311,6 +1311,9 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 - The user can cancel a sweep. The queued runs get the status `cancelled`.
   A running run continues to its end. A sweep has no status column: its
   status is the run count of each status (#203).
+- The user can delete a sweep when no run is queued or running. The delete
+  removes the runs and their result rows. Then a strategy without other uses
+  can be deleted.
 - A sweep run uses the `out_of_sample_share` of the request, the same as
   one backtest (#203).
 - A run opens on the backtest page like any other backtest.
@@ -1339,6 +1342,7 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 | `GET /api/sweeps` | `200` with all sweeps, the newest first. Each sweep has `id`, `strategy_version_id`, `strategy_id`, `strategy_name`, `version_number` (#204), `grid`, `created_at_utc`, `run_count`, and `status_counts` (the number of runs in each status that has runs). |
 | `GET /api/sweeps/{sweep_id}` | `200` with the sweep and `runs` (`[{"backtest_id", "parameters", "status", "metrics"}]`). `404` when the sweep does not exist. |
 | `POST /api/sweeps/{sweep_id}/cancel` | `200` with the sweep. The queued runs get `cancelled`. `404` when the sweep does not exist. |
+| `DELETE /api/sweeps/{sweep_id}` | A true delete of the sweep, its runs, and their result rows. `204` when deleted. `404` when the sweep does not exist. `409` with the reason: "Parameter sweep #<id> has queued or running runs. Wait for their end." or "A run of parameter sweep #<id> is the same-period backtest of a forward test." |
 
 - `strategy` exports the function that reads the parameters with the AST.
   `backtest` already imports `strategy`.
@@ -1363,6 +1367,11 @@ chart is hard to read on flat Carbon surfaces.
   - A status line with the number of finished, failed, running, and queued
     runs: each count follows its status icon, and the status word is the
     tooltip of the icon.
+  - The "Delete parameter sweep" icon button opens a danger `Dialog` with only
+    the title ("Delete parameter sweep #<id>?") and the buttons "Cancel" and
+    "Delete parameter sweep". It sends `DELETE /api/sweeps/{id}`. An inline
+    error notification ("Parameter sweep not deleted") shows a refusal. After
+    the delete, `/sweeps` opens the newest sweep that is left.
   - With 1 parameter: a point chart. With 2 or 3 parameters: a heat map.
   - A "Metric" select. The default is Total return. With 3 parameters, a
     second select chooses the value of the third parameter.

@@ -7,10 +7,12 @@
      cell shows its value on a Carbon sequential color. Bottom panel "Runs": the parameter values, the status icon, and
      the key metrics of each run. Each column sorts the rows, and a click on a row opens its backtest. A right-click on
      a sweep row opens its context menu ("Open in new tab"). The page reads the
-     list again after each change that /ws/sweeps pushes, and the open sweep when its list row changes.
+     list again after each change that /ws/sweeps pushes, and the open sweep when its list row changes. The
+     "Delete parameter sweep" button opens a danger dialog; the backend can refuse the delete, and the page shows the reason.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
+  import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -18,7 +20,9 @@
   import {
     ContextMenu,
     DataTable,
+    Dialog,
     IconButton,
+    InlineNotification,
     readSequentialColor,
     Select,
     SortHeader,
@@ -33,6 +37,7 @@
   import {
     DEFAULT_SWEEP_METRIC,
     SWEEPS_SOCKET_PATH,
+    deleteSweep,
     formatSweepMetric,
     listSweeps,
     readParameterNames,
@@ -82,6 +87,9 @@
   let sliceValue = $state<ParameterValue | null>(null);
   let sortColumn = $state<string>(DEFAULT_SWEEP_METRIC);
   let sortDirection = $state<SortDirection>('descending');
+  let isDeleteDialogOpen = $state(false);
+  let isDeleting = $state(false);
+  let deleteMessage = $state('');
 
   const shownSweep = $derived(workbench.detail !== null && workbench.detail.id === sweepId ? workbench.detail : null);
   const parameterNames = $derived(shownSweep === null ? [] : readParameterNames(shownSweep));
@@ -122,6 +130,21 @@
         },
       },
     ];
+  }
+
+  // After a delete, /sweeps opens the newest sweep that is left.
+  async function deleteOpenSweep(id: number): Promise<void> {
+    isDeleting = true;
+    const result = await deleteSweep(fetch, id);
+    isDeleting = false;
+    isDeleteDialogOpen = false;
+    if (result.kind === 'failed') {
+      deleteMessage = result.message;
+      return;
+    }
+    deleteMessage = '';
+    workbench.items = workbench.items.filter((item) => item.id !== id);
+    await goto(resolve('/sweeps/[[sweepId]]', { sweepId: undefined }), { replace: true });
   }
 
   function openStartedSweep(started: SweepDetail): void {
@@ -182,6 +205,17 @@
   </SideColumn>
 
   <RunCenter {workbench} listTitle="Parameter sweeps not read" detailTitle="Parameter sweep not read">
+    {#if deleteMessage !== ''}
+      <InlineNotification
+        kind="error"
+        title="Parameter sweep not deleted"
+        subtitle={deleteMessage}
+        lowContrast
+        onClose={() => {
+          deleteMessage = '';
+        }}
+      />
+    {/if}
     {#if shownSweep === null || chart === null}
       <div class="atrade-run-empty">
         {#if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === '' && workbench.detailMessage === ''}
@@ -215,6 +249,13 @@
                     >
                   {/each}
                 </span>
+                <IconButton
+                  label="Delete parameter sweep"
+                  icon={TrashCan16}
+                  onclick={() => {
+                    isDeleteDialogOpen = true;
+                  }}
+                />
               {/snippet}
               <div class="chart-toolbar">
                 <Select
@@ -360,6 +401,23 @@
   onOpenChange={workbench.changeStartDialog}
   onStarted={openStartedSweep}
 />
+
+{#if sweepId !== null}
+  {@const id = sweepId}
+  <Dialog
+    open={isDeleteDialogOpen}
+    onOpenChange={(open: boolean) => {
+      isDeleteDialogOpen = open;
+    }}
+    title={`Delete parameter sweep #${String(id)}?`}
+    primaryText="Delete parameter sweep"
+    primaryKind="danger"
+    busy={isDeleting}
+    onPrimary={() => {
+      void deleteOpenSweep(id);
+    }}
+  />
+{/if}
 
 <style>
   .table-region {

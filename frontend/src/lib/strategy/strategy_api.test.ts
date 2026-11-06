@@ -142,7 +142,7 @@ describe('listStrategyTemplates', () => {
 
 describe('deleteStrategy', () => {
   it('reports that a strategy in use cannot be deleted', async () => {
-    const detail = 'A backtest or forward test uses a version of this strategy. It cannot be deleted.';
+    const detail = 'A backtest, parameter sweep, or forward test uses a version of this strategy. It cannot be deleted.';
 
     const result = await deleteStrategy(respondWith(409, { detail }), 4);
 

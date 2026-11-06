@@ -113,8 +113,26 @@ async function checkRuns(page: Page, sweepId: string): Promise<void> {
   await expect(page).toHaveURL(new RegExp(`/sweeps/${sweepId}$`));
 }
 
-test('starts a parameter sweep, sorts its runs, and opens the backtest of a run', async ({ page, request }, currentTest) => {
-  test.setTimeout(RUN_TIMEOUT_MILLISECONDS * 2);
+async function deleteSweep(page: Page, request: APIRequestContext, sweepId: string): Promise<void> {
+  // A running run continues after the cancel, and the backend refuses the delete until its end.
+  await expect
+    .poll(async () => {
+      const sweep = (await (await request.get(`/api/sweeps/${sweepId}`)).json()) as { status_counts: Record<string, number> };
+      return (sweep.status_counts['queued'] ?? 0) + (sweep.status_counts['running'] ?? 0);
+    }, { timeout: RUN_TIMEOUT_MILLISECONDS })
+    .toBe(0);
+  await page.goto(`/sweeps/${sweepId}`);
+  await page.getByRole('button', { name: 'Delete parameter sweep' }).click();
+  const dialog = page.getByRole('dialog', { name: `Delete parameter sweep #${sweepId}?` });
+  await dialog.getByRole('button', { name: 'Delete parameter sweep' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page).not.toHaveURL(new RegExp(`/sweeps/${sweepId}$`));
+  await expect(page.getByRole('link', { name: `#${sweepId}`, exact: true })).toHaveCount(0);
+  expect((await request.get(`/api/sweeps/${sweepId}`)).status()).toBe(404);
+}
+
+test('starts a parameter sweep, sorts its runs, opens the backtest of a run, and deletes the sweep', async ({ page, request }, currentTest) => {
+  test.setTimeout(RUN_TIMEOUT_MILLISECONDS * 3);
   await saveAppleBars(page, request);
   const strategyName = `Sweep ${currentTest.project.name} ${String(Date.now())}`;
   await createStrategy(page, strategyName);
@@ -129,4 +147,5 @@ test('starts a parameter sweep, sorts its runs, and opens the backtest of a run'
     // The other specs share the backtest queue: the queued runs of this sweep must not wait in it.
     await request.post(`/api/sweeps/${sweepId}/cancel`);
   }
+  await deleteSweep(page, request, sweepId);
 });

@@ -668,7 +668,12 @@ export interface paths {
         get: operations["read_sweep_api_sweeps__sweep_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Sweep
+         * @description A true delete of the sweep and its runs. 409 while a run is queued or running, and for a run that is the
+         *     same-period backtest of a forward test.
+         */
+        delete: operations["delete_sweep_api_sweeps__sweep_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -5612,6 +5617,53 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_sweep_api_sweeps__sweep_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sweep_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

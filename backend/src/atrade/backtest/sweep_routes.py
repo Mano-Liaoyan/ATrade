@@ -26,6 +26,7 @@ from atrade.backtest.parameter_sweep import (
     GridEntry,
     SweepRow,
     cancel_queued_runs,
+    delete_sweep,
     insert_sweep,
     make_grid,
     select_sweep,
@@ -33,6 +34,7 @@ from atrade.backtest.parameter_sweep import (
     select_sweeps,
 )
 from atrade.foundation.clock import Clock
+from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.foundation.table_changes import ChangeSocket
 from atrade.market_data import ExchangeRateReader
 from atrade.strategy import StrategyParameter, StrategyVersion, read_strategy_parameters, read_strategy_version
@@ -197,6 +199,16 @@ class SweepRoutes:
             await cancel_queued_runs(connection, sweep_id=sweep_id, ended_at_utc=self.clock.read_now_utc())
         return await self.read_sweep(sweep_id)
 
+    async def delete_sweep(self, sweep_id: int) -> None:
+        """A true delete of the sweep and its runs. 409 while a run is queued or running, and for a run that is the
+        same-period backtest of a forward test."""
+        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
+            if await select_sweep(connection, sweep_id) is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=SWEEP_NOT_FOUND)
+            refusal = await delete_sweep(connection, sweep_id)
+        if refusal is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=refusal)
+
 
 def create_sweep_router(*, database_url: str, clock: Clock, exchange_rate_reader: ExchangeRateReader) -> APIRouter:
     routes = SweepRoutes(database_url=database_url, clock=clock, exchange_rate_reader=exchange_rate_reader)
@@ -209,4 +221,11 @@ def create_sweep_router(*, database_url: str, clock: Clock, exchange_rate_reader
     router.add_api_route("/sweeps", routes.list_sweeps, methods=["GET"])
     router.add_api_route("/sweeps/{sweep_id}", routes.read_sweep, methods=["GET"], responses=NOT_FOUND)
     router.add_api_route("/sweeps/{sweep_id}/cancel", routes.cancel_sweep, methods=["POST"], responses=responses)
+    router.add_api_route(
+        "/sweeps/{sweep_id}",
+        routes.delete_sweep,
+        methods=["DELETE"],
+        status_code=status.HTTP_204_NO_CONTENT,
+        responses={**NOT_FOUND, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
+    )
     return router
