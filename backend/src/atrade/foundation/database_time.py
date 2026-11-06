@@ -8,16 +8,17 @@ registration is on the global adapters, so it applies to all connections of the 
 from datetime import UTC, datetime
 
 import psycopg
+from psycopg.abc import Buffer
 from psycopg.types.datetime import TimestamptzBinaryLoader, TimestamptzLoader
 
 
 class UtcTextLoader(TimestamptzLoader):
-    def load(self, data: bytes) -> datetime:
+    def load(self, data: Buffer) -> datetime:
         return super().load(data).astimezone(UTC)
 
 
 class UtcBinaryLoader(TimestamptzBinaryLoader):
-    def load(self, data: bytes) -> datetime:
+    def load(self, data: Buffer) -> datetime:
         return super().load(data).astimezone(UTC)
 
 
