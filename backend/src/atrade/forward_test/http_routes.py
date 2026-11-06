@@ -52,9 +52,9 @@ FORWARD_TEST_CHANGE_SOCKET = ChangeSocket(
         {
             "forward_test",
             "forward_test_equity_point",
-            "forward_test_fill",
             "forward_test_interruption",
             "forward_test_same_period_backtest",
+            "owner_ledger_entry",
         }
     ),
 )
