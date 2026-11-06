@@ -106,8 +106,9 @@
 {/if}
 
 <style>
-  /* The legend does not take pointer events, so the crosshair follows the pointer also over the legend. A row with
-     buttons takes them. */
+  /* The legend does not take pointer events, so the crosshair follows the pointer also over the legend. In a row with
+     buttons, the name, the values, and a shown button take them, so a trade mark under a hidden button stays reachable.
+     The row with the pointer or the focus takes them all. */
   .chart-legend {
     margin: 0;
     padding: 0;
@@ -127,7 +128,11 @@
     white-space: nowrap;
   }
 
-  .legend-row--actions {
+  .legend-row--actions .legend-name,
+  .legend-row--actions .legend-value,
+  .legend-row--actions .legend-action--shown,
+  .legend-row--actions:hover,
+  .legend-row--actions:focus-within {
     pointer-events: auto;
   }
 

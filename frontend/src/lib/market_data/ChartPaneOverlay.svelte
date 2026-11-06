@@ -1,7 +1,7 @@
 <!-- The HTML layer over one pane of a bar chart (docs/architecture/indicator.md section 23.9.4): the legend at the top
      left, and the options menu ("Options for <legend name>") at the top right. A legend that is higher than its pane
      scrolls in itself with a visible track (ScrollRegion). The layer takes no pointer events, so the crosshair follows
-     the pointer over it. Only the options button, the scroll track, and the legend rows with buttons take them. -->
+     the pointer over it. Only the options button, the scroll track, and the parts of the legend rows with buttons take them. -->
 <script lang="ts">
   import { OverflowMenu, type OverflowMenuItem } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';

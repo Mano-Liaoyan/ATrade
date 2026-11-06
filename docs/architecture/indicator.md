@@ -784,7 +784,9 @@ section 6.2).
     round trip has no number.
   - The tooltip is a Carbon popover (no high contrast, so the support
     colors keep their contrast), below a "B" mark and above an "S" mark.
-  - A legend row over a mark takes the pointer first.
+  - The name, the values, and a shown button of a legend row over a mark
+    take the pointer first. A hidden button does not, so the mark that the
+    Trades row centers in a short chart keeps its tooltip.
 - Each trade of `GET /api/backtests/{backtest_id}` and each fill of
   `GET /api/forward-tests/{id}` gets `round_trip_net_profit_usd` (decimal
   text, or null). The backend calculates it with the round trip rule of the

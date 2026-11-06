@@ -259,7 +259,7 @@ const LINE_PIXELS = 200;
 
 async function hoverRow(page: Page, name: string): Promise<Locator> {
   const row = legendRow(page, name);
-  await row.hover();
+  await row.locator('.legend-name').hover();
   return row;
 }
 
