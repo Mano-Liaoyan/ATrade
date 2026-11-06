@@ -257,10 +257,10 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
     finally:
         gateway_connection.disconnect()
     # The equity starts at the allocated capital (section 12.8). Each row with a client ID has it (section 12.24).
-    assert job.row.allocated_capital_usd is not None
-    return CheckedAccount(
-        account_id=account_id, start_balance_usd=job.row.allocated_capital_usd, warm_up_bars=warm_up_bars
-    )
+    start_capital_usd = job.row.start_capital_usd
+    # Each row has one of the 2 values: the start route writes the capital, and an old row has its start balance.
+    assert start_capital_usd is not None
+    return CheckedAccount(account_id=account_id, start_balance_usd=start_capital_usd, warm_up_bars=warm_up_bars)
 
 
 async def write_waiting_for_gateway(job: ChildJob) -> None:
