@@ -13,7 +13,12 @@ import httpx
 import pytest
 
 from atrade.assistant import make_default_text
-from tests.backtest.real_runner import add_decimal_places_to_saved_bars, run_backtest_runner, wait_for_final_status
+from tests.backtest.real_runner import (
+    TEST_STRATEGY_FILE,
+    add_decimal_places_to_saved_bars,
+    run_backtest_runner,
+    wait_for_final_status,
+)
 from tests.backtest.test_universe_backtest_routes import read_universe_members
 from tests.backtest.universe_data import (
     AAA,
@@ -37,6 +42,7 @@ async def run_universe_backtest(
     clock: FixedClock,
     *,
     code: str | None = None,
+    expected_status: str = "finished",
     **universe: object,
 ) -> dict[str, Any]:
     strategy = (await web_client.post("/api/strategies", json={"name": "Follow universe"})).json()
@@ -46,7 +52,7 @@ async def run_universe_backtest(
     assert response.status_code == 201, response.text
     async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=120):
         backtest = await wait_for_final_status(web_client, response.json()["id"])
-    assert backtest["status"] == "finished", backtest["error_message"]
+    assert backtest["status"] == expected_status, backtest["error_message"]
     return backtest
 
 
@@ -85,6 +91,28 @@ def read_prompt_example() -> str:
     """The AI assistant copies this example (docs/architecture/assistant.md 25.9), so a real run checks the text."""
     [_, example_code] = re.findall(r"```python\n(.*?)```", make_default_text("# Template"), re.DOTALL)
     return example_code
+
+
+@pytest.mark.anyio
+async def test_a_single_instrument_strategy_on_a_universe_fails_with_a_clear_message(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    save_universe_test_data(database_url)
+
+    backtest = await run_universe_backtest(
+        web_client,
+        database_url,
+        clock,
+        code=TEST_STRATEGY_FILE.read_text(),
+        expected_status="failed",
+        universe_kind="rule",
+        top_n=2,
+    )
+
+    assert backtest["error_message"] == (
+        "This strategy trades a single instrument: its configuration needs instrument_id or bar_type. A universe gives"
+        " neither. Run it on one instrument, or use a multi-instrument strategy."
+    )
 
 
 @pytest.mark.anyio

@@ -257,6 +257,9 @@ Failures that the user sees in `error_message`:
   When the file is not empty, the backtest fails with its content.
   `logger_flush()` does not wait for the log writer thread, so the file can
   still be empty after an error in `on_bar`.
+- A single-instrument strategy on a universe: a message that tells the user
+  to use one instrument or a multi-instrument strategy. Its configuration
+  needs `instrument_id` or `bar_type`, and a universe gives neither.
 - No saved bars in the range: a message that tells the user to open the bar
   chart of the instrument, which loads the bars from IBKR. The start route
   refuses such a request first. The child checks again, because it reads the

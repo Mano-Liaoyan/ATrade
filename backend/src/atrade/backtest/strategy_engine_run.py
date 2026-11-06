@@ -21,6 +21,7 @@ from typing import Any, Literal, cast
 
 from nautilus_trader.backtest import BacktestEngine, BacktestEngineConfig
 from nautilus_trader.common import CacheConfig, FileWriterConfig, LoggerConfig, LogLevel, TimeEvent, logger_flush
+from nautilus_trader.config import StrategyConfig
 from nautilus_trader.execution import FixedFeeModel
 from nautilus_trader.model import (
     AccountId,
@@ -77,6 +78,12 @@ CATALOG_LAST_NS = 2**63 - 1
 OPEN_TICK_DELAY_NS = 1_000_000
 # The engine splits a bar into 4 ticks. The open tick has the volume of 1 of them.
 BAR_VOLUME_PARTS = 4
+
+
+SINGLE_INSTRUMENT_ON_UNIVERSE_MESSAGE = (
+    "This strategy trades a single instrument: its configuration needs instrument_id or bar_type. A universe gives"
+    " neither. Run it on one instrument, or use a multi-instrument strategy."
+)
 
 
 class StrategyFailedError(Exception):
@@ -309,6 +316,18 @@ class EngineInputs:
     changed_orders: list[str] | None = None
 
 
+def create_config(config_class: type[StrategyConfig], fields: dict[str, object]) -> StrategyConfig:
+    """Raises StrategyFileError when a single-instrument strategy runs on a universe, which gives no such fields."""
+    try:
+        # readability-exception: the StrategyConfig stub has no such fields. The user subclass must define
+        # them (docs/architecture/strategy.md section 9.2).
+        return config_class(**fields)  # pyright: ignore[reportArgumentType]
+    except TypeError as error:
+        if "instrument_id" not in fields and any(name in str(error) for name in ("instrument_id", "bar_type")):
+            raise StrategyFileError(SINGLE_INSTRUMENT_ON_UNIVERSE_MESSAGE) from error
+        raise
+
+
 def run_engine(engine: BacktestEngine, inputs: EngineInputs, work_directory: Path) -> None:
     """Loads the strategy classes, makes the configuration, adds the open ticks, and runs the engine.
 
@@ -321,9 +340,7 @@ def run_engine(engine: BacktestEngine, inputs: EngineInputs, work_directory: Pat
         engine.add_data(ticks)
     try:
         strategy_class, config_class = load_strategy_classes(inputs.code, work_directory)
-        # readability-exception: the StrategyConfig stub has no such fields. The user subclass must define
-        # them (docs/architecture/strategy.md section 9.2).
-        config = config_class(**inputs.config_fields)  # pyright: ignore[reportArgumentType]
+        config = create_config(config_class, inputs.config_fields)
         checked_class = record_handler_errors(strategy_class, handler_errors)
         open_times_ns = {
             ticks[0].instrument_id: [tick.ts_event for tick in ticks] for ticks in inputs.open_ticks if ticks
