@@ -167,7 +167,8 @@ New columns of `strategy_version`:
   order counts, so a denied, rejected, or canceled order gets a new order on
   the next bar. A lost order gets at most 1 retry each day (UTC day of the
   bar), so a permanent refusal on 1-minute bars does not send an order each
-  minute. An exit cancels the open buy orders of the instrument
+  minute. A partly filled order gets no new order, because a position exists.
+  An exit cancels the open buy orders of the instrument
   and uses `close_position`, so a backtest exit fills at the next open, as a
   forward test does. A saved version keeps its code (ADR 0006), so a version
   from before these rules must be saved again to get them. It shows only the
