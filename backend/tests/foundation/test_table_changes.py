@@ -36,17 +36,19 @@ APP_CHANGE_SOCKETS = [
 
 
 @asynccontextmanager
-async def open_change_socket(database_url: str) -> AsyncGenerator[AsyncWebSocketSession]:
+async def open_change_socket(
+    database_url: str, change_socket: ChangeSocket = TEST_SOCKET
+) -> AsyncGenerator[AsyncWebSocketSession]:
     """The socket opens before the feed listens. The first message ("changed" after LISTEN) shows that it listens."""
     feed = TableChangeFeed(database_url)
     app = FastAPI()
     app.include_router(
-        create_change_socket_router(feed, [TEST_SOCKET], heartbeat_interval_seconds=SHORT_HEARTBEAT_SECONDS)
+        create_change_socket_router(feed, [change_socket], heartbeat_interval_seconds=SHORT_HEARTBEAT_SECONDS)
     )
     async with (
         anyio.create_task_group() as task_group,
         httpx.AsyncClient(transport=ASGIWebSocketTransport(app=app), base_url="http://test") as client,
-        aconnect_ws(TEST_SOCKET.path, client) as socket,
+        aconnect_ws(change_socket.path, client) as socket,
     ):
         while not feed.signals:
             await anyio.sleep(0.01)
@@ -73,6 +75,19 @@ async def test_a_change_of_a_watched_table_sends_changed(database_url: str) -> N
             database_url,
             "INSERT INTO watchlist_instrument (symbol, exchange, currency, added_at_utc) "
             "VALUES ('AAPL', 'NASDAQ', 'USD', now())",
+        )
+
+        assert await receive_type(socket) == "changed"
+
+
+@pytest.mark.anyio
+async def test_a_new_owner_ledger_fill_sends_changed_on_the_forward_test_socket(database_url: str) -> None:
+    async with open_change_socket(database_url, FORWARD_TEST_CHANGE_SOCKET) as socket:
+        await write_in_other_connection(
+            database_url,
+            "INSERT INTO owner_ledger_entry (owner_kind, entry_kind, time_utc, account, symbol, exchange, currency, "
+            "quantity_change, price, cash_change, ibkr_execution_id) "
+            "VALUES ('by_hand', 'fill', now(), 'DU1', 'AAPL', 'NASDAQ', 'USD', 1, 100, -100, 'E1')",
         )
 
         assert await receive_type(socket) == "changed"
