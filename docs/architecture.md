@@ -1122,7 +1122,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   it with read_backtest and fix the strategy code." in the message input of
   the AI assistant column and sends it when the conversation socket is open.
   Without an open conversation, during a run, or without a credential, the
-  message stays in the input. The AI
+  message stays in the input, and the Output tab says so. The AI
   assistant reads the error itself (`read_backtest`, assistant section
   25.4.1). A backtest tab has the "Equity" / "Bars" switcher of the backtest
   page (indicator section 23.9.8) in a line over its body. "Bars" shows

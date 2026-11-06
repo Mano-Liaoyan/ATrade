@@ -484,11 +484,13 @@
 
   // "Ask AI to fix": the AI assistant reads the error itself (read_backtest). Without an open conversation, during a
   // run, or without a credential, the message stays in the message input of the AI assistant column, so the user can
-  // send it.
+  // send it. The Output tab says so, because the column can be minimized.
   function askAssistantToFix(backtestId: number): void {
     assistantSession.text = describeFixRequest(backtestId);
-    if (assistantSession.connection === 'open') {
-      assistantSession.send();
+    if (assistantSession.connection !== 'open' || !assistantSession.send()) {
+      assistantSession.reportError(
+        'Fix request not sent. No open conversation, a run in progress, or no credential. The message is in the AI assistant input.',
+      );
     }
   }
 

@@ -88,8 +88,12 @@ test('a failed backtest tab shows its error, and a closed tab stays closed after
   await failedTab.click();
   await expect(results.getByRole('alert').filter({ hasText: LAST_ERROR_LINE })).toContainText('Failed');
   await expect(results.getByRole('region', { name: 'Log' })).toContainText('in on_start');
+  await page.getByRole('button', { name: 'Minimize AI assistant' }).click();
   await results.getByRole('button', { name: 'Ask AI to fix' }).click();
-  // Without an open conversation, the request stays in the message input of the AI assistant.
+  // Without an open conversation, the request stays in the message input of the AI assistant. The Output tab says so,
+  // also while the column is minimized.
+  await expect(page.getByText('Fix request not sent.', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: 'Open AI assistant' }).click();
   await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue(
     'Backtest #21 failed. Read it with read_backtest and fix the strategy code.',
   );
