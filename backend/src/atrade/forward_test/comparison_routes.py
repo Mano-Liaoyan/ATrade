@@ -264,7 +264,7 @@ def to_forward_test_fill_response(
             commission_usd=Decimal(0),
             amount_usd=forward_test_fill.cash_in_lieu_usd or Decimal(0),
             split_ratio=forward_test_fill.split_ratio,
-            round_trip_net_profit_usd=None,
+            round_trip_net_profit_usd=round_trip_net_profit_usd,
         )
     return ForwardTestFillResponse(
         symbol=forward_test_fill.instrument.symbol,

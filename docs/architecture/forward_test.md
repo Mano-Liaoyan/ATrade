@@ -762,8 +762,11 @@ and the status codes of the new refusals are choices of this document.
   it. The forward test panel has the "Equity" / "Bars" switcher; "Bars" shows
   the bars from `created_at_utc` to `stopped_at_utc`, or to now. Done in
   #332: `round_trip_net_profit_usd` of each fill row, from
-  `find_round_trip_net_profits` on the `fill` rows (the rule of the
-  Instruments tab). A split adjustment row has null.
+  `find_round_trip_net_profits` on all ledger rows (the rule of the
+  Instruments tab). A split adjustment row that ends a round trip has its net
+  profit, for example a 1:10 reverse split of 5 shares. So the values of the
+  rows add up to the net profit of the Instruments tab. The chart has no mark
+  for a split adjustment row, because the row has no price.
 
 ## 12.14 Worker comparison
 

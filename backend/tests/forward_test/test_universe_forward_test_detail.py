@@ -150,5 +150,37 @@ async def test_a_split_adjustment_counts_for_the_position_but_not_as_a_trade(
     assert [fill["round_trip_net_profit_usd"] for fill in detail["fills"]] == [None, None, "1000", None, "-500"]
 
 
+@pytest.mark.anyio
+async def test_a_split_adjustment_that_ends_a_round_trip_has_the_net_profit_of_the_instrument_row(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url, ["AAPL"])
+    # Buy 5 at 100. A 1:10 reverse split leaves 0.5 shares, so the position goes to 0 with 30 USD cash in lieu.
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %s, 'fill', %s, 'DU1234567', 'AAPL', 'NASDAQ', 'USD', 5, 100, 0, -500, 'E-1', 1)
+            """,
+            (forward_test["id"], make_day(1)),
+        )
+        connection.execute(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, cash_change, stock_split_id)
+            VALUES ('forward_test', %s, 'split_adjustment', %s, 'DU1234567', 'AAPL', 'NASDAQ', 'USD', -5, 30, 1)
+            """,
+            (forward_test["id"], make_day(2)),
+        )
+
+    detail = (await web_client.get(f"/api/forward-tests/{forward_test['id']}")).json()
+
+    [instrument] = detail["instruments"]
+    profits = [fill["round_trip_net_profit_usd"] for fill in detail["fills"]]
+    assert profits[0] is None
+    assert Decimal(profits[1]) == Decimal(instrument["net_profit_usd"])
+
+
 def make_day(day: int) -> datetime:
     return datetime(2026, 2, day, 15, tzinfo=UTC)
