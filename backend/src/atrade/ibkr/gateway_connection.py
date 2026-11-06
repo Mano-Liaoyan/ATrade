@@ -8,7 +8,7 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Literal, Protocol
 
@@ -61,6 +61,8 @@ EXCHANGE_RATE_BAR_SIZE = "1 hour"
 # A commission report comes after its execution, also after the end of a reqExecutions answer.
 COMMISSION_REPORT_WAIT_SECONDS = 2.0
 COMMISSION_REPORT_CHECK_SECONDS = 0.05
+# At this age, a fill without its report comes with commission 0: a wrong commission costs less than a lost fill.
+COMMISSION_REPORT_LIMIT = timedelta(minutes=5)
 # While no live bar update comes, the live bar stream checks the connection this often.
 LIVE_BAR_CONNECTION_CHECK_SECONDS = 1.0
 # IB Gateway sends these codes when its connection to the IBKR servers is lost (1100, 2110) or comes back (1101, 1102).
@@ -159,7 +161,8 @@ class GatewayConnection(Protocol):
     async def read_executions(self, *, include_held: bool = False) -> list[Execution]:
         """The executions that IBKR returns for reqExecutions, of all client IDs of the account that IBKR shows. A fill
         without its commission report (a held fill) stays out of the list until a later read. With `include_held`, it
-        is in the list with `is_commission_reported` False."""
+        is in the list with `is_held` True. After COMMISSION_REPORT_LIMIT, a fill without a report is not held any
+        more: it is in the list with commission 0."""
         ...
 
     async def read_historical_bars(
@@ -202,8 +205,10 @@ class IbAsyncGatewayConnection:
         # balance. ATrade reports "connected" only after that startup synchronization.
         self.synchronized = False
         self.ib = IB()
-        # The fills that were held after the wait of read_executions. No later read waits for them.
-        self.timed_out_execution_ids: set[str] = set()
+        # execId -> the end of the wait of read_executions for a fill without a report. No later read waits for it.
+        self.held_since_utc: dict[str, datetime] = {}
+        # The fills that reached COMMISSION_REPORT_LIMIT. Each one gets one warning.
+        self.released_execution_ids: set[str] = set()
         # ib_async keeps one result per request type. Two parallel reqAllOpenOrders calls would lose one answer.
         self.open_orders_lock = asyncio.Lock()
         # Without this, ib_async ends a failed request with an empty result, the same as "no bars in the range".
@@ -496,11 +501,12 @@ class IbAsyncGatewayConnection:
             raise GatewayRequestError(message) from error
         stored_fills = [self.ib.wrapper.fills.get(fill.execution.execId, fill) for fill in fills]
         await self.wait_for_commission_reports(stored_fills)
-        return [convert_fill(fill) for fill in stored_fills if include_held or has_commission_report(fill)]
+        executions = [convert_fill(fill, is_held=self.is_held(fill)) for fill in stored_fills]
+        return [execution for execution in executions if include_held or not execution.is_held]
 
     async def wait_for_commission_reports(self, fills: list[Fill]) -> None:
         """Waits for each report one time only, so a fill without a report does not slow each later read."""
-        waiting = [fill for fill in fills if fill.execution.execId not in self.timed_out_execution_ids]
+        waiting = [fill for fill in fills if fill.execution.execId not in self.held_since_utc]
         loop = asyncio.get_running_loop()
         deadline = loop.time() + COMMISSION_REPORT_WAIT_SECONDS
         while True:
@@ -509,8 +515,23 @@ class IbAsyncGatewayConnection:
                 break
             await asyncio.sleep(COMMISSION_REPORT_CHECK_SECONDS)
         for fill in waiting:
-            self.timed_out_execution_ids.add(fill.execution.execId)
+            self.held_since_utc[fill.execution.execId] = datetime.now(UTC)
             logger.warning("Execution %s has no commission report.", fill.execution.execId)
+
+    def is_held(self, fill: Fill) -> bool:
+        """The age counts from the execution time, for a child process that reads the fill only once, or from the end
+        of the first wait. ib_async reads a time without a zone as local time (`TimezoneTWS` is not set), and that time
+        reaches ATrade with a zone, so ATrade cannot see it. The second start bounds a time that is too late."""
+        if has_commission_report(fill):
+            return False
+        execution_id = fill.execution.execId
+        held_since_utc = min(fill.execution.time, self.held_since_utc[execution_id])
+        if datetime.now(UTC) - held_since_utc < COMMISSION_REPORT_LIMIT:
+            return True
+        if execution_id not in self.released_execution_ids:
+            self.released_execution_ids.add(execution_id)
+            logger.warning("Execution %s has commission 0: the report did not arrive in time.", execution_id)
+        return False
 
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange

@@ -25,6 +25,9 @@ PAPER_CHECK_FAILED_MESSAGE = "The paper account check failed."
 # The child exits with this code when IB Gateway is not reachable for a long time (section 12.7). It is not a crash:
 # the worker writes "waiting_for_gateway" and starts the child again, which waits for IB Gateway.
 GATEWAY_UNREACHABLE_EXIT_CODE = 4
+# The child exits with this code when a fill has no commission report after the cancel step (section 12.6). A stop
+# then is `stop_failed`. A stock split restart is not a crash: the new child waits for the report (section 12.7).
+HELD_FILL_EXIT_CODE = 5
 # After this number of crashes in a row, the worker stops the restarts (section 12.7).
 CRASH_LIMIT = 3
 # A run child that ran this long before its crash starts a new count: the crashes are not "in a row".
@@ -161,7 +164,11 @@ class ForwardTestWorker:
         self, connection: psycopg.AsyncConnection, row: ForwardTestRow, running_child: RunningChild, exit_code: int
     ) -> None:
         now_utc = self.clock.read_now_utc()
-        if running_child.is_restart_requested and exit_code == 0 and not running_child.is_stop_requested:
+        if (
+            running_child.is_restart_requested
+            and exit_code in {0, HELD_FILL_EXIT_CODE}
+            and not running_child.is_stop_requested
+        ):
             await forward_test_store.write_status(connection, forward_test_id=row.id, status="starting")
             return
         is_stop = running_child.mode == "cancel_orders" or running_child.is_stop_requested

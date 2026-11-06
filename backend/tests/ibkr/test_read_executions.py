@@ -6,7 +6,7 @@ replace only the socket: IB Gateway messages go into the real `ib_async` wrapper
 
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -14,7 +14,7 @@ from ib_async import CommissionReport, Contract, Stock
 from ib_async import Execution as IbExecution
 
 from atrade.ibkr import gateway_connection as gateway_connection_module
-from atrade.ibkr.gateway_connection import IbAsyncGatewayConnection
+from atrade.ibkr.gateway_connection import COMMISSION_REPORT_LIMIT, IbAsyncGatewayConnection
 
 EXECUTION_ID = "0000e0d5.1"
 LIVE_MESSAGE_REQUEST_ID = -1
@@ -23,16 +23,16 @@ EXECUTION_CONTRACT = Stock("AAPL", "ISLAND", "USD")
 ORDER_REF = "O-20260102-030405-001-FT7-1"
 
 
-def make_ib_execution() -> IbExecution:
+def make_ib_execution(*, order_id: int = 8, client_id: int = 10, age: timedelta = timedelta(0)) -> IbExecution:
     return IbExecution(
         execId=EXECUTION_ID,
-        time=datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC),
+        time=datetime.now(UTC) - age,
         acctNumber="DU1234567",
         side="BOT",
         shares=10.0,
         price=20.5,
-        orderId=8,
-        clientId=10,
+        orderId=order_id,
+        clientId=client_id,
         orderRef=ORDER_REF,
     )
 
@@ -44,17 +44,18 @@ class GatewayMessages:
         self.connection = IbAsyncGatewayConnection(host="127.0.0.1", port=1, client_id=10)
         self.wrapper = self.connection.ib.wrapper
         self.contract: Contract = EXECUTION_CONTRACT
+        self.execution = make_ib_execution()
         monkeypatch.setattr(self.connection.ib.client, "isReady", lambda: True)
         monkeypatch.setattr(self.connection.ib.client, "reqExecutions", self.answer_executions_request)
 
     def send_live_execution(self) -> None:
-        self.wrapper.execDetails(LIVE_MESSAGE_REQUEST_ID, self.contract, make_ib_execution())
+        self.wrapper.execDetails(LIVE_MESSAGE_REQUEST_ID, self.contract, self.execution)
 
     def send_commission_report(self, commission: float) -> None:
         self.wrapper.commissionReport(CommissionReport(execId=EXECUTION_ID, commission=commission, currency="USD"))
 
     def answer_executions_request(self, request_id: int, _execution_filter: object) -> None:
-        self.wrapper.execDetails(request_id, self.contract, make_ib_execution())
+        self.wrapper.execDetails(request_id, self.contract, self.execution)
         self.wrapper.execDetailsEnd(request_id)
 
 
@@ -125,7 +126,37 @@ async def test_a_read_with_held_fills_returns_them_with_their_state(gateway: Gat
     [execution] = await gateway.connection.read_executions(include_held=True)
 
     assert execution.execution_id == EXECUTION_ID
-    assert not execution.is_commission_reported
+    assert execution.is_held
+
+
+@pytest.mark.anyio
+async def test_a_held_fill_at_the_limit_comes_with_commission_0_and_one_warning(
+    gateway: GatewayMessages, caplog: pytest.LogCaptureFixture
+) -> None:
+    gateway.execution = make_ib_execution(age=COMMISSION_REPORT_LIMIT)
+
+    with caplog.at_level(logging.WARNING, logger="atrade.ibkr"):
+        [execution] = await gateway.connection.read_executions()
+        await gateway.connection.read_executions()
+
+    assert (execution.commission, execution.is_held) == (0, False)
+    assert len([message for message in caplog.messages if "commission 0" in message]) == 1
+
+
+@pytest.mark.anyio
+async def test_the_limit_also_counts_from_the_first_wait_when_the_execution_time_is_wrong(
+    gateway: GatewayMessages, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A time without a zone: ib_async reads it as local time, so the time can be hours after now.
+    gateway.execution = make_ib_execution(age=timedelta(hours=-5))
+    monkeypatch.setattr(gateway_connection_module, "COMMISSION_REPORT_LIMIT", timedelta(milliseconds=100))
+
+    held = await gateway.connection.read_executions()
+    await asyncio.sleep(0.15)
+    released = await gateway.connection.read_executions()
+
+    assert held == []
+    assert [execution.execution_id for execution in released] == [EXECUTION_ID]
 
 
 @pytest.mark.anyio

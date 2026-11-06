@@ -70,10 +70,10 @@ class Execution:
     side: str
     quantity: Decimal
     price: Decimal
-    # The commission of the IBKR commission report. 0 when `is_commission_reported` is False.
+    # The commission of the IBKR commission report. 0 without a report.
     commission: Decimal
-    # False for a held fill: `read_executions` returns it only with `include_held`.
-    is_commission_reported: bool
+    # True for a fill that waits for its commission report. `read_executions` returns it only with `include_held`.
+    is_held: bool
     # The orderRef of the order. It tells the source of the order (`read_order_source`).
     order_ref: str
     # The contract of the execution. Its exchange is the execution venue, not the primary exchange of an instrument.
@@ -120,7 +120,7 @@ def has_commission_report(fill: Fill) -> bool:
     return bool(fill.commissionReport.execId)
 
 
-def convert_fill(fill: Fill) -> Execution:
+def convert_fill(fill: Fill, *, is_held: bool) -> Execution:
     execution = fill.execution
     return Execution(
         execution_id=execution.execId,
@@ -132,7 +132,7 @@ def convert_fill(fill: Fill) -> Execution:
         quantity=Decimal(str(execution.shares)),
         price=Decimal(str(execution.price)),
         commission=Decimal(str(fill.commissionReport.commission)),
-        is_commission_reported=has_commission_report(fill),
+        is_held=is_held,
         order_ref=execution.orderRef,
         symbol=fill.contract.symbol,
         currency=fill.contract.currency,

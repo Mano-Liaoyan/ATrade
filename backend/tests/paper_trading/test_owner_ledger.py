@@ -5,6 +5,7 @@ each position on /ws/paper-trading. Real PostgreSQL and the IBKR fake (docs/arch
 import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -19,8 +20,16 @@ from httpx_ws.transport import ASGIWebSocketTransport
 from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
 from atrade.ibkr import AccountValue
+from atrade.ibkr import gateway_connection as gateway_connection_module
 from tests.fakes.clock import FixedClock
-from tests.fakes.ibkr import FakeGatewayConnection, make_balance_values, make_execution, make_stock_position
+from tests.fakes.ibkr import (
+    WEB_CLIENT_ID,
+    FakeGatewayConnection,
+    make_balance_values,
+    make_execution,
+    make_stock_position,
+)
+from tests.ibkr.test_read_executions import GatewayMessages, make_ib_execution
 
 ACCOUNT_ID = "DU1234567"
 ORDERS_PATH = "/api/paper-trading/orders"
@@ -264,6 +273,37 @@ async def test_records_each_fill_of_an_order_by_hand_once(
     with psycopg.connect(database_url) as connection:
         row = connection.execute("SELECT count(*) FROM owner_ledger_entry WHERE entry_kind = 'fill'").fetchone()
     assert row == (2,)
+
+
+@pytest.mark.anyio
+async def test_records_a_fill_by_hand_without_a_report_at_the_limit(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(gateway_connection_module, "COMMISSION_REPORT_WAIT_SECONDS", 0.05)
+    gateway_connection = make_gateway()
+    messages = GatewayMessages(monkeypatch)
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        await read_account(client)
+        response = await client.post(
+            ORDERS_PATH, json=make_order(symbol="AAPL", side="BUY", quantity=10, limit_price="100")
+        )
+        gateway_connection.open_orders = []
+        messages.execution = make_ib_execution(
+            order_id=response.json()["ibkr_order_id"], client_id=WEB_CLIENT_ID, age=timedelta(minutes=5)
+        )
+        gateway_connection.read_executions = messages.connection.read_executions  # pyright: ignore[reportAttributeAccessIssue]
+        await read_account(client)
+
+    with psycopg.connect(database_url) as connection:
+        rows = connection.execute(
+            "SELECT quantity_change, commission FROM owner_ledger_entry WHERE entry_kind = 'fill'"
+        ).fetchall()
+    assert rows == [(Decimal(10), Decimal(0))]
 
 
 @pytest.mark.anyio

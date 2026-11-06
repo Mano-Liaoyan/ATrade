@@ -6,7 +6,6 @@ The IBKR connection is the fake. The function that runs the LiveNode is a fake: 
 """
 
 import asyncio
-import logging
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -19,6 +18,7 @@ import pytest
 
 from atrade.forward_test import (
     GATEWAY_UNREACHABLE_EXIT_CODE,
+    HELD_FILL_EXIT_CODE,
     PAPER_CHECK_FAILED_EXIT_CODE,
     ChildMode,
     IbkrAccess,
@@ -565,7 +565,7 @@ def make_held_execution(forward_test_id: int, *, time_utc: datetime) -> Executio
         client_id=FORWARD_TEST_CLIENT_ID,
         execution_id=HELD_EXECUTION_ID,
         order_ref=f"O-20260102-030405-001-FT{forward_test_id}-1",
-        is_commission_reported=False,
+        is_held=True,
     )
     return replace(execution, time_utc=time_utc)
 
@@ -582,41 +582,18 @@ async def test_a_stop_with_a_held_fill_fails_and_the_retry_saves_the_fill(
 
     exit_code, _ = await run_child(settings, forward_test["id"], "cancel_orders", FakeLiveNode(gateway_connection))
 
-    assert exit_code == 1
+    assert exit_code == HELD_FILL_EXIT_CODE
     assert read_ledger_fills(database_url) == []
     listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
     assert HELD_EXECUTION_ID in listed["error_message"]
 
-    gateway_connection.executions = [replace(held, commission=Decimal("1.25"), is_commission_reported=True)]
+    gateway_connection.executions = [replace(held, commission=Decimal("1.25"), is_held=False)]
     retry_exit_code, _ = await run_child(
         settings, forward_test["id"], "cancel_orders", FakeLiveNode(gateway_connection)
     )
 
     assert retry_exit_code == 0
     assert read_ledger_fills(database_url) == [("AAPL", "NASDAQ", Decimal(10), Decimal("1.25"))]
-
-
-@pytest.mark.anyio
-async def test_the_stop_ends_with_commission_0_when_the_report_does_not_come_in_5_minutes(
-    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    forward_test = await start_forward_test(web_client)
-    gateway_connection = make_forward_test_gateway()
-    gateway_connection.executions = [
-        make_held_execution(forward_test["id"], time_utc=CHILD_NOW_UTC - timedelta(minutes=5))
-    ]
-
-    with caplog.at_level(logging.WARNING, logger="atrade.forward_test_child"):
-        exit_code, _ = await run_child(
-            make_settings(database_url, frontend_build_dir),
-            forward_test["id"],
-            "cancel_orders",
-            FakeLiveNode(gateway_connection),
-        )
-
-    assert exit_code == 0
-    assert read_ledger_fills(database_url) == [("AAPL", "NASDAQ", Decimal(10), Decimal(0))]
-    assert any(HELD_EXECUTION_ID in message for message in caplog.messages)
 
 
 @pytest.mark.anyio
@@ -631,7 +608,7 @@ async def test_a_restart_with_a_held_fill_waits_for_the_report_and_is_not_a_cras
 
     async def read_and_then_report(*, include_held: bool = False) -> list[Execution]:
         executions = await read_executions(include_held=include_held)
-        gateway_connection.executions = [replace(held, commission=Decimal("1.25"), is_commission_reported=True)]
+        gateway_connection.executions = [replace(held, commission=Decimal("1.25"), is_held=False)]
         return executions
 
     gateway_connection.read_executions = read_and_then_report  # pyright: ignore[reportAttributeAccessIssue]
@@ -657,6 +634,8 @@ async def test_a_restart_with_a_held_fill_waits_for_the_report_and_is_not_a_cras
     assert exit_code == 0
     assert fills_at_start == [("AAPL", "NASDAQ", Decimal(10), Decimal("1.25"))]
     assert len(opened_client_ids) == 3
+    [listed] = (await web_client.get(FORWARD_TESTS_PATH)).json()
+    assert [interruption["ended_at_utc"] is not None for interruption in listed["interruptions"]] == [True]
 
 
 @pytest.mark.anyio

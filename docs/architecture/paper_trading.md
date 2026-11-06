@@ -131,7 +131,7 @@ orders only when all 4 conditions are true:
   `reqExecutions` returns only the executions of the current day (section
   21), so an older fill shows `filled_quantity` `"0"`. `filled_quantity` does
   not include a held fill (`ibkr.md`): a fill without its commission report
-  counts when the report arrives.
+  counts when the report arrives or the hold ends at 5 minutes.
 - The "Filled today" tab of the home page and the instrument page shows the
   list "Filled orders by hand"
   (`FilledManualOrderList.svelte`, `ScrollRegion` with the same label): the

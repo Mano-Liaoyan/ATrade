@@ -226,14 +226,11 @@ This replaces the rules above:
   `reqExecutions` returns only the current day, so a fill stays lost when no
   child reads it on its day.
 - A held fill (`ibkr.md`, no commission report yet) of the forward test fails
-  step 5: the status is `stop_failed`, and the worker runs the stop steps
-  again on a new connection. No transfer to "By hand" happens before the fill
-  is in the ledger. End condition: the retries end when the report arrives,
-  or when the fill is 5 minutes old (`COMMISSION_REPORT_LIMIT`, measured from
-  the execution time). At that age, the child saves the fill with commission
-  0 and logs a warning with the execId. A wrong commission costs less than a
-  wrong owner position. A held fill that is already this old at the first
-  read gets only the 2 second wait of `read_executions()`.
+  step 5 with exit code 5: the status is `stop_failed`, and the worker runs
+  the stop steps again on a new connection. No transfer to "By hand" happens
+  before the fill is in the ledger. End condition: the retries end when the
+  report arrives, or when `read_executions()` ends the hold at 5 minutes and
+  returns the fill with commission 0.
 
 ## 12.7 Recovery after restart
 
@@ -255,7 +252,8 @@ This replaces the rules above:
      section 12.6), so that the owner position is correct before the
      `LiveNode` starts. A held fill is not a crash: the child runs the start
      steps again every 30 seconds with the status `waiting_for_gateway`, with
-     the end condition of section 12.6.
+     the end condition of section 12.6. The `gateway` interruption of this
+     wait ends at the `LiveNode` start or at the stop.
   2. Start the `LiveNode`. Set `external_order_instrument_ids` and
      `reconciliation_instrument_ids` to the instrument. The account position
      on this instrument belongs to this strategy (section 12.2).
@@ -278,13 +276,15 @@ This replaces the rules above:
   current quarter.
 - Phase 3 (#149): the stock split check restarts the forward tests that trade
   an instrument after it changes the owner ledger for a stock split
-  (section 12.22). This restart does not count toward the 3-crash limit.
+  (section 12.22). This restart does not count toward the 3-crash limit,
+  also when the old child ends with a held fill (exit code 5).
 - An event table records the start and the end of each interruption.
 
 Implementation (#77):
 
 - A crash is the end of a `run` child without a stop request, with an exit
-  code other than 3 (paper account check) or 4 (IB Gateway). The worker adds
+  code other than 3 (paper account check) or 4 (IB Gateway), and not a stock
+  split restart with exit code 0 or 5. The worker adds
   1 to `crash_count`, opens a `crash` interruption, and writes `starting`.
   The next comparison starts a new `run` child. At `crash_count = 3` the
   status is `failed`, the client ID stays taken, and there is no restart.
@@ -650,7 +650,7 @@ Phase 3 table changes (#146). The column names are choices of this document.
 |---|---|
 | `starting` | The Web process inserted the row, or a crash happened. The worker did not start a child yet. |
 | `running` | A `run` child runs. |
-| `waiting_for_gateway` | IB Gateway is not reachable. The child retries every 30 seconds, or the worker starts a new child after a lost Gateway. The client ID stays taken. |
+| `waiting_for_gateway` | IB Gateway is not reachable, or a fill waits for its commission report before the `LiveNode` start (section 12.7). The child retries every 30 seconds, or the worker starts a new child after a lost Gateway. The client ID stays taken. |
 | `stopping` | The worker sent the stop request, or a `cancel_orders` child runs. |
 | `stopped` | The orders are cancelled and the child ended. The client ID is free. |
 | `stop_failed` | A cancel or the save of a fill failed. The client ID stays taken. The next comparison starts a `cancel_orders` child again. |
@@ -1344,7 +1344,7 @@ Implemented (#220) with the IBKR fake only:
   state. The other 3 cases give the state at once.
 - After a confirmed stock split, the check asks the worker to restart the
   forward tests that held the instrument (`ForwardTestWorker.request_restart`).
-  The worker asks the child to stop. When it ends with exit code 0, the
+  The worker asks the child to stop. When it ends with exit code 0 or 5, the
   worker writes `starting` and the next comparison starts a new child. The
   restart adds nothing to `crash_count`. The new child cancels the open
   orders of its client ID (section 12.7) and gets the new owner positions
