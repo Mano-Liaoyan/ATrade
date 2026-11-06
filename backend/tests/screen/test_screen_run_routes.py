@@ -16,6 +16,7 @@ from psycopg.types.json import Jsonb
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarRequest, save_received_bars
+from atrade.screen.screen_run import ScreenOutcome, run_screen_steps
 from atrade.screen.screen_running import read_start_summaries
 
 LAST_DAY = datetime(2025, 12, 31, tzinfo=UTC)
@@ -160,6 +161,22 @@ async def test_a_run_saves_a_screen_result_that_the_read_route_gives_back(
             {"symbol": "TSLA", "exchange": "NASDAQ", "currency": "USD", "reason": "filters[0]: Close > 15"},
         ],
     }
+
+
+@pytest.mark.anyio
+async def test_a_screen_deleted_during_its_run_gives_404(
+    web_client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    screen_id = await create_screen(web_client, make_definition())
+
+    async def run_and_delete(**arguments: Any) -> ScreenOutcome:
+        assert (await web_client.delete(f"/api/screens/{screen_id}")).status_code == httpx.codes.NO_CONTENT
+        return await run_screen_steps(**arguments)
+
+    monkeypatch.setattr("atrade.screen.screen_running.run_screen_steps", run_and_delete)
+    response = await web_client.post(f"/api/screens/{screen_id}/runs")
+
+    assert response.status_code == httpx.codes.NOT_FOUND, response.text
 
 
 @pytest.mark.anyio

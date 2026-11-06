@@ -412,6 +412,8 @@ class ScreenRoutes:
         screen_result_id = await run_saved_screen(
             database_url=self.database_url, clock=self.clock, screen=screen, assistant_conversation_id=conversation_id
         )
+        if screen_result_id is None:
+            raise screen_not_found(screen_id)
         return await self.read_screen_result(screen_result_id)
 
     async def read_screen_result(

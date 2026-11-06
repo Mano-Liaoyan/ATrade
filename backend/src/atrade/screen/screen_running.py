@@ -79,8 +79,9 @@ def to_row_values(row: ScreenRow) -> tuple[str, str, str, dict[str, Any]]:
 
 async def run_saved_screen(
     *, database_url: str, clock: Clock, screen: screen_store.ScreenRecord, assistant_conversation_id: int | None = None
-) -> int:
-    """Runs a checked screen and returns the ID of its new screen result. A run of the user has no conversation."""
+) -> int | None:
+    """Runs a checked screen and returns the ID of its new screen result, or None when the screen was deleted during
+    the run. A run of the user has no conversation."""
     run_at_utc = clock.read_now_utc()
     started = time.perf_counter()
     definition = screen.definition
@@ -121,6 +122,10 @@ async def run_saved_screen(
         assistant_conversation_id=assistant_conversation_id,
     )
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        screen_result_id = await screen_store.insert_screen_result(connection, new_result)
+        try:
+            screen_result_id = await screen_store.insert_screen_result(connection, new_result)
+        except psycopg.errors.ForeignKeyViolation:
+            # readability-exception: PostgreSQL reports a deleted screen only as an error.
+            return None
         await connection.commit()
     return screen_result_id
