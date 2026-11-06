@@ -63,13 +63,6 @@ class PromptMessage(BaseModel):
     thinking_level: ThinkingLevel
 
 
-class SteerMessage(BaseModel):
-    """Browser to server: a user message while the AI assistant runs."""
-
-    type: Literal["steer"] = "steer"
-    text: NonEmptyText
-
-
 class AbortMessage(BaseModel):
     """Browser to server: stop the active run (the "Stop" button)."""
 
@@ -216,14 +209,13 @@ class LoginEndMessage(BaseModel):
 
 
 type BrowserMessage = Annotated[
-    PromptMessage | SteerMessage | AbortMessage | LoginStartMessage | LoginAnswerMessage, Field(discriminator="type")
+    PromptMessage | AbortMessage | LoginStartMessage | LoginAnswerMessage, Field(discriminator="type")
 ]
 BROWSER_MESSAGE_ADAPTER: TypeAdapter[BrowserMessage] = TypeAdapter(BrowserMessage)
 
 # The messages of /ws/assistant in both directions. The OpenAPI document adds their JSON Schema for the frontend types.
 ASSISTANT_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [
     PromptMessage,
-    SteerMessage,
     AbortMessage,
     MessageDeltaMessage,
     MessageEndMessage,
@@ -380,7 +372,7 @@ class ConversationSocket:
                     await self.send_error("No login waits for this answer.")
             case PromptMessage():
                 if self.is_running:
-                    await self.send_error("The AI assistant runs. Send a steer message, or stop the run.")
+                    await self.send_error("The AI assistant runs. Stop the run first.")
                     return
                 selection = ModelSelection(
                     provider=message.provider,
@@ -390,9 +382,6 @@ class ConversationSocket:
                 )
                 task_group.start_soon(self.run, self.conversation_id, message.text, selection)
                 self.is_running = True
-            case SteerMessage():
-                if not self.is_running or not await self.assistant_service.steer(self.conversation_id, message.text):
-                    await self.send_error("The AI assistant does not run. Send the message as a new prompt.")
             case AbortMessage():
                 await self.assistant_service.abort(self.conversation_id)
 

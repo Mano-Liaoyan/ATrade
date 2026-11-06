@@ -111,7 +111,6 @@ export class Conversations {
   /** The active runs that got an abort before their session existed. */
   private readonly abortedRuns = new Set<string>();
   private readonly sessions = new Map<string, AgentSession>();
-  private readonly budgets = new Map<string, UserMessageBudget>();
 
   constructor(options: ConversationsOptions) {
     this.options = options;
@@ -124,7 +123,7 @@ export class Conversations {
   /** Runs one user message to its end. Each error becomes an error event. */
   async run(conversationId: string, request: RunRequest, emit: (event: RunEvent) => void): Promise<void> {
     if (this.activeRuns.has(conversationId)) {
-      emit({ type: 'error', message: 'The conversation has an active run. Send a steer message.' });
+      emit({ type: 'error', message: 'The conversation has an active run.' });
       return;
     }
     const run = this.runSession(conversationId, request, emit)
@@ -133,7 +132,6 @@ export class Conversations {
       })
       .finally(() => {
         this.sessions.delete(conversationId);
-        this.budgets.delete(conversationId);
         this.abortedRuns.delete(conversationId);
         this.activeRuns.delete(conversationId);
       });
@@ -149,7 +147,6 @@ export class Conversations {
     }
     const conversationSession = openConversationSession(this.options.piDir, conversationId);
     const budget: UserMessageBudget = { startedBacktests: 0 };
-    this.budgets.set(conversationId, budget);
     const session = await createAssistantSession({
       modelRuntime: opened.modelRuntime,
       model: opened.model,
@@ -177,21 +174,6 @@ export class Conversations {
       unsubscribe();
       session.dispose();
     }
-  }
-
-  /** Adds a user message to the active run. False when the conversation has no active run. A steer message is a new
-   * user message, so it can start 5 more backtests (25.4.2). */
-  async steer(conversationId: string, text: string): Promise<boolean> {
-    const session = this.sessions.get(conversationId);
-    if (session === undefined) {
-      return false;
-    }
-    const budget = this.budgets.get(conversationId);
-    if (budget !== undefined) {
-      budget.startedBacktests = 0;
-    }
-    await session.steer(text);
-    return true;
   }
 
   async abort(conversationId: string): Promise<void> {

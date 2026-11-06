@@ -35,7 +35,6 @@ class FakeAssistantService:
         self.runs: list[tuple[int, str, ModelSelection]] = []
         # The system prompt of each run, in the order of runs.
         self.system_prompts: list[str] = []
-        self.steers: list[tuple[int, str]] = []
         self.aborts: list[int] = []
         self.title_requests: list[tuple[int, ModelSelection]] = []
         # The generated title, or the error text of a failed generation.
@@ -80,11 +79,6 @@ class FakeAssistantService:
                     return
                 continue
             yield item
-
-    async def steer(self, conversation_id: int, text: str) -> bool:
-        self.require_reachable()
-        self.steers.append((conversation_id, text))
-        return True
 
     async def abort(self, conversation_id: int) -> None:
         self.require_reachable()

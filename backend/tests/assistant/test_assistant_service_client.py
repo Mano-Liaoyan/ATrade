@@ -164,13 +164,12 @@ async def test_title_returns_the_title_or_raises_the_reason() -> None:
 
 
 @pytest.mark.anyio
-async def test_read_messages_and_steer_and_delete_use_the_conversation_paths() -> None:
+async def test_read_messages_and_delete_use_the_conversation_paths() -> None:
     requests: list[httpx.Request] = []
     message = {"role": "assistant", "text": "Hi.", "provider": "fake", "model": "m", "credential_name": "Key"}
     message["thinking_level"] = "low"
 
     messages = await client_for(httpx.Response(200, json={"messages": [message]}), requests).read_messages(7)
-    is_steered = await client_for(httpx.Response(409, json={"detail": "No run."}), requests).steer(7, "Use SMA 50.")
     await client_for(httpx.Response(204), requests).delete_conversation(7)
 
     assert messages == [
@@ -178,10 +177,8 @@ async def test_read_messages_and_steer_and_delete_use_the_conversation_paths() -
             role="assistant", text="Hi.", provider="fake", model="m", credential_name="Key", thinking_level="low"
         )
     ]
-    assert is_steered is False
     assert [(request.method, request.url.path) for request in requests] == [
         ("GET", "/conversations/7/messages"),
-        ("POST", "/conversations/7/steer"),
         ("DELETE", "/conversations/7"),
     ]
 

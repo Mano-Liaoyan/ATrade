@@ -172,32 +172,6 @@ describe('a run of a conversation', () => {
     expect(events).toEqual([{ type: 'error', message: 'The credential missing does not exist.' }]);
   });
 
-  test('steer adds a user message to the active run', async () => {
-    const gate = holdGate();
-    const { conversations, model } = await openConversations([
-      { text: 'Working on it.', holdUntil: gate.promise },
-      { text: 'Changed as you asked.' },
-    ]);
-
-    const run = runOnce(conversations, 'Write a strategy.');
-    await model.waitForRequests(1);
-    expect(await conversations.steer('7', 'Use SMA 50.')).toBe(true);
-    gate.release();
-    const events = await run;
-
-    expect(JSON.stringify(model.requests[1]?.messages)).toContain('Use SMA 50.');
-    expect(events.filter((event) => event.type === 'message_end').map((event) => event.text)).toEqual([
-      'Working on it.',
-      'Changed as you asked.',
-    ]);
-  });
-
-  test('steer without an active run does nothing', async () => {
-    const { conversations } = await openConversations([]);
-
-    expect(await conversations.steer('7', 'Use SMA 50.')).toBe(false);
-  });
-
   test('abort stops the active run', async () => {
     const gate = holdGate();
     const { conversations, model } = await openConversations([{ text: 'A long answer.', holdUntil: gate.promise }]);
@@ -221,7 +195,7 @@ describe('a run of a conversation', () => {
     gate.release();
     await run;
 
-    expect(events).toEqual([{ type: 'error', message: 'The conversation has an active run. Send a steer message.' }]);
+    expect(events).toEqual([{ type: 'error', message: 'The conversation has an active run.' }]);
   });
 
   test('delete removes the JSONL file', async () => {

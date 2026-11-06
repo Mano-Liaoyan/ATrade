@@ -11564,27 +11564,6 @@
         "title": "SplitCheckMessage",
         "type": "object"
       },
-      "SteerMessage": {
-        "description": "Browser to server: a user message while the AI assistant runs.",
-        "properties": {
-          "type": {
-            "const": "steer",
-            "default": "steer",
-            "title": "Type",
-            "type": "string"
-          },
-          "text": {
-            "minLength": 1,
-            "title": "Text",
-            "type": "string"
-          }
-        },
-        "required": [
-          "text"
-        ],
-        "title": "SteerMessage",
-        "type": "object"
-      },
       "StrategyVersionSavedMessage": {
         "description": "The AI assistant saved a strategy version, for the diff card (25.5.2).",
         "properties": {
