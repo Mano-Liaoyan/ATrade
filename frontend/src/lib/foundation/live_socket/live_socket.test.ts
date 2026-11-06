@@ -111,6 +111,17 @@ describe('openLiveSocket', () => {
     expect(sockets).toHaveLength(2);
   });
 
+  it('closes and connects again when a socket does not open within the heartbeat timeout', () => {
+    const { sockets } = startSocket();
+    const firstSocket = latestSocket(sockets);
+
+    vi.advanceTimersByTime(1000);
+    expect(firstSocket.isClosed).toBe(true);
+    vi.advanceTimersByTime(100);
+
+    expect(sockets).toHaveLength(2);
+  });
+
   it('waits longer after each failed connection, up to a maximum', () => {
     const { sockets } = startSocket();
 

@@ -63,6 +63,10 @@ SELECT_MEMBERS: LiteralString = """
 
 HAS_MEMBERS: LiteralString = "SELECT EXISTS (SELECT 1 FROM us_universe_member WHERE quarter_start_utc = %s)"
 
+SELECT_CURRENT_QUARTER: LiteralString = (
+    "SELECT max(quarter_start_utc) FROM us_universe_member WHERE quarter_start_utc <= %s"
+)
+
 SELECT_LAST_BAR_DAY: LiteralString = """
     SELECT max(start_utc) FROM databento_bar WHERE currency = 'USD' AND bar_period = '1-DAY'
 """
@@ -90,11 +94,27 @@ def has_us_universe(connection: psycopg.Connection, quarter_start_utc: datetime)
     return row is not None and bool(row[0])
 
 
-def insert_members(connection: psycopg.Connection, quarter_start_utc: datetime, last_ranking_day: date) -> None:
+def read_window_days(connection: psycopg.Connection, last_ranking_day: date) -> list[datetime]:
     rows = connection.execute(
         SELECT_WINDOW_DAYS, {"last_ranking_day_utc": to_utc_day(last_ranking_day), "day_count": WINDOW_TRADING_DAYS}
     ).fetchall()
-    window_days: list[datetime] = [row[0] for row in rows]
+    return [row[0] for row in rows]
+
+
+def has_ranking_window(*, database_url: str, last_ranking_day: date) -> bool:
+    """True when databento_bar holds the 63 trading days to `last_ranking_day` without a gap. The calculation then
+    needs no download. This is the durable record that an earlier process bought and imported the window."""
+    with psycopg.connect(database_url) as connection:
+        window_days = read_window_days(connection, last_ranking_day)
+    return (
+        len(window_days) == WINDOW_TRADING_DAYS
+        and window_days[0] == to_utc_day(last_ranking_day)
+        and window_days[-1] >= to_utc_day(last_ranking_day - timedelta(days=WINDOW_CALENDAR_DAYS))
+    )
+
+
+def insert_members(connection: psycopg.Connection, quarter_start_utc: datetime, last_ranking_day: date) -> None:
+    window_days = read_window_days(connection, last_ranking_day)
     if len(window_days) < WINDOW_TRADING_DAYS:
         message = (
             f"The universe of {quarter_start_utc:%Y-%m-%d} needs {WINDOW_TRADING_DAYS} trading days of Databento"
@@ -175,6 +195,15 @@ async def read_us_universe_members(
         )
         for row in rows
     ]
+
+
+async def read_current_us_universe_quarter(*, database_url: str, now_utc: datetime) -> datetime | None:
+    """The current quarter of all readers of the US universe: the start of the last saved quarter on or before
+    `now_utc`. A quarter without saved members does not count. None when no quarter is saved."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        cursor = await connection.execute(SELECT_CURRENT_QUARTER, (now_utc,))
+        row = await cursor.fetchone()
+    return None if row is None else row[0]
 
 
 async def read_us_universe_quarter_starts(*, database_url: str, end_utc: datetime) -> list[datetime]:

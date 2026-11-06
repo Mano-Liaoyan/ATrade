@@ -26,8 +26,11 @@ COPY_HOURLY_RECORDS: LiteralString = """
     COPY databento_hourly_record (symbol, start_utc, open, high, low, close, volume) FROM STDIN
 """
 
+# Section 8.8.4: a link from 2024-07-01 moved no bar.
 SELECT_SYMBOL_LINKS: LiteralString = """
-    SELECT old_symbol, new_symbol, change_day FROM databento_symbol_link ORDER BY change_day, id
+    SELECT old_symbol, new_symbol, change_day FROM databento_symbol_link
+    WHERE change_day < '2024-07-01'
+    ORDER BY change_day, id
 """
 
 # Section 8.8.4: the history of an old symbol is under its new symbol.
@@ -123,9 +126,11 @@ SELECT_PURCHASE_SYMBOLS: LiteralString = """
     ), old_symbol AS (
         SELECT member.quarter_start_utc, link.old_symbol AS symbol, link.change_day
         FROM member JOIN databento_symbol_link AS link ON link.new_symbol = member.symbol
+            AND link.change_day < '2024-07-01'
         UNION
         SELECT old_symbol.quarter_start_utc, link.old_symbol, link.change_day
         FROM old_symbol JOIN databento_symbol_link AS link ON link.new_symbol = old_symbol.symbol
+            AND link.change_day < '2024-07-01'
     )
     SELECT quarter_start_utc, symbol FROM member
     UNION

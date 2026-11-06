@@ -3,7 +3,7 @@
 Each run plays the next script of `run_scripts`. The item HOLD makes the run wait until `release()` or `abort()`.
 An abort ends the run at once, like pi.
 
-A login plays `login_script`. After a LoginStep `prompt`, the login waits for `answer_login` with its prompt ID. The
+A login plays `login_script`. After a login step `prompt`, the login waits for `answer_login` with its prompt ID. The
 answers are kept in `login_answers`. A deleted credential leaves `credentials`.
 """
 
@@ -13,20 +13,19 @@ from typing import Final, Literal
 import anyio
 
 from atrade.assistant import (
+    AssistantEvent,
     AssistantServiceError,
     ConversationMessage,
-    CredentialSummary,
-    LoginEnd,
-    LoginEvent,
-    LoginStep,
+    CredentialResponse,
+    LoginEndMessage,
+    LoginStepMessage,
     ModelSelection,
     ProviderSummary,
-    RunEvent,
 )
 
 HOLD: Final = "hold"
 
-type ScriptItem = RunEvent | str
+type ScriptItem = AssistantEvent | str
 
 
 class FakeAssistantService:
@@ -35,7 +34,6 @@ class FakeAssistantService:
         self.runs: list[tuple[int, str, ModelSelection]] = []
         # The system prompt of each run, in the order of runs.
         self.system_prompts: list[str] = []
-        self.steers: list[tuple[int, str]] = []
         self.aborts: list[int] = []
         self.title_requests: list[tuple[int, ModelSelection]] = []
         # The generated title, or the error text of a failed generation.
@@ -49,8 +47,8 @@ class FakeAssistantService:
         self.release_event = anyio.Event()
         self.run_started = anyio.Event()
         self.providers: list[ProviderSummary] = []
-        self.credentials: list[CredentialSummary] = []
-        self.login_script: list[LoginEvent] = []
+        self.credentials: list[CredentialResponse] = []
+        self.login_script: list[AssistantEvent] = []
         self.logins: list[tuple[str, str, str]] = []
         self.login_answers: dict[str, str] = {}
         self.answer_event = anyio.Event()
@@ -66,7 +64,7 @@ class FakeAssistantService:
 
     async def run(
         self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
-    ) -> AsyncIterator[RunEvent]:
+    ) -> AsyncIterator[AssistantEvent]:
         self.require_reachable()
         self.runs.append((conversation_id, text, selection))
         self.system_prompts.append(system_prompt)
@@ -80,11 +78,6 @@ class FakeAssistantService:
                     return
                 continue
             yield item
-
-    async def steer(self, conversation_id: int, text: str) -> bool:
-        self.require_reachable()
-        self.steers.append((conversation_id, text))
-        return True
 
     async def abort(self, conversation_id: int) -> None:
         self.require_reachable()
@@ -114,7 +107,7 @@ class FakeAssistantService:
         self.require_reachable()
         return self.providers
 
-    async def list_credentials(self) -> list[CredentialSummary]:
+    async def list_credentials(self) -> list[CredentialResponse]:
         self.require_reachable()
         return self.credentials
 
@@ -125,17 +118,19 @@ class FakeAssistantService:
         self.credentials = kept
         return deleted
 
-    async def login(self, provider: str, method: Literal["oauth", "api_key"], name: str) -> AsyncIterator[LoginEvent]:
+    async def login(
+        self, provider: str, method: Literal["oauth", "api_key"], name: str
+    ) -> AsyncIterator[AssistantEvent]:
         self.require_reachable()
         self.logins.append((provider, method, name))
         try:
             for event in self.login_script:
                 yield event
-                if isinstance(event, LoginStep) and event.prompt_id is not None:
+                if isinstance(event, LoginStepMessage) and event.prompt_id is not None:
                     while event.prompt_id not in self.login_answers:
                         await self.answer_event.wait()
                         self.answer_event = anyio.Event()
-                if isinstance(event, LoginEnd):
+                if isinstance(event, LoginEndMessage):
                     self.credentials.append(event.credential)
         finally:
             self.login_closed = True

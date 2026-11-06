@@ -50,7 +50,7 @@ async def read_trial_sharpe_ratios(*, database_url: str, strategy_id: int, row: 
             for trial in finished
             if trial.strategy_version_id in versions and versions[trial.strategy_version_id].strategy_id == strategy_id
         ]
-        equity_curves = await backtest_store.select_equity_curves(connection, [trial.id for trial in trials])
+        equity_curves = await backtest_store.select_daily_equity_curves(connection, [trial.id for trial in trials])
     return [
         calculate_daily_sharpe(
             calculate_daily_returns(start_capital_usd=trial.paper_capital_usd, equity_curve=equity_curves[trial.id])

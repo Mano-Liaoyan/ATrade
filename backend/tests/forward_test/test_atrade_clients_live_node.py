@@ -5,12 +5,15 @@ Each `run_node` is one start of a forward test child. The restart steps: send an
 the strategy position. Then a stock split changes the owner position, and a restart restores the new position.
 """
 
+import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
 
-from atrade.forward_test import OwnerFill, OwnerPosition
+from atrade.forward_test import ForwardTestPosition, OwnerFill
+from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import read_order_source
 from atrade.ibkr import OpenOrder
 from tests.fakes.ibkr import LIVE_BAR_NOW_UTC, make_execution, make_forward_test_order
@@ -21,6 +24,7 @@ from tests.forward_test.atrade_clients_node import (
     BUY_QUANTITY,
     CLIENT_ID,
     FORWARD_TEST_ID,
+    POLL_SECONDS,
     ClientsWorld,
     make_strategy,
     make_world,
@@ -81,7 +85,7 @@ async def test_the_restarted_strategy_gets_its_position_from_the_owner_ledger_an
     assert world.gateway.open_orders == []
 
     # Stock split 2-for-1: the ledger change doubles the owner position and halves the average price (section 11.11).
-    world.ledger.positions[FORWARD_TEST_ID, APPLE] = OwnerPosition(
+    world.ledger.positions[FORWARD_TEST_ID, APPLE] = ForwardTestPosition(
         APPLE, Decimal(2 * BUY_QUANTITY), Decimal(FILL_PRICE) / 2
     )
     strategy_after_split = make_strategy(claims_external_orders=True)
@@ -91,6 +95,86 @@ async def test_the_restarted_strategy_gets_its_position_from_the_owner_ledger_an
 
     assert strategy_after_split.positions_at_start == [(Decimal(2 * BUY_QUANTITY), Decimal("50.125"))]
     assert len(world.ledger.checked_orders) == 1
+
+
+@pytest.mark.anyio
+async def test_the_account_balance_follows_the_owner_ledger_cash_after_each_fill_and_at_a_restart(
+    database_url: str,
+) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        fill_open_order(world, "100")
+        await wait_until(lambda: strategy.read_cash() == Decimal(9000))
+
+    restored_strategy = make_strategy(claims_external_orders=True, sell_quantity=BUY_QUANTITY)
+    async with run_node(world, restored_strategy, 2) as data_factory:
+        assert restored_strategy.read_cash() == Decimal(9000)
+        await send_today_bar(world, data_factory, "150")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        fill_open_order(world, "150")
+        await wait_until(lambda: restored_strategy.read_cash() == Decimal(10500))
+
+    assert world.ledger.cash_usd == Decimal(10500)
+    assert world.ledger.read_quantity(FORWARD_TEST_ID, APPLE) == 0
+
+
+@pytest.mark.anyio
+async def test_the_fill_event_of_the_strategy_sees_the_new_cash(database_url: str) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        fill_open_order(world, "100")
+        await wait_until(lambda: bool(strategy.cash_at_fills))
+
+    assert strategy.cash_at_fills == [Decimal(9000)]
+
+
+@pytest.mark.anyio
+async def test_a_failed_cash_read_at_a_fill_does_not_lose_the_fill_event(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+
+        async def fail_cash_read(forward_test_id: int) -> Decimal:
+            raise OSError(forward_test_id)
+
+        monkeypatch.setattr(world.ledger, "read_cash_usd", fail_cash_read)
+        fill_open_order(world, "100")
+        await wait_until(lambda: bool(strategy.own_positions()))
+
+    assert strategy.positions_at_stop == [(Decimal(BUY_QUANTITY), Decimal(100))]
+
+
+@pytest.mark.anyio
+async def test_a_fill_above_the_cash_gives_a_balance_of_0_also_at_a_restart(database_url: str) -> None:
+    """A market order can fill above the price of the ledger check. The engine refuses a negative balance."""
+    world = make_world(database_url)
+    world.ledger.cash_usd = Decimal(100)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "10")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        fill_open_order(world, "11")
+        await wait_until(lambda: strategy.read_cash() == 0)
+
+    restarted_strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, restarted_strategy, 2):
+        assert restarted_strategy.read_cash() == 0
+
+    assert world.ledger.cash_usd == Decimal(-10)
 
 
 @pytest.mark.anyio
@@ -163,6 +247,23 @@ async def test_the_client_reports_only_the_orders_and_fills_of_its_own_client_id
 
 
 @pytest.mark.anyio
+async def test_the_open_order_of_an_earlier_session_gets_the_instrument_of_the_forward_test(database_url: str) -> None:
+    world = make_world(database_url)
+    earlier_order = make_forward_test_order(
+        ACCOUNT_ID, forward_test_id=FORWARD_TEST_ID, order_id=900, client_id=CLIENT_ID
+    )
+    world.gateway.open_orders.append(
+        replace(earlier_order, instrument=Instrument(symbol="AAPL", exchange="SMART", currency="USD"))
+    )
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1):
+        orders = strategy.cache.orders()  # pyright: ignore[reportUnknownMemberType]
+
+    assert [str(order.instrument_id) for order in orders] == ["AAPL.NASDAQ"]
+
+
+@pytest.mark.anyio
 async def test_two_equal_partial_fills_of_one_order_both_go_into_the_owner_ledger(database_url: str) -> None:
     """The execution ID tells the executions apart. The 2 executions have the same quantity, price, and time."""
     world = make_world(database_url)
@@ -184,7 +285,102 @@ async def test_two_equal_partial_fills_of_one_order_both_go_into_the_owner_ledge
             )
             for number in range(2)
         )
-        await wait_until(lambda: len(world.ledger.fills) == 2)
+        # The fill events come to the strategy after the ledger save, so the wait reads the position of the strategy.
+        await wait_until(lambda: strategy.own_positions() == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))])
 
     assert world.ledger.read_quantity(FORWARD_TEST_ID, APPLE) == BUY_QUANTITY
     assert strategy.positions_at_stop == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))]
+
+
+@pytest.mark.anyio
+async def test_an_order_that_ibkr_ends_without_a_fill_is_no_longer_open(database_url: str) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        await wait_until(lambda: strategy.count_open_orders() == 1)
+        world.gateway.open_orders.clear()
+        await wait_until(lambda: strategy.count_open_orders() == 0)
+
+    assert world.ledger.fills == []
+
+
+@pytest.mark.anyio
+async def test_an_empty_order_list_after_a_reconnect_does_not_end_an_open_order(database_url: str) -> None:
+    """A wrong cancel makes the strategy send the order again, and the old order is still open at IBKR."""
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: strategy.count_open_orders() == 1)
+        world.gateway.empty_own_open_order_reads = 1
+        world.gateway.connected = False
+        await wait_until(lambda: world.gateway.empty_own_open_order_reads == 0)
+        await asyncio.sleep(POLL_SECONDS * 5)
+        assert strategy.count_open_orders() == 1
+
+
+@pytest.mark.anyio
+async def test_2_empty_order_lists_after_a_reconnect_end_an_order(database_url: str) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: strategy.count_open_orders() == 1)
+        world.gateway.open_orders.clear()
+        world.gateway.connected = False
+        await wait_until(lambda: strategy.count_open_orders() == 0)
+
+
+@pytest.mark.anyio
+async def test_a_held_fill_of_an_order_that_left_the_open_orders_does_not_cancel_the_order(database_url: str) -> None:
+    """A fill stays out of the fill read until its commission report comes. The open orders no longer show the order."""
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        await wait_until(lambda: strategy.count_open_orders() == 1)
+        open_order = world.gateway.open_orders.pop()
+        execution = make_execution(
+            ACCOUNT_ID, order_id=open_order.order_id, quantity="10", price=FILL_PRICE, client_id=CLIENT_ID
+        )
+        world.gateway.executions.append(replace(execution, is_held=True))
+        await asyncio.sleep(POLL_SECONDS * 5)
+        assert strategy.count_open_orders() == 1
+        world.gateway.executions[0] = execution
+        await wait_until(lambda: strategy.own_positions() == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))])
+
+
+@pytest.mark.anyio
+async def test_the_client_connects_again_after_a_gateway_restart_and_reads_the_fill_of_the_gap(
+    database_url: str,
+) -> None:
+    """ib_async does not connect again by itself. The order stays open at IBKR and fills while the socket is down."""
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        open_order = world.gateway.open_orders.pop()
+        world.gateway.connected = False
+        world.gateway.is_gateway_reachable = False
+        world.gateway.executions.append(
+            make_execution(
+                ACCOUNT_ID, order_id=open_order.order_id, quantity="10", price=FILL_PRICE, client_id=CLIENT_ID
+            )
+        )
+        # The failed connect does not end the fill check.
+        await asyncio.sleep(POLL_SECONDS * 5)
+        assert world.ledger.fills == []
+        world.gateway.is_gateway_reachable = True
+        await wait_until(lambda: strategy.own_positions() == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))])
+
+    assert world.gateway.connected is False  # The stop disconnects.
+    assert world.ledger.read_quantity(FORWARD_TEST_ID, APPLE) == BUY_QUANTITY

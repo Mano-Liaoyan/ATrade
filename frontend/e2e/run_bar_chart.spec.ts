@@ -68,7 +68,7 @@ async function expectBarsWithStrategyIndicators(page: Page): Promise<void> {
 
   // The settings of a strategy indicator work as on the instrument page (#329).
   const strategyRow = legendRow(page, STRATEGY_INDICATOR_NAME);
-  await strategyRow.hover();
+  await strategyRow.locator('.legend-name').hover();
   await strategyRow.getByRole('button', { name: `Settings for ${STRATEGY_INDICATOR_NAME}` }).click();
   const settings = page.getByRole('dialog', { name: 'SMA' });
   await settings.getByRole('spinbutton', { name: 'Period' }).fill('10');

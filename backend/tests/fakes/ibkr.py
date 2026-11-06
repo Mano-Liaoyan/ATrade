@@ -2,7 +2,7 @@
 
 Tests set `is_gateway_reachable`, `connected`, `has_ibkr_connection`, `port`, `managed_accounts`, `account_values`, `portfolio`,
 `instruments`, `search_error_message`, `historical_bars`, `historical_bars_error_message`, `open_orders`, `order_error_message`,
-`cancel_error_message`, `executions`, `exchange_rates`, `exchange_rate_error_message`, `daily_exchange_rates`,
+`order_rejection_message`, `cancel_error_message`, `executions`, `exchange_rates`, `exchange_rate_error_message`, `daily_exchange_rates`,
 `live_bars_error_message`, `live_bar_now_utc`, and `live_bar_interval_seconds` directly, and read
 `historical_bar_requests`, `exchange_rate_requests`, `daily_exchange_rate_requests`, `live_bar_subscriptions`, and
 `active_live_bar_stream_count`.
@@ -28,6 +28,7 @@ from atrade.ibkr import (
     OrderRequest,
     PortfolioPosition,
 )
+from atrade.ibkr.orders import read_price
 
 # The fake checks the reachable flag this often. A short wait keeps the e2e server from using a full CPU.
 CHECK_INTERVAL_SECONDS = 0.05
@@ -115,8 +116,13 @@ class FakeGatewayConnection:
         self.client_id = client_id
         # All open orders of the account, like reqAllOpenOrders. Tests add orders of other client IDs here.
         self.open_orders: list[OpenOrder] = []
+        # The next reads of the own open orders that are empty, like the first read after an IB Gateway restart.
+        self.empty_own_open_order_reads = 0
         # When it is set, place_order fails with this message, like an API error of IBKR.
         self.order_error_message: str | None = None
+        # When it is set, IBKR rejects the order after the send, like error 201: place_order returns the ID, the order is
+        # never open, and place_order_and_wait fails with this message.
+        self.order_rejection_message: str | None = None
         # When it is set, cancel_order_and_wait fails with this message, like a cancel without a confirmation.
         self.cancel_error_message: str | None = None
         # All executions that reqExecutions returns. Tests add them.
@@ -222,6 +228,8 @@ class FakeGatewayConnection:
             raise GatewayRequestError(self.order_error_message)
         order_id = self.next_order_id
         self.next_order_id += 1
+        if self.order_rejection_message is not None:
+            return order_id
         self.open_orders.append(
             OpenOrder(
                 order_id=order_id,
@@ -232,13 +240,20 @@ class FakeGatewayConnection:
                 side=request.side,
                 quantity=Decimal(request.quantity),
                 order_type=request.order_type,
-                limit_price=request.limit_price,
+                # Like the real library: lmtPrice is 0.0 for a market order.
+                limit_price=read_price(0.0 if request.limit_price is None else request.limit_price),
                 time_in_force=request.time_in_force,
                 status="Submitted",
                 filled_quantity=Decimal(0),
                 order_ref=request.order_ref,
             )
         )
+        return order_id
+
+    async def place_order_and_wait(self, request: OrderRequest) -> int:
+        order_id = await self.place_order(request)
+        if self.order_rejection_message is not None:
+            raise GatewayRequestError(self.order_rejection_message)
         return order_id
 
     async def read_open_orders(self) -> list[OpenOrder]:
@@ -260,6 +275,9 @@ class FakeGatewayConnection:
 
     async def read_own_open_orders(self) -> list[OpenOrder]:
         self.require_connection()
+        if self.empty_own_open_order_reads > 0:
+            self.empty_own_open_order_reads -= 1
+            return []
         return [order for order in self.open_orders if order.client_id == self.client_id]
 
     async def cancel_order_and_wait(self, order_id: int) -> None:
@@ -268,9 +286,9 @@ class FakeGatewayConnection:
             raise GatewayRequestError(self.cancel_error_message)
         await self.cancel_order(order_id)
 
-    async def read_executions(self) -> list[Execution]:
+    async def read_executions(self, *, include_held: bool = False) -> list[Execution]:
         self.require_connection()
-        return list(self.executions)
+        return [execution for execution in self.executions if include_held or not execution.is_held]
 
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
@@ -412,6 +430,10 @@ def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument
     side: str = "BOT",
     commission: str = "0",
     execution_id: str | None = None,
+    order_ref: str = "",
+    symbol: str = "AAPL",
+    currency: str = "USD",
+    is_held: bool = False,
 ) -> Execution:
     """One fill from reqExecutions. The default execution ID is unique for the order, the quantity, and the price."""
     return Execution(
@@ -424,4 +446,8 @@ def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument
         quantity=Decimal(quantity),
         price=Decimal(price),
         commission=Decimal(commission),
+        is_held=is_held,
+        order_ref=order_ref,
+        symbol=symbol,
+        currency=currency,
     )

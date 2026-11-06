@@ -6,29 +6,45 @@ import {
   createCondition,
   createOperand,
   findChangedLines,
+  findIndicatorChoice,
   describeRulesWarning,
   findRulesVersionNumber,
   listOperandChoices,
   readCurrentOperand,
   readOperandChoice,
+  type CatalogIndicator,
   type RuleCondition,
 } from './strategy_rules';
 
+function makeIndicator(key: string, change: Partial<CatalogIndicator> = {}): CatalogIndicator {
+  return { key, name: key, short_name: key, chart_placement: 'own', parameters: [], outputs: ['value'], value_description: '', ...change };
+}
+
+function makePeriod(name: string, value: number): CatalogIndicator['parameters'][number] {
+  return { name, value_type: 'int', default: value, minimum: 1, maximum: 1000, is_in_name: true };
+}
+
+const CATALOG = [
+  makeIndicator('rsi', { parameters: [makePeriod('period', 14)] }),
+  makeIndicator('macd', {
+    name: 'MACD',
+    parameters: [makePeriod('fast_period', 12), makePeriod('slow_period', 26), makePeriod('signal_period', 9)],
+    outputs: ['value', 'signal', 'histogram'],
+  }),
+  makeIndicator('bollinger_bands', { outputs: ['upper', 'middle', 'lower'] }),
+];
+
 describe('createOperand', () => {
   it('gives a price operand for a price choice', () => {
-    expect(createOperand('price:high')).toEqual({ type: 'price', price: 'high' });
+    expect(createOperand('price:high', CATALOG)).toEqual({ type: 'price', price: 'high' });
   });
 
   it('gives an indicator with the catalog default parameters', () => {
-    expect(createOperand('indicator:rsi')).toEqual({ type: 'indicator', indicator: 'rsi', parameters: { period: 14 } });
-  });
-
-  it('gives ADR% with the catalog default period', () => {
-    expect(createOperand('indicator:adr_percent')).toEqual({ type: 'indicator', indicator: 'adr_percent', parameters: { period: 20 } });
+    expect(createOperand('indicator:rsi', CATALOG)).toEqual({ type: 'indicator', indicator: 'rsi', parameters: { period: 14 } });
   });
 
   it('gives the first line of a multi-line indicator', () => {
-    expect(createOperand('indicator:macd')).toEqual({
+    expect(createOperand('indicator:macd', CATALOG)).toEqual({
       type: 'indicator',
       indicator: 'macd',
       parameters: { fast_period: 12, slow_period: 26, signal_period: 9 },
@@ -37,7 +53,7 @@ describe('createOperand', () => {
   });
 
   it('gives the number 0 for the number choice', () => {
-    expect(createOperand('number')).toEqual({ type: 'number', value: 0 });
+    expect(createOperand('number', CATALOG)).toEqual({ type: 'number', value: 0 });
   });
 });
 
@@ -130,16 +146,16 @@ describe('findChangedLines', () => {
 
 describe('listOperandChoices', () => {
   it('offers only indicators for the rank of the universe mode', () => {
-    const choices = listOperandChoices('rank').map((choice) => choice.value);
+    const choices = listOperandChoices('rank', CATALOG).map((choice) => choice.value);
 
-    expect(choices).toContain('indicator:momentum_12_1');
+    expect(choices).toContain('indicator:rsi');
     expect(choices.every((choice) => choice.startsWith('indicator:'))).toBe(true);
   });
 
   const FORMULA = { name: 'Ratio', expression: 'close / sma(5)', chart_placement: 'own' };
 
-  it('offers the custom indicators after the built-in indicators', () => {
-    const choices = listOperandChoices('rank', [{ key: 'custom_1', name: 'Ratio', formula: FORMULA }]);
+  it('offers the indicators in the order of the catalog', () => {
+    const choices = listOperandChoices('rank', [...CATALOG, makeIndicator('custom_1', { name: 'Ratio', formula: FORMULA })]);
 
     expect(choices.at(-1)).toEqual({ value: 'indicator:custom_1', label: 'Ratio' });
   });
@@ -151,7 +167,7 @@ describe('listOperandChoices', () => {
   });
 
   it('a custom operand holds the formula', () => {
-    expect(createOperand('indicator:custom_1', [{ key: 'custom_1', name: 'Ratio', formula: FORMULA }])).toEqual({
+    expect(createOperand('indicator:custom_1', [makeIndicator('custom_1', { formula: FORMULA })])).toEqual({
       type: 'indicator',
       indicator: 'custom_1',
       parameters: {},
@@ -160,9 +176,47 @@ describe('listOperandChoices', () => {
   });
 });
 
+describe('a new indicator of the catalog', () => {
+  const NEW_INDICATOR = makeIndicator('new_one', {
+    name: 'New one',
+    parameters: [makePeriod('period', 7), { ...makePeriod('hidden', 3), is_in_name: false }],
+    outputs: ['value', 'upper'],
+  });
+
+  it('is a choice of the rule builder without a change of the frontend', () => {
+    expect(listOperandChoices('rank', [NEW_INDICATOR])).toEqual([{ value: 'indicator:new_one', label: 'New one' }]);
+  });
+
+  it('gets its parameters and its first line from the catalog', () => {
+    expect(createOperand('indicator:new_one', [NEW_INDICATOR])).toEqual({
+      type: 'indicator',
+      indicator: 'new_one',
+      parameters: { period: 7 },
+      output: 'value',
+    });
+  });
+});
+
+describe('findIndicatorChoice', () => {
+  it('keeps the MACD line labels and names other lines from their output', () => {
+    expect(findIndicatorChoice('macd', CATALOG)?.lines).toEqual([
+      ['value', 'MACD line'],
+      ['signal', 'Signal line'],
+      ['histogram', 'Histogram'],
+    ]);
+    expect(findIndicatorChoice('bollinger_bands', CATALOG)?.lines[0]).toEqual(['upper', 'Upper']);
+  });
+
+  it('gives no choice for a custom indicator', () => {
+    const formula = { name: 'Ratio', expression: 'close / sma(5)', chart_placement: 'own' };
+
+    expect(findIndicatorChoice('custom_1', [makeIndicator('custom_1', { formula })])).toBeUndefined();
+  });
+});
+
 describe('readCurrentOperand', () => {
   const formula = { name: 'Ratio', expression: 'close / sma(5)', chart_placement: 'own' };
-  const changed = { key: 'custom_1', name: 'Ratio', formula: { ...formula, expression: 'close / sma(9)' } };
+  const changed = makeIndicator('custom_1', { formula: { ...formula, expression: 'close / sma(9)' } });
   const operand = { type: 'indicator', indicator: 'custom_1', parameters: {}, formula } as const;
 
   it('copies the formula of the catalog into an operand with another formula', () => {
@@ -170,7 +224,7 @@ describe('readCurrentOperand', () => {
   });
 
   it('gives null when the operand has the formula of the catalog', () => {
-    expect(readCurrentOperand(operand, [{ key: 'custom_1', name: 'Ratio', formula }])).toBeNull();
+    expect(readCurrentOperand(operand, [makeIndicator('custom_1', { formula })])).toBeNull();
   });
 
   it('gives null for a deleted indicator and for an operand without a formula', () => {

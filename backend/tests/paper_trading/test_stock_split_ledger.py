@@ -11,6 +11,7 @@ from atrade.paper_trading.owner_ledger_store import BY_HAND, Owner
 FORWARD_TEST_A = Owner(kind="forward_test", forward_test_id=1)
 FORWARD_TEST_B = Owner(kind="forward_test", forward_test_id=2)
 SEVEN_THIRTEENTHS = Decimal(7) / Decimal(13)
+ONE_THIRD = Decimal(1) / Decimal(3)
 
 
 def test_a_3_for_2_split_gives_whole_shares_cash_in_lieu_and_the_rest_to_by_hand() -> None:
@@ -78,3 +79,31 @@ def test_the_evidence_gives_a_confirmed_split_or_the_reason_of_the_split_check(
     evidence = find_split_evidence(bar_ratio=bar_ratio, quantity_before=quantity_before, quantity_after=quantity_after)
 
     assert evidence == expected
+
+
+@pytest.mark.parametrize(
+    ("split_ratio", "quantity_before", "quantity_after"),
+    [
+        (ONE_THIRD, Decimal(300), Decimal(100)),
+        (Decimal(4) / Decimal(3), Decimal(300), Decimal(400)),
+    ],
+)
+def test_an_exact_split_of_thirds_is_confirmed_and_pays_no_cash_in_lieu(
+    split_ratio: Decimal, quantity_before: Decimal, quantity_after: Decimal
+) -> None:
+    evidence = find_split_evidence(
+        bar_ratio=split_ratio, quantity_before=quantity_before, quantity_after=quantity_after
+    )
+    adjustments = calculate_split_adjustments(
+        owner_quantities={FORWARD_TEST_A: quantity_before},
+        split_ratio=split_ratio,
+        account_quantity_after=quantity_after,
+        last_close_before_ex_date=Decimal(10),
+    )
+
+    assert evidence == SplitEvidence(kind="confirmed", ratio=split_ratio)
+    assert adjustments == [
+        SplitAdjustment(
+            owner=FORWARD_TEST_A, quantity_change=quantity_after - quantity_before, cash_in_lieu=Decimal(0), price=None
+        )
+    ]

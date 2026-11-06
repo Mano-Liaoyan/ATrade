@@ -17,9 +17,12 @@ permissions:
   id-token: write
 
 # One deployment at a time. A new deployment waits until the current one ends.
+# queue: max keeps up to 100 waiting runs. By default, a new run cancels the waiting run, so an older commit can
+# cancel the deployment of a newer commit.
 concurrency:
   group: deploy
   cancel-in-progress: false
+  queue: max
 
 jobs:
   deploy:

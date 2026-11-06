@@ -77,9 +77,9 @@ E2E_UNIVERSE_COMPARED_MEMBERS = {
     datetime(2026, 1, 1, tzinfo=UTC): ("FTUA", "FTUB"),
     datetime(2026, 4, 1, tzinfo=UTC): ("FTUA", "FTUC"),
 }
-# The ledger fills of this forward test are on another account: add_owner_ledger_start() clears the rows of the fake
-# account, and the paper trading page shows only the rows of the fake account.
-E2E_UNIVERSE_COMPARED_ACCOUNT = "DU7654321"
+# The ledger fills of the forward tests are on another account: add_owner_ledger_start() clears the rows of the fake
+# account, and the Home page shows only the rows of the fake account.
+E2E_FORWARD_TEST_ACCOUNT = "DU7654321"
 # The look-back bars of the strategy (SMA 20 on 60 days) start before the forward test.
 E2E_UNIVERSE_COMPARED_FIRST_BAR_START_UTC = datetime(2026, 1, 1, tzinfo=UTC)
 # A strategy with a discarded version of the AI assistant (docs/architecture/assistant.md 25.5.3): v1 of the user,
@@ -119,6 +119,16 @@ HK_INSTRUMENTS = [
     for project_name in PLAYWRIGHT_PROJECT_NAMES
     for number in range(1, HK_INSTRUMENTS_PER_PROJECT + 1)
 ]
+
+
+def cancel_leftover_backtests(database_url: str) -> None:
+    """A stopped run leaves its queued backtests, and the e2e database is not cleared between runs. One queue with
+    concurrency 1 would run them first, so the tests of this run would wait past their timeouts."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "UPDATE backtest SET status = 'cancelled', ended_at_utc = %(now)s WHERE status = 'queued'",
+            {"now": FIXED_NOW_UTC},
+        )
 
 
 def insert_strategy_version(connection: psycopg.Connection, *, name: str, code: str) -> int | None:
@@ -203,31 +213,56 @@ def add_compared_bars(connection: psycopg.Connection) -> None:
         )
 
 
+def add_ledger_fills(
+    connection: psycopg.Connection, forward_test_id: int, fills: list[tuple[datetime, str, int, Decimal]]
+) -> None:
+    """Owner ledger rows of a forward test, without a commission. Each fill: time, symbol, quantity change, price."""
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %(id)s, 'fill', %(time_utc)s, %(account)s, %(symbol)s, 'ARCA', 'USD',
+                %(quantity_change)s, %(price)s, 0, %(cash_change)s, %(execution_id)s, %(order_id)s)
+            """,
+            [
+                {
+                    "id": forward_test_id,
+                    "time_utc": time_utc,
+                    "account": E2E_FORWARD_TEST_ACCOUNT,
+                    "symbol": symbol,
+                    "quantity_change": quantity_change,
+                    "price": price,
+                    "cash_change": -quantity_change * price,
+                    "execution_id": f"E2E-FT-{forward_test_id}-{fill_number}",
+                    "order_id": fill_number + 1,
+                }
+                for fill_number, (time_utc, symbol, quantity_change, price) in enumerate(fills)
+            ],
+        )
+
+
 def add_compared_records(connection: psycopg.Connection, forward_test_id: int) -> None:
-    """Rows like the DataActor writes them: 1 fill after each bar end and 1 equity point at each bar end. And 1
+    """Rows like a forward test writes them: 1 fill after each bar end and 1 equity point at each bar end. And 1
     interruption like the worker writes it."""
     bar_ends_utc = {
         bar_number: E2E_COMPARED_FIRST_BAR_START_UTC + timedelta(days=bar_number)
         for bar_number in range(1, E2E_COMPARED_BAR_COUNT + 1)
     }
+    add_ledger_fills(
+        connection,
+        forward_test_id,
+        [
+            (
+                bar_ends_utc[bar_number] + timedelta(seconds=1),
+                E2E_COMPARED_SYMBOL,
+                1 if bar_number % 2 == 1 else -1,
+                make_compared_close_usd(bar_number) + Decimal("0.01"),
+            )
+            for bar_number in range(1, E2E_COMPARED_FILL_COUNT + 1)
+        ],
+    )
     with connection.cursor() as cursor:
-        cursor.executemany(
-            """
-            INSERT INTO forward_test_fill (forward_test_id, trade_id, time_utc, side, quantity_shares, price_usd,
-                commission_usd)
-            VALUES (%(id)s, %(trade_id)s, %(time_utc)s, %(side)s, 1, %(price_usd)s, 0)
-            """,
-            [
-                {
-                    "id": forward_test_id,
-                    "trade_id": f"E2E-{bar_number}",
-                    "time_utc": bar_ends_utc[bar_number] + timedelta(seconds=1),
-                    "side": "BUY" if bar_number % 2 == 1 else "SELL",
-                    "price_usd": make_compared_close_usd(bar_number) + Decimal("0.01"),
-                }
-                for bar_number in range(1, E2E_COMPARED_FILL_COUNT + 1)
-            ],
-        )
         cursor.executemany(
             """
             INSERT INTO forward_test_equity_point (forward_test_id, time_utc, equity_usd)
@@ -255,7 +290,7 @@ def add_compared_records(connection: psycopg.Connection, forward_test_id: int) -
 
 
 def add_compared_forward_test(database_url: str) -> None:
-    """A stopped forward test with a start balance, fills, and equity points, and the saved bars of its period."""
+    """A stopped forward test with an allocated capital, fills, and equity points, and the saved bars of its period."""
     with psycopg.connect(database_url, autocommit=True) as connection:
         version_id = insert_strategy_version(
             connection, name=E2E_COMPARED_STRATEGY_NAME, code=E2E_COMPARED_STRATEGY_FILE.read_text()
@@ -266,7 +301,7 @@ def add_compared_forward_test(database_url: str) -> None:
         forward_test_row = connection.execute(
             """
             INSERT INTO forward_test (strategy_version_id, symbol, exchange, currency, bar_period, desired_state,
-                status, start_balance_usd, created_at_utc, stopped_at_utc)
+                status, allocated_capital_usd, created_at_utc, stopped_at_utc)
             VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', 'stopped', 'stopped', 10000, %(start_utc)s,
                 %(stopped_utc)s)
             RETURNING id
@@ -321,12 +356,13 @@ def add_chart_indicator_forward_test(database_url: str) -> None:
         if version_id is None:
             return
         add_chart_bars(connection)
-        connection.execute(
+        forward_test_row = connection.execute(
             """
             INSERT INTO forward_test (strategy_version_id, symbol, exchange, currency, bar_period, desired_state,
-                status, start_balance_usd, created_at_utc, stopped_at_utc)
+                status, allocated_capital_usd, created_at_utc, stopped_at_utc)
             VALUES (%(version_id)s, %(symbol)s, 'ARCA', 'USD', '1-DAY', 'stopped', 'stopped', 10000, %(start_utc)s,
                 %(stopped_utc)s)
+            RETURNING id
             """,
             {
                 "version_id": version_id,
@@ -334,22 +370,18 @@ def add_chart_indicator_forward_test(database_url: str) -> None:
                 "start_utc": E2E_CHART_FIRST_BAR_START_UTC,
                 "stopped_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=E2E_COMPARED_BAR_COUNT),
             },
-        )
-        connection.cursor().executemany(
-            """
-            INSERT INTO forward_test_fill (forward_test_id, trade_id, time_utc, side, quantity_shares, price_usd,
-                commission_usd)
-            SELECT id, %(trade_id)s, %(time_utc)s, %(side)s, 1, %(price_usd)s, 0
-            FROM forward_test WHERE strategy_version_id = %(version_id)s
-            """,
+        ).fetchone()
+        assert forward_test_row is not None
+        add_ledger_fills(
+            connection,
+            int(forward_test_row[0]),
             [
-                {
-                    "version_id": version_id,
-                    "trade_id": f"E2E-CHART-{bar_number}",
-                    "time_utc": E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=bar_number, seconds=1),
-                    "side": side,
-                    "price_usd": make_compared_close_usd(bar_number) + Decimal("0.01"),
-                }
+                (
+                    E2E_CHART_FIRST_BAR_START_UTC + timedelta(days=bar_number, seconds=1),
+                    E2E_CHART_SYMBOL,
+                    1 if side == "BUY" else -1,
+                    make_compared_close_usd(bar_number) + Decimal("0.01"),
+                )
                 for bar_number, side in E2E_CHART_FILLS
             ],
         )
@@ -452,35 +484,17 @@ def add_universe_compared_records(connection: psycopg.Connection, forward_test_i
                 for symbol in symbols
             ],
         )
-        fills = [
-            (
-                bar_ends_utc[fill_number] + timedelta(seconds=1),
-                "FTUA" if fill_number // 2 % 2 == 0 else "FTUB",
-                1 if fill_number % 2 == 0 else -1,
-                make_compared_close_usd(fill_number + 1) + Decimal("0.01"),
-            )
-            for fill_number in range(E2E_COMPARED_FILL_COUNT)
-        ]
-        cursor.executemany(
-            """
-            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
-                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
-            VALUES ('forward_test', %(id)s, 'fill', %(time_utc)s, %(account)s, %(symbol)s, 'ARCA', 'USD',
-                %(quantity_change)s, %(price)s, 0, %(cash_change)s, %(execution_id)s, %(order_id)s)
-            """,
+        add_ledger_fills(
+            connection,
+            forward_test_id,
             [
-                {
-                    "id": forward_test_id,
-                    "time_utc": time_utc,
-                    "account": E2E_UNIVERSE_COMPARED_ACCOUNT,
-                    "symbol": symbol,
-                    "quantity_change": quantity_change,
-                    "price": price,
-                    "cash_change": -quantity_change * price,
-                    "execution_id": f"E2E-FTU-{forward_test_id}-{fill_number}",
-                    "order_id": fill_number + 1,
-                }
-                for fill_number, (time_utc, symbol, quantity_change, price) in enumerate(fills)
+                (
+                    bar_ends_utc[fill_number] + timedelta(seconds=1),
+                    "FTUA" if fill_number // 2 % 2 == 0 else "FTUB",
+                    1 if fill_number % 2 == 0 else -1,
+                    make_compared_close_usd(fill_number + 1) + Decimal("0.01"),
+                )
+                for fill_number in range(E2E_COMPARED_FILL_COUNT)
             ],
         )
         cursor.executemany(
@@ -688,6 +702,7 @@ def main() -> None:
     frontend_build_dir = Path(os.environ["ATRADE_E2E_FRONTEND_BUILD_DIR"])
     port = int(os.environ["ATRADE_E2E_PORT"])
     upgrade_database(database_url)
+    cancel_leftover_backtests(database_url)
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
     add_chart_indicator_forward_test(database_url)

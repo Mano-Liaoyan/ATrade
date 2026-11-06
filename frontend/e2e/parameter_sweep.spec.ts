@@ -2,6 +2,7 @@
 // dialog, see the heatmap and the "Metric" select, sort the Runs table, scroll to its last row, and open the backtest
 // of a run, which links back to its sweep. The bar chart saves the AAPL bars first, and the watchlist has AAPL.
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expectHeaderButtonsClickable } from './header_buttons';
 
 // A real child process runs each run. The browser projects share one queue with concurrency 1.
 const RUN_TIMEOUT_MILLISECONDS = 90_000;
@@ -88,8 +89,49 @@ async function checkHeatmap(page: Page, sweepId: string): Promise<void> {
   await expect(tradesHeatmap.getByRole('cell', { name: /^\d+$/ }).first()).toBeVisible();
 }
 
+/** The values of all columns of the Runs table can be read, and the sideways track reaches the last column. */
+async function checkRunsWidth(page: Page, width: number): Promise<void> {
+  await page.setViewportSize({ width, height: 720 });
+  const runs = page.getByRole('region', { name: 'Runs' });
+  await expect(runs.getByRole('row').nth(1).getByRole('cell').last()).toBeAttached();
+  // A long header can end with an ellipsis, but a header has a width and a value is whole.
+  const emptyHeaders = await runs.getByRole('columnheader').evaluateAll((headers) => headers.filter((header) => header.clientWidth === 0).length);
+  expect(emptyHeaders).toBe(0);
+  const cutValues = await runs.getByRole('cell').evaluateAll((cells) => cells.filter((cell) => cell.scrollWidth > cell.clientWidth).map((cell) => cell.textContent));
+  expect(cutValues).toEqual([]);
+  const track = page.getByRole('scrollbar', { name: 'Runs columns scroll bar' });
+  await expect(track).toBeInViewport({ ratio: 1 });
+  await track.press('End');
+  await expect(runs.getByRole('columnheader').last()).toBeInViewport({ ratio: 1 });
+  await track.press('Home');
+}
+
+/** The column names and the sort buttons stay at the top of the region while the rows scroll. */
+async function checkRunsHeaderStays(page: Page): Promise<void> {
+  // The panel and the scroll region in it have the same name.
+  const runs = page.getByRole('region', { name: 'Runs' }).getByRole('region', { name: 'Runs' });
+  const firstRow = runs.getByRole('row').nth(1);
+  await firstRow.evaluate((row) => {
+    row.style.height = '100rem';
+  });
+  const scrolled = await runs.evaluate((region) => {
+    region.scrollTop = region.scrollHeight;
+    const header = region.querySelector('th');
+    return { scrollTop: region.scrollTop, headerOffset: (header?.getBoundingClientRect().top ?? 0) - region.getBoundingClientRect().top };
+  });
+  expect(scrolled.scrollTop).toBeGreaterThan(0);
+  expect(scrolled.headerOffset).toBeCloseTo(0, 0);
+  await firstRow.evaluate((row) => {
+    row.style.height = '';
+  });
+}
+
 /** Sorts the Runs table, scrolls to its last row, opens the backtest of that run, and goes back to the sweep. */
 async function checkRuns(page: Page, sweepId: string): Promise<void> {
+  for (const width of [1440, 1280]) {
+    await checkRunsWidth(page, width);
+  }
+  await checkRunsHeaderStays(page);
   const runs = page.getByRole('region', { name: 'Runs' });
   const periodHeader = runs.getByRole('columnheader', { name: 'average_period' });
   await periodHeader.getByRole('button').click();
@@ -113,8 +155,26 @@ async function checkRuns(page: Page, sweepId: string): Promise<void> {
   await expect(page).toHaveURL(new RegExp(`/sweeps/${sweepId}$`));
 }
 
-test('starts a parameter sweep, sorts its runs, and opens the backtest of a run', async ({ page, request }, currentTest) => {
-  test.setTimeout(RUN_TIMEOUT_MILLISECONDS * 2);
+async function deleteSweep(page: Page, request: APIRequestContext, sweepId: string): Promise<void> {
+  // A running run continues after the cancel, and the backend refuses the delete until its end.
+  await expect
+    .poll(async () => {
+      const sweep = (await (await request.get(`/api/sweeps/${sweepId}`)).json()) as { status_counts: Record<string, number> };
+      return (sweep.status_counts['queued'] ?? 0) + (sweep.status_counts['running'] ?? 0);
+    }, { timeout: RUN_TIMEOUT_MILLISECONDS })
+    .toBe(0);
+  await page.goto(`/sweeps/${sweepId}`);
+  await page.getByRole('button', { name: 'Delete parameter sweep' }).click();
+  const dialog = page.getByRole('dialog', { name: `Delete parameter sweep #${sweepId}?` });
+  await dialog.getByRole('button', { name: 'Delete parameter sweep' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page).not.toHaveURL(new RegExp(`/sweeps/${sweepId}$`));
+  await expect(page.getByRole('link', { name: `#${sweepId}`, exact: true })).toHaveCount(0);
+  expect((await request.get(`/api/sweeps/${sweepId}`)).status()).toBe(404);
+}
+
+test('starts a parameter sweep, sorts its runs, opens the backtest of a run, and deletes the sweep', async ({ page, request }, currentTest) => {
+  test.setTimeout(RUN_TIMEOUT_MILLISECONDS * 3);
   await saveAppleBars(page, request);
   const strategyName = `Sweep ${currentTest.project.name} ${String(Date.now())}`;
   await createStrategy(page, strategyName);
@@ -124,9 +184,11 @@ test('starts a parameter sweep, sorts its runs, and opens the backtest of a run'
   await expect(page).toHaveURL(new RegExp(`/sweeps/${sweepId}$`));
   try {
     await checkHeatmap(page, sweepId);
+    await expectHeaderButtonsClickable(page, page.getByRole('region', { name: `Parameter sweep #${sweepId}` }));
     await checkRuns(page, sweepId);
   } finally {
     // The other specs share the backtest queue: the queued runs of this sweep must not wait in it.
     await request.post(`/api/sweeps/${sweepId}/cancel`);
   }
+  await deleteSweep(page, request, sweepId);
 });

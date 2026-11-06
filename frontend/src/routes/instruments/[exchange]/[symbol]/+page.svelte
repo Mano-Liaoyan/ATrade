@@ -41,7 +41,13 @@
     type IndicatorSeriesResult,
     type Instrument,
   } from '#lib/market_data';
-  import { FilledManualOrderList, InstrumentOrderPanel, OpenOrderList, PaperAccountFeed, PositionTable } from '#lib/paper_trading';
+  import {
+    FilledManualOrderList,
+    InstrumentOrderPanel,
+    OpenOrderList,
+    paperAccountFeed as accountFeed,
+    PositionTable,
+  } from '#lib/paper_trading';
   import InstrumentWatchlist from '../../../InstrumentWatchlist.svelte';
 
   const chartRequest = $derived(readChartRequest(page.params, page.url.searchParams));
@@ -251,8 +257,9 @@
   const lastPrice = $derived(shownDayQuote?.last ?? liveBar?.close ?? chartBars.at(-1)?.close ?? null);
 
   // The paper account. Forward tests and orders by hand share the instruments (forward_test.md section 12.2).
-  const accountFeed = new PaperAccountFeed();
-  $effect(() => accountFeed.start(fetch, window.location));
+  $effect(() => {
+    void accountFeed.refreshFilledOrders(fetch);
+  });
   const account = $derived(accountFeed.account);
 
   const PANELS: PanelSpec[] = [

@@ -4,6 +4,8 @@
 it. It walks the rules in a fixed order (entry group, then exit items), so the same rules always give the same code.
 """
 
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from atrade.indicator import IndicatorDefinition, find_indicator_definition
@@ -27,7 +29,10 @@ INDENT = "    "
 COMPARISON_OPERATORS = {"above": ">", "below": "<", "at_or_above": ">=", "at_or_below": "<="}
 GROUP_OPERATORS = {"all_of": "and", "any_of": "or"}
 
+WARM_UP_BAR_COUNT_LINE = re.compile(r"^WARM_UP_BAR_COUNT = \d+$", re.MULTILINE)
+
 type Operand = PriceOperand | IndicatorOperand | NumberOperand
+type RunParameters = Mapping[str, int | float | bool]
 
 
 @dataclass(frozen=True)
@@ -175,7 +180,7 @@ def write_buy(rules: StrategyRules, parts: CodeParts) -> list[str]:
     if isinstance(size, PercentOfEquity):
         percent = parts.add_field("equity_percent", size.percent)
         quantity_lines = [
-            "        account = self.portfolio.account(self.settings.instrument_id.venue)",
+            "        account = atrade.strategy.find_account(self, self.settings.instrument_id.venue)",
             "        equity = None if account is None else account.balance_total()",
             "        if equity is None:",
             "            return",
@@ -193,9 +198,18 @@ def write_buy(rules: StrategyRules, parts: CodeParts) -> list[str]:
     ]
 
 
+def write_atrade_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
+    imports = [
+        *(["import atrade.indicator"] if parts.indicators else []),
+        *(["import atrade.strategy"] if isinstance(rules.settings.position_size, PercentOfEquity) else []),
+    ]
+    return ["", *imports] if imports else []
+
+
 def write_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
     standard = [
         *(["import math"] if isinstance(rules.settings.position_size, PercentOfEquity) else []),
+        *(["from collections.abc import Sequence"] if parts.indicators else []),
         *(["from datetime import timedelta"] if parts.indicators else []),
     ]
     return [
@@ -204,19 +218,28 @@ def write_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
         "from nautilus_trader.config import StrategyConfig",
         "from nautilus_trader.model import Bar, BarType, InstrumentId, OrderSide, Position, Quantity",
         "from nautilus_trader.trading import Strategy",
-        *(["", "import atrade.indicator"] if parts.indicators else []),
+        *write_atrade_imports(rules, parts),
     ]
 
 
-def count_warm_up_bars(parts: CodeParts) -> int | None:
+def apply_run_parameters(indicator: IndicatorUse, run_parameters: RunParameters) -> dict[str, int | float]:
+    """The indicator parameters with the values of a parameter sweep run (ADR 0006: they are configuration fields)."""
+    return {name: run_parameters.get(f"{indicator.name}_{name}", value) for name, value in indicator.parameters.items()}
+
+
+def count_warm_up_bars(parts: CodeParts, run_parameters: RunParameters | None = None) -> int | None:
     """The bars that the longest indicator needs (section 23.4), or None without an indicator."""
     if not parts.indicators:
         return None
-    return max(indicator.definition.screen_look_back_bars(indicator.parameters) for indicator in parts.indicators)
+    return max(
+        indicator.definition.screen_look_back_bars(apply_run_parameters(indicator, run_parameters or {}))
+        for indicator in parts.indicators
+    )
 
 
-def find_warm_up_bar_count(rules: StrategyRules) -> int | None:
-    """The look-back bar count of a rule builder version: the bars of its longest indicator (#164).
+def find_warm_up_bar_count(rules: StrategyRules, run_parameters: RunParameters | None = None) -> int | None:
+    """The look-back bar count of a rule builder version: the bars of its longest indicator (#164), with the
+    parameter values of a parameter sweep run.
 
     The backtest and the forward test give the strategy the last bars of this count before the start.
     """
@@ -225,7 +248,12 @@ def find_warm_up_bar_count(rules: StrategyRules) -> int | None:
     write_exit_checks(parts, rules)
     if rules.settings.universe is not None:
         parts.value_names(rules.settings.universe.rank_indicator)
-    return count_warm_up_bars(parts)
+    return count_warm_up_bars(parts, run_parameters)
+
+
+def set_warm_up_bar_count(code: str, bar_count: int) -> str:
+    """The code of a rule builder version with another `WARM_UP_BAR_COUNT`. The saved code holds the default length."""
+    return WARM_UP_BAR_COUNT_LINE.sub(f"WARM_UP_BAR_COUNT = {bar_count}", code, count=1)
 
 
 def write_warm_up_constants(parts: CodeParts) -> list[str]:
@@ -284,6 +312,19 @@ def write_indicator_object(indicator: IndicatorUse) -> str:
     )
 
 
+def write_on_historical_bars(parts: CodeParts) -> list[str]:
+    """Only the code with an indicator asks for look-back bars (`write_on_start`)."""
+    if not parts.indicators:
+        return []
+    return [
+        "    def on_historical_bars(self, bars: Sequence[Bar]) -> None:",
+        "        # A cross compares the first bar with the last look-back bar. A late answer must not replace a live bar.",
+        "        if bars and self.previous_values is None:",
+        "            self.previous_values = self.read_values(bars[-1])",
+        "",
+    ]
+
+
 def write_strategy(parts: CodeParts, entry: str, exit_checks: list[str], buy: list[str]) -> list[str]:
     indicators = [write_indicator_object(indicator) for indicator in parts.indicators]
     values = [f'            "{key}": {expression},' for key, expression in parts.values.items()]
@@ -296,9 +337,12 @@ def write_strategy(parts: CodeParts, entry: str, exit_checks: list[str], buy: li
         *indicators,
         "        self.previous_values: dict[str, float] | None = None",
         "        self.bars_in_position = 0",
+        "        self.order_is_lost = False",
+        "        self.last_retry_ns = -1",
         "",
         *write_on_start(parts),
         "",
+        *write_on_historical_bars(parts),
         "    def on_bar(self, bar: Bar) -> None:",
         "        position = self.read_open_position()",
         "        self.bars_in_position = 0 if position is None else self.bars_in_position + 1",
@@ -310,10 +354,29 @@ def write_strategy(parts: CodeParts, entry: str, exit_checks: list[str], buy: li
         "        if now is None or waits_for_fill or self.cache.orders_open_count(strategy_id=self.strategy_id) > 0:",
         "            return",
         "        if position is None:",
-        "            if self.entry_is_true(now, previous):",
+        "            if self.entry_is_true(now, previous) and self.can_send_order(bar, ENTRY_RETRY_PERIOD_NS):",
         "                self.buy(bar)",
-        "        elif self.exit_is_true(now, previous, position):",
+        "        elif self.exit_is_true(now, previous, position) and self.can_send_order(bar, EXIT_RETRY_PERIOD_NS):",
         "            self.close_position(position)",
+        "",
+        "    def on_order_denied(self, event: object) -> None:",
+        "        self.order_is_lost = True",
+        "",
+        "    def on_order_rejected(self, event: object) -> None:",
+        "        self.order_is_lost = True",
+        "",
+        "    def on_order_canceled(self, event: object) -> None:",
+        "        self.order_is_lost = True",
+        "",
+        "    def can_send_order(self, bar: Bar, retry_period_ns: int) -> bool:",
+        '        """A lost order gets at most 1 retry in each period, so that a permanent refusal does not repeat on each bar."""',
+        "        if not self.order_is_lost:",
+        "            return True",
+        "        if bar.ts_event // retry_period_ns == self.last_retry_ns // retry_period_ns:",
+        "            return False",
+        "        self.order_is_lost = False",
+        "        self.last_retry_ns = bar.ts_event",
+        "        return True",
         "",
         "    def read_values(self, bar: Bar) -> dict[str, float] | None:",
         '        """The prices and the indicator outputs of the rules at this bar. None when an indicator has no value."""',
@@ -366,6 +429,11 @@ def make_rules_code(rules: StrategyRules) -> str:
         "",
         "",
         *write_warm_up_constants(parts),
+        "# A lost entry gets 1 retry each day. A lost exit gets 1 retry each 5 minutes, because a day is too long for an exit.",
+        "ENTRY_RETRY_PERIOD_NS = 86_400_000_000_000",
+        "EXIT_RETRY_PERIOD_NS = 300_000_000_000",
+        "",
+        "",
         *write_chart_indicators(parts),
         *write_config(parts),
         "",
@@ -447,19 +515,39 @@ def write_universe_strategy(
         "        self.rebalance_wait = 0",
         "        self.last_bar_time_ns = 0",
         "        self.buys: list[str] = []",
-        "        self.targets: set[str] = set()",
+        "        # The instrument ID and the member name of each target, in rank order.",
+        "        self.targets: dict[str, str] = {}",
+        "        # The instrument IDs with a lost order, and the time of the last retry of each.",
+        "        self.lost_instruments: set[str] = set()",
+        "        self.last_retry_times: dict[str, int] = {}",
+        "        # A restart restores the positions, but not the targets: a retry would sell all positions.",
+        "        self.has_ranked = False",
         "",
         "    def on_start(self) -> None:",
+        "        positions = self.cache.positions_open(strategy_id=self.strategy_id)",
+        "        # A restored position shows that the rebalance of this period ran. A new rebalance would trade again.",
+        "        if positions:",
+        "            self.period = read_period(self.clock.timestamp_ns())",
+        "        # A forward test restart can restore a position outside the universe. Its bars give its sell a price.",
+        "        for position in positions:",
+        '            bar_type = BarType.from_str(f"{position.instrument_id}-1-DAY-LAST-EXTERNAL")',
+        "            self.request_bars(bar_type, start=self.clock.utc_now() - MIN_WARM_UP_LENGTH)",
+        "            self.subscribe_bars(bar_type)",
         '        self.subscribe_data(DataType("UniverseUpdate"))',
         "",
         "    def on_data(self, data: object) -> None:",
         '        names = str(data.data.bar_types).split(",")  # pyright: ignore[reportAttributeAccessIssue]',
         "        new_members = {name: BarType.from_str(name) for name in names if name}",
+        "        is_first_list = not self.members",
         "        for name, bar_type in list(self.members.items()):",
         "            if name in new_members:",
         "                continue",
         "            self.unsubscribe_bars(bar_type)",
         "            del self.members[name]",
+        "            self.targets.pop(str(bar_type.instrument_id), None)",
+        "            # A member that comes back needs new values: the old values would rank it with an old close.",
+        "            self.values.pop(name, None)",
+        "            self.last_close.pop(name, None)",
         "            position = self.read_open_position(bar_type)",
         "            if position is not None:",
         "                self.close_position(position)",
@@ -474,6 +562,20 @@ def write_universe_strategy(
         "            warm_up_length = max(bar_length * WARM_UP_BAR_COUNT * WARM_UP_CALENDAR_FACTOR, MIN_WARM_UP_LENGTH)",
         "            self.request_bars(bar_type, start=self.clock.utc_now() - warm_up_length)",
         "            self.subscribe_bars(bar_type)",
+        "        # A restored position outside the first list shows a restart in a new period, before its rebalance.",
+        "        instrument_ids = {str(bar_type.instrument_id) for bar_type in new_members.values()}",
+        "        positions = self.cache.positions_open(strategy_id=self.strategy_id)",
+        "        if is_first_list and any(str(position.instrument_id) not in instrument_ids for position in positions):",
+        "            self.rebalance_is_due = True",
+        "",
+        "    def on_order_denied(self, event: object) -> None:",
+        "        self.lost_instruments.add(str(event.instrument_id))  # pyright: ignore[reportAttributeAccessIssue]",
+        "",
+        "    def on_order_rejected(self, event: object) -> None:",
+        "        self.lost_instruments.add(str(event.instrument_id))  # pyright: ignore[reportAttributeAccessIssue]",
+        "",
+        "    def on_order_canceled(self, event: object) -> None:",
+        "        self.lost_instruments.add(str(event.instrument_id))  # pyright: ignore[reportAttributeAccessIssue]",
         "",
         "    def on_bar(self, bar: Bar) -> None:",
         "        # The rebalance runs at the first bar time after the period start, on the complete bars of all members.",
@@ -486,6 +588,11 @@ def write_universe_strategy(
         "                if self.rebalance_wait > MAX_REBALANCE_WAIT or all(name in self.values for name in self.members):",
         "                    self.rebalance_is_due = False",
         "                    self.rebalance()",
+        "            # A lost order does not wait for the next rebalance.",
+        "            if self.has_ranked:",
+        "                retries = {name for name in tuple(self.lost_instruments) if self.can_retry(name, bar.ts_event)}",
+        "                if retries:",
+        "                    self.send_target_orders(retries)",
         "            period = read_period(bar.ts_event)",
         "            if period != self.period:",
         "                self.period = period",
@@ -502,9 +609,26 @@ def write_universe_strategy(
         "        self.bars_in_position[name] = 0 if position is None else self.bars_in_position.get(name, 0) + 1",
         "        # The exit items run on each bar of each member, but not while an order of the member waits for its fill.",
         "        if position is not None and now is not None and not self.has_orders(bar.bar_type.instrument_id):",
-        "            if self.exit_is_true(now, previous, position, name):",
+        "            instrument = str(bar.bar_type.instrument_id)",
+        "            if self.exit_is_true(now, previous, position, name) and self.can_retry(instrument, bar.ts_event):",
+        "                # The retry of a lost order must not buy this instrument again in this period.",
+        "                self.targets.pop(instrument, None)",
         "                self.close_position(position)",
         "        self.send_buys()",
+        "",
+        "    def can_retry(self, instrument: str, time_ns: int) -> bool:",
+        '        """A lost order gets at most 1 retry in each period, so that a permanent refusal does not repeat on each bar.',
+        '        Only a sell has an open position: its period is the short exit period."""',
+        "        if instrument not in self.lost_instruments:",
+        "            return True",
+        "        instrument_id = InstrumentId.from_str(instrument)",
+        "        positions = self.cache.positions_open(instrument_id=instrument_id, strategy_id=self.strategy_id)",
+        "        period = EXIT_RETRY_PERIOD_NS if positions else ENTRY_RETRY_PERIOD_NS",
+        "        if time_ns // period == self.last_retry_times.get(instrument, -1) // period:",
+        "            return False",
+        "        self.lost_instruments.discard(instrument)",
+        "        self.last_retry_times[instrument] = time_ns",
+        "        return True",
         "",
         "    def read_values(self, bar: Bar, indicators: MemberIndicators) -> dict[str, float] | None:",
         '        """The prices and the indicator outputs of the rules at this bar. None when an indicator has no value."""',
@@ -533,12 +657,28 @@ def write_universe_strategy(
         f"                ranked.append(({rank}, name))",
         f"        ranked.sort(key=lambda item: ({rank_order}, item[1]))",
         "        targets = [name for _, name in ranked[: self.settings.hold_count]]",
-        "        for name, bar_type in self.members.items():",
-        "            position = self.read_open_position(bar_type)",
-        "            if position is not None and name not in targets:",
+        "        self.targets = {str(self.members[name].instrument_id): name for name in targets}",
+        "        self.has_ranked = True",
+        "        self.send_target_orders()",
+        "",
+        "    def send_target_orders(self, retries: set[str] | None = None) -> None:",
+        '        """Sells each position outside the targets and buys each target without a position or an order. With',
+        '        retries, only the orders of these instrument IDs and the buys that wait for a sell."""',
+        "        # A position can be outside the members: a buy that filled after the list removed its member, a sell that",
+        "        # IBKR ended, or a restart in a new quarter.",
+        "        for position in self.cache.positions_open(strategy_id=self.strategy_id):",
+        "            instrument = str(position.instrument_id)",
+        "            if retries is not None and instrument not in retries:",
+        "                continue",
+        "            if instrument not in self.targets and not self.has_orders(position.instrument_id):",
         "                self.close_position(position)",
-        "        self.targets = {str(self.members[name].instrument_id) for name in targets}",
-        "        self.buys = [name for name in targets if self.read_open_position(self.members[name]) is None]",
+        "        self.buys = [",
+        "            name",
+        "            for instrument, name in self.targets.items()",
+        "            if (retries is None or instrument in retries or name in self.buys)",
+        "            and self.read_open_position(self.members[name]) is None",
+        "            and not self.has_orders(self.members[name].instrument_id)",
+        "        ]",
         "        self.send_buys()",
         "",
         "    def send_buys(self) -> None:",
@@ -549,7 +689,7 @@ def write_universe_strategy(
         "        self.buys = []",
         "        if not buys:",
         "            return",
-        "        account = self.portfolio.account(self.members[buys[0]].instrument_id.venue)",
+        "        account = atrade.strategy.find_account(self, self.members[buys[0]].instrument_id.venue)",
         "        cash = None if account is None else account.balance_total()",
         "        if cash is None:",
         "            return",
@@ -611,11 +751,15 @@ def make_universe_code(rules: StrategyRules, universe: UniverseSettings) -> str:
         "from nautilus_trader.trading import Strategy",
         "",
         "import atrade.indicator",
+        "import atrade.strategy",
         "",
         "# Each member gets this share of equity / hold_count. The rest stays as cash for the commissions and the gap",
         "# from the close of the rank to the fill.",
         "INVESTED_SHARE = 0.95",
         "MAX_REBALANCE_WAIT = 5",
+        "# A lost entry gets 1 retry each day. A lost exit gets 1 retry each 5 minutes, because a day is too long for an exit.",
+        "ENTRY_RETRY_PERIOD_NS = 86_400_000_000_000",
+        "EXIT_RETRY_PERIOD_NS = 300_000_000_000",
         "",
         *write_warm_up_constants(parts),
         *write_chart_indicators(parts),

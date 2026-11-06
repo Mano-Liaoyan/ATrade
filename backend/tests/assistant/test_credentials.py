@@ -17,7 +17,14 @@ import pytest
 from httpx_ws import aconnect_ws
 from psycopg import sql
 
-from atrade.assistant import CredentialSummary, LoginEnd, LoginOption, LoginStep, ProviderModel, ProviderSummary
+from atrade.assistant import (
+    CredentialResponse,
+    LoginEndMessage,
+    LoginOptionResponse,
+    LoginStepMessage,
+    ProviderModel,
+    ProviderSummary,
+)
 from tests.assistant.assistant_app import open_assistant_client
 from tests.fakes.assistant import FakeAssistantService
 from tests.fakes.clock import FixedClock
@@ -26,7 +33,7 @@ pytestmark = pytest.mark.anyio
 
 MESSAGE_WAIT_SECONDS = 5
 SECRET_KEY = "sk-test-secret-value-7a9f"
-API_KEY_CREDENTIAL = CredentialSummary(
+API_KEY_CREDENTIAL = CredentialResponse(
     id="0f6c2a1e-5b7d-4c11-9a0e-3d2f1b4c5e6f",
     name="Anthropic API key · personal",
     provider="anthropic",
@@ -35,7 +42,7 @@ API_KEY_CREDENTIAL = CredentialSummary(
     state="ready",
     state_message=None,
 )
-SUBSCRIPTION_CREDENTIAL = CredentialSummary(
+SUBSCRIPTION_CREDENTIAL = CredentialResponse(
     id="7d1e2f3a-4b5c-4d6e-8f70-1a2b3c4d5e6f",
     name="Claude Max",
     provider="anthropic",
@@ -46,6 +53,12 @@ SUBSCRIPTION_CREDENTIAL = CredentialSummary(
 )
 
 type JsonObject = dict[str, Any]
+
+
+def login_step(**fields: Any) -> LoginStepMessage:
+    """A login step. Each field that the test does not name is null, like the assistant service sends it."""
+    empty = {"message": None, "url": None, "user_code": None, "prompt_id": None, "prompt_type": None, "options": None}
+    return LoginStepMessage.model_validate(empty | fields)
 
 
 @pytest.fixture
@@ -166,11 +179,11 @@ async def test_a_subscription_login_sends_each_login_step_and_forwards_the_answe
     client: httpx.AsyncClient, assistant_service: FakeAssistantService
 ) -> None:
     assistant_service.login_script = [
-        LoginStep(step="auth_url", url="https://login.example.test/authorize", message="Open the link."),
-        LoginStep(step="device_code", url="https://login.example.test/device", user_code="ABCD-1234"),
-        LoginStep(step="progress", message="Waiting for the code."),
-        LoginStep(step="prompt", prompt_id="p1", prompt_type="manual_code", message="Paste the authorization code"),
-        LoginEnd(credential=SUBSCRIPTION_CREDENTIAL),
+        login_step(step="auth_url", url="https://login.example.test/authorize", message="Open the link."),
+        login_step(step="device_code", url="https://login.example.test/device", user_code="ABCD-1234"),
+        login_step(step="progress", message="Waiting for the code."),
+        login_step(step="prompt", prompt_id="p1", prompt_type="manual_code", message="Paste the authorization code"),
+        LoginEndMessage(credential=SUBSCRIPTION_CREDENTIAL),
     ]
 
     async with aconnect_ws("/ws/assistant", client) as socket:
@@ -201,9 +214,9 @@ async def test_a_subscription_login_sends_each_login_step_and_forwards_the_answe
 async def test_a_select_prompt_sends_its_options(
     client: httpx.AsyncClient, assistant_service: FakeAssistantService
 ) -> None:
-    options = [LoginOption(id="pro", label="Pro"), LoginOption(id="max", label="Max")]
+    options = [LoginOptionResponse(id="pro", label="Pro"), LoginOptionResponse(id="max", label="Max")]
     assistant_service.login_script = [
-        LoginStep(step="prompt", prompt_id="p1", prompt_type="select", message="Plan", options=options)
+        login_step(step="prompt", prompt_id="p1", prompt_type="select", message="Plan", options=options)
     ]
 
     async with aconnect_ws("/ws/assistant", client) as socket:
@@ -221,8 +234,8 @@ async def test_no_secret_reaches_the_browser_the_logs_or_postgresql(
 ) -> None:
     caplog.set_level(logging.DEBUG)
     assistant_service.login_script = [
-        LoginStep(step="prompt", prompt_id="p1", prompt_type="secret", message="Enter API key"),
-        LoginEnd(credential=API_KEY_CREDENTIAL),
+        login_step(step="prompt", prompt_id="p1", prompt_type="secret", message="Enter API key"),
+        LoginEndMessage(credential=API_KEY_CREDENTIAL),
     ]
 
     async with aconnect_ws("/ws/assistant", client) as socket:
@@ -265,7 +278,7 @@ async def dump_all_tables(database_url: str) -> str:
 async def test_leaving_the_dialog_stops_the_login(
     client: httpx.AsyncClient, assistant_service: FakeAssistantService
 ) -> None:
-    assistant_service.login_script = [LoginStep(step="prompt", prompt_id="p1", prompt_type="secret", message="Key")]
+    assistant_service.login_script = [login_step(step="prompt", prompt_id="p1", prompt_type="secret", message="Key")]
 
     async with aconnect_ws("/ws/assistant", client) as socket:
         await socket.send_text(json.dumps({"type": "login_start", "provider": "x", "method": "api_key", "name": "X"}))

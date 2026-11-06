@@ -5,6 +5,7 @@ The Web process writes only `desired_state` after the start. The forward-test wo
 tables, and the page reads the list again.
 """
 
+from collections.abc import Iterable
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
@@ -41,7 +42,12 @@ from atrade.paper_trading import (
     PaperAccountMonitor,
     read_needed_split_checks_with_holders,
 )
-from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
+from atrade.strategy import (
+    StrategyVersion,
+    find_backtest_only_orders,
+    read_strategy_version,
+    read_strategy_versions,
+)
 from atrade.watchlist import read_watchlist_instruments
 
 # The forward test list and the records of each forward test: /ws/ sends a change message after a change
@@ -52,9 +58,9 @@ FORWARD_TEST_CHANGE_SOCKET = ChangeSocket(
         {
             "forward_test",
             "forward_test_equity_point",
-            "forward_test_fill",
             "forward_test_interruption",
             "forward_test_same_period_backtest",
+            "owner_ledger_entry",
         }
     ),
 )
@@ -286,6 +292,19 @@ def refuse_request(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
 
 
+def require_usd_instruments(instruments: Iterable[Instrument]) -> None:
+    """The cash of a forward test is in USD, and the strategy and the equity read prices in the instrument currency.
+    Without exchange rates, another currency gives wrong order sizes and a wrong equity (section 12.1)."""
+    others = [
+        f"{instrument.symbol} {instrument.currency}" for instrument in instruments if instrument.currency != "USD"
+    ]
+    if others:
+        raise refuse_request(
+            "A forward test supports only USD instruments, because a forward test has no exchange rates."
+            f" Not in USD: {', '.join(others)}."
+        )
+
+
 def read_universe_body(request: StartForwardTestRequest) -> UniverseBody:
     """The universe of the request. The flat `symbol`, `exchange`, and `currency` are a single instrument."""
     has_flat_fields = request.symbol is not None or request.exchange is not None or request.currency is not None
@@ -346,6 +365,8 @@ class ForwardTestRoutes:
         if request.end_time_utc is not None and request.end_time_utc <= self.clock.read_now_utc():
             detail = "The end time must be later than now."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+        if order_problems := find_backtest_only_orders(strategy_version.code):
+            return refuse_start(" ".join(f"Line {problem.line}: {problem.message}" for problem in order_problems))
         forward_test_request = await self.make_forward_test_request(request)
         net_liquidation = await self.read_net_liquidation_usd()
         if isinstance(net_liquidation, str):
@@ -382,6 +403,7 @@ class ForwardTestRoutes:
             if universe.symbol is None or universe.exchange is None or universe.currency is None or universe.top_n:
                 raise refuse_request("A single-instrument forward test needs symbol, exchange, and currency only.")
             instrument = Instrument(symbol=universe.symbol, exchange=universe.exchange, currency=universe.currency)
+            require_usd_instruments([instrument])
             return replace(forward_test_request, instrument=instrument)
         if universe.symbol is not None or universe.exchange is not None or universe.currency is not None:
             raise refuse_request(f"A {universe.kind} universe does not take symbol, exchange, or currency.")
@@ -410,6 +432,7 @@ class ForwardTestRoutes:
             members = await read_watchlist_instruments(database_url=self.database_url)
             if not members:
                 raise refuse_request("The watchlist has no instrument.")
+        require_usd_instruments(members)
         return replace(
             forward_test_request,
             universe_top_n=universe.top_n,

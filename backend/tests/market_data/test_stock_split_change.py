@@ -3,6 +3,7 @@
 Real PostgreSQL and the IBKR fake (docs/architecture/market_data.md sections 8.13.2 and 8.13.3).
 """
 
+import threading
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -25,12 +26,16 @@ from atrade.market_data import (
     StockSplitChange,
     StockSplitConfirmedError,
     apply_stock_split,
+    check_import_detections,
     read_daily_bar_summaries,
+    read_daily_bar_summaries_before,
     read_saved_bars,
     read_stock_split_candidates,
     read_unsaved_ranges,
     save_received_bars,
 )
+from atrade.market_data.daily_bar_summary import DailyBarSummary, calculate_daily_bar_summary
+from atrade.market_data.stock_split_evidence import find_evidence_ratio
 from tests.backtest.real_runner import (
     TEST_STRATEGY_FILE,
     run_backtest_runner,
@@ -40,6 +45,7 @@ from tests.backtest.real_runner import (
 )
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection
+from tests.market_data.test_daily_bar_summary import save_source_bars, set_source_order
 
 BARS_PATH = "/api/market-data/bars"
 BTEST = Instrument(symbol="BTEST", exchange="ARCA", currency="USD")
@@ -135,6 +141,22 @@ async def test_a_ratio_of_1_gives_no_candidate(
     await read_missing_daily_bars(client)
 
     assert await read_stock_split_candidates(database_url=database_url) == []
+
+
+@pytest.mark.parametrize(
+    ("stored_close", "ibkr_close", "split_ratio"),
+    [
+        pytest.param("10.00", "9.60", None, id="a thin close gap of 4%"),
+        pytest.param("10.70", "10.00", None, id="a gap of 7%"),
+        pytest.param("10.00", "10.70", None, id="a gap of 7% down"),
+        pytest.param("110", "100", Decimal(10) / Decimal(9), id="a gap of 10%"),
+        pytest.param("100", "50", Decimal(2), id="a stock split"),
+    ],
+)
+def test_a_close_gap_of_8_percent_or_less_is_not_a_stock_split(
+    stored_close: str, ibkr_close: str, split_ratio: Decimal | None
+) -> None:
+    assert find_evidence_ratio(Decimal(stored_close), Decimal(ibkr_close)) == split_ratio
 
 
 def store_bars(database_url: str, bar_source: BarSource, bar_period: BarPeriod, close: str) -> None:
@@ -381,6 +403,68 @@ async def test_a_waiting_import_split_gives_no_second_candidate_and_new_ibkr_bar
     assert closes == [100.0, 100.0, 50.0, 50.0]
 
 
+async def read_older_bars_with_waiting_import_split(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection, ibkr_close: str
+) -> None:
+    """Databento: 100 before the ex-date and 48 from the ex-date. The import split of 2 waits. IBKR gives older days."""
+    stored_range = TimeRange(STORED_DAY_UTC, STORED_DAY_UTC + ONE_DAY * 2)
+    save_source_bars(database_url, "databento", APPLE, stored_range, [29], Decimal(100))
+    save_source_bars(database_url, "databento", APPLE, stored_range, [30], Decimal(48))
+    write_waiting_import_split(database_url, STORED_DAY_UTC + ONE_DAY)
+    older_range = TimeRange(STORED_DAY_UTC - ONE_DAY * 3, STORED_DAY_UTC)
+    gateway_connection.historical_bars[APPLE] = [
+        create_bar(older_range.start_utc + ONE_DAY * offset, ibkr_close) for offset in range(3)
+    ]
+    await read_daily_closes(client, older_range)
+
+
+@pytest.mark.anyio
+async def test_a_crash_that_waits_as_an_import_split_keeps_the_real_ibkr_prices(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    await read_older_bars_with_waiting_import_split(client, database_url, gateway_connection, ibkr_close="100")
+
+    all_days = TimeRange(STORED_DAY_UTC - ONE_DAY * 3, STORED_DAY_UTC + ONE_DAY * 2)
+    assert await read_daily_closes(client, all_days) == [100.0, 100.0, 100.0, 100.0, 48.0]
+
+
+@pytest.mark.anyio
+async def test_a_stored_close_far_from_the_ibkr_bars_does_not_show_a_waiting_split(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    stored_range = TimeRange(STORED_DAY_UTC, STORED_DAY_UTC + ONE_DAY * 2)
+    save_source_bars(database_url, "databento", APPLE, stored_range, [29], Decimal(100))
+    write_waiting_import_split(database_url, STORED_DAY_UTC + ONE_DAY)
+    older_range = TimeRange(STORED_DAY_UTC - ONE_DAY * 40, STORED_DAY_UTC - ONE_DAY * 37)
+    gateway_connection.historical_bars[APPLE] = [
+        create_bar(older_range.start_utc + ONE_DAY * offset, "50") for offset in range(3)
+    ]
+
+    assert await read_daily_closes(client, older_range) == [50.0, 50.0, 50.0]
+
+
+@pytest.mark.anyio
+async def test_a_real_split_that_waits_as_an_import_split_has_one_form_in_both_tables_after_the_check(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    await read_older_bars_with_waiting_import_split(client, database_url, gateway_connection, ibkr_close="50")
+    all_days = TimeRange(STORED_DAY_UTC - ONE_DAY * 3, STORED_DAY_UTC + ONE_DAY * 2)
+    closes_before_the_check = await read_daily_closes(client, all_days)
+
+    check_import_detections(database_url=database_url, rejected_split_ids=set(), checked_at_utc=RECORDED_AT_UTC)
+
+    assert closes_before_the_check == [100.0, 100.0, 100.0, 100.0, 48.0]
+    assert await read_daily_closes(client, all_days) == [50.0, 50.0, 50.0, 50.0, 48.0]
+    for bar_source, days in ((BarSource.IBKR, 3), (BarSource.DATABENTO, 2)):
+        saved = await read_saved_bars(
+            database_url=database_url,
+            bar_request=BarRequest(APPLE, BarPeriod.ONE_DAY, all_days),
+            source_order=[bar_source],
+        )
+        assert len(saved.bars) == days
+        assert {bar.close for bar in saved.bars} == ({Decimal(50)} if days == 3 else {Decimal(50), Decimal(48)})
+
+
 @pytest.mark.anyio
 async def test_an_ibkr_confirmation_does_not_take_a_waiting_import_split(database_url: str) -> None:
     store_bars_of_all_sources(database_url)
@@ -447,3 +531,105 @@ async def test_a_failed_read_of_the_stored_day_does_not_stop_the_read_of_the_mis
 
     assert closes == [50.0, 50.0, 50.0]
     assert await read_stock_split_candidates(database_url=database_url) == []
+
+
+async def insert_stock_split(
+    database_url: str, ex_date_utc: datetime, confirmation: str | None, split_ratio: int = 2
+) -> None:
+    """A `stock_split` row from the Databento import or the IBKR stock split check. It does not change the bars."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        await connection.execute(
+            """
+            INSERT INTO stock_split (
+                symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc
+            )
+            VALUES ('AAPL', 'NASDAQ', 'USD', %s, %s, 'databento_import', %s, %s)
+            """,
+            (ex_date_utc, split_ratio, confirmation, RECORDED_AT_UTC),
+        )
+
+
+async def read_close_before(database_url: str, before_utc: datetime) -> Decimal:
+    [summary] = await read_daily_bar_summaries_before(
+        database_url=database_url, instruments=[APPLE], before_utc=before_utc
+    )
+    return summary.last_close
+
+
+async def save_stored_week(database_url: str) -> None:
+    bars = [create_bar(start_utc, "120") for start_utc in BAR_DAYS_UTC]
+    await save_received_bars(
+        database_url=database_url,
+        bar_request=BarRequest(APPLE, BarPeriod.ONE_DAY, STORED_RANGE),
+        bars=bars,
+    )
+
+
+async def apply_week_split(database_url: str, ex_date_utc: datetime, split_ratio: str) -> None:
+    await apply_stock_split(
+        database_url=database_url,
+        change=StockSplitChange(APPLE, ex_date_utc, Decimal(split_ratio)),
+        confirmation="bar_evidence",
+        recorded_at_utc=RECORDED_AT_UTC,
+    )
+
+
+@pytest.mark.anyio
+async def test_a_summary_before_a_date_has_the_real_close_of_its_last_day(database_url: str) -> None:
+    """The stored closes after 2 stock splits: 120 / 4 / 0.5 = 60 before the first ex-date, 120 / 0.5 = 240 before the
+    second, and 120 on the last days."""
+    await save_stored_week(database_url)
+    await apply_week_split(database_url, EX_DATE_UTC, "4")
+    await apply_week_split(database_url, EX_DATE_UTC + ONE_DAY * 2, "0.5")
+
+    # The last day is before both ex-dates, before the second ex-date only, and on the second ex-date.
+    assert await read_close_before(database_url, BAR_DAYS_UTC[2]) == Decimal(120)
+    assert await read_close_before(database_url, BAR_DAYS_UTC[3]) == Decimal(120)
+    assert await read_close_before(database_url, BAR_DAYS_UTC[4] + ONE_DAY) == Decimal(120)
+    [saved_summary] = await read_daily_bar_summaries(database_url=database_url, instruments=[APPLE])
+    assert saved_summary.last_close == Decimal(120)
+
+
+@pytest.mark.anyio
+async def test_a_summary_before_a_date_is_not_calculated_on_the_event_loop(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await save_stored_week(database_url)
+    calculation_threads: list[threading.Thread] = []
+
+    def record_thread(instrument: Instrument, bars: list[Bar]) -> DailyBarSummary:
+        calculation_threads.append(threading.current_thread())
+        return calculate_daily_bar_summary(instrument, bars)
+
+    monkeypatch.setattr("atrade.market_data.daily_bar_summary.calculate_daily_bar_summary", record_thread)
+
+    await read_close_before(database_url, BAR_DAYS_UTC[2])
+
+    assert calculation_threads
+    assert threading.current_thread() not in calculation_threads
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("confirmation", [None, "import_rejected"])
+async def test_a_stock_split_that_changed_no_bar_does_not_change_the_close_of_a_summary_before_a_date(
+    database_url: str, confirmation: str | None
+) -> None:
+    await save_stored_week(database_url)
+    await insert_stock_split(database_url, EX_DATE_UTC, confirmation)
+
+    assert await read_close_before(database_url, EX_DATE_UTC) == Decimal(120)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("bar_sources", [["ibkr", "databento"], ["databento", "ibkr"]])
+async def test_the_ibkr_stock_split_check_changes_only_the_close_of_a_summary_with_a_databento_last_bar(
+    database_url: str, bar_sources: list[str]
+) -> None:
+    """The IBKR bars were read before the ex-date and hold the real close 120. The check divided only the Databento
+    bars by 10 and wrote `bar_evidence` (section 8.8.3.1), and no IBKR read followed, so no evidence A row exists."""
+    await save_stored_week(database_url)
+    save_source_bars(database_url, "databento", APPLE, STORED_RANGE, [22, 23], Decimal(12))
+    set_source_order(database_url, bar_sources)
+    await insert_stock_split(database_url, EX_DATE_UTC, "bar_evidence", 10)
+
+    assert await read_close_before(database_url, EX_DATE_UTC) == Decimal(120)

@@ -4,6 +4,8 @@ import type { WebPortAnswer } from './web_port_client.ts';
 
 const HTTP_OK_FIRST = 200;
 const HTTP_OK_LAST = 299;
+/** The longest text of one tool result. Compaction is off, so the model gets each result again with each message. */
+export const MAX_TOOL_RESULT_CHARACTERS = 100_000;
 
 /** The structured part of a tool result. pi keeps it out of the model text. web reads it from the run events. */
 export interface ToolDetails {
@@ -43,9 +45,21 @@ export function isSuccess(answer: WebPortAnswer): boolean {
   return answer.status >= HTTP_OK_FIRST && answer.status <= HTTP_OK_LAST;
 }
 
+/** The text, or its start with a note when it is above the limit. */
+function capText(text: string): string {
+  if (text.length <= MAX_TOOL_RESULT_CHARACTERS) {
+    return text;
+  }
+  const note =
+    `\n\n[ATrade cut this tool result. It has ${String(text.length)} characters, and the limit is ` +
+    `${String(MAX_TOOL_RESULT_CHARACTERS)}. The end of the result is left out. Call a tool that returns less.]`;
+  return text.slice(0, MAX_TOOL_RESULT_CHARACTERS - note.length).toWellFormed() + note;
+}
+
+/** Each tool result goes through this function, so no tool can send more than the limit to the model. */
 export function textResult(value: unknown, details: ToolDetails = {}): ToolResult {
   const text = typeof value === 'string' ? value : JSON.stringify(value);
-  return { content: [{ type: 'text', text }], details };
+  return { content: [{ type: 'text', text: capText(text) }], details };
 }
 
 export function errorResult(text: string, details: ToolDetails = {}): ToolResult {

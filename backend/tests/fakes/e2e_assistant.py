@@ -25,21 +25,21 @@ from psycopg.types.json import Jsonb
 from pydantic import JsonValue
 
 from atrade.assistant import (
+    AssistantEvent,
     AssistantServiceError,
-    BacktestFinished,
+    BacktestFinishedMessage,
     ConversationMessage,
-    CredentialSummary,
-    MessageEnd,
+    CredentialResponse,
+    MessageDeltaMessage,
+    MessageEndMessage,
     ModelSelection,
     ProviderModel,
     ProviderSummary,
-    RunEvent,
-    ScreenRunFinished,
-    ScreenSaved,
-    StrategyVersionSaved,
-    TextDelta,
+    ScreenRunFinishedMessage,
+    ScreenSavedMessage,
+    StrategyVersionSavedMessage,
     ThinkingLevel,
-    ToolStep,
+    ToolStepMessage,
 )
 from tests.fakes.assistant import FakeAssistantService
 
@@ -91,8 +91,8 @@ E2E_AI_SCREEN: JsonValue = {
 }
 
 
-def make_credential(credential_id: str, name: str) -> CredentialSummary:
-    return CredentialSummary(
+def make_credential(credential_id: str, name: str) -> CredentialResponse:
+    return CredentialResponse(
         id=credential_id,
         name=name,
         provider="openai",
@@ -145,8 +145,8 @@ class E2EAssistantService(FakeAssistantService):
         levels = model.thinking_levels if model is not None else []
         return selection.thinking_level if selection.thinking_level in levels else "off"
 
-    def answer_end(self, conversation_id: int, text: str, selection: ModelSelection) -> MessageEnd:
-        end = MessageEnd(
+    def answer_end(self, conversation_id: int, text: str, selection: ModelSelection) -> MessageEndMessage:
+        end = MessageEndMessage(
             text=text,
             provider=selection.provider,
             model=selection.model,
@@ -167,7 +167,7 @@ class E2EAssistantService(FakeAssistantService):
 
     async def run(
         self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
-    ) -> AsyncIterator[RunEvent]:
+    ) -> AsyncIterator[AssistantEvent]:
         self.runs.append((conversation_id, text, selection))
         self.system_prompts.append(system_prompt)
         self.first_texts.setdefault(conversation_id, text)
@@ -177,7 +177,7 @@ class E2EAssistantService(FakeAssistantService):
         if "wait" in text:
             abort_event = anyio.Event()
             self.abort_events[conversation_id] = abort_event
-            yield TextDelta(text="Working on it")
+            yield MessageDeltaMessage(text="Working on it")
             await abort_event.wait()
             return
         if "screen" in text:
@@ -202,7 +202,7 @@ class E2EAssistantService(FakeAssistantService):
             parts = ["Hello ", "from the fake ", "AI assistant."]
         for part in parts:
             await anyio.sleep(STREAM_PAUSE_SECONDS)
-            yield TextDelta(text=part)
+            yield MessageDeltaMessage(text=part)
         yield self.answer_end(conversation_id, "".join(parts), selection)
 
     async def abort(self, conversation_id: int) -> None:
@@ -218,8 +218,8 @@ class E2EAssistantService(FakeAssistantService):
             raise AssistantServiceError(message)
         return f"Title of {self.first_texts.get(conversation_id, 'the conversation')}"
 
-    async def save_version(self, conversation_id: int) -> AsyncIterator[RunEvent]:
-        yield ToolStep(
+    async def save_version(self, conversation_id: int) -> AsyncIterator[AssistantEvent]:
+        yield ToolStepMessage(
             tool_call_id="save",
             tool_name="save_strategy_version",
             status="running",
@@ -262,40 +262,40 @@ class E2EAssistantService(FakeAssistantService):
             )
             version_row = await cursor.fetchone()
             assert version_row is not None
-        yield ToolStep(
+        yield ToolStepMessage(
             tool_call_id="save",
             tool_name="save_strategy_version",
             status="succeeded",
             backtest_id=None,
             backtest_status=None,
         )
-        yield StrategyVersionSaved(
+        yield StrategyVersionSavedMessage(
             strategy_id=int(strategy_id), strategy_version_id=int(version_row[0]), version_number=version_number
         )
 
-    async def save_screen(self, conversation_id: int) -> AsyncIterator[RunEvent]:
+    async def save_screen(self, conversation_id: int) -> AsyncIterator[AssistantEvent]:
         """A screen of the user and a changed copy of the AI assistant, with each change mark of the condition card:
         a changed value (Close > 5 to 20), a removed condition (Close above SMA(200)), and an added one (RSI(14) < 30).
         The fake does not run the screen; its funnel counts are fixed."""
         # The e2e database is not cleared, and screen names are unique.
         name = f"E2E momentum {conversation_id} {time.time_ns()}"
-        yield ToolStep(
+        yield ToolStepMessage(
             tool_call_id="screen", tool_name="create_screen", status="running", backtest_id=None, backtest_status=None
         )
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             await self.insert_screen(connection, name, E2E_SOURCE_SCREEN, None)
             screen_id = await self.insert_screen(connection, f"{name} (AI)", E2E_AI_SCREEN, conversation_id)
-        yield ToolStep(
+        yield ToolStepMessage(
             tool_call_id="screen", tool_name="create_screen", status="succeeded", backtest_id=None, backtest_status=None
         )
-        yield ScreenSaved(
+        yield ScreenSavedMessage(
             screen_id=screen_id,
             name=f"{name} (AI)",
             market="US",
             definition=E2E_AI_SCREEN,
             previous_definition=E2E_SOURCE_SCREEN,
         )
-        yield ScreenRunFinished(
+        yield ScreenRunFinishedMessage(
             screen_id=screen_id,
             screen_result_id=0,
             start_count=500,
@@ -326,7 +326,7 @@ class E2EAssistantService(FakeAssistantService):
         assert row is not None
         return int(row[0])
 
-    async def run_backtest(self, conversation_id: int) -> AsyncIterator[RunEvent]:
+    async def run_backtest(self, conversation_id: int) -> AsyncIterator[AssistantEvent]:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             cursor = await connection.execute(
                 """
@@ -355,11 +355,11 @@ class E2EAssistantService(FakeAssistantService):
         backtest_id = int(row[0])
         for status in ("queued", "running", "finished"):
             await anyio.sleep(STREAM_PAUSE_SECONDS)
-            yield ToolStep(
+            yield ToolStepMessage(
                 tool_call_id="backtest",
                 tool_name="run_backtest",
                 status="succeeded" if status == "finished" else "running",
                 backtest_id=backtest_id,
                 backtest_status=status,
             )
-        yield BacktestFinished(backtest_id=backtest_id)
+        yield BacktestFinishedMessage(backtest_id=backtest_id)

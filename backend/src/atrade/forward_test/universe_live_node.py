@@ -32,6 +32,7 @@ from atrade.forward_test.forward_test_universe import UniverseNodeInput, Univers
 from atrade.forward_test.live_node_run import (
     TRADER_ID_PREFIX,
     GatewayWatch,
+    create_ledger_connection,
     run_live_node,
     wait_for_end_or_stop,
 )
@@ -44,9 +45,8 @@ from atrade.forward_test.owner_ledger_execution_client import (
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
-from atrade.ibkr import IbAsyncGatewayConnection
-from atrade.market_data import BarRequest, read_saved_bars, read_source_order, read_unsaved_ranges
-from atrade.paper_trading import ForwardTestLedger, read_forward_test_fills
+from atrade.market_data import BarRequest, read_saved_bars_of_many, read_source_order, read_unsaved_ranges
+from atrade.paper_trading import read_forward_test_fills
 from atrade.strategy import load_strategy_classes
 
 DAILY = BarPeriod.ONE_DAY
@@ -68,7 +68,7 @@ class UniverseClients:
 
 def find_bar_type_names(members: tuple[Instrument, ...]) -> tuple[str, ...]:
     """`SYMBOL.<primary exchange>-1-DAY-LAST-EXTERNAL`: the strategy uses only these instrument IDs (ADR 0003)."""
-    return tuple(f"{create_instrument_id(member)}-{DAILY.value}-LAST-EXTERNAL" for member in members)
+    return tuple(DAILY.external_bar_type(create_instrument_id(member)) for member in members)
 
 
 def read_universe(live_node_input: LiveNodeInput) -> UniverseNodeInput:
@@ -109,18 +109,7 @@ def create_universe_clients(
 
 
 def create_production_clients(live_node_input: LiveNodeInput) -> UniverseClients:
-    """The owner ledger in PostgreSQL and one ib_async connection with the client ID of the forward test."""
-    gateway_connection = IbAsyncGatewayConnection(
-        host=live_node_input.gateway_host, port=live_node_input.gateway_port, client_id=live_node_input.client_id
-    )
-    ledger = ForwardTestLedger(
-        database_url=live_node_input.database_url,
-        account=live_node_input.account_id,
-        forward_test_id=live_node_input.forward_test_id,
-        gateway_connection=gateway_connection,
-        clock=SystemClock(),
-    )
-    return create_universe_clients(live_node_input, ledger, gateway_connection)
+    return create_universe_clients(live_node_input, *create_ledger_connection(live_node_input))
 
 
 def build_universe_node(live_node_input: LiveNodeInput, clients: UniverseClients) -> LiveNode:
@@ -142,20 +131,19 @@ def create_universe_strategy_config(
     config_class: type[StrategyConfig], live_node_input: LiveNodeInput
 ) -> StrategyConfig:
     """A multi-instrument configuration has no `instrument_id` and no `bar_type` (backtest.md section 10.10.8). The
-    strategy owns the restored positions of all known members (section 12.7). A multi-instrument `__init__` passes
-    the other keywords to `StrategyConfig.__init__` (strategy.md section 9.2), as in the multi-instrument backtest."""
+    strategy owns the restored positions of all known members (section 12.7)."""
     instrument_ids = [
         create_instrument_id(instrument) for instrument in find_node_instruments(read_universe(live_node_input))
     ]
-    return config_class(order_id_tag=live_node_input.order_id_tag, external_order_instrument_ids=instrument_ids)  # pyright: ignore[reportCallIssue]
-
-
-async def read_daily_bars(database_url: str, instrument: Instrument, time_range: TimeRange) -> list[Bar]:
-    source_order = await read_source_order(database_url=database_url)
-    saved_bars = await read_saved_bars(
-        database_url=database_url, bar_request=BarRequest(instrument, DAILY, time_range), source_order=source_order
-    )
-    return saved_bars.bars
+    # readability-exception: the user __init__ forwards other keywords to object.__init__, which refuses them. The
+    # NautilusTrader fields go to __new__ directly, as in `live_node_run.create_strategy_config` (E1).
+    nautilus_fields: dict[str, object] = {
+        "order_id_tag": live_node_input.order_id_tag,
+        "external_order_instrument_ids": instrument_ids,
+    }
+    config: StrategyConfig = config_class.__new__(config_class, **nautilus_fields)
+    config.__init__()  # pyright: ignore[reportUnknownMemberType]
+    return config
 
 
 async def record_universe_equity(
@@ -172,9 +160,14 @@ async def record_universe_equity(
         ]
         instruments = dict.fromkeys([*members, *(fill.instrument for fill in fills)])
         time_range = TimeRange(floor_to_bar_start(universe.row.created_at_utc, DAILY), now_utc)
+        saved_bars_of_instruments = await read_saved_bars_of_many(
+            database_url=database_url,
+            bar_requests=[BarRequest(instrument, DAILY, time_range) for instrument in instruments],
+            source_order=await read_source_order(database_url=database_url),
+        )
         bars_by_instrument: dict[tuple[str | None, str | None], list[Bar]] = {
-            (instrument.symbol, instrument.exchange): await read_daily_bars(database_url, instrument, time_range)
-            for instrument in instruments
+            (instrument.symbol, instrument.exchange): saved_bars.bars
+            for instrument, saved_bars in zip(instruments, saved_bars_of_instruments, strict=True)
         }
         equity_curve = [
             point
@@ -289,7 +282,9 @@ async def run_universe_node(
     poller = UniversePoller(live_node_input, clients, strategy, options.clock)
     poll_task = asyncio.create_task(poller.keep_polling(options.poll_seconds))
     try:
-        return await wait_for_end_or_stop(live_node, live_node_input, stop_requested, options.gateway_watch)
+        return await wait_for_end_or_stop(
+            live_node, live_node_input, stop_requested, options.gateway_watch, clients.execution_factory.gateway
+        )
     finally:
         poll_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):

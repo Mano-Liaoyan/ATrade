@@ -1,7 +1,8 @@
 """The body of one forward test child process: the wait for IB Gateway, the paper account check, the cancel of old
-orders, the warm-up bars, the LiveNode run, and the stop steps (docs/architecture.md sections 12.5-12.7).
+orders with the save of their fills, the warm-up bars, the LiveNode run, and the stop steps (docs/architecture.md
+sections 12.5-12.7).
 
-The child writes start_balance_usd, error_message, the status "waiting_for_gateway" and "running", and the
+The child writes error_message, the status "waiting_for_gateway" and "running", and the
 interruption rows of a wait for IB Gateway. The worker reads the exit code and writes the other states.
 """
 
@@ -20,17 +21,24 @@ from atrade.forward_test.forward_test_store import ForwardTestRow
 from atrade.forward_test.forward_test_universe import UniverseNodeInput, read_universe_node_input
 from atrade.forward_test.forward_test_worker import (
     GATEWAY_UNREACHABLE_EXIT_CODE,
+    HELD_FILL_EXIT_CODE,
     PAPER_CHECK_FAILED_EXIT_CODE,
     ChildMode,
 )
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
-from atrade.foundation.order_ref import format_forward_test_order_tag
+from atrade.foundation.order_ref import format_forward_test_order_tag, read_order_source
 from atrade.foundation.settings import Settings
-from atrade.ibkr import GatewayConnection, GatewayRequestError
+from atrade.ibkr import Execution, GatewayConnection, GatewayRequestError
 from atrade.market_data import BarRequest, save_received_bars
-from atrade.paper_trading import PaperAccountCheckError, PaperAccountMonitor, require_paper_account
+from atrade.paper_trading import (
+    BOUGHT_SIDE,
+    ForwardTestLedger,
+    OwnerFill,
+    PaperAccountCheckError,
+    require_paper_account,
+)
 from atrade.strategy import read_strategy_version
 
 SUCCESS_EXIT_CODE = 0
@@ -39,6 +47,10 @@ FAILURE_EXIT_CODE = 1
 GATEWAY_RETRY_SECONDS = 30.0
 
 logger = logging.getLogger("atrade.forward_test_child")
+
+
+class HeldFillError(GatewayRequestError):
+    """A fill of the forward test has no commission report yet. A later read on a new connection tries again."""
 
 
 @dataclass(frozen=True)
@@ -103,20 +115,9 @@ async def write_error_message(job: ChildJob, error_message: str) -> None:
 @dataclass(frozen=True)
 class CheckedAccount:
     account_id: str
-    # The start of the equity: the allocated capital, or the first start balance of an old forward test.
+    # The start of the equity: the allocated capital.
     start_balance_usd: Decimal
     warm_up_bars: tuple[Bar, ...]
-
-
-async def save_start_balance(job: ChildJob, net_liquidation_usd: Decimal | None) -> Decimal | None:
-    """Saves the balance at the first start and returns the saved value."""
-    async with await psycopg.AsyncConnection.connect(job.settings.database_url, autocommit=True) as connection:
-        if net_liquidation_usd is not None:
-            await forward_test_store.write_start_balance(
-                connection, forward_test_id=job.row.id, start_balance_usd=net_liquidation_usd
-            )
-        row = await forward_test_store.select_forward_test(connection, job.row.id)
-    return None if row is None else row.start_balance_usd
 
 
 async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection) -> tuple[Bar, ...]:
@@ -131,7 +132,7 @@ async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection
     strategy_version = await read_strategy_version(
         database_url=job.settings.database_url, strategy_version_id=job.row.strategy_version_id
     )
-    look_back = find_look_back(bar_period, None if strategy_version is None else strategy_version.warm_up_bar_count)
+    look_back = find_look_back(bar_period, None if strategy_version is None else strategy_version.count_warm_up_bars())
     end_utc = floor_to_bar_start(job.ibkr_access.clock.read_now_utc(), bar_period)
     time_range = TimeRange(start_utc=end_utc - look_back.length, end_utc=end_utc)
     bar_request = BarRequest(
@@ -156,6 +157,69 @@ async def save_warm_up_bars(job: ChildJob, bar_request: BarRequest, bars: list[B
         logger.warning("Forward test %s: the warm-up bars were not saved: %s", job.row.id, error)
 
 
+async def read_forward_test_instruments(job: ChildJob) -> list[Instrument]:
+    """The instrument, or the members of all recorded quarters of a multi-instrument forward test."""
+    instrument = forward_test_store.read_single_instrument(job.row)
+    if instrument is not None:
+        return [instrument]
+    async with await psycopg.AsyncConnection.connect(job.settings.database_url) as connection:
+        members = await forward_test_store.select_universe_members(connection, job.row.id)
+    return [member for quarter_members in members.values() for member in quarter_members]
+
+
+def make_owner_fill(job: ChildJob, execution: Execution, instrument: Instrument) -> OwnerFill:
+    return OwnerFill(
+        forward_test_id=job.row.id,
+        instrument=instrument,
+        side="BUY" if execution.side == BOUGHT_SIDE else "SELL",
+        quantity=execution.quantity,
+        price=execution.price,
+        time_utc=execution.time_utc,
+        order_ref=execution.order_ref,
+        execution_id=execution.execution_id,
+        ibkr_order_id=execution.order_id,
+        commission=execution.commission,
+    )
+
+
+async def save_fills(job: ChildJob, gateway_connection: GatewayConnection) -> None:
+    """Saves the executions of all orders of this forward test, also of earlier children, after the cancel step.
+
+    A fill after a crash, a lost IB Gateway, or the last read of the LiveNode has no other way into the owner ledger.
+    The owner ledger stores each execId once. reqExecutions returns only the current day (section 12.6).
+
+    Raises HeldFillError for a held fill. `read_executions` ends the hold at its limit, so the retries end.
+    """
+    executions = [
+        execution
+        for execution in await gateway_connection.read_executions(include_held=True)
+        if read_order_source(execution.order_ref).forward_test_id == job.row.id
+    ]
+    if not executions:
+        return
+    for execution in executions:
+        if execution.is_held:
+            message = f"Execution {execution.execution_id} has no commission report."
+            raise HeldFillError(message)
+    # The exchange of an execution is the venue, not the primary exchange of the instrument.
+    instruments = {
+        (instrument.symbol, instrument.currency): instrument for instrument in await read_forward_test_instruments(job)
+    }
+    ledger = ForwardTestLedger(
+        database_url=job.settings.database_url,
+        account=executions[0].account,
+        forward_test_id=job.row.id,
+        gateway_connection=gateway_connection,
+        clock=job.ibkr_access.clock,
+    )
+    for execution in executions:
+        instrument = instruments.get((execution.symbol, execution.currency))
+        if instrument is None:
+            logger.warning("Forward test %s: execution %s has no instrument.", job.row.id, execution.execution_id)
+            continue
+        await ledger.save_fill(make_owner_fill(job, execution, instrument))
+
+
 async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
     """Steps 1-3 of section 12.5 and restart step 1 of section 12.7, on one connection.
 
@@ -167,8 +231,6 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         try:
             await gateway_connection.connect()
             account_id = require_paper_account(settings=job.settings, gateway_connection=gateway_connection)
-            monitor = PaperAccountMonitor(settings=job.settings, gateway_connection=gateway_connection)
-            balance = await monitor.read_balance()
         except GatewayRequestError as error:
             logger.warning("Forward test %s: IB Gateway is not reachable: %s", job.row.id, error)
             return GATEWAY_UNREACHABLE_EXIT_CODE
@@ -180,27 +242,25 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         try:
             for order in await gateway_connection.read_own_open_orders():
                 await gateway_connection.cancel_order_and_wait(order.order_id)
+            await save_fills(job, gateway_connection)
+        except HeldFillError as error:
+            # Not a crash. The start steps run again after the retry time, until the fill is saved (section 12.7).
+            logger.warning("Forward test %s: %s", job.row.id, error)
+            return GATEWAY_UNREACHABLE_EXIT_CODE
         except GatewayRequestError as error:
-            await write_error_message(job, f"The open orders were not cancelled before the start: {error}")
+            await write_error_message(
+                job, f"The open orders were not cancelled or their fills were not saved before the start: {error}"
+            )
             return FAILURE_EXIT_CODE
         # A multi-instrument forward test reads its warm-up from the bar store, not from IBKR (section 12.17).
         warm_up_bars = await read_warm_up_bars(job, gateway_connection) if job.row.universe_kind == "single" else ()
     finally:
         gateway_connection.disconnect()
-    if job.row.allocated_capital_usd is not None:
-        # The equity starts at the allocated capital (section 12.8). The child does not need NetLiquidation.
-        return CheckedAccount(
-            account_id=account_id, start_balance_usd=job.row.allocated_capital_usd, warm_up_bars=warm_up_bars
-        )
-    # A forward test from the time before the allocated capital keeps its first start balance (section 12.24).
-    start_balance_usd = await save_start_balance(job, None if balance is None else balance.net_liquidation_usd)
-    if start_balance_usd is None:
-        # The equity of the records starts at the balance (section 12.8). This child sent no order.
-        reason = None if balance is None else balance.message
-        message = "The paper account has no NetLiquidation value in USD."
-        await write_error_message(job, message if reason is None else f"{message} {reason}")
-        return PAPER_CHECK_FAILED_EXIT_CODE
-    return CheckedAccount(account_id=account_id, start_balance_usd=start_balance_usd, warm_up_bars=warm_up_bars)
+    # The equity starts at the allocated capital (section 12.8). Each row with a client ID has it (section 12.24).
+    start_capital_usd = job.row.start_capital_usd
+    # Each row has one of the 2 values: the start route writes the capital, and an old row has its start balance.
+    assert start_capital_usd is not None
+    return CheckedAccount(account_id=account_id, start_balance_usd=start_capital_usd, warm_up_bars=warm_up_bars)
 
 
 async def write_waiting_for_gateway(job: ChildJob) -> None:
@@ -228,14 +288,19 @@ async def wait_until_ready(job: ChildJob, stop_requested: asyncio.Event) -> Chec
 
 
 async def cancel_open_orders(job: ChildJob) -> int:
-    """Steps 2-4 of section 12.6: cancel each open order of the client ID and wait for each confirmation."""
+    """Steps 2-5 of section 12.6: cancel each open order of the client ID, wait for each confirmation, and save the
+    fills of the forward test."""
     gateway_connection = job.ibkr_access.open_gateway_connection(job.client_id)
     try:
         await gateway_connection.connect()
         for order in await gateway_connection.read_own_open_orders():
             await gateway_connection.cancel_order_and_wait(order.order_id)
+        await save_fills(job, gateway_connection)
+    except HeldFillError as error:
+        await write_error_message(job, str(error))
+        return HELD_FILL_EXIT_CODE
     except GatewayRequestError as error:
-        await write_error_message(job, f"The open orders were not cancelled: {error}")
+        await write_error_message(job, f"The open orders were not cancelled or their fills were not saved: {error}")
         return FAILURE_EXIT_CODE
     finally:
         gateway_connection.disconnect()

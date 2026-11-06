@@ -3,6 +3,8 @@
 Real PostgreSQL, the IBKR fake, and hand-made DBN files (docs/architecture/market_data.md section 8.11).
 """
 
+import asyncio
+import threading
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -18,16 +20,18 @@ from atrade.app.web import create_web_app
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
-from atrade.indicator import AverageTradingValue
+from atrade.indicator import AverageTradingValue, make_nautilus_bar
 from atrade.market_data import (
     BarRequest,
     DailyBarSummary,
+    daily_bar_summary,
     import_databento_files,
     read_daily_bar_summaries,
     read_last_daily_bars,
     save_received_bars,
     save_received_bars_blocking,
 )
+from atrade.market_data.daily_bar_summary import LAST_DAILY_BARS_QUERY, create_last_daily_bars_parameters
 from tests.fakes.clock import FixedClock
 from tests.fakes.databento import (
     CLOSE_PRICE,
@@ -109,15 +113,21 @@ def closes_by_day(bars: list[Bar]) -> list[tuple[int, Decimal]]:
 
 @pytest.fixture
 def query_count(monkeypatch: pytest.MonkeyPatch) -> list[int]:
-    """Counts the SQL statements that async cursors send."""
+    """Counts the SQL statements that async and blocking cursors send."""
     count = [0]
     original_execute = psycopg.AsyncCursor.execute
+    original_blocking_execute = psycopg.Cursor.execute
 
     async def count_execute(self: psycopg.AsyncCursor[Any], *args: Any, **kwargs: Any) -> psycopg.AsyncCursor[Any]:
         count[0] += 1
         return await original_execute(self, *args, **kwargs)
 
+    def count_blocking_execute(self: psycopg.Cursor[Any], *args: Any, **kwargs: Any) -> psycopg.Cursor[Any]:
+        count[0] += 1
+        return original_blocking_execute(self, *args, **kwargs)
+
     monkeypatch.setattr(psycopg.AsyncCursor, "execute", count_execute)
+    monkeypatch.setattr(psycopg.Cursor, "execute", count_blocking_execute)
     return count
 
 
@@ -126,6 +136,7 @@ async def test_reads_the_last_daily_bars_of_many_instruments_in_one_query_throug
     database_url: str, query_count: list[int]
 ) -> None:
     save_apple_and_microsoft_bars(database_url)
+    query_count[0] = 0
 
     bars = await read_last_daily_bars(
         database_url=database_url, instruments=[APPLE, MICROSOFT, TENCENT], before_utc=day(9), bar_count=3
@@ -138,6 +149,48 @@ async def test_reads_the_last_daily_bars_of_many_instruments_in_one_query_throug
         MICROSOFT: [(2, DATABENTO_CLOSE), (3, DATABENTO_CLOSE), (4, DATABENTO_CLOSE)],
         TENCENT: [],
     }
+
+
+def find_table_scan_rows(plan: dict[str, Any]) -> int:
+    """The rows that the plan node and its child nodes read from the bar tables."""
+    rows = plan["Actual Rows"] * plan["Actual Loops"] if plan.get("Relation Name", "").endswith("_bar") else 0
+    return int(rows) + sum(find_table_scan_rows(child) for child in plan.get("Plans", []))
+
+
+def test_the_read_stops_at_the_bar_count_in_each_bar_source(database_url: str) -> None:
+    all_days = list(range(1, 29))
+    save_source_bars(database_url, "ibkr", APPLE, TimeRange(day(1), day(15)), all_days[:14], IBKR_CLOSE)
+    save_source_bars(database_url, "databento", APPLE, TimeRange(day(1), day(29)), all_days, DATABENTO_CLOSE)
+    with psycopg.connect(database_url) as connection:
+        # A small test table has no plan with the primary key without this.
+        connection.execute("SET LOCAL enable_seqscan = off")
+        connection.execute("SET LOCAL enable_bitmapscan = off")
+        row = connection.execute(
+            sql.SQL("EXPLAIN (ANALYZE, FORMAT JSON) ") + LAST_DAILY_BARS_QUERY,
+            create_last_daily_bars_parameters([APPLE], None, 3),
+        ).fetchone()
+
+    assert row is not None
+    assert find_table_scan_rows(row[0][0]["Plan"]) <= 3 + 3
+
+
+def test_the_read_runs_in_a_thread(database_url: str) -> None:
+    save_apple_and_microsoft_bars(database_url)
+    threads: list[threading.Thread] = []
+    original_read = daily_bar_summary.select_last_daily_bars_blocking
+
+    def record_thread(*args: Any) -> dict[Instrument, list[Bar]]:
+        threads.append(threading.current_thread())
+        return original_read(*args)
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(daily_bar_summary, "select_last_daily_bars_blocking", record_thread)
+        asyncio.run(
+            read_last_daily_bars(database_url=database_url, instruments=[APPLE], before_utc=day(9), bar_count=3)
+        )
+
+    assert len(threads) == 1
+    assert threads[0] is not threading.current_thread()
 
 
 @pytest.mark.anyio
@@ -173,7 +226,7 @@ async def test_the_average_trading_value_20_is_the_value_of_the_indicator_class(
     bars = create_varied_bars(25)
     indicator = AverageTradingValue(20)
     for bar in bars:
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
 
     await save_received_bars(database_url=database_url, bar_request=december_request(APPLE), bars=bars)
 

@@ -14,6 +14,9 @@ import httpx
 import psycopg
 import pytest
 
+from atrade.backtest import backtest_store
+from atrade.backtest.backtest_metrics import EquityPoint, calculate_daily_returns
+
 TEST_STRATEGY_CODE = (Path(__file__).parent / "strategies" / "buy_and_sell_by_bar_count.py").read_text()
 PAPER_CAPITAL = Decimal(10000)
 # Daily Sharpe ratio 0.33: PSR(0) is 99.44 % (tests/backtest/test_sharpe_probability.py).
@@ -166,3 +169,35 @@ async def test_fewer_than_60_daily_returns_give_no_sharpe_probability(
     assert robustness["sharpe_probability_percent"] is None
     assert robustness["sharpe_probability_status"] is None
     assert robustness["missing_reasons"] == {"sharpe_probability_percent": "Fewer than 60 daily returns"}
+
+
+@pytest.mark.anyio
+async def test_the_daily_equity_curves_give_the_daily_returns_of_the_full_curve(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    version_id = await save_version(web_client, await save_strategy(web_client, "Intraday"))
+    backtest_id = save_backtest(database_url, SavedBacktest(version_id, [], bar_period="5-MINS"))
+    points = [
+        EquityPoint(datetime(2026, 1, 5, 14, tzinfo=UTC), Decimal(10100)),
+        EquityPoint(datetime(2026, 1, 5, 23, 30, tzinfo=UTC), Decimal(10200)),
+        EquityPoint(datetime(2026, 1, 6, 0, 30, tzinfo=UTC), Decimal(10300)),
+        EquityPoint(datetime(2026, 1, 6, 21, tzinfo=UTC), Decimal(10150)),
+        EquityPoint(datetime(2026, 1, 7, 14, tzinfo=UTC), Decimal(10400)),
+    ]
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
+        for point in points:
+            await connection.execute(
+                "INSERT INTO backtest_equity_point VALUES (%s, %s, %s)", (backtest_id, point.time_utc, point.equity_usd)
+            )
+        # A trading day is a UTC date, also for a database session in another time zone.
+        await connection.execute("SET TIME ZONE 'Asia/Shanghai'")
+        curves = await backtest_store.select_daily_equity_curves(connection, [backtest_id])
+
+    assert [point.time_utc for point in curves[backtest_id]] == [
+        points[1].time_utc,
+        points[3].time_utc,
+        points[4].time_utc,
+    ]
+    assert calculate_daily_returns(
+        start_capital_usd=PAPER_CAPITAL, equity_curve=curves[backtest_id]
+    ) == calculate_daily_returns(start_capital_usd=PAPER_CAPITAL, equity_curve=points)

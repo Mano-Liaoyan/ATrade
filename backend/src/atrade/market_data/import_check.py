@@ -23,7 +23,7 @@ SELECT_WAITING_SPLITS: LiteralString = """
     ORDER BY symbol, ex_date_utc
 """
 SELECT_UNCHECKED_LINKS: LiteralString = """
-    SELECT id, old_symbol, new_symbol, exchange, change_day FROM databento_symbol_link
+    SELECT id, old_symbol, new_symbol, exchange, change_day, change_day < '2024-07-01' FROM databento_symbol_link
     WHERE checked_at_utc IS NULL
     ORDER BY change_day, old_symbol
 """
@@ -54,6 +54,7 @@ class UncheckedLink:
     new_symbol: str
     exchange: str
     change_day: date
+    is_moved: bool
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,12 @@ def read_detections(connection: psycopg.Connection) -> ImportDetections:
     ]
     links = [
         UncheckedLink(
-            id=int(row[0]), old_symbol=str(row[1]), new_symbol=str(row[2]), exchange=str(row[3]), change_day=row[4]
+            id=int(row[0]),
+            old_symbol=str(row[1]),
+            new_symbol=str(row[2]),
+            exchange=str(row[3]),
+            change_day=row[4],
+            is_moved=row[5],
         )
         for row in connection.execute(SELECT_UNCHECKED_LINKS).fetchall()
     ]

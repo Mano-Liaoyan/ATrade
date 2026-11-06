@@ -4,7 +4,7 @@ and read or change the backtest limits (timeout and concurrency).
 A new backtest waits in the queue. The backtest runner of the Web process starts it (backtest_runner.py).
 """
 
-from dataclasses import asdict, replace
+from dataclasses import asdict, fields, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal, NoReturn
@@ -30,6 +30,7 @@ from atrade.backtest.backtest_metrics import (
     EquityPoint,
     SplitMetrics,
     calculate_split_metrics,
+    clip_to_equity_curve,
     round_value,
 )
 from atrade.backtest.backtest_robustness import SharpeProbabilityKind, read_robustness
@@ -61,7 +62,7 @@ from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALI
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.table_changes import ChangeSocket
 from atrade.market_data import BarSource, ExchangeRateReader, read_us_universe_quarter_starts
-from atrade.screen import MARKET_CURRENCIES, read_saved_screen, read_screen_result_members
+from atrade.screen import MARKET_CURRENCIES, check_screen, read_saved_screen, read_screen_result_members
 from atrade.strategy import (
     ChartIndicator,
     StrategyVersion,
@@ -189,6 +190,8 @@ class BacktestResponse(BaseModel):
     survivorship_bias: bool
     # True when an instrument waited for the IBKR stock split check when the backtest was created (section 10.12).
     has_split_check_pending: bool
+    # The run warning when the free cash did not pay for an order at the open (section 10.10.3). Else null.
+    fill_warning: str | None
     # The parameter sweep of a sweep run and its parameter values (section 10.11). Null for another backtest.
     sweep_id: int | None
     parameters: ParameterValues | None
@@ -277,22 +280,7 @@ def to_metrics_response(metrics: BacktestMetrics | None) -> BacktestMetricsRespo
 
 def to_present_metrics_response(metrics: BacktestMetrics) -> BacktestMetricsResponse:
     return BacktestMetricsResponse(
-        final_equity_usd=metrics.final_equity_usd,
-        total_return_percent=metrics.total_return_percent,
-        max_drawdown_percent=metrics.max_drawdown_percent,
-        trade_count=metrics.trade_count,
-        cagr_percent=metrics.cagr_percent,
-        annual_volatility_percent=metrics.annual_volatility_percent,
-        sharpe_ratio=metrics.sharpe_ratio,
-        sortino_ratio=metrics.sortino_ratio,
-        calmar_ratio=metrics.calmar_ratio,
-        profit_factor=metrics.profit_factor,
-        average_win_usd=metrics.average_win_usd,
-        average_win_percent=metrics.average_win_percent,
-        average_loss_usd=metrics.average_loss_usd,
-        exposure_percent=metrics.exposure_percent,
-        turnover_per_year=metrics.turnover_per_year,
-        win_rate_percent=metrics.win_rate_percent,
+        **{field.name: getattr(metrics, field.name) for field in fields(metrics)},
         missing_reasons=metrics.missing_reasons,
     )
 
@@ -332,7 +320,9 @@ def calculate_finished_split_metrics(
         return None
     return calculate_split_metrics(
         paper_capital_usd=row.paper_capital_usd,
-        time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
+        time_range=clip_to_equity_curve(
+            TimeRange(start_utc=row.start_utc, end_utc=row.end_utc), equity_curve, BarPeriod(row.bar_period)
+        ),
         equity_curve=equity_curve,
         trades=trades,
         split_time_utc=row.split_time_utc,
@@ -389,6 +379,7 @@ def make_backtest_response(row: BacktestRow, strategy_version: StrategyVersion |
         else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
         survivorship_bias=has_survivorship_bias(request),
         has_split_check_pending=row.has_split_check_pending,
+        fill_warning=row.fill_warning,
         sweep_id=row.sweep_id,
         parameters=row.parameters,
     )
@@ -498,6 +489,10 @@ class BacktestRoutes:
         screen = await read_saved_screen(database_url=self.database_url, screen_id=request.screen_id)
         if screen is None:
             refuse(f"Screen {request.screen_id} does not exist.")
+        # An old screen can fail a newer check. A saved copy is not checked again, so it stays repeatable.
+        problems = check_screen(name=screen.name, market=screen.market, definition=screen.definition)
+        if problems:
+            refuse(problems[0].message)
         return BacktestUniverse(
             kind="screen",
             currency=MARKET_CURRENCIES[screen.market],

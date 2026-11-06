@@ -5,7 +5,8 @@
 
 Without options, the program lists the detected stock splits that wait for the check and the symbol links that are
 not checked. With `--accept`, it confirms all listed stock splits except the rejected IDs, changes the stored bars
-before their ex-dates, and records the check of all listed links.
+before their ex-dates, and records the check of all listed links. The check moves no bar of a link. The list marks a
+rename from 2024-07-01 as a new listing.
 """
 
 import argparse
@@ -52,7 +53,12 @@ def log_detections(detections: ImportDetections) -> None:
     logger.info("%d symbol links are not checked:", len(detections.symbol_links))
     for link in detections.symbol_links:
         logger.info(
-            "  %s to %s on %s, from %s", link.old_symbol, link.new_symbol, link.exchange, link.change_day.isoformat()
+            "  %s to %s on %s, from %s%s",
+            link.old_symbol,
+            link.new_symbol,
+            link.exchange,
+            link.change_day.isoformat(),
+            "" if link.is_moved else ". A new listing: no bar moved.",
         )
 
 

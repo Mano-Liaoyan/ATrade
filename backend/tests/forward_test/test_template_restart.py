@@ -1,0 +1,346 @@
+"""The code templates restore their position state at a forward test restart (docs/architecture/strategy.md section
+9.2). A restart gives the strategy its position from the owner ledger, and new objects."""
+
+import asyncio
+from datetime import timedelta
+from decimal import Decimal
+from pathlib import Path
+from typing import Any
+
+import pytest
+from nautilus_trader.config import StrategyConfig
+from nautilus_trader.model import Bar as NautilusBar
+from nautilus_trader.model import Price
+
+from atrade.forward_test import OwnerFill
+from atrade.foundation.order_ref import format_forward_test_order_tag
+from atrade.ibkr import GatewayRequestError
+from atrade.strategy import STRATEGY_TEMPLATE, load_strategy_classes
+from atrade.strategy.rules_code import make_rules_code
+from atrade.strategy.strategy_rules import StrategyRules
+from atrade.strategy.strategy_templates import TEMPLATES_BY_ID
+from tests.fakes.ibkr import LIVE_BAR_NOW_UTC, make_execution
+from tests.forward_test.atrade_clients_node import (
+    ACCOUNT_ID,
+    APPLE,
+    APPLE_ID,
+    CLIENT_ID,
+    DAY_BAR_TYPE,
+    FORWARD_TEST_ID,
+    ClientsWorld,
+    make_day_bar,
+    make_world,
+    run_node,
+    save_day_bars,
+    send_today_bar,
+    today_start_utc,
+    wait_until,
+)
+from tests.strategy.rules_examples import condition, group, make_rules, number, price
+
+RESTORED_SHARES = 40
+REFUSAL_WAIT_SECONDS = 0.2
+ONE_DAY_NS = 86_400_000_000_000
+EXIT_RETRY_NS = 300_000_000_000
+
+
+async def make_world_with_position(database_url: str) -> ClientsWorld:
+    world = make_world(database_url)
+    await world.ledger.save_fill(
+        OwnerFill(
+            FORWARD_TEST_ID,
+            APPLE,
+            "BUY",
+            Decimal(RESTORED_SHARES),
+            Decimal(100),
+            LIVE_BAR_NOW_UTC,
+            "FT7",
+            "0001",
+            1,
+            Decimal(0),
+        )
+    )
+    return world
+
+
+def create_config(config_class: Any, **fields: Any) -> StrategyConfig:
+    """The NautilusTrader fields go to __new__, as in `live_node_run.create_strategy_config`."""
+    config = config_class.__new__(
+        config_class,
+        order_id_tag=format_forward_test_order_tag(FORWARD_TEST_ID),
+        external_order_instrument_ids=[APPLE_ID],
+    )
+    config.__init__(**fields)
+    return config
+
+
+def make_rules_strategy_code() -> str:
+    entry = group("all_of", condition(price(), "above", number(0)))
+    return make_rules_code(StrategyRules.model_validate(make_rules(entry, exits={"exit_after_bars": 1})))
+
+
+def make_template_strategy(tmp_path: Path, code: str = STRATEGY_TEMPLATE) -> Any:
+    strategy_class, config_class = load_strategy_classes(code, tmp_path)
+    return strategy_class(create_config(config_class, instrument_id=APPLE_ID, bar_type=DAY_BAR_TYPE))
+
+
+async def save_warm_up_bars(database_url: str) -> None:
+    first_bar_utc = today_start_utc() - timedelta(days=30)
+    await save_day_bars(database_url, [make_day_bar(first_bar_utc + timedelta(days=day), "100") for day in range(30)])
+
+
+def read_orders(world: ClientsWorld) -> list[tuple[str, Decimal]]:
+    return [(order.side, order.quantity) for order in world.gateway.open_orders]
+
+
+async def wait_for_refusal(world: ClientsWorld) -> None:
+    await wait_until(lambda: bool(world.ledger.checked_orders))
+    await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+
+
+def replace_close(bar: NautilusBar, close: float) -> NautilusBar:
+    price = Price(close, bar.close.precision)
+    return NautilusBar(bar.bar_type, price, price, price, price, bar.volume, bar.ts_event, bar.ts_init)
+
+
+def send_later_bar(strategy: Any, later_ns: int, close: float | None = None) -> None:
+    """A bar after the last bar of the cache. The data client does not send a bar of a future time."""
+    bar = strategy.cache.bar(DAY_BAR_TYPE)
+    ts_event = bar.ts_event + later_ns
+    price = bar.close if close is None else Price(close, bar.close.precision)
+    strategy.on_bar(NautilusBar(bar.bar_type, price, price, price, price, bar.volume, ts_event, ts_event))
+
+
+def repeat_last_bar(strategy: Any) -> None:
+    """The next bar with the same close. The data client sends 1 bar for each day."""
+    strategy.on_bar(strategy.cache.bar(DAY_BAR_TYPE))
+
+
+@pytest.mark.anyio
+async def test_the_default_template_sells_again_on_the_next_bar_after_a_denied_sell(
+    database_url: str, tmp_path: Path
+) -> None:
+    world = await make_world_with_position(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "50")
+        await wait_for_refusal(world)
+        assert read_orders(world) == []
+        world.ledger.split_check_needed.clear()
+        repeat_last_bar(strategy)
+        await wait_until(lambda: bool(world.gateway.open_orders))
+
+        assert read_orders(world) == [("SELL", Decimal(RESTORED_SHARES))]
+
+
+@pytest.mark.anyio
+async def test_the_default_template_does_not_buy_more_after_a_denied_sell(database_url: str, tmp_path: Path) -> None:
+    world = await make_world_with_position(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "50")
+        await wait_for_refusal(world)
+        world.ledger.split_check_needed.clear()
+        strategy.on_bar(replace_close(strategy.cache.bar(DAY_BAR_TYPE), 200))
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+
+        assert read_orders(world) == []
+
+
+@pytest.mark.anyio
+async def test_the_default_template_buys_again_on_the_next_bar_after_a_rejected_buy(
+    database_url: str, tmp_path: Path
+) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    world.gateway.order_error_message = "Rejected by IBKR"
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_for_refusal(world)
+        world.gateway.order_error_message = None
+        repeat_last_bar(strategy)
+        await wait_until(lambda: bool(world.gateway.open_orders))
+
+        assert read_orders(world) == [("BUY", Decimal(10))]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("code", [STRATEGY_TEMPLATE, make_rules_strategy_code()], ids=["template", "rule_builder"])
+async def test_a_single_instrument_strategy_retries_a_refused_buy_once_a_day(
+    database_url: str, tmp_path: Path, code: str
+) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path, code)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_for_refusal(world)
+        repeat_last_bar(strategy)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        for _ in range(3):
+            repeat_last_bar(strategy)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        assert len(world.ledger.checked_orders) == 2
+        send_later_bar(strategy, ONE_DAY_NS)
+        await wait_until(lambda: len(world.ledger.checked_orders) == 3)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("code", [STRATEGY_TEMPLATE, make_rules_strategy_code()], ids=["template", "rule_builder"])
+async def test_a_single_instrument_strategy_retries_a_refused_sell_every_5_minutes(
+    database_url: str, tmp_path: Path, code: str
+) -> None:
+    world = await make_world_with_position(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path, code)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "50")
+        await wait_for_refusal(world)
+        repeat_last_bar(strategy)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        for _ in range(3):
+            repeat_last_bar(strategy)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        assert len(world.ledger.checked_orders) == 2
+        send_later_bar(strategy, EXIT_RETRY_NS)
+        await wait_until(lambda: len(world.ledger.checked_orders) == 3)
+
+
+@pytest.mark.anyio
+async def test_the_retry_of_a_buy_leaves_a_retry_for_a_later_exit_of_the_same_day(
+    database_url: str, tmp_path: Path
+) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_for_refusal(world)
+        world.ledger.split_check_needed.clear()
+        repeat_last_bar(strategy)
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        order_id = world.gateway.open_orders[0].order_id
+        world.gateway.executions.append(
+            make_execution(ACCOUNT_ID, order_id=order_id, quantity="10", price="200", client_id=CLIENT_ID)
+        )
+        await wait_until(lambda: bool(strategy.cache.positions_open(strategy_id=strategy.strategy_id)))
+        world.ledger.split_check_needed.add(APPLE)
+        send_later_bar(strategy, 1 * EXIT_RETRY_NS, close=50)
+        await wait_until(lambda: len(world.ledger.checked_orders) == 3)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        send_later_bar(strategy, 2 * EXIT_RETRY_NS, close=50)
+        await wait_until(lambda: len(world.ledger.checked_orders) == 4)
+
+
+@pytest.mark.anyio
+async def test_the_cancel_of_an_exit_is_no_lost_order(database_url: str, tmp_path: Path) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_for_refusal(world)
+        world.ledger.split_check_needed.clear()
+        repeat_last_bar(strategy)
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        send_later_bar(strategy, EXIT_RETRY_NS, close=50)
+        await wait_until(lambda: not world.gateway.open_orders)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        send_later_bar(strategy, 2 * EXIT_RETRY_NS, close=200)
+        await wait_until(lambda: bool(world.gateway.open_orders))
+
+
+@pytest.mark.anyio
+async def test_the_default_template_retries_a_refused_cancel_every_5_minutes(database_url: str, tmp_path: Path) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    cancel_requests: list[int] = []
+
+    async def refuse_cancel(order_id: int) -> None:
+        cancel_requests.append(order_id)
+        raise GatewayRequestError("Refused by IBKR")
+
+    world.gateway.cancel_order = refuse_cancel
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        low_bar = replace_close(strategy.cache.bar(DAY_BAR_TYPE), 50)
+        for _ in range(5):
+            strategy.on_bar(low_bar)
+            await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        assert len(cancel_requests) == 2
+        send_later_bar(strategy, EXIT_RETRY_NS, close=50)
+        await wait_until(lambda: len(cancel_requests) == 3)
+
+
+@pytest.mark.anyio
+async def test_the_default_template_exit_cancels_the_open_buy_and_sells_the_filled_part(
+    database_url: str, tmp_path: Path
+) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        order_id = world.gateway.open_orders[0].order_id
+        world.gateway.executions.append(
+            make_execution(ACCOUNT_ID, order_id=order_id, quantity="4", price="200", client_id=CLIENT_ID)
+        )
+        await wait_until(lambda: bool(strategy.cache.positions_open(strategy_id=strategy.strategy_id)))
+        strategy.on_bar(replace_close(strategy.cache.bar(DAY_BAR_TYPE), 50))
+        await wait_until(lambda: read_orders(world) == [("SELL", Decimal(4))])
+
+
+@pytest.mark.anyio
+async def test_the_default_template_exit_sells_all_restored_shares(database_url: str, tmp_path: Path) -> None:
+    """A stock split or a partial fill leaves another quantity than the trade quantity of 10 shares."""
+    world = await make_world_with_position(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "50")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        orders = [(order.side, order.quantity) for order in world.gateway.open_orders]
+
+    assert orders == [("SELL", RESTORED_SHARES)]
+
+
+@pytest.mark.anyio
+async def test_the_m1_template_knows_its_restored_shares(database_url: str, tmp_path: Path) -> None:
+    world = await make_world_with_position(database_url)
+    code = TEMPLATES_BY_ID["m1"].code
+    assert code is not None
+    strategy_class, config_class = load_strategy_classes(code, tmp_path)
+
+    class SubscribingStrategy(strategy_class):
+        """`run_node` waits for a bar subscription. The universe poller is not part of this test."""
+
+        def on_start(self) -> None:
+            super().on_start()
+            self.subscribe_bars(DAY_BAR_TYPE)  # pyright: ignore[reportUnknownMemberType]
+
+    strategy: Any = SubscribingStrategy(create_config(config_class))
+
+    async with run_node(world, strategy, 1):
+        assert strategy.shares == {str(APPLE_ID): RESTORED_SHARES}

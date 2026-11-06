@@ -2,7 +2,9 @@
 // and each fake child stops at once after the stop request. The server has 30 stopped forward tests of the strategy
 // "E2E stopped forward tests", so the list overflows. The client ID range 10-13 allows 4 forward tests at a time, and
 // the browser projects run at the same time, so each test starts only 1 forward test and stops it.
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page, type WebSocketRoute } from '@playwright/test';
+import { expectHeaderButtonsClickable } from './header_buttons';
+import { waitForStartedRunId } from './started_run';
 
 // A status change takes worker comparisons and socket reads, each every 2 seconds: "Running" takes 1 comparison and
 // 1 read (up to 4 seconds), "Stopped" takes 2 comparisons and 1 read. The worker and the socket run in the e2e server
@@ -29,6 +31,12 @@ async function expectErrorIconColor(button: Locator): Promise<void> {
     return { fill: getComputedStyle(path).fill, errorColor };
   });
   expect(iconColors.fill).toBe(iconColors.errorColor);
+}
+
+// A narrow header line clips the capital note, and the actions stay clickable.
+async function expectCapitalAndClickableActions(page: Page, chartPanel: Locator): Promise<void> {
+  await expect(chartPanel.getByText('Capital 1,000.00 USD', { exact: true })).toBeVisible();
+  await expectHeaderButtonsClickable(page, chartPanel);
 }
 
 async function expectNoPageScroll(page: Page): Promise<void> {
@@ -75,6 +83,28 @@ async function fillCapitalBelowTheUnallocatedAmount(dialog: Locator, capitalUsd:
   await expect(startButton).toBeEnabled();
 }
 
+test('the New forward test dialog shows why an instrument that is not in USD does not start', async ({
+  page,
+}, currentTest) => {
+  const strategyName = `Forward test HKD ${currentTest.project.name} ${String(Date.now() % 1_000_000)}`;
+  await createStrategy(page, strategyName);
+
+  await page.getByRole('link', { name: 'Forward tests', exact: true }).click();
+  await page.getByRole('button', { name: 'New forward test' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New forward test' });
+  await dialog.getByRole('combobox', { name: 'Strategy', exact: true }).click();
+  await page.getByRole('option', { name: strategyName }).click();
+  await expect(dialog.getByRole('combobox', { name: 'Strategy version' })).toHaveText(`${strategyName} v1`);
+  await dialog.getByLabel('Symbol').fill('700');
+  await dialog.getByLabel('Exchange').fill('SEHK');
+  await dialog.getByLabel('Currency').fill('HKD');
+  await fillCapitalBelowTheUnallocatedAmount(dialog, '1000');
+  await dialog.getByRole('button', { name: 'Start forward test' }).click();
+
+  await expect(dialog.getByText('Forward test not started')).toBeVisible();
+  await expect(dialog.getByText('Not in USD: 700 HKD.')).toBeVisible();
+});
+
 test('starts a forward test in the New forward test dialog, sees it running, and stops it from the header line', async ({
   page,
 }, currentTest) => {
@@ -102,19 +132,20 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   const startButton = dialog.getByRole('button', { name: 'Start forward test' });
   // A local time far after the fixed clock of the e2e server, so the worker does not stop the forward test.
   await dialog.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
+  const startedId = waitForStartedRunId(page, '/api/forward-tests');
   await startButton.click();
 
   // The page opens the new forward test.
+  const forwardTestId = await startedId;
   await expect(dialog).toHaveCount(0);
-  await expect(page).toHaveURL(/\/forward-tests\/\d+$/);
-  const forwardTestId = page.url().split('/').at(-1) ?? '';
+  await expect(page).toHaveURL(new RegExp(`/forward-tests/${forwardTestId}$`));
   const chartPanel = page.getByRole('region', { name: `Forward test #${forwardTestId}` });
   const heading = chartPanel.getByRole('heading', { level: 1 });
   await expect(heading).toContainText(`#${forwardTestId}`);
   await expect(heading.getByRole('link', { name: `${strategyName} v1` })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: symbol, exact: true })).toBeVisible();
   await expect(heading).toContainText('1 min');
-  await expect(chartPanel.getByText('Capital 1,000.00 USD', { exact: true })).toBeVisible();
+  await expectCapitalAndClickableActions(page, chartPanel);
   // The worker compares the states every 2 seconds, and the page reads the forward test every 2 seconds.
   const status = chartPanel.getByRole('status', { name: 'Forward test status' });
   await expect(status.getByRole('img', { name: 'Running', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
@@ -169,11 +200,12 @@ test('starts a top N forward test on daily bars with the universe name, the Inst
   await dialog.getByLabel('N', { exact: true }).fill('30');
   await fillCapitalBelowTheUnallocatedAmount(dialog, '1000');
   await dialog.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
+  const startedId = waitForStartedRunId(page, '/api/forward-tests');
   await dialog.getByRole('button', { name: 'Start forward test' }).click();
 
+  const forwardTestId = await startedId;
   await expect(dialog).toHaveCount(0);
-  await expect(page).toHaveURL(/\/forward-tests\/\d+$/);
-  const forwardTestId = page.url().split('/').at(-1) ?? '';
+  await expect(page).toHaveURL(new RegExp(`/forward-tests/${forwardTestId}$`));
   const chartPanel = page.getByRole('region', { name: `Forward test #${forwardTestId}` });
   const heading = chartPanel.getByRole('heading', { level: 1 });
   await expect(heading).toContainText('Top 30 by trading value');
@@ -201,6 +233,90 @@ test('starts a top N forward test on daily bars with the universe name, the Inst
   await expect(status.getByRole('img', { name: 'Running', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
   await chartPanel.getByRole('button', { name: 'Stop forward test', exact: true }).click();
   await expect(status.getByRole('img', { name: 'Stopped', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
+});
+
+// The worker allows 4 running forward tests, so these tests fake the forward test routes and the /ws/forward-tests socket.
+/** Answers the list and each detail read with these running forward tests. Returns the function that sends "changed". */
+async function fakeRunningForwardTests(page: Page, ids: number[]): Promise<() => void> {
+  const forwardTests = ids.map((id) => ({
+    id,
+    strategy_version_id: 0,
+    strategy_id: 1,
+    strategy_name: 'Fake forward test',
+    version_number: 1,
+    symbol: `FT${String(id)}`,
+    exchange: 'ARCA',
+    currency: 'USD',
+    bar_period: '1-MINUTE',
+    desired_state: 'running',
+    status: 'running',
+    client_id: 10,
+    start_balance_usd: null,
+    error_message: null,
+    created_at_utc: '2026-01-02T03:04:05Z',
+    stopped_at_utc: null,
+    end_time_utc: null,
+    crash_count: 0,
+    allocated_capital_usd: '1000',
+    interruptions: [],
+    split_checks_needed: [],
+    strategy_indicators: [],
+  }));
+  const sockets: WebSocketRoute[] = [];
+  await page.routeWebSocket(/\/ws\/forward-tests$/, (socket) => {
+    sockets.push(socket);
+  });
+  await page.route('**/api/forward-tests', (route) => route.fulfill({ json: forwardTests }));
+  await page.route(/\/api\/forward-tests\/\d+$/, (route) =>
+    route.fulfill({
+      json: {
+        forward_test: forwardTests.find((item) => route.request().url().endsWith(`/${String(item.id)}`)),
+        metrics: null,
+        equity_curve: [],
+        fills: [],
+        instruments: [],
+        same_period_backtests: [],
+      },
+    }),
+  );
+  return () => {
+    for (const socket of sockets) {
+      socket.send(JSON.stringify({ type: 'changed' }));
+    }
+  };
+}
+
+test('a failed read of the open forward test shows the reason above the shown numbers', async ({ page }) => {
+  const sendChanged = await fakeRunningForwardTests(page, [9101]);
+  await page.goto('/forward-tests/9101');
+  const chartPanel = page.getByRole('region', { name: 'Forward test #9101' });
+  await expect(chartPanel.getByRole('heading', { level: 1 })).toContainText('#9101');
+
+  await page.route('**/api/forward-tests/9101', (route) => route.fulfill({ status: 500, json: { detail: 'Detail read failed' } }));
+  sendChanged();
+
+  await expect(page.getByRole('main').getByText('Forward test not read')).toBeVisible();
+  await expect(chartPanel.getByRole('heading', { level: 1 })).toContainText('#9101');
+});
+
+test('after a stop of the open forward test, the list menu stops another forward test', async ({ page }) => {
+  await fakeRunningForwardTests(page, [9201, 9202]);
+  const stopRequests: string[] = [];
+  await page.route(/\/api\/forward-tests\/\d+\/stop$/, async (route) => {
+    stopRequests.push(route.request().url().split('/').at(-2) ?? '');
+    await route.fulfill({ status: 202 });
+  });
+  await page.goto('/forward-tests/9201');
+
+  const stopButton = page.getByRole('region', { name: 'Forward test #9201' }).getByRole('button', { name: 'Stop forward test', exact: true });
+  await stopButton.click();
+  await expect.poll(() => stopRequests).toEqual(['9201']);
+
+  await page.getByRole('complementary', { name: 'Forward tests' }).getByRole('link', { name: '#9202', exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Stop forward test' }).click();
+  await expect.poll(() => stopRequests).toEqual(['9201', '9202']);
+  // The socket pushed nothing: the button shows the accepted stop.
+  await expect(stopButton).toHaveCount(0);
 });
 
 test('the forward test list has a visible scroll track', async ({ page }) => {

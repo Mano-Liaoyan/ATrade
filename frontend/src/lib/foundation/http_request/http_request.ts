@@ -52,13 +52,16 @@ export async function readErrorMessage(response: Response, failedAction: string)
   return describeErrorBody(await readJsonBody(response), response.status, failedAction);
 }
 
-/** Sends the request and returns the JSON body, or a message when the backend is not reachable or refuses. */
-export async function requestJson<T>(
+export function jsonRequest(method: string, body: unknown): RequestInit {
+  return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
+}
+
+async function requestAccepted(
   fetchFunction: typeof fetch,
   failedAction: string,
   path: string,
   init?: RequestInit,
-): Promise<RequestResult<T>> {
+): Promise<RequestResult<Response>> {
   const response = await sendRequest(fetchFunction, path, init);
   if (response === null) {
     return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
@@ -66,5 +69,34 @@ export async function requestJson<T>(
   if (!response.ok) {
     return { kind: 'failed', message: await readErrorMessage(response, failedAction) };
   }
-  return { kind: 'ok', value: (await response.json()) as T };
+  return { kind: 'ok', value: response };
+}
+
+/** Sends the request and returns the JSON body, or a message when the backend is not reachable or refuses, or when the body cannot be read. */
+export async function requestJson<T>(
+  fetchFunction: typeof fetch,
+  failedAction: string,
+  path: string,
+  init?: RequestInit,
+): Promise<RequestResult<T>> {
+  const result = await requestAccepted(fetchFunction, failedAction, path, init);
+  if (result.kind === 'failed') {
+    return result;
+  }
+  try {
+    return { kind: 'ok', value: (await result.value.json()) as T };
+  } catch {
+    return { kind: 'failed', message: describeErrorBody(null, result.value.status, failedAction) };
+  }
+}
+
+/** Sends a request and does not read the answer body. Gives a message when the backend is not reachable or refuses. */
+export async function sendCommand(
+  fetchFunction: typeof fetch,
+  failedAction: string,
+  path: string,
+  init?: RequestInit,
+): Promise<RequestResult<undefined>> {
+  const result = await requestAccepted(fetchFunction, failedAction, path, init);
+  return result.kind === 'ok' ? { kind: 'ok', value: undefined } : result;
 }

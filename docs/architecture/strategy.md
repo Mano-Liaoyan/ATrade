@@ -44,8 +44,9 @@ puts the new parts of this section in phases.
 - Unsaved edits exist only in the browser `localStorage`.
 - The backtest table and the forward test table each have a
   `strategy_version_id` foreign key. It must not be null.
-- Strategy versions cannot be deleted. A strategy that no backtest or forward
-  test uses can be deleted. A strategy in use cannot be deleted.
+- Strategy versions cannot be deleted. A strategy that no backtest, parameter
+  sweep, or forward test uses can be deleted. A strategy in use cannot be
+  deleted.
 
 ### 9.1.1 Tables
 
@@ -161,8 +162,20 @@ New columns of `strategy_version`:
     `distance_to_52_week_high` (252) for M3.
 - The "Blank code" start point is the code in
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
-  cross strategy: buy 10 shares when the close goes above SMA(20), sell when
-  it goes below. It shows only the file format. It cites no research, so it
+  cross strategy: buy 10 shares when the close goes above SMA(20), sell the
+  whole position when it goes below. Each bar reads the position and the
+  order counts, so a denied, rejected, or canceled order gets a new order on
+  the next bar. A lost entry gets at most 1 retry each UTC day of the bar. A
+  lost exit gets at most 1 retry in each 5-minute period, because a day is too
+  long for an exit. So a permanent refusal on 1-minute bars does not send an
+  order each minute. A cancel that IBKR refuses has the exit limit. The cancel
+  of an exit is no lost order. A partly filled order gets no new order,
+  because a position exists.
+  An exit cancels the open buy orders of the instrument
+  and uses `close_position`, so a backtest exit fills at the next open, as a
+  forward test does. A saved version keeps its code (ADR 0006), so a version
+  from before these rules must be saved again to get them. It shows only the
+  file format. It cites no research, so it
   is not a strategy template and is not in the template library
   ([#139](https://github.com/Mano-Liaoyan/ATrade/issues/139), T8).
 - The "Blank rules" start point and the rule templates make version 1 with
@@ -323,10 +336,18 @@ them by ID. A missing ID is not in the result. The forward test list uses it
   only that region. The "Rules" tab uses these (section 9.8.5).
 - `frontend/src/lib/strategy/` holds the HTTP client of the strategy routes,
   the version label (`formatVersionLabel`), the drafts in `localStorage`, and
-  the language server connection (`connectStrategyLanguageServer`).
+  `StrategyVersionSelects`, the strategy and version selects of the backtest,
+  parameter sweep, and forward test start forms.
+  `frontend/src/lib/strategy_language_server/` holds the language server
+  connection (`connectStrategyLanguageServer`, `docs/architecture.md`
+  section 13).
 - One draft exists for each strategy version. The `localStorage` key is
   `atrade.strategy-draft.<strategy id>.v<version number>`. A save removes the
-  draft of the version that the user edited.
+  draft of the version that the user edited, after the new version opens.
+  When the new version does not open, the draft stays. With blocked or full storage,
+  the editor keeps working and the page keeps no draft. A failed write also
+  removes the older draft, and the editor panel shows the warning "Draft not
+  saved".
 - Unsaved rules of the "Rules" tab (section 9.8.5) have their own draft. The
   key is `atrade.strategy-rules-draft.<strategy id>.v<version number>`, with
   the number of the version that the rules come from (0 for the blank
@@ -410,7 +431,8 @@ runs in a backtest and in a forward test like all other strategy versions.
 - When any indicator of the rules has no value, no rule runs on that bar
   ([ADR 0001](../adr/0001-one-indicator-definition-for-screens-and-strategies.md)).
 - Bracket orders (`OrderFactory.bracket`) and trailing stops are not in
-  phase 1. They can come later.
+  phase 1. They can come later. In hand-written code they work only in a
+  backtest ([`forward_test.md`](forward_test.md) section 12.19).
 
 ### 9.8.2 Rules
 
@@ -520,6 +542,18 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
   The bar of the entry order is bar 0. The exit is true on bar N.
 - The percent of equity uses the account balance total in the account
   currency at the entry bar.
+- Generated code and the code templates M1 to M4 find the account with
+  `atrade.strategy.find_account`. A backtest has its account on the venue of
+  the instruments (ADR 0003). A forward test has 1 account on the venue
+  `ATRADE` (ADR 0007). When no account exists, `find_account` writes 1
+  warning for each strategy instance and returns nothing.
+- The AI assistant must use `find_account`. The rule is in the fixed part of
+  the system prompt (section 25.9).
+- A saved strategy version keeps its code (ADR 0006). In a forward test, a
+  version with `self.portfolio.account(` in its code finds no account and
+  never buys. Such a version needs a new version. To make it, save the rules
+  again or start from the code template again. Code that a user wrote must
+  use `atrade.strategy.find_account`.
 
 ### 9.8.3 Code from the rules
 
@@ -556,9 +590,15 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
   JSON value (`int` or `float`).
 - Decided (#172): at each bar close, the code reads the prices and the
   indicator outputs of the rules. When an output has no value, or an order
-  of the strategy is open or in flight, no rule runs on that bar. A cross
-  compares with the values of the previous bar. A cross is false when the
-  previous bar had no value. The code warms up the indicators with
+  of the strategy is open or in flight, no rule runs on that bar. A denied,
+  rejected, or canceled entry gets at most 1 retry each UTC day of the bar,
+  and such an exit gets at most 1 retry in each 5-minute period, so a
+  permanent refusal does not repeat on each bar. A cross
+  compares with the values of the previous bar. The previous bar of the first
+  bar is the last look-back bar (`on_historical_bars`). A cross is false when
+  the previous bar had no value. A saved version keeps its code (ADR 0006), so
+  it must be saved again to get `on_historical_bars`. The code warms up the
+  indicators with
   `request_bars` in `on_start`: the bar count is the largest look-back count
   of the indicators ([`indicator.md`](indicator.md) section 23.4). The
   request goes `bar period × count × 6` back, and 7 days at least. The
@@ -604,7 +644,9 @@ Source: [Rule builder prototype](https://github.com/Mano-Liaoyan/ATrade/issues/1
 - The left side of "Rules" is the builder with 3 blocks: Settings, Entry,
   and Exit.
 - The right side is the code from the rules, read-only (`CodeEditor`). It
-  changes after each rule change (`POST /api/strategy-rules/code`).
+  changes after each rule change (`POST /api/strategy-rules/code`). When
+  this request fails, an error notification shows above the last code until
+  the next answer.
 - The lines of the code that a rule change changed are highlighted.
 - After a rule change, the code region scrolls to the first highlighted
   line. Only the code region scrolls. The page does not scroll.
@@ -622,12 +664,13 @@ Source: [Rule builder prototype](https://github.com/Mano-Liaoyan/ATrade/issues/1
 - Decided (#173): the components are `RulesTab.svelte`,
   `RuleGroupEditor.svelte`, `RuleOperand.svelte`, and
   `RuleNumberInput.svelte` in `frontend/src/routes/strategies/`. The
-  operand choices and the indicator parameters are in
-  `frontend/src/lib/strategy/strategy_rules.ts`. They copy the catalog of
-  `atrade.indicator` (section 23.3 of [`indicator.md`](indicator.md)): no
-  route gives the catalog yet. A parameter that the catalog keeps out of the
-  name (`bars_per_year` of realized volatility) is not shown and keeps its
-  default.
+  operand choices and the indicator parameters come from the response of
+  `GET /api/market-data/indicators` (section 23.3 of
+  [`indicator.md`](indicator.md)), through
+  `frontend/src/lib/strategy/strategy_rules.ts`. `RulesTab.svelte` reads it
+  once and shows a failed read. A parameter that the catalog keeps out of
+  the name (`bars_per_year` of realized volatility) is not shown and keeps
+  its default.
 - Decided (#173): the tab opens the rules of the open version when it has
   rules. Else it opens the rules of vM. A strategy without a version with
   rules opens the blank rules: no conditions, no exit items, and 10 fixed
@@ -677,9 +720,34 @@ Decided (#201):
   ranks at the next bar time, on the complete bars of all members, so it does
   not see a later bar. It waits for the first bar of a new member, at most 5
   bar times.
-- The strategy sells the positions that are not in the new targets. It buys
-  only when no order of the strategy is open and no position outside the
-  targets is open.
+- The strategy sells each of its positions that is not in the new targets,
+  also a position outside the members: a buy that filled after the list
+  removed its member, a sell that IBKR ended, or a position that a forward
+  test restart restored in a new quarter. A position with an open order
+  keeps that order. It buys only when no order of the strategy is open and no
+  position outside the targets is open.
+- A denied, rejected, or canceled order adds its instrument to
+  `lost_instruments`. At the next bar time the strategy sends the sell or the
+  buy of this instrument again, also when the next rebalance is months away.
+  Each instrument gets at most 1 buy retry each UTC day of the bar and at most
+  1 sell retry in each 5-minute period, also for the sell of an exit item, so
+  a permanent refusal does not repeat on each bar. A target that an exit item sold leaves the targets, so the retry does
+  not buy it again.
+- A restored position sets the period of `on_start` to the current period, so
+  a restart does not rebalance a second time in a period. A restart between
+  a period start and its rebalance thus skips that rebalance. The exception
+  is a restored position outside the first member list: it marks a rebalance.
+  A restart loses the targets, so `lost_instruments` starts no retry until the
+  next rebalance. A flat restart has no period and ranks at its first bar time.
+- Universe code has no `on_historical_bars`, so it has no look-back previous
+  value. A cross on the first bar of a new member is false, also when the
+  last look-back bar and that bar show a cross. A saved version keeps its
+  code (ADR 0006), so a saved universe version must be saved again to get the
+  rules of this list.
+- `on_start` subscribes to the 1-day bars of each restored position, because
+  a market order needs a price in the cache.
+- A member that leaves loses its values and its last close. When it comes
+  back, the rebalance waits for its new values.
 - Equal weight: each buy gets equity × 0.95 / `hold_count` at the last close.
   The equity is the cash plus the open positions at the last close. The 5%
   stays as cash, as in the rule templates (section 9.9.3).
@@ -690,6 +758,9 @@ Decided (#201):
   indicator and "Highest first" or "Lowest first"). The entry block is
   "Entry filter". The tab has no control that turns the mode on or off: the
   rules of the version hold it.
+- A saved version keeps its code (ADR 0006). A version from before these
+  rules of the sell, of `on_start`, and of the values has the old code. To
+  get the new code, save the rules again.
 
 ### 9.8.7 Left to the implementation
 
@@ -821,6 +892,20 @@ Decided (#202):
   values, the total position is 100%.
 - The buys keep 2% of the equity as cash, because a market order fills at
   the open of the next bar.
+- `on_start` sets `shares` from `cache.positions_open`, because a forward
+  test restart restores the positions in a new strategy object. It also
+  subscribes to the bars of each position, because a position can be outside
+  the universe, and a market order needs a price in the cache.
+- An order that IBKR or ATrade denied, rejected, or ended gives no fill. On
+  the first bar of a day without an open or in-flight order, the strategy
+  sends only the lost orders again, with the same side and the quantity
+  without a fill. A refused buy thus does not rank all targets each day. The
+  first bar of a new month clears the lost orders and the sell count, so the
+  rebalance runs also when a sell stays lost. A sell that ended without an
+  event clears the sell count and ranks again. So a lost order waits for less
+  than 1 day, and an order that fails again repeats once a day.
+- A saved version keeps its code (ADR 0006), so a saved M1 to M4 version must
+  be saved again to get these 2 rules.
 
 Decided (#175):
 

@@ -1,7 +1,13 @@
 """Checks before save through the HTTP route: each failed check blocks the save and names the line and the reason."""
 
+import asyncio
+from typing import Any
+
 import httpx
 import pytest
+
+from atrade.strategy import find_backtest_only_orders
+from atrade.strategy.code_checks import find_ruff_problems
 
 VALID_CODE = """from nautilus_trader.config import StrategyConfig
 from nautilus_trader.trading import Strategy
@@ -15,6 +21,43 @@ class EmptyConfig(StrategyConfig):
 class EmptyStrategy(Strategy):
     pass
 """
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "self.order_factory.bracket(1)",
+        "strategy.order_factory.stop_market(1)",
+        "order_factory.trailing_stop_market(1)",
+        "self.submit_order_list(orders)",
+    ],
+)
+def test_the_order_check_finds_the_calls_of_the_nautilus_trader_api(call: str) -> None:
+    assert [problem.line for problem in find_backtest_only_orders(call)] == [1]
+
+
+@pytest.mark.parametrize("call", ["self.bracket(1)", "bands.stop_market(1)", "self.helpers.trailing_stop_limit(1)"])
+def test_the_order_check_accepts_a_method_of_the_user_with_the_same_name(call: str) -> None:
+    assert find_backtest_only_orders(call) == []
+
+
+@pytest.mark.anyio
+async def test_ruff_process_gets_no_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABENTO_API_KEY", "db-test-key")
+    start_process = asyncio.create_subprocess_exec
+    environments: list[dict[str, str] | None] = []
+
+    async def record_environment(*command: Any, **options: Any) -> asyncio.subprocess.Process:
+        environments.append(options.get("env"))
+        return await start_process(*command, **options)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", record_environment)
+
+    assert await find_ruff_problems("value = 1\n") == []
+
+    [environment] = environments
+    assert environment is not None
+    assert "DATABENTO_API_KEY" not in list(environment)
 
 
 async def create_strategy(web_client: httpx.AsyncClient) -> int:

@@ -15,12 +15,13 @@ from pathlib import Path
 from typing import Protocol
 
 import pytest
+from nautilus_trader.model import Bar as NautilusBar
 
 from atrade.backtest.backtest_store import BacktestRequest
 from atrade.backtest.strategy_engine_run import StrategyRun, run_strategy_on_bars
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
-from atrade.indicator import ATR, EMA, MACD, RSI, SMA, BollingerBands, DonchianChannel
+from atrade.indicator import ATR, EMA, MACD, RSI, SMA, BollingerBands, DonchianChannel, make_nautilus_bar
 
 RECORD_STRATEGY_FILE = Path(__file__).parent / "strategies" / "record_indicator_outputs.py"
 FIRST_BAR_UTC = datetime(2026, 1, 1, tzinfo=UTC)
@@ -33,7 +34,7 @@ class ScreenIndicator(Protocol):
     @property
     def initialized(self) -> bool: ...
 
-    def update(self, bar: Bar) -> None: ...
+    def handle_bar(self, bar: NautilusBar) -> None: ...
 
     def reset(self) -> None: ...
 
@@ -105,7 +106,7 @@ def read_screen_path_outputs(indicator_with_outputs: IndicatorWithOutputs, bars:
     indicator, read_outputs = indicator_with_outputs
     outputs: list[Outputs] = []
     for bar in bars:
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
         outputs.append(read_outputs())
     return outputs
 
@@ -208,7 +209,7 @@ def test_atr_uses_the_wilder_average_of_the_true_range() -> None:
 
 def give_all_test_bars[IndicatorT: ScreenIndicator](indicator: IndicatorT) -> IndicatorT:
     for bar in make_test_bars():
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
     return indicator
 
 
@@ -256,6 +257,6 @@ def test_an_indicator_reads_a_split_adjusted_bar_with_many_decimals() -> None:
     price = Decimal(100) / Decimal("1.5")
     indicator = SMA(period=1)
 
-    indicator.update(Bar(FIRST_BAR_UTC, price, price, price, price, Decimal(1000) / Decimal(3)))
+    indicator.handle_bar(make_nautilus_bar(Bar(FIRST_BAR_UTC, price, price, price, price, Decimal(1000) / Decimal(3))))
 
     assert indicator.value == pytest.approx(66.666666667)

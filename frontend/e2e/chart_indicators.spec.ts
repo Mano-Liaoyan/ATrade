@@ -256,10 +256,11 @@ const LIGHT_COLOR_1 = '#6929c4';
 const DARK_COLOR_1 = '#8a3ffc';
 // Antialiasing gives some pixels of other lines a near color; a drawn line gives many more.
 const LINE_PIXELS = 200;
+const MOVED_ROW_WAIT_MS = 300;
 
 async function hoverRow(page: Page, name: string): Promise<Locator> {
   const row = legendRow(page, name);
-  await row.hover();
+  await row.locator('.legend-name').hover();
   return row;
 }
 
@@ -269,6 +270,50 @@ async function addSma(page: Page): Promise<Locator> {
   await expect(row.locator('.legend-value')).toHaveText([NUMBER_PATTERN]);
   return row;
 }
+
+test('a legend row keeps its buttons when it moves away from a pointer that stands still', async ({ page }) => {
+  await openChart(page);
+  const row = await addSma(page);
+  await row.locator('.legend-name').hover();
+  await row.evaluate((element) => {
+    element.style.marginTop = '48px';
+  });
+  await page.waitForTimeout(MOVED_ROW_WAIT_MS);
+
+  await row.getByRole('button', { name: 'Settings for SMA 50' }).click({ timeout: 3000 });
+
+  await expect(page.getByRole('dialog', { name: 'SMA' })).toBeVisible();
+});
+
+test('a removed legend row gives no page error on a later pointer move', async ({ page }) => {
+  const errors: Error[] = [];
+  page.on('pageerror', (error) => errors.push(error));
+  await openChart(page);
+  const row = await addSma(page);
+  await row.locator('.legend-name').hover();
+  await page.getByRole('button', { name: 'Remove SMA 50' }).click();
+  await expect(row).toHaveCount(0);
+
+  await page.mouse.move(0, 0);
+  await page.mouse.move(1, 1);
+
+  // A browser can report a harmless ResizeObserver notice as a page error. A removed row in the legend gives a TypeError.
+  expect(errors.filter((error) => /TypeError|ChartLegend/.test(`${error.name} ${error.message} ${error.stack ?? ''}`))).toEqual([]);
+});
+
+test('a pointer that leaves the window ends the active legend row', async ({ page }) => {
+  await openChart(page);
+  const row = await addSma(page);
+  const hideButton = page.locator('.legend-action').filter({ has: page.getByRole('button', { name: 'Hide SMA 50' }) });
+  await row.locator('.legend-name').hover();
+  await expect(hideButton).toHaveCSS('opacity', '1');
+
+  await page.evaluate(() => {
+    document.documentElement.dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: null }));
+  });
+
+  await expect(hideButton).toHaveCSS('opacity', '0');
+});
 
 test('Tab to a legend row shows its buttons', async ({ page }) => {
   await openChart(page);
@@ -497,6 +542,34 @@ test('a star puts RSI first in Add indicator without an add, and the favorite st
 
   await expect(dialog.getByRole('option').first()).toHaveText('RSI');
   await expect(dialog.getByRole('button', { name: 'Remove RSI from favorite indicators' })).toBeVisible();
+});
+
+test('Enter on a star changes the favorite and does not add the indicator', async ({ page }) => {
+  await openChart(page);
+  await page.getByRole('button', { name: 'Add indicator' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add indicator' });
+  const star = dialog.getByRole('button', { name: 'Add SMA to favorite indicators' });
+  await star.focus();
+
+  await page.keyboard.press('Enter');
+
+  await expect(dialog.getByRole('button', { name: 'Remove SMA from favorite indicators' })).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => (chartIndicatorSet.read() as { favorites: string[] }).favorites).toEqual(['sma']);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('list', { name: 'Legend' }).getByRole('listitem')).toHaveCount(1);
+});
+
+test('a link to another page leaves a chart with a visible indicator', async ({ page }) => {
+  await openChart(page);
+  await page.getByRole('button', { name: 'Add indicator' }).click();
+  await page.getByRole('dialog', { name: 'Add indicator' }).getByRole('option', { name: 'SMA' }).click();
+  await expect(legendRow(page, 'SMA 50')).toBeVisible();
+
+  await page.getByRole('link', { name: 'Backtests' }).click();
+
+  await expect(page).toHaveURL(/\/backtests/);
+  await expect(page.getByRole('complementary', { name: 'Backtests' })).toBeVisible();
 });
 
 test('a failed save shows the detail text over the chart, and the chart keeps the change', async ({ page }) => {

@@ -8,6 +8,7 @@ import httpx
 import pytest
 
 from atrade.indicator import IndicatorProblem, check_formula, check_indicator_reference
+from atrade.market_data.indicator_series import IndicatorProblemResponse
 
 BASE_PATH = "/api/custom-indicators"
 JSON_HEADERS = {"content-type": "application/json"}
@@ -36,6 +37,26 @@ async def test_create_gives_a_key_outside_the_built_in_keys_and_the_list_and_rea
 
     assert (await web_client.get(BASE_PATH)).json() == [created]
     assert (await web_client.get(f"{BASE_PATH}/{created['custom_indicator_id']}")).json() == created
+
+
+@pytest.mark.anyio
+async def test_a_second_save_of_the_same_name_at_the_same_time_gives_409(
+    web_client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    other = await create(web_client, name="Other")
+    await create(web_client)
+
+    async def find_no_problem(*_arguments: object) -> list[IndicatorProblemResponse]:
+        """The name check ran before the other save committed, so only the unique index sees the same name."""
+        return []
+
+    monkeypatch.setattr("atrade.market_data.custom_indicators.check_custom_indicator", find_no_problem)
+    created = await web_client.post(BASE_PATH, json=RATIO)
+    changed = await web_client.put(f"{BASE_PATH}/{other['custom_indicator_id']}", json=RATIO)
+
+    for response in (created, changed):
+        assert response.status_code == httpx.codes.CONFLICT, response.text
+        assert response.json() == {"detail": f"A custom indicator with the name {RATIO['name']!r} exists."}
 
 
 @pytest.mark.parametrize("path", ["/api/market-data/indicators", "/api/screen-indicators"])

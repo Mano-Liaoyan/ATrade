@@ -15,7 +15,7 @@ import psycopg
 import pytest
 from httpx_ws import aconnect_ws
 
-from atrade.assistant import MessageEnd
+from atrade.assistant import MessageEndMessage
 from tests.assistant.assistant_app import create_conversation, create_strategy, open_assistant_client
 from tests.backtest.real_runner import save_test_bars
 from tests.fakes.assistant import FakeAssistantService
@@ -23,7 +23,9 @@ from tests.fakes.clock import FixedClock
 
 MESSAGE_WAIT_SECONDS = 5
 MODEL = {"provider": "fake", "model": "fake-model", "credential_id": "fake-key-1", "thinking_level": "off"}
-ANSWER = MessageEnd(text="Hello.", provider="fake", model="fake-model", credential_name="Fake key")
+ANSWER = MessageEndMessage(
+    text="Hello.", provider="fake", model="fake-model", credential_name="Fake key", thinking_level=None
+)
 
 
 @pytest.fixture
@@ -101,6 +103,10 @@ async def test_the_default_text_is_english_and_asks_for_the_metrics_and_the_out_
     assert "When you answer about a backtest result, name its metrics and its out-of-sample result." in default_text
     # The file format and the template of docs/architecture/strategy.md 9.2.
     assert "class MovingAverageConfig(StrategyConfig):" in default_text
+    # The multi-instrument rule (docs/architecture/backtest.md 10.10.8).
+    assert "has no instrument_id and no bar_type" in default_text
+    assert 'self.subscribe_data(DataType("UniverseUpdate"))' in default_text
+    assert "data.data.bar_types" in default_text
 
 
 @pytest.mark.anyio
@@ -110,6 +116,7 @@ async def test_the_fixed_part_has_the_forbidden_actions(client: httpx.AsyncClien
     assert "Do not send a paper order." in fixed_part
     assert "Do not start a forward test." in fixed_part
     assert "Do not promise returns." in fixed_part
+    assert "atrade.strategy.find_account(self, instrument_id.venue)" in fixed_part
 
 
 @pytest.mark.anyio
@@ -193,6 +200,9 @@ async def test_the_system_prompt_is_the_editable_part_and_then_the_fixed_part_wi
     editable_part, fixed_part = system_prompt.split("\n\n", 1)
     assert editable_part == "Answer in short sentences."
     assert "Do not send a paper order." in fixed_part
+    # A saved prompt version does not change (25.9.1), so the fixed part has the account rule.
+    assert "atrade.strategy.find_account" in fixed_part
+    assert "market and limit orders" in fixed_part
     assert f"The open strategy: ID {strategy_id}, name SMA cross." in fixed_part
     assert "The open version: 1." in fixed_part
     last_three = ", ".join(str(backtest_id) for backtest_id in reversed(backtest_ids[1:]))

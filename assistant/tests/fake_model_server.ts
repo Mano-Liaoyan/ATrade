@@ -1,7 +1,7 @@
 // A local fake OpenAI-compatible model server (docs/architecture.md section 17.3). No real model provider in tests.
 // Each answer is one step of a script: a text or a tool call. The server keeps each request body.
 // A text step with `holdUntil` sends its first half, then waits for the promise, then sends the rest. A test uses it to
-// steer or abort a run while the model writes.
+// abort a run while the model writes.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 

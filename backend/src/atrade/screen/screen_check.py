@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import cast
 
-from atrade.indicator import check_indicator_reference
+from atrade.indicator import check_indicator_reference, find_indicator_definition
+from atrade.screen.screen_run import name_indicator
 
 type Location = tuple[str | int, ...]
 
@@ -64,27 +65,34 @@ def check_definition(market: str, definition: object, location: Location) -> lis
         problems += check_list(fields["indicator_conditions"], (*location, "indicator_conditions"), check_condition)
     if "order" in fields:
         problems += check_order(fields["order"], (*location, "order"))
-    return problems or check_formula_names(fields, location)
+    return problems or check_column_names(fields, location)
 
 
-def check_formula_names(fields: Mapping[str, object], location: Location) -> list[ScreenProblem]:
-    """A result names its columns by the indicator name, so one name cannot have 2 expressions (ADR 0009)."""
+def read_reference_identity(reference: Mapping[str, object]) -> object:
+    """Equal for 2 references that give the same values. A missing parameter counts as its default."""
+    definition = find_indicator_definition(reference)
+    parameters = cast("Mapping[str, int | float]", reference.get("parameters", {}))
+    return definition.expression or (definition.key, definition.with_defaults(parameters))
+
+
+def check_column_names(fields: Mapping[str, object], location: Location) -> list[ScreenProblem]:
+    """A result names its columns by the indicator name, so one name means one reference (section 24.6, ADR 0009).
+    The check runs on a correct definition only."""
     places: list[tuple[Location, object]] = [
         ((*location, "indicator_conditions", index, "indicator"), read_key(condition, "indicator"))
         for index, condition in enumerate(cast("Sequence[object]", fields.get("indicator_conditions", [])))
     ]
     places.append(((*location, "order", "indicator"), read_key(fields.get("order"), "indicator")))
-    expressions: dict[object, object] = {}
+    identities: dict[str, object] = {}
     problems: list[ScreenProblem] = []
     for place, reference in places:
-        formula = read_key(reference, "formula")
-        if formula is None:
-            continue
-        name, expression = read_key(formula, "name"), read_key(formula, "expression")
-        if expressions.setdefault(name, expression) != expression:
+        checked = cast("Mapping[str, object]", reference)
+        name = name_indicator(checked)
+        identity = read_reference_identity(checked)
+        if identities.setdefault(name, identity) != identity:
             message = (
-                f"The indicator name {name!r} has 2 expressions. "
-                'Click "Use current expression" in each place, or select another indicator.'
+                f"The indicator name {name!r} has 2 different references. Use the same parameters in each place, "
+                'click "Use current expression" in each place, or select another indicator.'
             )
             problems.append(ScreenProblem(place, message))
     return problems

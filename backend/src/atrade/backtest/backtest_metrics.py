@@ -9,7 +9,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Literal
 
-from atrade.foundation.bar import Bar, BarPeriod, TimeRange
+from atrade.foundation.bar import Bar, BarPeriod, TimeRange, find_bar_end
 
 PERCENT = Decimal(100)
 PERCENT_STEP = Decimal("0.01")
@@ -92,7 +92,7 @@ def calculate_equity_curve(
     next_trade_index = 0
     equity_curve: list[EquityPoint] = []
     for bar in bars:
-        bar_end_utc = bar.start_utc + bar_period.length
+        bar_end_utc = find_bar_end(bar.start_utc, bar_period)
         while next_trade_index < len(sorted_trades) and sorted_trades[next_trade_index].time_utc <= bar_end_utc:
             trade = sorted_trades[next_trade_index]
             signed_shares = trade.quantity_shares if trade.side == "BUY" else -trade.quantity_shares
@@ -125,7 +125,7 @@ def calculate_universe_equity_curve(
     closes_by_end: dict[datetime, dict[InstrumentKey, Decimal]] = {}
     for key, bars in bars_by_instrument.items():
         for bar in bars:
-            closes_by_end.setdefault(bar.start_utc + bar_period.length, {})[key] = bar.close
+            closes_by_end.setdefault(find_bar_end(bar.start_utc, bar_period), {})[key] = bar.close
     sorted_trades = sorted(trades, key=lambda trade: trade.time_utc)
     cash = start_cash
     positions: dict[InstrumentKey, Decimal] = {}
@@ -418,6 +418,21 @@ def calculate_part_metrics(part: MetricPart) -> BacktestMetrics:
         turnover_per_year=calculate_turnover_per_year(part.equity_curve, part.trades, years),
         win_rate_percent=round_trip_metrics.win_rate_percent,
     )
+
+
+def clip_to_bars(time_range: TimeRange, first_start_utc: datetime, last_end_utc: datetime) -> TimeRange:
+    """The part of the range that has bars (docs/architecture/backtest.md section 10.9.2)."""
+    return TimeRange(
+        start_utc=max(time_range.start_utc, first_start_utc), end_utc=min(time_range.end_utc, last_end_utc)
+    )
+
+
+def clip_to_equity_curve(time_range: TimeRange, equity_curve: list[EquityPoint], bar_period: BarPeriod) -> TimeRange:
+    """`clip_to_bars` from the equity curve, which has one point at the end of each bar. A curve without points gives
+    the range."""
+    if not equity_curve:
+        return time_range
+    return clip_to_bars(time_range, equity_curve[0].time_utc - bar_period.length, equity_curve[-1].time_utc)
 
 
 def find_split_time(time_range: TimeRange, out_of_sample_share: int) -> datetime | None:

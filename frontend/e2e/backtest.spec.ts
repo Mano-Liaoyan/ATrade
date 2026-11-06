@@ -3,7 +3,9 @@
 // and the Trades / Orders / Logs / Metrics panel. The bar chart saves the bars first: the IBKR fake of
 // backend/tests/e2e_server.py has one daily bar for each day, with saw-tooth prices. The form offers only watchlist
 // instruments with saved bars of the selected bar period.
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectHeaderButtonsClickable } from './header_buttons';
+import { waitForStartedRunId } from './started_run';
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
@@ -106,6 +108,17 @@ async function expectMetricTable(page: Page): Promise<void> {
   }
 }
 
+// A key metric that the user cannot read is worse than a shorter chart: the row wraps and clips no value.
+async function expectMetricsWithoutClip(page: Page, metrics: Locator): Promise<void> {
+  for (const width of [1280, 1440]) {
+    await page.setViewportSize({ width, height: 800 });
+    for (const metric of await metrics.all()) {
+      const isClipped = await metric.evaluate((element) => element.scrollWidth > element.clientWidth);
+      expect(isClipped, (await metric.textContent()) ?? '').toBe(false);
+    }
+  }
+}
+
 test('starts a backtest and sees its metrics, curves, and trades on the workbench', async ({ page, request }, currentTest) => {
   test.setTimeout(BACKTEST_TIMEOUT_MILLISECONDS * 2);
   // The chart saves the daily bars from 2023-01-02 to 2026-01-01 in PostgreSQL. Backtests read only saved bars.
@@ -125,11 +138,12 @@ test('starts a backtest and sees its metrics, curves, and trades on the workbenc
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(strategyName);
 
   await page.getByRole('link', { name: 'Backtests' }).click();
+  const startedId = waitForStartedRunId(page, '/api/backtests');
   await startBacktestInDialog(page, strategyName);
 
+  const backtestId = await startedId;
   await expect(page.getByRole('dialog', { name: 'New backtest' })).toHaveCount(0);
-  await expect(page).toHaveURL(/\/backtests\/\d+$/);
-  const backtestId = page.url().split('/').at(-1) ?? '';
+  await expect(page).toHaveURL(new RegExp(`/backtests/${backtestId}$`));
   const chartPanel = page.getByRole('region', { name: `Backtest #${backtestId}` });
   const heading = chartPanel.getByRole('heading', { level: 1 });
   await expect(heading).toContainText(`#${backtestId}`);
@@ -154,6 +168,8 @@ test('starts a backtest and sees its metrics, curves, and trades on the workbenc
     'aria-disabled',
   );
   await expectNoPageScroll(page);
+  await expectHeaderButtonsClickable(page, chartPanel);
+  await expectMetricsWithoutClip(page, metrics);
 
   await expectTradesOrdersAndLogs(page);
   await expectMetricTable(page);

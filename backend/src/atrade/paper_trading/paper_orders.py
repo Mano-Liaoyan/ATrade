@@ -4,6 +4,7 @@ Each order and each cancel runs the paper account check first and fails closed (
 source of order status. ATrade stores only its orders by hand, without status (section 11.4).
 """
 
+import asyncio
 from datetime import datetime
 from decimal import Decimal
 from typing import Annotated, Literal, Self
@@ -23,9 +24,18 @@ from atrade.paper_trading.paper_account_check import PaperAccountCheckError
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
+# The largest order price of the IBKR API is a float. A larger JSON number gives no valid order.
+LIMIT_PRICE_END = Decimal(10**12)
+# The limits of the manual_order columns. A value that PostgreSQL refuses after the send leaves an order at IBKR without
+# a row, so the request must refuse it first (section 11.3).
+MAX_ORDER_QUANTITY = 2**31 - 1
+MAX_LIMIT_PRICE_DECIMAL_PLACES = 16383
 
 InstrumentField = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH)
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH, pattern=r"^[^\x00]*$"
+    ),
 ]
 
 
@@ -34,9 +44,11 @@ class SendOrderRequest(BaseModel):
     exchange: InstrumentField
     currency: InstrumentField
     side: OrderSide
-    quantity: Annotated[int, Field(gt=0)]
+    quantity: Annotated[int, Field(gt=0, le=MAX_ORDER_QUANTITY)]
     order_type: OrderType
-    limit_price: Annotated[Decimal, Field(gt=0)] | None
+    limit_price: (
+        Annotated[Decimal, Field(gt=0, lt=LIMIT_PRICE_END, decimal_places=MAX_LIMIT_PRICE_DECIMAL_PLACES)] | None
+    )
     time_in_force: TimeInForce
 
     @model_validator(mode="after")
@@ -235,6 +247,9 @@ class PaperOrderRoutes:
         self.ledger = ManualOrderLedger(
             paper_account_monitor=paper_account_monitor, database_url=database_url, clock=clock
         )
+        # The check reads the open orders of IBKR, so the next check must start after the order is at IBKR. One Web
+        # process sends the orders by hand.
+        self.send_lock = asyncio.Lock()
 
     async def send_order(self, request: SendOrderRequest) -> ManualOrderResponse | JSONResponse:
         try:
@@ -245,26 +260,28 @@ class PaperOrderRoutes:
         order_by_hand = OrderByHand(
             instrument=instrument, side=request.side, quantity=request.quantity, limit_price=request.limit_price
         )
-        try:
-            refusal = await self.ledger.check_order(account_id, order_by_hand)
-        except GatewayRequestError as error:
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
-        if refusal is not None:
-            return refuse_by_ledger(refusal)
-        order_request = OrderRequest(
-            account=account_id,
-            instrument=instrument,
-            side=request.side,
-            quantity=request.quantity,
-            order_type=request.order_type,
-            limit_price=request.limit_price,
-            time_in_force=request.time_in_force,
-            order_ref=MANUAL_ORDER_REF,
-        )
-        try:
-            ibkr_order_id = await self.paper_account_monitor.gateway_connection.place_order(order_request)
-        except GatewayRequestError as error:
-            raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=f"IB Gateway refused the order: {error}") from error
+        async with self.send_lock:
+            try:
+                refusal = await self.ledger.check_order(account_id, order_by_hand)
+            except GatewayRequestError as error:
+                raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=str(error)) from error
+            if refusal is not None:
+                return refuse_by_ledger(refusal)
+            order_request = OrderRequest(
+                account=account_id,
+                instrument=instrument,
+                side=request.side,
+                quantity=request.quantity,
+                order_type=request.order_type,
+                limit_price=request.limit_price,
+                time_in_force=request.time_in_force,
+                order_ref=MANUAL_ORDER_REF,
+            )
+            try:
+                ibkr_order_id = await self.paper_account_monitor.gateway_connection.place_order_and_wait(order_request)
+            except GatewayRequestError as error:
+                message = f"IB Gateway refused the order: {error}"
+                raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=message) from error
         new_order = manual_order_store.NewManualOrder(
             created_at_utc=self.clock.read_now_utc(),
             account=account_id,

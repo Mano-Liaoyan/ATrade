@@ -1,5 +1,6 @@
 // The one forward test list of a page: it reads the list again after each change that /ws/forward-tests pushes, and
-// keeps the socket connection state. The forward test page uses forwardTests for its list.
+// keeps the socket connection state. The strategy page and the comparison page use it. The forward test page reads its
+// list through routes/run_workbench.svelte.ts.
 import { readOnChange } from '#lib/foundation/live_socket';
 import { FORWARD_TESTS_SOCKET_PATH, listForwardTests, type ForwardTest } from './forward_test_api';
 

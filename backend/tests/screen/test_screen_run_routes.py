@@ -11,11 +11,16 @@ from typing import Any
 import httpx
 import psycopg
 import pytest
+from fastapi import HTTPException
 from psycopg.types.json import Jsonb
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarRequest, save_received_bars
+from atrade.screen.http_routes import ScreenRoutes
+from atrade.screen.screen_run import ScreenOutcome, run_screen_steps
+from atrade.screen.screen_running import read_start_summaries
+from tests.fakes.clock import FixedClock
 
 LAST_DAY = datetime(2025, 12, 31, tzinfo=UTC)
 NOW_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
@@ -162,6 +167,36 @@ async def test_a_run_saves_a_screen_result_that_the_read_route_gives_back(
 
 
 @pytest.mark.anyio
+async def test_a_conversation_deleted_during_a_run_is_named_and_not_the_screen(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    screen_id = await create_screen(web_client, make_definition())
+    routes = ScreenRoutes(database_url=database_url, clock=clock)
+
+    with pytest.raises(HTTPException) as refusal:
+        await routes.run_screen_of(screen_id, 999_999)
+
+    assert refusal.value.status_code == httpx.codes.NOT_FOUND
+    assert refusal.value.detail == "Conversation 999999 does not exist."
+
+
+@pytest.mark.anyio
+async def test_a_screen_deleted_during_its_run_gives_404(
+    web_client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    screen_id = await create_screen(web_client, make_definition())
+
+    async def run_and_delete(**arguments: Any) -> ScreenOutcome:
+        assert (await web_client.delete(f"/api/screens/{screen_id}")).status_code == httpx.codes.NO_CONTENT
+        return await run_screen_steps(**arguments)
+
+    monkeypatch.setattr("atrade.screen.screen_running.run_screen_steps", run_and_delete)
+    response = await web_client.post(f"/api/screens/{screen_id}/runs")
+
+    assert response.status_code == httpx.codes.NOT_FOUND, response.text
+
+
+@pytest.mark.anyio
 async def test_the_read_route_gives_one_page_of_rows(web_client: httpx.AsyncClient, database_url: str) -> None:
     instruments = [stock(f"S{number:02}") for number in range(1, 61)]
     for number, instrument in enumerate(instruments, start=1):
@@ -216,6 +251,29 @@ async def test_the_start_instruments_of_each_kind(web_client: httpx.AsyncClient,
         "all_with_daily_bars": ["AAPL", "MSFT"],
         "hk_instrument_list": ["700"],
     }
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "now_utc",
+    [datetime(2026, 1, 1, 1, 30, tzinfo=UTC), datetime(2022, 10, 1, 12, tzinfo=UTC)],
+    ids=["evening_of_the_last_day_of_a_quarter", "weekend_before_the_first_trading_day"],
+)
+async def test_the_quarter_universe_is_the_last_saved_quarter(database_url: str, now_utc: datetime) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO us_universe_member (
+                quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+            )
+            VALUES (%(quarter_start_utc)s, 1, 'AAPL', 'NASDAQ', 'USD', 1, %(quarter_start_utc)s)
+            """,
+            {"quarter_start_utc": now_utc - timedelta(days=60)},
+        )
+
+    instruments, _ = await read_start_summaries(database_url, market="US", start="quarter_universe", now_utc=now_utc)
+
+    assert instruments == [stock("AAPL")]
 
 
 @pytest.mark.anyio

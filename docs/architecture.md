@@ -183,7 +183,7 @@ counts from `atrade/`.
 | `forward_test/` | Start and stop forward tests. Record forward test results. The ATrade NautilusTrader execution and data clients, the bar fetcher, and the daily stock split check. The worker also runs the quarterly universe update of `market_data`. |
 | `assistant/` | Conversations and prompt versions, `/ws/assistant`, the change of pi events into ATrade messages, and the routes of section 25. It calls the `assistant` service over HTTP (`AssistantServiceClient`, section 25.14). It holds no credential. |
 | `ibkr/` | IB Gateway connection, client IDs, reconnection, request rate limits. Protocol details only, no business rules. |
-| `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `table_changes` (`TableChangeFeed`, `ChangeSocket`, `ChangedMessage`, `create_change_socket_router`: the change sockets of section 13 "Live updates"), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`). |
+| `foundation/` | `money`, `clock`, `instrument`, `bar`, `settings`, `order_ref`, `database_time` (each `timestamptz` that psycopg reads is in UTC, for each PostgreSQL time zone; SQL that casts a `timestamptz` to a date uses `AT TIME ZONE`), `socket_push` (`HeartbeatMessage`, `ChangedMessageSender`, `serve_until_disconnect`, `wait_for_disconnect` for the `/ws/` routes), `table_changes` (`TableChangeFeed`, `ChangeSocket`, `ChangedMessage`, `create_change_socket_router`: the change sockets of section 13 "Live updates"), `error_response` (`ErrorResponse`, the `{"detail": "<reason>"}` body that routes declare with `responses=`; the shared `422` handlers, also for a value that PostgreSQL refuses, for example a NUL character or a number above 64 bits). |
 | `app/` | Program entry points. They create and connect all dependencies. |
 
 ### 6.2 Dependency direction
@@ -199,8 +199,8 @@ indicator     -> (foundation only)
 screen        -> indicator, market_data, watchlist
 backtest      -> strategy, market_data, screen
 assistant     -> (foundation only)
-paper_trading -> ibkr
-forward_test  -> strategy, paper_trading, backtest, market_data, ibkr
+paper_trading -> ibkr, market_data
+forward_test  -> strategy, paper_trading, backtest, market_data, ibkr, watchlist
 all modules   -> foundation
 app           -> all modules
 ```
@@ -209,6 +209,13 @@ app           -> all modules
 - `strategy -> indicator` is for the rule builder (#172): the rules check
   reads `INDICATOR_CATALOG` and `check_indicator_reference()`, and the code
   from the rules names the `atrade.indicator` classes.
+- `paper_trading -> market_data` is for the stock split check of the owner
+  ledger: it reads the last daily bars and the candidates of evidence A, and
+  changes the stored bars in the transaction of the ledger change
+  (`apply_stock_split_in_transaction()`, section 11.11 of
+  `docs/architecture/paper_trading.md`).
+- `forward_test -> watchlist` is only for the start of a forward test with a
+  `list` universe: `read_watchlist_instruments()` gives its members.
 - `forward_test -> paper_trading` is for the paper account check
   (`require_paper_account()`, and `PaperAccountMonitor` for the balance at
   start). From phase 3 (section 20.1) it is also for the owner ledger
@@ -307,7 +314,7 @@ app           -> all modules
 | `app/forward_test_worker.py` | Compose service `forward-test` | Reads forward test state from PostgreSQL. Starts and stops one child process per forward test. From phase 3 it also runs the bar fetcher (client ID `ATRADE_IBKR_BAR_FETCHER_CLIENT_ID`, after each daily close), the quarterly universe update (06:00 ET on the first trading day of each quarter), and the daily stock split check (08:00 ET, 08:30 HKT, with the bar fetcher client ID, one connection at a time). |
 | `app/databento_import.py` | One-time run by the user, in the `web` image with `docker compose run` (README.md) | Downloads the bought Databento batch jobs (with `--job-id`) and imports their DBN files into `databento_bar` and `databento_bar_saved_range`. It needs no IB Gateway. It links symbol changes, finds the stock splits of the instruments that stopped trading with the detection rule, records the instruments that still trade in `ibkr_split_check`, and writes `stock_split` and `databento_symbol_link` rows (section 8.8.3, 8.8.4). It imports the daily bars and the XNAS.ITCH `ohlcv-1h` hourly bars of the universe quarters (section 8.8.2), and then calculates the quarters of `us_universe_member` without members (section 8.9). `--hourly-cost` imports nothing: it prints the hourly bar purchase list and its cost from `metadata.get_cost` before the purchase (section 8.8.1). |
 | `app/ibkr_split_check.py` | Run by the user after the Databento import, in a temporary container of the `web` image with `docker compose run --detach` (README.md). Not in `forward-test`. | The IBKR stock split check of each instrument in `ibkr_split_check`, in 3 steps (section 8.8.3.1). `read`: reads the IBKR daily closes, one instrument at a time, and stores them in `ibkr_daily_close`. IB Gateway, client ID `--ibkr-client-id`, default `30`. Waits after an IBKR pacing violation or a lost connection. Saves each instrument at once, so a new run continues. `report`: tests the stock split rule on the stored closes against the confirmed stock splits and changes nothing. `apply`: adjusts the stored Databento bars for each stock split that it finds in the stored closes. Each step stops when no instrument waits. |
-| `app/databento_check.py` | Run by the user after the Databento import, in the `web` image with `docker compose run` (README.md) | Lists the detected stock splits that wait for the user check and the symbol links that are not checked. `--accept` confirms them, `--reject-split <ID>` rejects one stock split (section 8.8.3). |
+| `app/databento_check.py` | Run by the user after the Databento import, in the `web` image with `docker compose run` (README.md) | Lists the detected stock splits that wait for the user check and the symbol links that are not checked. `--accept` confirms them, and `--reject-split <ID>` rejects one stock split (sections 8.8.3 and 8.8.4). |
 | `assistant` service (TypeScript) | Compose service `assistant` | Runs the pi SDK for all conversations. Calls only port 8001 of `web`. Keeps the credentials in the volume `atrade-assistant-pi` (section 25). |
 | `app/forward_test_process.py` | Child process of `forward-test` | Runs one forward test (`run`) or only cancels its open orders (`cancel_orders`). Gets the forward test ID and the mode. Stops at `SIGTERM`. |
 
@@ -330,6 +337,19 @@ Port 8000 refuses with `403` each request whose peer address (ASGI
 `app/assistant_port.py`. The body is `{"detail": "Port 8000 does not answer
 requests from the assistant network."}`. A WebSocket from this subnet is
 closed before accept, so uvicorn answers `403`.
+
+Port 8000 also refuses each WebSocket and each non-GET request from a page of
+another site. The WebSockets and the routes have no login of their own, so
+without this rule a page on another site can open `/ws/assistant` or send
+`POST /api/paper-trading/stock-splits/{id}/apply`. The middleware is
+`RefuseOtherSite` in `app/assistant_port.py`. It compares the host and port of
+the `Origin` header with the `Host` header. When they differ, or when `Origin`
+is `null` or is not a URL, a request gets `403` with `{"detail": "Port 8000
+does not answer requests from another site."}`, and a WebSocket is closed
+before accept. A request without `Origin` passes, so tools such as `curl` still
+work. Port 8001 does not have this rule. The rule needs the `Host` header of
+the browser at `web`. The Vite development proxy keeps it, and the proxy path
+of section 14 keeps it.
 
 ## 7. IBKR access
 
@@ -403,6 +423,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   and build time.
 - `src/lib/` has one directory per capability (`lib/market_data/`,
   `lib/backtest/`, and so on) and `lib/foundation/`.
+- `#lib/strategy_language_server` is a separate entry for the language
+  server connection of the editor. Only the strategy editor page imports it.
+  `@codemirror/lsp-client` has no `sideEffects` field, so a bundler keeps it
+  in each page that imports its barrel. Keep it out of `#lib/strategy`, or
+  each page that imports `#lib/strategy` loads CodeMirror.
 - A capability can import only `#lib/foundation/<module>` and the generated
   API types `#lib/api`. Capabilities must not import each other. Only
   `src/routes/` combines capabilities.
@@ -470,6 +495,17 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   fields of a form or of a list of values: as many columns as fit, each at
   least 12rem wide (9rem with `atrade-auto-grid--narrow`, 14rem with
   `atrade-auto-grid--wide`), with a `--cds-spacing-05` gap.
+- The global classes `atrade-run-*` of `carbon.scss` are the parts of the run
+  pages (backtest, forward test, parameter sweep, comparison, and strategy pages):
+  the empty main area, the title line, the status, the actions, and the log text.
+- `routes/run_workbench.svelte.ts` (`RunWorkbench`) holds the state of the
+  backtest, forward test, parameter sweep, and screen pages: the list, the
+  navigation to the newest run or to `defaultId`, the read of the open run, and
+  the New dialog.
+- `routes/RunCenter.svelte` is the center area of the backtest, forward test,
+  and parameter sweep pages. When a read of the list or of the open run fails,
+  it shows the reason above the content. The rows and the numbers of the last
+  read stay.
 - While a button action runs, the button is disabled and its text says why,
   for example "Saving…", "Creating…", or "Starting…".
 - UI rule: a status icon stands alone, with no word next to it, before the
@@ -495,7 +531,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   [#105](https://github.com/Mano-Liaoyan/ATrade/issues/105)) is a workbench
   with the structure of the backtest page: the "Forward tests" `SideColumn`
   with the live list (`routes/forward-tests/ForwardTestList.svelte`, 32px
-  rows, from `ForwardTestsOnInstrumentsFeed.forwardTests`) and the
+  rows, from `RunWorkbench.items`, `routes/run_workbench.svelte.ts`) and the
   "New forward test" dialog (form id `start-forward-test`); the forward test
   panel (header line with the status icon before "#<id>", the red "Stop forward test" icon button
   while the forward test can stop, and the "Backtest the same period" icon
@@ -578,7 +614,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   popover. The header has no status word and no clock of its own. The Paper
   tag is a Carbon operational tag with a tooltip. The tooltip shows the checked paper
   account number with its middle hidden, for example `DU****567`. The header
-  reads the account check from `/ws/paper-trading`. A header tooltip is the
+  reads the account check from the one `paperAccountFeed` of `paper_trading`.
+  The layout starts this feed, so the app has one `/ws/paper-trading` socket,
+  and the pages only read the feed. A header tooltip is the
   light Carbon high-contrast bubble. It has the Carbon popover drop shadow,
   so it stays visible on the light page. Carbon hides the header
   navigation below 1056 px. ATrade is a desktop app, so it keeps the
@@ -645,8 +683,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   (`ErrorResponse` of `foundation/error_response`), so the frontend does not
   write error types by hand.
 - `foundation/http_request` sends the HTTP requests of the capabilities:
-  `sendRequest`, `requestJson`, `readJsonBody`, `readErrorMessage`,
-  `describeErrorBody`, `BACKEND_NOT_REACHABLE`, and the type `RequestResult`.
+  `sendRequest`, `requestJson`, `sendCommand`, `jsonRequest`, `readJsonBody`,
+  `readErrorMessage`, `describeErrorBody`, `BACKEND_NOT_REACHABLE`, and the
+  type `RequestResult`.
   An error message is the `detail` text, the first field error of a list
   `detail` ("<field>: <message>"), or "<action> failed with HTTP status N.".
 - `foundation/live_socket` also has `readSocketMessage`: it returns a parsed
@@ -662,11 +701,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   region takes the full height of its parent, for example a workbench panel.
   `role` is `region` (the default) or `log`. The bindable `viewport` gives
   the scrolling element to a parent that scrolls it, for example `ChatLog`.
-  `HorizontalScrollTrack` (`label`, `viewport`, `content`, `viewportId`) is
-  the same track and thumb for an element that scrolls sideways, for example
-  the tab strip of `Tabs` (`aria-orientation="horizontal"`, Arrow Left and
-  Right, Page Up, Page Down, Home, End). A vertical mouse wheel on the element
-  scrolls it sideways. The parent places the track.
+  `HorizontalScrollTrack` (`label`, `viewport`, `content`, `viewportId`,
+  `wheelScrolls`) is the same track and thumb for an element that scrolls
+  sideways, for example the tab strip of `Tabs`
+  (`aria-orientation="horizontal"`, Arrow Left and Right, Page Up, Page Down,
+  Home, End). A vertical mouse wheel on the element scrolls it sideways, unless
+  `wheelScrolls` is false, for example the Runs table of a parameter sweep. The
+  parent places the track.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a
@@ -703,7 +744,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     | `/ws/screens` | `screen`, `screen_result` | `screen` |
     | `/ws/custom-indicators` | `custom_indicator` | `market_data` (`CUSTOM_INDICATOR_CHANGE_SOCKET`) |
     | `/ws/watchlist` | `watchlist_instrument` | `watchlist` |
-    | `/ws/forward-tests` | `forward_test`, `forward_test_interruption`, `forward_test_equity_point`, `forward_test_fill`, `forward_test_same_period_backtest` | `forward_test` |
+    | `/ws/forward-tests` | `forward_test`, `forward_test_interruption`, `forward_test_equity_point`, `forward_test_same_period_backtest`, `owner_ledger_entry` | `forward_test` |
 
   - `readOnChange({ socketPath, read, onResult, onConnectionChange? })` of
     `foundation/live_socket` reads at once, after each open of the socket,
@@ -897,11 +938,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   shows in the Open orders tab from `/ws/paper-trading`. The fields and the
   button stay in view; only the numbers scroll, in their own `ScrollRegion`.
   The side column is the landmark; its content has no landmark with the same
-  name (the form is "Paper order of <symbol>"). The page reads the paper account with `PaperAccountFeed`
+  name (the form is "Paper order of <symbol>"). The page reads the paper account with `paperAccountFeed`
   of `paper_trading` and the running forward tests with
   `ForwardTestsOnInstrumentsFeed` of `forward_test` (the one
   forward test list, read again after each `/ws/forward-tests` change: `forwardTests`, `onInstruments`, `isConnected`;
-  the forward test page uses it for its list and the strategy page for
+  the comparison page uses it and the strategy page uses it for
   its Stop forward test button; the home page uses the
   same paper account feed). While a socket is not connected, the panel and
   the column show `LiveUpdatesNotification`.
@@ -1102,7 +1143,8 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   `ScrollRegion` ("Log"). "Ask AI to fix" puts "Backtest #<id> failed. Read
   it with read_backtest and fix the strategy code." in the message input of
   the AI assistant column and sends it when the conversation socket is open.
-  Without an open conversation, the message stays in the input. The AI
+  Without an open conversation, during a run, or without a credential, the
+  message stays in the input, and the Output tab says so. The AI
   assistant reads the error itself (`read_backtest`, assistant section
   25.4.1). A backtest tab has the "Equity" / "Bars" switcher of the backtest
   page (indicator section 23.9.8) in a line over its body. "Bars" shows
@@ -1285,7 +1327,10 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
 - Nginx Proxy Manager (NPM) runs on a different host in the user's tailnet.
   One proxy host sends the Web host name to
   `http://<server Tailscale IP>:<ATRADE_WEB_PORT>`
-  with WebSocket support on (market data, the language server).
+  with WebSocket support on (market data, the language server). NPM sends
+  the `Host` header of the browser by default (`proxy_set_header Host $host`).
+  Do not change this in the advanced settings of the proxy host: `web` compares
+  it with `Origin` (section 6).
 - Only Cloudflare can connect to NPM: the firewall of the NPM host lets only
   the Cloudflare IP ranges connect to port 443. Without this rule, a request to
   the IP address of the NPM host bypasses Cloudflare Access.
@@ -1337,9 +1382,7 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   volume and stops (`check_database_password` in `app/web.py`).
 - Before Compose starts, `./start run` checks the env file. It stops with a
   message when `ATRADE_POSTGRES_PASSWORD` is not set in the env file or in the
-  process environment. It writes a warning for each variable of the old stack
-  (for example `ATRADE_API_HTTP_PORT`, `ATRADE_IBKR_PAPER_ACCOUNT_ID`). The
-  test is `backend/tests/app/test_start_script.py`.
+  process environment. The test is `backend/tests/app/test_start_script.py`.
 - Services added later (`ib-gateway`, `forward-test`) must not
   block the local start when their credentials are missing. They fail with a
   clear message, or they are in a Compose profile. `ib-gateway` is in the
@@ -1400,14 +1443,34 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   `restrict,command="<checkout>/scripts/deploy"`. The key can run nothing
   else.
 - `scripts/deploy` accepts only a full SHA of a commit on `origin/main`. It
-  stops when `.env` is not there. It checks out the commit (detached HEAD),
+  stops when `.env` is not there. When the commit is an ancestor of `HEAD` and
+  is not `HEAD`, it writes the reason and exits with 0 and changes nothing,
+  because CI runs can end in a different order than their commits
+  ([#379](https://github.com/Mano-Liaoyan/ATrade/issues/379)). Else it makes a
+  database backup, checks out the commit (detached HEAD),
   then runs `./start run --detach --wait`. The server builds the images. The
   build is the production build: `vp build` for the SPA, `uv sync --no-dev`,
   and uvicorn with 1 worker. The test is
   `backend/tests/app/test_deploy_script.py`.
+- `web` runs the migrations at start, so `scripts/deploy` makes the backup
+  first. It runs `docker compose up --detach --wait postgres` with the Compose
+  file of the deployed commit, so the stack can be down. Then it runs `pg_dump
+  --format=custom` in the `postgres` service and writes
+  `~/atrade-backups/atrade-<UTC time>-<deployed commit>.dump` of the deploy
+  user, with only owner access. It keeps the last 7 files. A failed backup
+  stops the deployment before the checkout, with a message. The backup has no
+  rows of `ibkr_bar`, `databento_bar`, and their `_saved_range` tables. The
+  Databento import and IBKR give these rows again, and a saved range without
+  its bars would hide that the bars are missing. README.md tells how to
+  restore.
+- The deploy workflow runs one deployment at a time (concurrency group
+  `deploy`). `queue: max` keeps up to 100 waiting runs. Without it, GitHub
+  keeps 1 waiting run, and an older commit can cancel the run of a newer commit.
 - `.env` stays on the server (section 15). GitHub has no ATrade secrets.
 - A deployment recreates `web` and `forward-test` when their image changes.
-  The worker restarts the running forward tests (section 12.7).
+  The worker restarts the running forward tests (section 12.7). `.dockerignore`
+  excludes `backend/tests`, `frontend/e2e`, and `frontend/src/**/*.test.ts`, so
+  a commit that changes only these files does not change the image.
 
 ## 15. Secrets and configuration
 
@@ -1858,7 +1921,7 @@ The map [Wayfinder: indicators, screens, and strategy help](https://github.com/M
 ### 20.2 Limits of the first version
 
 - The first version does not handle cash dividends. Backtests do not include
-  dividends. On the paper trading page, a dividend shows as an
+  dividends. On the Home page, a dividend shows as an
   "Unattributed" difference (section 11).
 
 ### 20.3 Later work
@@ -1983,8 +2046,8 @@ option and records it in this document.
 - Decided (#161): the 7 wrapped indicators are the classes `SMA`, `EMA`,
   `ATR`, `RSI`, `MACD`, `BollingerBands`, and `DonchianChannel` of
   `atrade.indicator`. An output is `float | None` (None is "no value"). The
-  screen-path method is `update(bar)`: it makes a NautilusTrader bar from
-  the `foundation` bar and calls `handle_bar`. The defaults are in section
+  screen path makes a NautilusTrader bar from the `foundation` bar with
+  `make_nautilus_bar` and calls `handle_bar`. The defaults are in section
   23.2 of [`indicator.md`](architecture/indicator.md).
 - Decided (#162): the 4 indicators that ATrade writes are the classes
   `Momentum12_1`, `DistanceTo52WeekHigh`, `RealizedVolatility`, and
@@ -2009,11 +2072,13 @@ option and records it in this document.
 - Decided (#171): a named CHECK constraint holds the values of
   `strategy_version.source`, and `read_strategy_version` does not return
   `source` and `rules` (strategy section 9.1.1).
-- Decided (#165): the daily returns use the UTC date as the trading day,
-  `years` comes from the request range, and `metrics.missing_reasons` gives
+- Decided (#165, changed): the daily returns use the UTC date as the trading
+  day, `years` comes from the part of the request range between the first
+  and the last bar, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
 - Decided (#166): the out-of-sample share is a share of the calendar time
-  of the request range, and the split time does not align to a bar end. The
+  of the part of the request range with saved bars, and the split time does
+  not align to a bar end. The
   route calculates the split metrics at each read from the saved equity
   curve and trades. The out-of-sample Sharpe percent is null when the
   in-sample Sharpe ratio is 0, below 0, or null (backtest section 10.9.4).
@@ -2023,7 +2088,7 @@ option and records it in this document.
   10.9.5).
 - Decided (#170): the exposure of a forward test counts its recorded equity
   points (one at each bar end) as its bars. The recorded fills go to
-  `find_round_trips` with no change, because `select_fills` already gives
+  `find_round_trips` with no change, because `list_trades` already gives
   `BacktestTrade` rows. The metrics of the forward test routes have
   `net_profit_usd` (forward test section 12.10).
 - Decided (#172): `strategy` imports `indicator` (section 6.2). The rules
@@ -2139,10 +2204,13 @@ option and records it in this document.
   from the Databento portal. It reads DBN files (`*.dbn`, `*.dbn.zst`), the
   default encoding of a batch job
   (`docs/architecture/market_data.md` section 8.14).
-- Decided (#190): the listing exchange of an EQUS.SUMMARY daily bar (from
-  2024-07-01) is the exchange of the latest earlier Databento daily bar of
-  the same symbol. A symbol without an earlier bar, for example a new
-  listing after 2024-07-01, gets no bar. The import names these symbols in
+- Decided (#190, changed for renames): the listing exchange of an
+  EQUS.SUMMARY daily bar (from 2024-07-01) is the exchange of the latest
+  earlier Databento daily bar of the same symbol. A renamed symbol has the
+  exchange of its old symbol and its own bars: no bar moves, and rank history
+  restarts at the rename (`docs/architecture/market_data.md` section
+  8.8.4). Another symbol without an earlier bar, for example a new listing
+  after 2024-07-01, gets no bar. The import names these symbols in
   its log. `docs/architecture/forward_test.md` section 12.24 (how a
   Databento symbol maps to the IBKR primary exchange) is the same question
   and stays open for these symbols.
@@ -2238,7 +2306,7 @@ option and records it in this document.
 - Decided (#215): the allocated capital is a ledger `transfer` from
   "By hand" at the start, and the stop transfers the positions and the cash
   back (`docs/architecture/paper_trading.md` section 11.13).
-  `forward_test_fill` keeps only the fills of the old forward tests
+  Migration `d7b2f4a9c613` dropped `forward_test_fill`
   (`forward_test.md` section 12.24).
 - Decided (#215): an execution that IBKR makes after the stop of a run does
   not go into the owner ledger. The next run sends fills only for its own
@@ -2247,8 +2315,8 @@ option and records it in this document.
 - Decided (#221): the start dialog reads `GET /api/forward-tests/capital`
   each time it opens and after each refused start. It does not read it again
   when the "Capital (USD)" input changes. Without an unallocated amount, the
-  dialog reads the paper account check from `/ws/paper-trading` while it is
-  open and shows its reason (`docs/architecture/forward_test.md` section
+  dialog reads the paper account check from `paperAccountFeed` and shows its
+  reason (`docs/architecture/forward_test.md` section
   12.16).
 - Decided (#213): the owner ledger of the ATrade execution client is the
   interface `OwnerLedger` in `forward_test/owner_ledger.py`. The client

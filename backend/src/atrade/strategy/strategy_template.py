@@ -11,13 +11,16 @@ from datetime import timedelta
 
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.indicators import SimpleMovingAverage
-from nautilus_trader.model import Bar, BarType, InstrumentId, OrderSide, Quantity
+from nautilus_trader.model import Bar, BarType, InstrumentId, OrderCanceled, OrderSide, Position, Quantity
 from nautilus_trader.trading import Strategy
 
 # The warm-up asks for 3 average periods of bars, and for 1 week at least, so that nights, weekends,
 # and holidays do not leave the indicator without bars. A long warm-up of short bars means many IBKR requests.
 WARM_UP_AVERAGE_PERIODS = 3
 MIN_WARM_UP_LENGTH = timedelta(days=7)
+# A lost entry gets 1 retry each day. A lost exit gets 1 retry each 5 minutes, because a day is too long for an exit.
+ENTRY_RETRY_PERIOD_NS = 86_400_000_000_000
+EXIT_RETRY_PERIOD_NS = 300_000_000_000
 
 # The bar chart of a backtest or a forward test shows these indicators. It has no effect on the run.
 # A parameter is a number or the name of a configuration field with an int or float default.
@@ -54,7 +57,9 @@ class MovingAverageStrategy(Strategy):
         super().__init__(config)
         self.settings = config
         self.average = SimpleMovingAverage(config.average_period)
-        self.is_long = False
+        self.order_is_lost = False
+        self.last_retry_ns = -1
+        self.own_cancels: set[object] = set()
 
     def on_start(self) -> None:
         self.register_indicator_for_bars(self.settings.bar_type, self.average)
@@ -67,18 +72,58 @@ class MovingAverageStrategy(Strategy):
     def on_bar(self, bar: Bar) -> None:
         if not self.average.initialized:
             return
+        # Each bar reads the position and the orders, because an order can be lost or fill in parts.
         close_price = bar.close.as_double()
-        if close_price > self.average.value and not self.is_long:
-            self.send_market_order(OrderSide.BUY)
-            self.is_long = True
-        elif close_price < self.average.value and self.is_long:
-            self.send_market_order(OrderSide.SELL)
-            self.is_long = False
+        positions = self.cache.positions_open(instrument_id=self.settings.instrument_id, strategy_id=self.strategy_id)
+        if close_price > self.average.value and not positions and not self.has_orders():
+            if self.can_send_order(bar, ENTRY_RETRY_PERIOD_NS):
+                self.send_buy_order()
+        elif close_price < self.average.value:
+            self.send_exit_orders(positions, bar)
 
-    def send_market_order(self, order_side: OrderSide) -> None:
+    def on_order_denied(self, event: object) -> None:
+        self.order_is_lost = True
+
+    def on_order_rejected(self, event: object) -> None:
+        self.order_is_lost = True
+
+    def on_order_canceled(self, event: OrderCanceled) -> None:
+        if event.client_order_id not in self.own_cancels:
+            self.order_is_lost = True
+
+    def on_order_cancel_rejected(self, event: object) -> None:
+        self.order_is_lost = True
+
+    def can_send_order(self, bar: Bar, retry_period_ns: int) -> bool:
+        """A lost order gets at most 1 retry in each period, so that a permanent refusal does not repeat on each bar."""
+        if not self.order_is_lost:
+            return True
+        if bar.ts_event // retry_period_ns == self.last_retry_ns // retry_period_ns:
+            return False
+        self.order_is_lost = False
+        self.last_retry_ns = bar.ts_event
+        return True
+
+    def has_orders(self, side: OrderSide | None = None) -> bool:
+        filters = {"instrument_id": self.settings.instrument_id, "strategy_id": self.strategy_id, "side": side}
+        return self.cache.orders_inflight_count(**filters) + self.cache.orders_open_count(**filters) > 0
+
+    def send_exit_orders(self, positions: list[Position], bar: Bar) -> None:
+        open_orders = self.cache.orders_open(instrument_id=self.settings.instrument_id, strategy_id=self.strategy_id)
+        buy_orders = [order for order in open_orders if order.side == OrderSide.BUY]
+        sell_is_due = positions and not self.has_orders(OrderSide.SELL)
+        if (buy_orders or sell_is_due) and self.can_send_order(bar, EXIT_RETRY_PERIOD_NS):
+            for order in buy_orders:
+                self.own_cancels.add(order.client_order_id)
+                self.cancel_order(order.client_order_id)
+            if sell_is_due:
+                for position in positions:
+                    self.close_position(position)
+
+    def send_buy_order(self) -> None:
         order = self.order_factory.market(
             self.settings.instrument_id,
-            order_side,
+            OrderSide.BUY,
             Quantity.from_int(self.settings.trade_quantity_shares),
         )
         self.submit_order(order)

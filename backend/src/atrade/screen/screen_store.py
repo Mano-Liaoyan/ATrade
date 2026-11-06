@@ -15,15 +15,19 @@ RECENT_SCREEN_RESULT_COUNT = 10
 
 
 @dataclass(frozen=True)
-class ScreenRecord:
+class ScreenListRow:
     id: int
     name: str
     market: str
-    definition: dict[str, Any]
     kept: bool
+    updated_at_utc: datetime
+
+
+@dataclass(frozen=True)
+class ScreenRecord(ScreenListRow):
+    definition: dict[str, Any]
     assistant_conversation_id: int | None
     created_at_utc: datetime
-    updated_at_utc: datetime
 
 
 @dataclass(frozen=True)
@@ -155,14 +159,11 @@ async def select_screen(connection: psycopg.AsyncConnection, screen_id: int) -> 
         return await cursor.fetchone()
 
 
-async def select_screens(connection: psycopg.AsyncConnection) -> list[ScreenRecord]:
+async def select_screens(connection: psycopg.AsyncConnection) -> list[ScreenListRow]:
     """The last changed screen first."""
-    async with connection.cursor(row_factory=class_row(ScreenRecord)) as cursor:
+    async with connection.cursor(row_factory=class_row(ScreenListRow)) as cursor:
         await cursor.execute(
-            """
-            SELECT id, name, market, definition, kept, assistant_conversation_id, created_at_utc, updated_at_utc
-            FROM screen ORDER BY updated_at_utc DESC, id DESC
-            """
+            "SELECT id, name, market, kept, updated_at_utc FROM screen ORDER BY updated_at_utc DESC, id DESC"
         )
         return await cursor.fetchall()
 

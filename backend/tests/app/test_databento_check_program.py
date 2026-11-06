@@ -31,7 +31,7 @@ def test_the_program_lists_the_waiting_splits_and_the_unchecked_links(
     main([])
 
     assert "ID 1: GONE NASDAQ USD, ex-date 2020-01-08, split ratio 2" in caplog.text
-    assert "SQ to XYZ on NYSE, from 2025-01-21" in caplog.text
+    assert "SQ to XYZ on NYSE, from 2025-01-21. A new listing: no bar moved." in caplog.text
 
 
 def test_the_program_confirms_all_except_the_rejected_splits(detections: str, caplog: pytest.LogCaptureFixture) -> None:

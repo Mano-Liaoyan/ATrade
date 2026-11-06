@@ -197,27 +197,23 @@ For development and checks, also:
 
 ### First start
 
-1. If a `.env` from the old ATrade stack is in the repository root (it has
-   variables such as `ATRADE_API_HTTP_PORT` or
-   `ATRADE_IBKR_PAPER_ACCOUNT_ID`), move it to a different name, for example
-   `.env.old-stack`. The rewrite does not read these variables.
-2. Copy `.env.example` to `.env`.
-3. Replace the placeholder values in `.env`. Do not commit `.env`. Set
+1. Copy `.env.example` to `.env`.
+2. Replace the placeholder values in `.env`. Do not commit `.env`. Set
    `ATRADE_POSTGRES_PASSWORD` to a new password (letters, digits, and `-`
    only). PostgreSQL keeps this password in its volume at the first start.
-4. On rootless Podman without the memory cgroup controller, set
+3. On rootless Podman without the memory cgroup controller, set
    `ATRADE_WEB_MEMORY_LIMIT=0` and `ATRADE_ASSISTANT_MEMORY_LIMIT=0`.
-5. Start all services:
+4. Start all services:
 
    ```sh
    ./start run -d --wait
    ```
 
-6. Open <http://127.0.0.1:8000> (or the port in `ATRADE_WEB_PORT`).
+5. Open <http://127.0.0.1:8000> (or the port in `ATRADE_WEB_PORT`).
    `GET /api/health` returns `"status": "ok"`.
 
 `./start run` stops with a message when `ATRADE_POSTGRES_PASSWORD` is not
-set, and writes a warning for each variable of the old stack.
+set.
 
 When `web` stops with "PostgreSQL refused the password", the volume
 `atrade-postgres18-data` has the password of an earlier start. Set that
@@ -276,7 +272,8 @@ With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
 | `assistant` | The AI assistant: a Node.js process with the pi SDK (`assistant/`, image from `deploy/assistant.Dockerfile`). Memory limit `ATRADE_ASSISTANT_MEMORY_LIMIT` (default `1g`), read-only root file system, writable `/tmp`, volume `atrade-assistant-pi` on `/data`. No published port, no database URL, no IBKR setting. Networks `atrade-assistant-internal` (with `web` only) and `atrade-assistant-egress` (to the model providers). Health check on `GET /health` (port 8002, inside the network only). |
 
 At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
-`live`, `web` does not start and writes the reason.
+`live`, `./start run` stops with the reason and does not call Compose. `web`
+also refuses this value.
 
 Rootless Podman without the memory cgroup controller cannot set a memory
 limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` and
@@ -331,8 +328,8 @@ of the same files adds no row. After the import, the program calculates the
 quarterly US universe of each quarter from 2018-10-01 that has no members.
 
 With `DATABENTO_API_KEY` in `.env`, the `forward-test` service updates the
-universe at 06:00 ET on the first trading day of each quarter (about 1.3 USD
-each quarter). With an empty key, the update does not run.
+universe from 06:00 ET on the first trading day of each quarter, until the
+quarter has members (about 1.3 USD each quarter). With an empty key, the update does not run.
 
 The import does not need IB Gateway. It sends no request to IBKR. It finds
 the stock splits of the instruments that stopped trading with the detection
@@ -396,8 +393,10 @@ docker compose --file deploy/compose.yaml --env-file .env run --rm web \
   python -m atrade.app.databento_check --accept --reject-split <ID>
 ```
 
-A confirmed stock split changes the stored bars before its ex-date. A
-rejected stock split changes nothing, and the next import keeps it rejected.
+A confirmed stock split changes the stored bars before its ex-date. A rejected
+stock split changes nothing, and the next import keeps it rejected. The check
+moves no bar of a symbol link. A rename from 2024-07-01 is a new listing with
+its own bars, and the list shows it for you to read.
 
 Buy the hourly bars after the first import
 (`docs/architecture/market_data.md` section 8.8.1). They do not wait for the
@@ -500,7 +499,9 @@ the server, for example `/srv/atrade`.
    `ATRADE_WEB_PORT`. The tailnet policy must let the NPM host connect to
    this port, and must not let tagged devices other than the NPM host
    connect to it.
-   Turn on "Websockets Support". Use an SSL certificate that Cloudflare
+   Turn on "Websockets Support". Do not set another `Host` header in the
+   advanced settings: `web` refuses a WebSocket and a non-GET request when
+   `Host` differs from `Origin`. Use an SSL certificate that Cloudflare
    accepts in Full (strict) mode, for example a Cloudflare Origin
    Certificate.
 8. In the firewall of the NPM host, let only the
@@ -523,6 +524,30 @@ the server, for example `/srv/atrade`.
 
 Each later push to `main` deploys after CI passes. To deploy by hand on the
 server: `<checkout>/scripts/deploy <full commit SHA>`.
+
+### Restore a database backup
+
+Before each deployment, `scripts/deploy` writes a PostgreSQL backup to
+`~/atrade-backups/` of the deploy user and keeps the last 7 files. A failed
+backup stops the deployment. The file name holds the time and the commit that
+was deployed at that time. The backup has no bars and no saved ranges of bars.
+
+To restore, stop the deployments in GitHub, then run these commands on the
+server. Replace `<commit>` and `<file>` with the values from the file name:
+
+```bash
+cd <checkout>
+git checkout --detach <commit>
+compose='docker compose --file deploy/compose.yaml --env-file .env'
+$compose stop web forward-test
+$compose exec --no-TTY postgres pg_restore --username=atrade --dbname=atrade \
+  --clean --if-exists --no-owner --exit-on-error < ~/atrade-backups/<file>
+./start run --detach --wait
+```
+
+The restore replaces all tables, so the bar tables are then empty. Import the
+Databento history again (see "Import the Databento history"). IBKR bars come
+back at the next read.
 
 ## Check the code
 

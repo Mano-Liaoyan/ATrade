@@ -668,7 +668,12 @@ export interface paths {
         get: operations["read_sweep_api_sweeps__sweep_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Sweep
+         * @description A true delete of the sweep and its runs. 409 while a run is queued or running, and for a run that is the
+         *     same-period backtest of a forward test.
+         */
+        delete: operations["delete_sweep_api_sweeps__sweep_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -840,6 +845,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/screen-results/{screen_result_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Screen Result */
+        get: operations["read_screen_result_api_screen_results__screen_result_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/screens/{screen_id}/keep": {
         parameters: {
             query?: never;
@@ -875,23 +897,6 @@ export interface paths {
          *     definition in place of the saved ones and keeps the saved screen (section 24.13).
          */
         post: operations["run_screen_api_screens__screen_id__runs_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/screen-results/{screen_result_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Read Screen Result */
-        get: operations["read_screen_result_api_screen_results__screen_result_id__get"];
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1180,6 +1185,8 @@ export interface components {
             survivorship_bias: boolean;
             /** Has Split Check Pending */
             has_split_check_pending: boolean;
+            /** Fill Warning */
+            fill_warning: string | null;
             /** Sweep Id */
             sweep_id: number | null;
             parameters: components["schemas"]["ParameterValues"] | null;
@@ -1312,6 +1319,8 @@ export interface components {
             survivorship_bias: boolean;
             /** Has Split Check Pending */
             has_split_check_pending: boolean;
+            /** Fill Warning */
+            fill_warning: string | null;
             /** Sweep Id */
             sweep_id: number | null;
             parameters: components["schemas"]["ParameterValues"] | null;
@@ -1492,6 +1501,8 @@ export interface components {
             survivorship_bias: boolean;
             /** Has Split Check Pending */
             has_split_check_pending: boolean;
+            /** Fill Warning */
+            fill_warning: string | null;
             /** Sweep Id */
             sweep_id: number | null;
             parameters: components["schemas"]["ParameterValues"] | null;
@@ -1529,16 +1540,6 @@ export interface components {
             paper_capital_usd: string;
             metrics: components["schemas"]["ComparedMetricsResponse"] | null;
         };
-        /** ComparedEquityPointResponse */
-        ComparedEquityPointResponse: {
-            /**
-             * Time Utc
-             * Format: date-time
-             */
-            time_utc: string;
-            /** Equity Usd */
-            equity_usd: string;
-        };
         /**
          * ComparedInterruptionResponse
          * @description A time without a running LiveNode (section 12.7). The chart marks it grey.
@@ -1563,8 +1564,6 @@ export interface components {
         ComparedMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
-            /** Net Profit Usd */
-            net_profit_usd: string;
             /** Total Return Percent */
             total_return_percent: string;
             /** Max Drawdown Percent */
@@ -1599,6 +1598,8 @@ export interface components {
             missing_reasons: {
                 [key: string]: string;
             };
+            /** Net Profit Usd */
+            net_profit_usd: string;
         };
         /** @enum {string} */
         Comparison: "above" | "below" | "at_or_above" | "at_or_below" | "crosses_above" | "crosses_below";
@@ -1847,9 +1848,9 @@ export interface components {
             backtest: components["schemas"]["ComparedBacktestSummaryResponse"];
             forward_test_metrics: components["schemas"]["ComparedMetricsResponse"] | null;
             /** Forward Test Equity Curve */
-            forward_test_equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
+            forward_test_equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Backtest Equity Curve */
-            backtest_equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
+            backtest_equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Fills */
             fills: components["schemas"]["FillComparisonResponse"][];
             /** Interruptions */
@@ -1864,7 +1865,7 @@ export interface components {
             forward_test: components["schemas"]["ForwardTestWithIndicatorsResponse"];
             metrics: components["schemas"]["ComparedMetricsResponse"] | null;
             /** Equity Curve */
-            equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
+            equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Fills */
             fills: components["schemas"]["ForwardTestFillResponse"][];
             /** Instruments */
@@ -3814,20 +3815,6 @@ export interface components {
             account_quantity_after: string;
         };
         /**
-         * SteerMessage
-         * @description Browser to server: a user message while the AI assistant runs.
-         */
-        SteerMessage: {
-            /**
-             * Type
-             * @default steer
-             * @constant
-             */
-            type: "steer";
-            /** Text */
-            text: string;
-        };
-        /**
          * StrategyVersionSavedMessage
          * @description The AI assistant saved a strategy version, for the diff card (25.5.2).
          */
@@ -4545,6 +4532,15 @@ export interface operations {
                     "application/json": components["schemas"]["CustomIndicatorResponse"];
                 };
             };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             /** @description Unprocessable Content */
             422: {
                 headers: {
@@ -4657,6 +4653,15 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5648,6 +5653,53 @@ export interface operations {
             };
         };
     };
+    delete_sweep_api_sweeps__sweep_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sweep_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     cancel_sweep_api_sweeps__sweep_id__cancel_post: {
         parameters: {
             query?: never;
@@ -6070,6 +6122,49 @@ export interface operations {
             };
         };
     };
+    read_screen_result_api_screen_results__screen_result_id__get: {
+        parameters: {
+            query?: {
+                offset?: number;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                screen_result_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScreenResultResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     keep_screen_api_screens__screen_id__keep_post: {
         parameters: {
             query?: never;
@@ -6150,49 +6245,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScreenCheckFailedResponse"];
-                };
-            };
-        };
-    };
-    read_screen_result_api_screen_results__screen_result_id__get: {
-        parameters: {
-            query?: {
-                offset?: number;
-                limit?: number;
-            };
-            header?: never;
-            path: {
-                screen_result_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ScreenResultResponse"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ErrorResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

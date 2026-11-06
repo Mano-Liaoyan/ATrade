@@ -1,7 +1,7 @@
 // Calls GET /api/market-data/indicators and POST /api/market-data/indicator-series (indicator.md section 23.9.6).
 // The series route reads only saved bars, so the chart asks for it after the bars route answered.
 import type { components } from '#lib/api';
-import { BACKEND_NOT_REACHABLE, readErrorMessage, readJsonBody, requestJson, sendRequest, type RequestResult } from '#lib/foundation/http_request';
+import { BACKEND_NOT_REACHABLE, jsonRequest, readErrorMessage, readJsonBody, requestJson, sendRequest, type RequestResult } from '#lib/foundation/http_request';
 import type { BarPeriod } from './bars';
 import type { ChartIndicatorDefinition, ChartPane, IndicatorFormula } from './chart_indicators';
 import type { Instrument } from './instrument_search';
@@ -60,11 +60,7 @@ export async function readIndicatorSeries(
     ...(request.sourceOrder === undefined ? {} : { source_order: request.sourceOrder }),
     indicators: request.indicators,
   };
-  const response = await sendRequest(fetchFunction, '/api/market-data/indicator-series', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const response = await sendRequest(fetchFunction, '/api/market-data/indicator-series', jsonRequest('POST', body));
   if (response === null) {
     return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
   }

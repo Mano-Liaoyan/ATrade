@@ -8,11 +8,23 @@ import asyncio
 import logging
 import time
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Literal, Protocol
 
-from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Forex, Order, RequestError, Trade
+from ib_async import (
+    IB,
+    BarData,
+    BarDataList,
+    Contract,
+    ContractDescription,
+    Fill,
+    Forex,
+    Order,
+    OrderStatus,
+    RequestError,
+    Trade,
+)
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
@@ -38,13 +50,21 @@ from atrade.ibkr.orders import (
     build_order,
     convert_fill,
     convert_trade,
+    has_commission_report,
 )
 
 DEFAULT_RETRY_SECONDS = 10.0
 CONNECT_TIMEOUT_SECONDS = 10.0
 OPEN_ORDERS_TIMEOUT_SECONDS = 10.0
+CONTRACT_REQUEST_TIMEOUT_SECONDS = 10.0
 CANCEL_CONFIRMATION_TIMEOUT_SECONDS = 10.0
 CANCEL_CONFIRMATION_CHECK_SECONDS = 0.1
+# The Web process holds its send lock during this wait, so the wait stays short.
+ORDER_ANSWER_TIMEOUT_SECONDS = 2.0
+ORDER_ANSWER_CHECK_SECONDS = 0.05
+# The statuses that end the wait for the first answer: the order works or it ended. A warning of IBKR sets
+# ValidationError, and a rejection can come after it.
+ORDER_ANSWER_STATUSES = OrderStatus.DoneStates | {OrderStatus.PreSubmitted, OrderStatus.Submitted}
 # ATrade trades stocks only. reqMatchingSymbols also returns other security types, for example indexes.
 STOCK_SECURITY_TYPE = "STK"
 HISTORICAL_DATA_TIMEOUT_SECONDS = 60.0
@@ -57,6 +77,11 @@ UTC_FORMAT_DATE = 2
 # The forex market closes on the weekend. 1 week of hourly bars always has a last bar.
 EXCHANGE_RATE_DURATION = "1 W"
 EXCHANGE_RATE_BAR_SIZE = "1 hour"
+# A commission report comes after its execution, also after the end of a reqExecutions answer.
+COMMISSION_REPORT_WAIT_SECONDS = 2.0
+COMMISSION_REPORT_CHECK_SECONDS = 0.05
+# At this age, a fill without its report comes with commission 0: a wrong commission costs less than a lost fill.
+COMMISSION_REPORT_LIMIT = timedelta(minutes=5)
 # While no live bar update comes, the live bar stream checks the connection this often.
 LIVE_BAR_CONNECTION_CHECK_SECONDS = 1.0
 # IB Gateway sends these codes when its connection to the IBKR servers is lost (1100, 2110) or comes back (1101, 1102).
@@ -128,6 +153,11 @@ class GatewayConnection(Protocol):
         """Sends the order and returns its IBKR order ID. Raises GatewayRequestError without a connection."""
         ...
 
+    async def place_order_and_wait(self, request: OrderRequest) -> int:
+        """Like place_order, for an order by hand. Also raises GatewayRequestError when IBKR rejects the order in the
+        first 2 seconds."""
+        ...
+
     async def read_open_orders(self) -> list[OpenOrder]:
         """All open orders of all client IDs (reqAllOpenOrders). IBKR is the only source of order status."""
         ...
@@ -152,8 +182,11 @@ class GatewayConnection(Protocol):
         """
         ...
 
-    async def read_executions(self) -> list[Execution]:
-        """The executions that IBKR returns for reqExecutions, of all client IDs of the account that IBKR shows."""
+    async def read_executions(self, *, include_held: bool = False) -> list[Execution]:
+        """The executions that IBKR returns for reqExecutions, of all client IDs of the account that IBKR shows. A fill
+        without its commission report (a held fill) stays out of the list until a later read. With `include_held`, it
+        is in the list with `is_held` True. After COMMISSION_REPORT_LIMIT, a fill without a report is not held any
+        more: it is in the list with commission 0."""
         ...
 
     async def read_historical_bars(
@@ -196,6 +229,10 @@ class IbAsyncGatewayConnection:
         # balance. ATrade reports "connected" only after that startup synchronization.
         self.synchronized = False
         self.ib = IB()
+        # execId -> the end of the wait of read_executions for a fill without a report. No later read waits for it.
+        self.held_since_utc: dict[str, datetime] = {}
+        # The fills that reached COMMISSION_REPORT_LIMIT. Each one gets one warning.
+        self.released_execution_ids: set[str] = set()
         # ib_async keeps one result per request type. Two parallel reqAllOpenOrders calls would lose one answer.
         self.open_orders_lock = asyncio.Lock()
         # Without this, ib_async ends a failed request with an empty result, the same as "no bars in the range".
@@ -270,7 +307,8 @@ class IbAsyncGatewayConnection:
         self.next_ibkr_link_check_at = 0.0
         try:
             await self.ib.connectAsync(self.host, self.port, clientId=self.client_id, timeout=CONNECT_TIMEOUT_SECONDS)
-        except (OSError, TimeoutError) as error:
+        # connectAsync reads the executions without return_exceptions. With RaiseRequestErrors, an IBKR error ends it.
+        except (OSError, TimeoutError, RequestError) as error:
             logger.warning(
                 "IB Gateway is not reachable at %s:%s (%s). Next try in %s seconds.",
                 self.host,
@@ -373,9 +411,14 @@ class IbAsyncGatewayConnection:
         """
         for pair, is_inverse in ((currency + quote_currency, False), (quote_currency + currency, True)):
             try:
-                contracts = await self.ib.qualifyContractsAsync(Forex(pair))
+                contracts = await asyncio.wait_for(
+                    self.ib.qualifyContractsAsync(Forex(pair)), CONTRACT_REQUEST_TIMEOUT_SECONDS
+                )
             except ConnectionError, RequestError:
                 continue
+            except TimeoutError as error:
+                message = f"IB Gateway did not answer the contract request of {pair} in time."
+                raise GatewayRequestError(message) from error
             contract = contracts[0] if contracts else None
             # qualifyContractsAsync gives None or a list of candidates when the pair does not exist in one form.
             if isinstance(contract, Contract) and contract.conId:
@@ -420,9 +463,31 @@ class IbAsyncGatewayConnection:
             message = f"IB Gateway at {self.host}:{self.port} has no connection to IBKR."
             raise GatewayRequestError(message)
 
-    async def place_order(self, request: OrderRequest) -> int:
+    def send_order(self, request: OrderRequest) -> Trade:
         self.require_connection()
-        trade = self.ib.placeOrder(build_contract(request.instrument), build_order(request))
+        return self.ib.placeOrder(build_contract(request.instrument), build_order(request))
+
+    async def place_order(self, request: OrderRequest) -> int:
+        return self.send_order(request).order.orderId
+
+    async def place_order_and_wait(self, request: OrderRequest) -> int:
+        """Sends the order and waits a short time for the first answer of IBKR: a working or an ended status. Without an
+        answer in the time, the order can still be good, so this function returns the ID.
+
+        Raises GatewayRequestError when IBKR rejects the order: the status is then Cancelled or Inactive, and the trade
+        log can have the IBKR message.
+        """
+        trade = self.send_order(request)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + ORDER_ANSWER_TIMEOUT_SECONDS
+        while (
+            trade.orderStatus.status not in ORDER_ANSWER_STATUSES and loop.time() < deadline and self.ib.isConnected()
+        ):
+            await asyncio.sleep(ORDER_ANSWER_CHECK_SECONDS)
+        status = trade.orderStatus.status
+        if status in {OrderStatus.Cancelled, OrderStatus.Inactive}:
+            message = f"Order {trade.order.orderId} has the status {status}. {trade.log[-1].message}"
+            raise GatewayRequestError(message)
         return trade.order.orderId
 
     async def read_open_orders(self) -> list[OpenOrder]:
@@ -474,15 +539,51 @@ class IbAsyncGatewayConnection:
                 raise GatewayRequestError(message)
             await asyncio.sleep(CANCEL_CONFIRMATION_CHECK_SECONDS)
 
-    async def read_executions(self) -> list[Execution]:
-        """https://interactivebrokers.github.io/tws-api/executions_commissions.html"""
+    async def read_executions(self, *, include_held: bool = False) -> list[Execution]:
+        """https://interactivebrokers.github.io/tws-api/executions_commissions.html
+
+        For an execId that ib_async knows, the answer holds a new Fill with an empty commission report. Only the
+        stored Fill of the execId gets the report, so this function reads the stored Fill.
+        """
         self.require_connection()
         try:
             fills = await asyncio.wait_for(self.ib.reqExecutionsAsync(), OPEN_ORDERS_TIMEOUT_SECONDS)
         except (ConnectionError, RequestError, TimeoutError) as error:
             message = f"IB Gateway did not return the executions: {error}"
             raise GatewayRequestError(message) from error
-        return [convert_fill(fill) for fill in fills]
+        stored_fills = [self.ib.wrapper.fills.get(fill.execution.execId, fill) for fill in fills]
+        await self.wait_for_commission_reports(stored_fills)
+        executions = [convert_fill(fill, is_held=self.is_held(fill)) for fill in stored_fills]
+        return [execution for execution in executions if include_held or not execution.is_held]
+
+    async def wait_for_commission_reports(self, fills: list[Fill]) -> None:
+        """Waits for each report one time only, so a fill without a report does not slow each later read."""
+        waiting = [fill for fill in fills if fill.execution.execId not in self.held_since_utc]
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + COMMISSION_REPORT_WAIT_SECONDS
+        while True:
+            waiting = [fill for fill in waiting if not has_commission_report(fill)]
+            if not waiting or loop.time() >= deadline:
+                break
+            await asyncio.sleep(COMMISSION_REPORT_CHECK_SECONDS)
+        for fill in waiting:
+            self.held_since_utc[fill.execution.execId] = datetime.now(UTC)
+            logger.warning("Execution %s has no commission report.", fill.execution.execId)
+
+    def is_held(self, fill: Fill) -> bool:
+        """The age counts from the execution time, for a child process that reads the fill only once, or from the end
+        of the first wait. ib_async reads a time without a zone as local time (`TimezoneTWS` is not set), and that time
+        reaches ATrade with a zone, so ATrade cannot see it. The second start bounds a time that is too late."""
+        if has_commission_report(fill):
+            return False
+        execution_id = fill.execution.execId
+        held_since_utc = min(fill.execution.time, self.held_since_utc[execution_id])
+        if datetime.now(UTC) - held_since_utc < COMMISSION_REPORT_LIMIT:
+            return True
+        if execution_id not in self.released_execution_ids:
+            self.released_execution_ids.add(execution_id)
+            logger.warning("Execution %s has commission 0: the report did not arrive in time.", execution_id)
+        return False
 
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
@@ -563,6 +664,9 @@ class IbAsyncGatewayConnection:
                     if not self.ib.isConnected():
                         message = "The connection to IB Gateway was lost."
                         raise GatewayRequestError(message) from None
+                    if self.ibkr_link_lost:
+                        message = f"IB Gateway at {self.host}:{self.port} has no connection to IBKR."
+                        raise GatewayRequestError(message) from None
                     continue
                 # Only the newest state counts. Updates that came at the same time are one update.
                 while not updates.empty():
@@ -575,9 +679,11 @@ class IbAsyncGatewayConnection:
 
     async def subscribe_to_live_bars(self, contract: Contract, bar_period: BarPeriod) -> BarDataList:
         self.require_ibkr_link()
-        try:
-            # keepUpToDate needs an empty end time: the bars go up to now.
-            return await self.ib.reqHistoricalDataAsync(
+        loop = asyncio.get_running_loop()
+        started_at = loop.time()
+        # keepUpToDate needs an empty end time: the bars go up to now.
+        request = asyncio.ensure_future(
+            self.ib.reqHistoricalDataAsync(
                 contract,
                 endDateTime="",
                 durationStr=LIVE_BAR_DURATIONS[bar_period],
@@ -588,8 +694,27 @@ class IbAsyncGatewayConnection:
                 keepUpToDate=True,
                 timeout=HISTORICAL_DATA_TIMEOUT_SECONDS,
             )
+        )
+        try:
+            bars_data = await asyncio.shield(request)
+        except asyncio.CancelledError:
+            # The list to cancel exists only after the first answer, and IBKR limits the open subscriptions.
+            request.add_done_callback(self.cancel_abandoned_subscription)
+            raise
         except (ConnectionError, RequestError) as error:
             raise GatewayRequestError(str(error)) from error
+        # After a timeout, ib_async cancels the request and returns an empty list, but it keeps the subscriber. No
+        # update comes for that list, so the stream must fail and the caller must subscribe again.
+        # One instrument can have no answer, so this does not mark the IBKR link as lost.
+        if not bars_data and loop.time() - started_at >= HISTORICAL_DATA_TIMEOUT_SECONDS:
+            self.ib.cancelHistoricalData(bars_data)
+            message = "IB Gateway did not answer the live bar subscription in time."
+            raise GatewayRequestError(message)
+        return bars_data
+
+    def cancel_abandoned_subscription(self, request: asyncio.Future[BarDataList]) -> None:
+        if not request.cancelled() and request.exception() is None and self.ib.isConnected():
+            self.ib.cancelHistoricalData(request.result())
 
     def disconnect(self) -> None:
         self.synchronized = False

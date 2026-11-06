@@ -6,6 +6,7 @@ Real PostgreSQL. The function that starts a child process is a fake (section 17.
 import httpx
 import pytest
 
+from atrade.forward_test import HELD_FILL_EXIT_CODE
 from tests.fakes.clock import FixedClock
 from tests.fakes.forward_test_child import FakeChildStarter
 from tests.forward_test.test_forward_test_worker import make_worker, read_forward_test, start_forward_test
@@ -37,3 +38,22 @@ async def test_a_stock_split_restart_does_not_count_toward_the_crash_limit(
     assert [child.mode for child in child_starter.children] == ["run"] * 6
     # The restart before the open misses no bar, so it opens no interruption (section 12.24).
     assert [interruption["reason"] for interruption in restarted["interruptions"]] == ["crash"]
+
+
+@pytest.mark.anyio
+async def test_a_stock_split_restart_with_a_held_fill_is_not_a_crash(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    child_starter = FakeChildStarter()
+    worker = make_worker(database_url, clock, child_starter)
+    await worker.compare_states()
+
+    worker.request_restart([forward_test["id"]])
+    child_starter.children[-1].exit_code = HELD_FILL_EXIT_CODE
+    await worker.compare_states()
+    await worker.compare_states()
+
+    restarted = await read_forward_test(web_client, forward_test["id"])
+    assert (restarted["status"], restarted["crash_count"]) == ("running", 0)
+    assert [child.mode for child in child_starter.children] == ["run"] * 2

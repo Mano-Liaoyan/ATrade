@@ -11,7 +11,6 @@ from typing import Literal, Protocol
 
 from nautilus_trader.model import Bar as NautilusBar
 
-from atrade.foundation.bar import Bar
 from atrade.indicator.atrade_indicators import (
     TRADING_DAYS_PER_YEAR,
     ADRPercent,
@@ -42,8 +41,6 @@ class CatalogIndicator(Protocol):
     def initialized(self) -> bool: ...
 
     def handle_bar(self, bar: NautilusBar) -> None: ...
-
-    def update(self, bar: Bar) -> None: ...
 
     def reset(self) -> None: ...
 

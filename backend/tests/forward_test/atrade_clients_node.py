@@ -15,7 +15,7 @@ from nautilus_trader.common import Environment
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.live import LiveExecutionEngineConfig, LiveNodeBuilder, LiveNodeConfig
 from nautilus_trader.model import Bar as NautilusBar
-from nautilus_trader.model import BarType, InstrumentId, OrderDenied, OrderSide, Quantity, TraderId
+from nautilus_trader.model import BarType, InstrumentId, OrderDenied, OrderFilled, OrderSide, Quantity, TraderId
 from nautilus_trader.trading import Strategy
 
 from atrade.forward_test import (
@@ -31,6 +31,7 @@ from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import format_forward_test_order_tag
 from atrade.market_data import BarRequest, save_received_bars
 from atrade.paper_trading import ForwardTestLedger
+from atrade.strategy import find_account
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection
 from tests.fakes.owner_ledger import FakeOwnerLedger
@@ -62,6 +63,7 @@ class BuyOnceStrategy(Strategy):
         self.positions_at_start: list[tuple[Decimal, Decimal]] = []
         self.positions_at_stop: list[tuple[Decimal, Decimal]] = []
         self.sell_quantity = 0
+        self.cash_at_fills: list[Decimal | None] = []
 
     def own_positions(self) -> list[tuple[Decimal, Decimal]]:
         return [
@@ -69,6 +71,15 @@ class BuyOnceStrategy(Strategy):
             for position in self.cache.positions_open(instrument_id=APPLE_ID)  # pyright: ignore[reportUnknownMemberType]
             if str(position.strategy_id) == str(self.strategy_id)
         ]
+
+    def read_cash(self) -> Decimal | None:
+        """The balance that generated code reads for its order size (docs/architecture/strategy.md section 9.8.2)."""
+        account = find_account(self, APPLE_ID.venue)
+        balance = None if account is None else account.balance_total()
+        return None if balance is None else balance.as_decimal()
+
+    def count_open_orders(self) -> int:
+        return self.cache.orders_open_count(strategy_id=self.strategy_id)  # pyright: ignore[reportUnknownMemberType]
 
     def on_start(self) -> None:
         self.positions_at_start = self.own_positions()
@@ -93,6 +104,9 @@ class BuyOnceStrategy(Strategy):
 
     def on_order_denied(self, event: OrderDenied) -> None:
         self.denied_reasons.append(str(event.reason))
+
+    def on_order_filled(self, event: OrderFilled) -> None:
+        self.cash_at_fills.append(self.read_cash())
 
 
 @dataclass
@@ -141,6 +155,8 @@ def build_node[LedgerT: OwnerLedger](
             account_id=ACCOUNT_ID,
             instruments=(APPLE,),
             fill_check_interval_seconds=POLL_SECONDS,
+            reconnect_interval_seconds=POLL_SECONDS,
+            open_order_check_interval_seconds=POLL_SECONDS,
         ),
         world.ledger,
         world.gateway,
@@ -167,7 +183,7 @@ async def wait_until(condition: Callable[[], bool]) -> None:
 
 @asynccontextmanager
 async def run_node[LedgerT: OwnerLedger](
-    world: ClientsWorld[LedgerT], strategy: BuyOnceStrategy, run_number: int
+    world: ClientsWorld[LedgerT], strategy: Strategy, run_number: int
 ) -> AsyncGenerator[BarStoreDataClientFactory]:
     builder, data_factory = build_node(world, run_number)
     live_node = builder.build()

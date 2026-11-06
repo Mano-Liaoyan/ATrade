@@ -2,8 +2,7 @@
 screen result in one transaction (docs/architecture/screen.md sections 24.2 and 24.5)."""
 
 import time
-from datetime import UTC, datetime
-from datetime import time as day_time
+from datetime import datetime
 from typing import Any
 
 import psycopg
@@ -13,7 +12,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import (
     DailyBarSummary,
-    find_first_trading_day_of_quarter,
+    read_current_us_universe_quarter,
     read_daily_bar_summaries,
     read_daily_bar_summaries_of_currency,
     read_hk_instrument_list,
@@ -26,35 +25,51 @@ from atrade.watchlist import read_watchlist_instruments
 
 MARKET_CURRENCIES = {"US": "USD", "HK": "HKD"}
 UNIVERSE_SIZE = 500
+CONVERSATION_FOREIGN_KEY = "screen_result_assistant_conversation_id_fkey"
 
 
-async def read_quarter_universe(database_url: str, now_utc: datetime) -> list[Instrument]:
-    """The universe of the current quarter (market_data.md section 8.9), by rank."""
-    quarter_start = find_first_trading_day_of_quarter(now_utc.date())
-    members = await read_us_universe_members(
-        database_url=database_url,
-        quarter_start_utc=datetime.combine(quarter_start, day_time(), tzinfo=UTC),
-        top_n=UNIVERSE_SIZE,
-    )
-    return [member.instrument for member in members]
+class ConversationDeletedError(Exception):
+    """The conversation of a run on port 8001 was deleted during the run."""
+
+
+async def read_start_instruments(
+    database_url: str, *, market: str, start: str, quarter_start_utc: datetime | None
+) -> tuple[list[Instrument], list[DailyBarSummary] | None]:
+    """The start instruments of section 24.2. `quarter_start_utc` selects the US universe (market_data.md section 8.9).
+    With None, the universe is empty. `all_with_daily_bars` also gives the summary rows that its read returns, so a
+    run needs no second read. The other start instruments give None."""
+    currency = MARKET_CURRENCIES[market]
+    if start == "all_with_daily_bars":
+        summaries = await read_daily_bar_summaries_of_currency(database_url=database_url, currency=currency)
+        return [summary.instrument for summary in summaries], summaries
+    if start == "quarter_universe":
+        if quarter_start_utc is None:
+            return [], None
+        members = await read_us_universe_members(
+            database_url=database_url, quarter_start_utc=quarter_start_utc, top_n=UNIVERSE_SIZE
+        )
+        return [member.instrument for member in members], None
+    if start == "hk_instrument_list":
+        return await read_hk_instrument_list(database_url=database_url), None
+    watchlist = await read_watchlist_instruments(database_url=database_url)
+    return [instrument for instrument in watchlist if instrument.currency == currency], None
 
 
 async def read_start_summaries(
     database_url: str, *, market: str, start: str, now_utc: datetime
 ) -> tuple[list[Instrument], list[DailyBarSummary]]:
     """The start instruments of section 24.2 and their daily bar summary rows."""
-    currency = MARKET_CURRENCIES[market]
-    if start == "all_with_daily_bars":
-        summaries = await read_daily_bar_summaries_of_currency(database_url=database_url, currency=currency)
-        return [summary.instrument for summary in summaries], summaries
-    if start == "quarter_universe":
-        instruments = await read_quarter_universe(database_url, now_utc)
-    elif start == "hk_instrument_list":
-        instruments = await read_hk_instrument_list(database_url=database_url)
-    else:
-        watchlist = await read_watchlist_instruments(database_url=database_url)
-        instruments = [instrument for instrument in watchlist if instrument.currency == currency]
-    return instruments, await read_daily_bar_summaries(database_url=database_url, instruments=instruments)
+    quarter_start_utc = (
+        await read_current_us_universe_quarter(database_url=database_url, now_utc=now_utc)
+        if start == "quarter_universe"
+        else None
+    )
+    instruments, summaries = await read_start_instruments(
+        database_url, market=market, start=start, quarter_start_utc=quarter_start_utc
+    )
+    if summaries is None:
+        summaries = await read_daily_bar_summaries(database_url=database_url, instruments=instruments)
+    return instruments, summaries
 
 
 def to_row_values(row: ScreenRow) -> tuple[str, str, str, dict[str, Any]]:
@@ -69,8 +84,11 @@ def to_row_values(row: ScreenRow) -> tuple[str, str, str, dict[str, Any]]:
 
 async def run_saved_screen(
     *, database_url: str, clock: Clock, screen: screen_store.ScreenRecord, assistant_conversation_id: int | None = None
-) -> int:
-    """Runs a checked screen and returns the ID of its new screen result. A run of the user has no conversation."""
+) -> int | None:
+    """Runs a checked screen and returns the ID of its new screen result, or None when the screen was deleted during
+    the run. A run of the user has no conversation.
+
+    Raises ConversationDeletedError when the conversation was deleted during the run."""
     run_at_utc = clock.read_now_utc()
     started = time.perf_counter()
     definition = screen.definition
@@ -111,6 +129,12 @@ async def run_saved_screen(
         assistant_conversation_id=assistant_conversation_id,
     )
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        screen_result_id = await screen_store.insert_screen_result(connection, new_result)
+        try:
+            screen_result_id = await screen_store.insert_screen_result(connection, new_result)
+        except psycopg.errors.ForeignKeyViolation as error:
+            # readability-exception: PostgreSQL reports a deleted screen or conversation only as an error.
+            if error.diag.constraint_name == CONVERSATION_FOREIGN_KEY:
+                raise ConversationDeletedError from error
+            return None
         await connection.commit()
     return screen_result_id

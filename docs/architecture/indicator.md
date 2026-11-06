@@ -166,8 +166,7 @@ Each class has:
 | Part | Behavior |
 |---|---|
 | Constructor | The parameters of the indicator, each with a default value. |
-| `handle_bar(bar)` | Takes one NautilusTrader `Bar`. `register_indicator_for_bars` calls it. |
-| `update(bar)` | The screen path: takes one `foundation` `Bar`. It gives the same update as `handle_bar` for the same open, high, low, close, and volume. A wrapped class makes a NautilusTrader bar from it and calls `handle_bar`. |
+| `handle_bar(bar)` | Takes one NautilusTrader `Bar`. `register_indicator_for_bars` calls it. The screen path makes the same bar from a `foundation` `Bar` with `make_nautilus_bar` and calls it, so both paths give the same update for the same open, high, low, close, and volume. |
 | `initialized` | `True` when the class has a value. NautilusTrader reads it for `indicators_initialized()`. |
 | Outputs (`value`, or the names of section 23.2) | The value (`float`), or "no value" (`None`) while `initialized` is `False`. |
 | `reset()` | Removes all received bars. |
@@ -448,7 +447,8 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
   its pane, in the line color. It is a price line with `lineVisible: false`
   and `axisLabelVisible: true`; its price follows the crosshair. A hidden
   indicator or a bar without a value shows no label.
-- When the pointer is on a row, or the focus is in it, the row shows 3 ghost
+- When the pointer is on the name or the values of a row, or the focus is in
+  it, the row shows 3 ghost
   icon buttons. Each has a Bits UI `Tooltip`:
   - "Hide <legend name>" (`View`) or "Show <legend name>" (`ViewOff`). A
     hidden indicator keeps its row. The name is `--cds-text-disabled`, the
@@ -581,7 +581,7 @@ section 6.2).
   rule builder version (backtest.md section 10.3.1). The read length is
   N × bar period × 2 for 1-day bars, and × 6 for intraday bars. It is at
   least 7 days. The route calculates
-  over all bars with `update(bar)` and returns only the values of the range.
+  over all bars with `handle_bar(bar)` and returns only the values of the range.
   So a chart value is equal to the screen value at the same daily bar. For
   a recursive average (EMA, RSI, ATR, MACD), a strategy value can be
   different by less than 0.005 (section 23.4).
@@ -762,8 +762,10 @@ section 6.2).
   no mark. The marks have no lines between trades.
 - A `lightweight-charts` series primitive (`attachPrimitive` on the
   candlestick series) draws the marks. Do not use `createSeriesMarkers`.
-- A trade goes on the bar with start < `time_utc` ≤ start + bar period. (A
-  backtest records the fill at the bar end, `ts_event`.)
+- A trade goes on the bar with start < `time_utc` ≤ start + bar period. A
+  backtest fill at an open has the time bar start + 1 millisecond, so it
+  goes on the bar of that open. A backtest fill at the last close has the
+  time of the bar end (`backtest.md` section 10.10.3).
 - Mark (style M3):
   - A 16 × 16 px square, `--cds-background-inverse`, with "B" (buy) or "S"
     (sell) in IBM Plex Mono semibold 11px, `--cds-text-inverse`.
@@ -776,14 +778,19 @@ section 6.2).
 - When the pointer is on a mark, the mark gets a 2px `--cds-focus` ring.
   A tooltip shows one line for each trade of the mark, in IBM Plex Mono
   with tabular numbers:
-  - "Buy 50 @ 182.35"
+  - "Buy 50 @ 182.35". The API gives prices and profits in USD, so a chart in
+    another currency shows "Buy 10 @ 42.24 USD" and "+15.00 USD".
   - "Sell 50 @ 190.10  +387.50". The signed number is the net profit of the
     round trip that the trade ends, after commissions, in
     `--cds-support-success` or `--cds-support-error`. A trade that ends no
     round trip has no number.
   - The tooltip is a Carbon popover (no high contrast, so the support
     colors keep their contrast), below a "B" mark and above an "S" mark.
-  - A legend row over a mark takes the pointer first.
+  - The name, the values, and a shown button of a legend row over a mark
+    take the pointer first. A hidden button does not, so the mark that the
+    Trades row centers in a short chart keeps its tooltip. The last pointer
+    move makes a row active, not `:hover`, so the buttons of a row that moved
+    away from a still pointer take the next click in each browser.
 - Each trade of `GET /api/backtests/{backtest_id}` and each fill of
   `GET /api/forward-tests/{id}` gets `round_trip_net_profit_usd` (decimal
   text, or null). The backend calculates it with the round trip rule of the
@@ -960,7 +967,7 @@ A stored reference holds a copy of the expression (ADR 0009):
 - Strategy code has `FormulaIndicator(<expression>)`. `CHART_INDICATORS` has
   `formula` as a dict literal of string literals.
   A backtest child and a forward test child read no custom indicator row.
-- A screen with 1 name and 2 expressions is refused (`check_screen`), because
+- A screen with 1 name and 2 references is refused (`check_screen`), because
   a result names its columns by the indicator name. The problem tells the user
   to click "Use current expression" in each place or to select another
   indicator. A name has no parentheses, so it cannot be equal to the UI name of
@@ -996,10 +1003,10 @@ Table `custom_indicator`: `custom_indicator_id`, `name` (unique, without case),
 | Route | Behavior |
 |---|---|
 | `GET /api/custom-indicators` | `200` with the list by name: `[{"custom_indicator_id", "key", "name", "expression", "chart_placement", "value_description", "kept", "assistant_conversation_id"}]`. |
-| `POST /api/custom-indicators` | Body `{"name", "expression", "chart_placement", "value_description"}`. `201` with the row. `422` with `{"problems": [{"location", "message"}]}`. |
+| `POST /api/custom-indicators` | Body `{"name", "expression", "chart_placement", "value_description"}`. `201` with the row. `422` with `{"problems": [{"location", "message"}]}`. `409` with `{"detail"}` when another save takes the name after the name check. |
 | `POST /api/custom-indicators/check` | The same body. `200` with `{"problems": [...], "look_back_bars"}`. `look_back_bars` is null when the expression has a problem. It saves nothing. The optional parameter `custom_indicator_id` names the row that the body changes, so the row does not conflict with its own name. |
 | `GET /api/custom-indicators/{id}` | `200` with the row. `404` for an unknown id. |
-| `PUT /api/custom-indicators/{id}` | The body of `POST`. `200` with the row. `404` or `422`. |
+| `PUT /api/custom-indicators/{id}` | The body of `POST`. `200` with the row. `404`, `409` (as `POST`), or `422`. |
 | `POST /api/custom-indicators/{id}/keep` | `200` with the row, and `kept` true. `404` for an unknown id. |
 | `DELETE /api/custom-indicators/{id}` | `204`. `404` for an unknown id. A delete is always allowed. |
 

@@ -16,14 +16,14 @@ from httpx_ws import AsyncWebSocketSession, aconnect_ws
 
 from atrade.assistant import (
     AssistantServiceError,
-    BacktestFinished,
-    MessageEnd,
+    BacktestFinishedMessage,
+    MessageDeltaMessage,
+    MessageEndMessage,
     ModelSelection,
-    ScreenRunFinished,
-    ScreenSaved,
-    StrategyVersionSaved,
-    TextDelta,
-    ToolStep,
+    ScreenRunFinishedMessage,
+    ScreenSavedMessage,
+    StrategyVersionSavedMessage,
+    ToolStepMessage,
 )
 from tests.assistant.assistant_app import create_conversation, create_strategy, open_assistant_client
 from tests.fakes.assistant import HOLD, FakeAssistantService
@@ -32,10 +32,12 @@ from tests.fakes.clock import FixedClock
 MESSAGE_WAIT_SECONDS = 5
 FIRST_MODEL = {"provider": "fake", "model": "fake-model", "credential_id": "fake-key-1", "thinking_level": "medium"}
 SECOND_MODEL = {"provider": "fake", "model": "fake-model-2", "credential_id": "fake-key-2", "thinking_level": "high"}
-FIRST_ANSWER = MessageEnd(
+FIRST_ANSWER = MessageEndMessage(
     text="Hello.", provider="fake", model="fake-model", credential_name="Fake key · first", thinking_level="medium"
 )
-SECOND_ANSWER = MessageEnd(text="Again.", provider="fake", model="fake-model-2", credential_name="Fake key · second")
+SECOND_ANSWER = MessageEndMessage(
+    text="Again.", provider="fake", model="fake-model-2", credential_name="Fake key · second", thinking_level=None
+)
 
 type JsonObject = dict[str, Any]
 
@@ -106,7 +108,7 @@ async def wait_for_title_attempt(connection: AssistantConnection) -> JsonObject:
 async def test_a_prompt_streams_the_answer_between_running_and_settled(
     connection: AssistantConnection, assistant_service: FakeAssistantService
 ) -> None:
-    assistant_service.run_scripts = [[TextDelta(text="Hel"), TextDelta(text="lo."), FIRST_ANSWER]]
+    assistant_service.run_scripts = [[MessageDeltaMessage(text="Hel"), MessageDeltaMessage(text="lo."), FIRST_ANSWER]]
 
     await connection.prompt("Hi.", FIRST_MODEL)
 
@@ -137,9 +139,9 @@ async def test_a_prompt_streams_the_answer_between_running_and_settled(
 async def test_the_tool_events_reach_the_browser_as_tool_steps_and_cards(
     connection: AssistantConnection, assistant_service: FakeAssistantService
 ) -> None:
-    def backtest_step(status: str, backtest_status: str | None) -> ToolStep:
+    def backtest_step(status: str, backtest_status: str | None) -> ToolStepMessage:
         backtest_id = None if backtest_status is None else 11
-        return ToolStep(
+        return ToolStepMessage(
             tool_call_id="call_2",
             tool_name="run_backtest",
             status="running" if status == "running" else "succeeded",
@@ -149,27 +151,27 @@ async def test_the_tool_events_reach_the_browser_as_tool_steps_and_cards(
 
     assistant_service.run_scripts = [
         [
-            ToolStep(
+            ToolStepMessage(
                 tool_call_id="call_1",
                 tool_name="save_strategy_version",
                 status="succeeded",
                 backtest_id=None,
                 backtest_status=None,
             ),
-            StrategyVersionSaved(strategy_id=3, strategy_version_id=103, version_number=3),
+            StrategyVersionSavedMessage(strategy_id=3, strategy_version_id=103, version_number=3),
             backtest_step("running", None),
             backtest_step("running", "queued"),
             backtest_step("running", "running"),
             backtest_step("succeeded", "finished"),
-            BacktestFinished(backtest_id=11),
-            ScreenSaved(
+            BacktestFinishedMessage(backtest_id=11),
+            ScreenSavedMessage(
                 screen_id=5,
                 name="Momentum (AI)",
                 market="US",
                 definition={"start": "watchlist"},
                 previous_definition={"start": "quarter_universe"},
             ),
-            ScreenRunFinished(
+            ScreenRunFinishedMessage(
                 screen_id=5,
                 screen_result_id=9,
                 start_count=500,
@@ -241,42 +243,10 @@ async def test_the_next_answer_after_a_model_change_names_the_new_model_and_the_
 
 
 @pytest.mark.anyio
-async def test_steer_adds_a_user_message_to_the_active_run(
-    connection: AssistantConnection, assistant_service: FakeAssistantService
-) -> None:
-    assistant_service.run_scripts = [[TextDelta(text="Work"), HOLD, FIRST_ANSWER]]
-    await connection.prompt("Write a strategy.", FIRST_MODEL)
-    assert await connection.receive() == {"type": "run_state", "state": "running"}
-    assert await connection.receive() == {"type": "message_delta", "text": "Work"}
-
-    await connection.send({"type": "steer", "text": "Use SMA 50."})
-    with anyio.fail_after(MESSAGE_WAIT_SECONDS):
-        while not assistant_service.steers:
-            await anyio.sleep(0.01)
-    assistant_service.release()
-
-    assert (await connection.receive_until_settled())[-2]["type"] == "message_end"
-    assert assistant_service.steers == [(connection.conversation_id, "Use SMA 50.")]
-
-
-@pytest.mark.anyio
-async def test_steer_without_an_active_run_sends_an_error(
-    connection: AssistantConnection, assistant_service: FakeAssistantService
-) -> None:
-    await connection.send({"type": "steer", "text": "Use SMA 50."})
-
-    assert await connection.receive() == {
-        "type": "error",
-        "message": "The AI assistant does not run. Send the message as a new prompt.",
-    }
-    assert assistant_service.steers == []
-
-
-@pytest.mark.anyio
 async def test_abort_stops_the_run_and_sends_settled(
     connection: AssistantConnection, assistant_service: FakeAssistantService
 ) -> None:
-    assistant_service.run_scripts = [[TextDelta(text="Work"), HOLD, FIRST_ANSWER]]
+    assistant_service.run_scripts = [[MessageDeltaMessage(text="Work"), HOLD, FIRST_ANSWER]]
     await connection.prompt("Write a strategy.", FIRST_MODEL)
     await connection.receive()
     await connection.receive()
@@ -291,7 +261,7 @@ async def test_abort_stops_the_run_and_sends_settled(
 async def test_a_second_prompt_during_a_run_sends_an_error(
     connection: AssistantConnection, assistant_service: FakeAssistantService
 ) -> None:
-    assistant_service.run_scripts = [[TextDelta(text="Work"), HOLD, FIRST_ANSWER]]
+    assistant_service.run_scripts = [[MessageDeltaMessage(text="Work"), HOLD, FIRST_ANSWER]]
     await connection.prompt("First.", FIRST_MODEL)
     await connection.receive()
     await connection.receive()
@@ -300,7 +270,7 @@ async def test_a_second_prompt_during_a_run_sends_an_error(
 
     assert await connection.receive() == {
         "type": "error",
-        "message": "The AI assistant runs. Send a steer message, or stop the run.",
+        "message": "The AI assistant runs. Stop the run first.",
     }
     assistant_service.release()
     await connection.receive_until_settled()
@@ -445,7 +415,7 @@ async def wait_until(condition: Callable[[], Awaitable[bool]]) -> None:
 async def test_leaving_during_a_run_stops_the_run(
     database_url: str, clock: FixedClock, frontend_build_dir: Path, assistant_service: FakeAssistantService
 ) -> None:
-    assistant_service.run_scripts = [[TextDelta(text="Work"), HOLD, FIRST_ANSWER]]
+    assistant_service.run_scripts = [[MessageDeltaMessage(text="Work"), HOLD, FIRST_ANSWER]]
     async with open_assistant_client(
         database_url=database_url,
         clock=clock,

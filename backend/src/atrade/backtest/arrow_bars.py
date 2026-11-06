@@ -2,14 +2,14 @@
 
 # pyarrow 26 has no type stubs.
 # pyright: reportMissingTypeStubs=false, reportUnknownMemberType=false, reportUnknownVariableType=false
-# pyright: reportUnknownArgumentType=false
+# pyright: reportUnknownArgumentType=false, reportUnknownParameterType=false
 
 from datetime import datetime
 from decimal import ROUND_HALF_EVEN, Context, Decimal
 
 import pyarrow
 
-from atrade.foundation.bar import Bar, BarPeriod
+from atrade.foundation.bar import Bar, BarPeriod, find_bar_end
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 # BarDataWrangler reads prices and volumes as Arrow decimal128(38, 16).
@@ -32,7 +32,7 @@ def round_to_arrow_scale(value: Decimal) -> Decimal:
 
 def convert_bars_to_arrow_bytes(bars: list[Bar], bar_period: BarPeriod) -> bytes:
     """`ts_event` is the bar end: a strategy sees a bar only after its period is over."""
-    bar_end_ns = [convert_to_ns(bar.start_utc + bar_period.length) for bar in bars]
+    bar_end_ns = [convert_to_ns(find_bar_end(bar.start_utc, bar_period)) for bar in bars]
     table = pyarrow.table(
         {
             "open": pyarrow.array([round_to_arrow_scale(bar.open) for bar in bars], ARROW_DECIMAL_TYPE),

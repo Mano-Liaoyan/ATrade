@@ -1,8 +1,8 @@
 """/ws/assistant: the conversation with the AI assistant (docs/architecture/assistant.md 25.10).
 
 The browser opens one socket for one conversation: `/ws/assistant?conversation_id=<id>`. `web` forwards the browser
-messages to the assistant service and changes the run events of the service into the ATrade messages below. The
-frontend depends only on these messages.
+messages to the assistant service and sends the server messages of assistant_service.py to the browser. The frontend
+depends only on these messages.
 
 After the first run with an answer, `web` generates the title once (25.8.3). A failure sends an `error` message and
 leaves the title. A rename before or during the generation wins. When the browser leaves, `web` stops the active run.
@@ -20,28 +20,25 @@ import anyio
 import psycopg
 from anyio.abc import TaskGroup
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from pydantic import BaseModel, Field, JsonValue, StringConstraints, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, StringConstraints, TypeAdapter, ValidationError
 
 from atrade.assistant import conversation_store
 from atrade.assistant.assistant_service import (
+    AssistantErrorMessage,
     AssistantService,
     AssistantServiceError,
-    BacktestFinished,
-    LoginEnd,
-    LoginEvent,
-    LoginStep,
-    MessageEnd,
+    BacktestFinishedMessage,
+    LoginEndMessage,
+    LoginStepMessage,
+    MessageDeltaMessage,
+    MessageEndMessage,
     ModelSelection,
-    RunError,
-    RunEvent,
-    ScreenRunFinished,
-    ScreenSaved,
-    StrategyVersionSaved,
-    TextDelta,
+    ScreenRunFinishedMessage,
+    ScreenSavedMessage,
+    StrategyVersionSavedMessage,
     ThinkingLevel,
-    ToolStep,
+    ToolStepMessage,
 )
-from atrade.assistant.credential_routes import CredentialResponse, to_credential_response
 from atrade.assistant.system_prompt import join_system_prompt
 from atrade.foundation.socket_push import HEARTBEAT_INTERVAL_SECONDS, HeartbeatMessage
 
@@ -63,36 +60,10 @@ class PromptMessage(BaseModel):
     thinking_level: ThinkingLevel
 
 
-class SteerMessage(BaseModel):
-    """Browser to server: a user message while the AI assistant runs."""
-
-    type: Literal["steer"] = "steer"
-    text: NonEmptyText
-
-
 class AbortMessage(BaseModel):
     """Browser to server: stop the active run (the "Stop" button)."""
 
     type: Literal["abort"] = "abort"
-
-
-class MessageDeltaMessage(BaseModel):
-    """A part of the streamed text of an AI assistant message."""
-
-    type: Literal["message_delta"] = "message_delta"
-    text: str
-
-
-class MessageEndMessage(BaseModel):
-    """The end of one AI assistant message: its full text, its model, its credential name, and the thinking level of
-    its run."""
-
-    type: Literal["message_end"] = "message_end"
-    text: str
-    provider: str
-    model: str
-    credential_name: str
-    thinking_level: str | None
 
 
 class RunStateMessage(BaseModel):
@@ -100,70 +71,6 @@ class RunStateMessage(BaseModel):
 
     type: Literal["run_state"] = "run_state"
     state: Literal["running", "settled"]
-
-
-class ToolStepMessage(BaseModel):
-    """The start, an update, or the end of one tool call. One `tool_call_id` is one tool step of the conversation.
-
-    `status` is `running` at the start and at each update, then `succeeded` or `failed`. For `run_backtest`,
-    `backtest_id` and `backtest_status` give the queue state (`queued`) or the run state (`running`, then a final
-    status). They are null for the other tools and at the start.
-    """
-
-    type: Literal["tool_step"] = "tool_step"
-    tool_call_id: str
-    tool_name: str
-    status: Literal["running", "succeeded", "failed"]
-    backtest_id: int | None
-    backtest_status: str | None
-
-
-class StrategyVersionSavedMessage(BaseModel):
-    """The AI assistant saved a strategy version, for the diff card (25.5.2)."""
-
-    type: Literal["strategy_version_saved"] = "strategy_version_saved"
-    strategy_id: int
-    strategy_version_id: int
-    version_number: int
-
-
-class BacktestFinishedMessage(BaseModel):
-    """A backtest of `run_backtest` ended in the wait of the tool, for the metric card."""
-
-    type: Literal["backtest_finished"] = "backtest_finished"
-    backtest_id: int
-
-
-class ScreenSavedMessage(BaseModel):
-    """The AI assistant made or changed a screen, for the condition card (25.12.4). The card compares `definition`
-    with `previous_definition`: the screen before `update_screen`, or the source screen of `create_screen`. Null when
-    `create_screen` has no source screen."""
-
-    type: Literal["screen_saved"] = "screen_saved"
-    screen_id: int
-    name: str
-    market: str
-    definition: JsonValue
-    previous_definition: JsonValue
-
-
-class ScreenRunFinishedMessage(BaseModel):
-    """`run_screen` saved a screen result. The last condition card of the screen shows its funnel counts."""
-
-    type: Literal["screen_run_finished"] = "screen_run_finished"
-    screen_id: int
-    screen_result_id: int
-    start_count: int
-    after_filters_count: int
-    after_indicator_conditions_count: int
-    result_count: int
-
-
-class AssistantErrorMessage(BaseModel):
-    """An error of the conversation, for the Output tab of the "Problems and output" panel."""
-
-    type: Literal["error"] = "error"
-    message: str
 
 
 class LoginStartMessage(BaseModel):
@@ -183,47 +90,14 @@ class LoginAnswerMessage(BaseModel):
     value: str
 
 
-class LoginOptionResponse(BaseModel):
-    id: str
-    label: str
-
-
-class LoginStepMessage(BaseModel):
-    """One login step of pi (25.7.3).
-
-    - `auth_url`: open `url` (the authorization link). `message` has the instructions of the provider.
-    - `device_code`: enter `user_code` at `url`.
-    - `progress`, `info`: `message` (and for `info` maybe a `url`).
-    - `prompt`: show a field for `prompt_type` (`text`, `secret` as a password field, `select` with `options`, or
-      `manual_code` to paste a code) with the label `message`, and answer with `login_answer` and `prompt_id`.
-    """
-
-    type: Literal["login_step"] = "login_step"
-    step: Literal["auth_url", "device_code", "progress", "info", "prompt"]
-    message: str | None
-    url: str | None
-    user_code: str | None
-    prompt_id: str | None
-    prompt_type: Literal["text", "secret", "select", "manual_code"] | None
-    options: list[LoginOptionResponse] | None
-
-
-class LoginEndMessage(BaseModel):
-    """The login ended. The credential is in the credential file of the assistant service."""
-
-    type: Literal["login_end"] = "login_end"
-    credential: CredentialResponse
-
-
 type BrowserMessage = Annotated[
-    PromptMessage | SteerMessage | AbortMessage | LoginStartMessage | LoginAnswerMessage, Field(discriminator="type")
+    PromptMessage | AbortMessage | LoginStartMessage | LoginAnswerMessage, Field(discriminator="type")
 ]
 BROWSER_MESSAGE_ADAPTER: TypeAdapter[BrowserMessage] = TypeAdapter(BrowserMessage)
 
 # The messages of /ws/assistant in both directions. The OpenAPI document adds their JSON Schema for the frontend types.
 ASSISTANT_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [
     PromptMessage,
-    SteerMessage,
     AbortMessage,
     MessageDeltaMessage,
     MessageEndMessage,
@@ -240,78 +114,6 @@ ASSISTANT_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [
     LoginStepMessage,
     LoginEndMessage,
 ]
-
-
-def to_socket_message(event: RunEvent) -> BaseModel:
-    match event:
-        case TextDelta():
-            return MessageDeltaMessage(text=event.text)
-        case MessageEnd():
-            return MessageEndMessage(
-                text=event.text,
-                provider=event.provider,
-                model=event.model,
-                credential_name=event.credential_name,
-                thinking_level=event.thinking_level,
-            )
-        case RunError():
-            return AssistantErrorMessage(message=event.message)
-        case ToolStep():
-            return ToolStepMessage(
-                tool_call_id=event.tool_call_id,
-                tool_name=event.tool_name,
-                status=event.status,
-                backtest_id=event.backtest_id,
-                backtest_status=event.backtest_status,
-            )
-        case StrategyVersionSaved():
-            return StrategyVersionSavedMessage(
-                strategy_id=event.strategy_id,
-                strategy_version_id=event.strategy_version_id,
-                version_number=event.version_number,
-            )
-        case BacktestFinished():
-            return BacktestFinishedMessage(backtest_id=event.backtest_id)
-        case ScreenSaved():
-            return ScreenSavedMessage(
-                screen_id=event.screen_id,
-                name=event.name,
-                market=event.market,
-                definition=event.definition,
-                previous_definition=event.previous_definition,
-            )
-        case ScreenRunFinished():
-            return ScreenRunFinishedMessage(
-                screen_id=event.screen_id,
-                screen_result_id=event.screen_result_id,
-                start_count=event.start_count,
-                after_filters_count=event.after_filters_count,
-                after_indicator_conditions_count=event.after_indicator_conditions_count,
-                result_count=event.result_count,
-            )
-
-
-def to_login_message(event: LoginEvent) -> BaseModel:
-    match event:
-        case LoginStep():
-            options = (
-                None
-                if event.options is None
-                else [LoginOptionResponse(id=option.id, label=option.label) for option in event.options]
-            )
-            return LoginStepMessage(
-                step=event.step,
-                message=event.message,
-                url=event.url,
-                user_code=event.user_code,
-                prompt_id=event.prompt_id,
-                prompt_type=event.prompt_type,
-                options=options,
-            )
-        case LoginEnd():
-            return LoginEndMessage(credential=to_credential_response(event.credential))
-        case RunError():
-            return AssistantErrorMessage(message=event.message)
 
 
 class ConversationSocket:
@@ -380,7 +182,7 @@ class ConversationSocket:
                     await self.send_error("No login waits for this answer.")
             case PromptMessage():
                 if self.is_running:
-                    await self.send_error("The AI assistant runs. Send a steer message, or stop the run.")
+                    await self.send_error("The AI assistant runs. Stop the run first.")
                     return
                 selection = ModelSelection(
                     provider=message.provider,
@@ -390,16 +192,13 @@ class ConversationSocket:
                 )
                 task_group.start_soon(self.run, self.conversation_id, message.text, selection)
                 self.is_running = True
-            case SteerMessage():
-                if not self.is_running or not await self.assistant_service.steer(self.conversation_id, message.text):
-                    await self.send_error("The AI assistant does not run. Send the message as a new prompt.")
             case AbortMessage():
                 await self.assistant_service.abort(self.conversation_id)
 
     async def login(self, message: LoginStartMessage) -> None:
         try:
             async for event in self.assistant_service.login(message.provider, message.method, message.name):
-                await self.send(to_login_message(event))
+                await self.send(event)
         except AssistantServiceError as error:
             await self.send_error(str(error))
         finally:
@@ -420,10 +219,10 @@ class ConversationSocket:
         try:
             system_prompt = await self.read_system_prompt(conversation_id)
             async for event in self.assistant_service.run(conversation_id, text, selection, system_prompt):
-                if isinstance(event, MessageEnd):
+                if isinstance(event, MessageEndMessage):
                     has_answer = True
                     await self.save_last_model(event)
-                await self.send(to_socket_message(event))
+                await self.send(event)
         except AssistantServiceError as error:
             await self.send_error(str(error))
         # Only a run that ends here is settled. After a cancellation, is_running stays True, so stop_active_run stops it.
@@ -432,7 +231,7 @@ class ConversationSocket:
         if has_answer:
             await self.generate_title_once(selection)
 
-    async def save_last_model(self, event: MessageEnd) -> None:
+    async def save_last_model(self, event: MessageEndMessage) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             await conversation_store.save_last_model(
                 connection,

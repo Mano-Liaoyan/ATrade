@@ -16,7 +16,9 @@ test('finds an instrument and shows symbol, exchange, and currency', async ({ pa
 });
 
 test('arrow keys choose a candidate, Enter confirms it, and Escape closes the list', async ({ page }) => {
-  // The test gives the answer of the watchlist, so the shared test database does not change.
+  // The test gives the answer of the watchlist, so the shared test database does not change. A change push from
+  // another test would read the empty list again and remove the added row, so this page gets no pushes.
+  await page.routeWebSocket(/\/ws\/watchlist$/, () => undefined);
   const addedInstruments: unknown[] = [];
   await page.route('**/api/watchlist', async (route) => {
     if (route.request().method() === 'POST') {

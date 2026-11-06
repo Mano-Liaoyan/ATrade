@@ -7,6 +7,7 @@ Orders on a real paper account are in test_forward_test_paper_contract.py (ibkr_
 import asyncio
 import socket
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -19,9 +20,10 @@ from nautilus_trader.trading import Strategy
 
 from atrade.backtest import write_look_back_catalog
 from atrade.forward_test import GatewayWatch, LiveNodeInput, run_live_node
-from atrade.forward_test.live_node_run import create_live_node_builder
+from atrade.forward_test.live_node_run import create_live_node_builder, wait_for_gateway_loss
 from atrade.foundation.bar import Bar, BarPeriod, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
+from tests.fakes.ibkr import FakeGatewayConnection
 
 TEST_STRATEGY_FILE = Path(__file__).parents[1] / "backtest" / "strategies" / "buy_and_sell_by_bar_count.py"
 STOP_AFTER_SECONDS = 1.0
@@ -74,6 +76,27 @@ async def test_the_live_node_stops_when_ib_gateway_is_not_reachable_for_too_long
     )
 
     assert live_node_end == "gateway_lost"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(("is_connected", "is_lost"), [(False, True), (True, False)])
+async def test_an_open_gateway_port_does_not_hide_a_lost_execution_connection(
+    database_url: str, *, is_connected: bool, is_lost: bool
+) -> None:
+    """After a Gateway restart the port answers, but the execution client can stay without its connection."""
+    gateway = FakeGatewayConnection(managed_accounts=["DU1234567"])
+    gateway.connected = is_connected
+    gateway_watch = GatewayWatch(check_interval_seconds=0.01, lost_after_seconds=0.05)
+    port_server = await asyncio.start_server(lambda _reader, writer: writer.close(), "127.0.0.1", 0)
+    port = port_server.sockets[0].getsockname()[1]
+    live_node_input = replace(make_live_node_input(database_url), gateway_host="127.0.0.1", gateway_port=port)
+    loss_task = asyncio.create_task(wait_for_gateway_loss(live_node_input, gateway_watch, gateway))
+
+    await asyncio.wait([loss_task], timeout=0.5)
+
+    assert loss_task.done() is is_lost
+    loss_task.cancel()
+    port_server.close()
 
 
 APPLE = Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")

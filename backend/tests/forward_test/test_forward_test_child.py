@@ -6,7 +6,7 @@ The IBKR connection is the fake. The function that runs the LiveNode is a fake: 
 """
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -18,6 +18,7 @@ import pytest
 
 from atrade.forward_test import (
     GATEWAY_UNREACHABLE_EXIT_CODE,
+    HELD_FILL_EXIT_CODE,
     PAPER_CHECK_FAILED_EXIT_CODE,
     ChildMode,
     IbkrAccess,
@@ -26,13 +27,15 @@ from atrade.forward_test import (
     run_forward_test_child,
 )
 from atrade.foundation.bar import BarPeriod, TimeRange
+from atrade.foundation.order_ref import MANUAL_ORDER_REF
 from atrade.foundation.settings import Settings
-from atrade.ibkr import AccountValue
+from atrade.ibkr import Execution
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import (
     FakeGatewayConnection,
     HistoricalBarRequest,
     make_balance_values,
+    make_execution,
     make_forward_test_order,
 )
 from tests.forward_test.test_forward_test_routes import (
@@ -47,6 +50,7 @@ CHILD_NOW_UTC = datetime(2026, 1, 2, 3, 10, 30, tzinfo=UTC)
 TEST_GATEWAY_RETRY_SECONDS = 0.01
 FORWARD_TEST_CLIENT_ID = 10
 WEB_CLIENT_ID = 1
+HELD_EXECUTION_ID = "0000e0d5.held"
 
 type JsonObject = dict[str, Any]
 
@@ -80,6 +84,16 @@ class FakeLiveNode:
         return "ended"
 
 
+def read_ledger_fills(database_url: str) -> list[tuple[str, str, Decimal, Decimal]]:
+    with psycopg.connect(database_url) as connection:
+        return connection.execute(
+            """
+            SELECT symbol, exchange, quantity_change, commission FROM owner_ledger_entry
+            WHERE entry_kind = 'fill' AND owner_kind = 'forward_test' ORDER BY quantity_change DESC
+            """
+        ).fetchall()
+
+
 def make_settings(database_url: str, frontend_build_dir: Path, *, ibkr_account_id: str = ACCOUNT_ID) -> Settings:
     return Settings(database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=ibkr_account_id)
 
@@ -97,16 +111,6 @@ def make_forward_test_gateway() -> FakeGatewayConnection:
 async def start_forward_test(web_client: httpx.AsyncClient) -> JsonObject:
     strategy_version_id = await save_test_strategy_version(web_client)
     return (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))).json()
-
-
-async def start_old_forward_test(web_client: httpx.AsyncClient, database_url: str) -> JsonObject:
-    """A forward test from the time before the allocated capital: its equity starts at the start balance."""
-    forward_test = await start_forward_test(web_client)
-    with psycopg.connect(database_url, autocommit=True) as connection:
-        connection.execute(
-            "UPDATE forward_test SET allocated_capital_usd = NULL WHERE id = %(id)s", {"id": forward_test["id"]}
-        )
-    return forward_test
 
 
 @dataclass(frozen=True)
@@ -321,79 +325,6 @@ async def test_a_failed_paper_account_check_starts_no_live_node(
 
 
 @pytest.mark.anyio
-async def test_a_paper_account_without_a_usd_balance_starts_no_live_node(
-    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
-) -> None:
-    forward_test = await start_old_forward_test(web_client, database_url)
-    gateway_connection = make_forward_test_gateway()
-    gateway_connection.account_values = []
-    live_node = FakeLiveNode(gateway_connection)
-
-    exit_code, _ = await run_child(
-        make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node
-    )
-
-    # The equity of the records starts at the balance, so a forward test without it cannot record (section 12.8).
-    assert exit_code == PAPER_CHECK_FAILED_EXIT_CODE
-    assert live_node.inputs == []
-    listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
-    assert listed["error_message"] == (
-        "The paper account has no NetLiquidation value in USD. IBKR sent no NetLiquidation value for the paper account."
-    )
-
-
-def make_eur_account_values() -> list[AccountValue]:
-    return [
-        AccountValue(account=ACCOUNT_ID, tag="NetLiquidation", value="1000.00", currency="EUR"),
-        AccountValue(account=ACCOUNT_ID, tag="TotalCashValue", value="1000.00", currency="EUR"),
-    ]
-
-
-@pytest.mark.anyio
-async def test_a_eur_paper_account_starts_with_the_balance_converted_to_usd(
-    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
-) -> None:
-    forward_test = await start_old_forward_test(web_client, database_url)
-    gateway_connection = make_forward_test_gateway()
-    gateway_connection.account_values = make_eur_account_values()
-    gateway_connection.exchange_rates = {("EUR", "USD"): Decimal("1.1139")}
-    live_node = FakeLiveNode(gateway_connection)
-
-    exit_code, _ = await run_child(
-        make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node
-    )
-
-    assert exit_code == 0
-    [live_node_input] = live_node.inputs
-    assert live_node_input.start_balance_usd == Decimal("1113.90")
-    listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
-    assert listed["start_balance_usd"] == "1113.90"
-
-
-@pytest.mark.anyio
-async def test_a_eur_paper_account_without_an_exchange_rate_starts_no_live_node(
-    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
-) -> None:
-    forward_test = await start_old_forward_test(web_client, database_url)
-    gateway_connection = make_forward_test_gateway()
-    gateway_connection.account_values = make_eur_account_values()
-    gateway_connection.exchange_rate_error_message = "No market data permissions."
-    live_node = FakeLiveNode(gateway_connection)
-
-    exit_code, _ = await run_child(
-        make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node
-    )
-
-    assert exit_code == PAPER_CHECK_FAILED_EXIT_CODE
-    assert live_node.inputs == []
-    listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
-    assert listed["error_message"] == (
-        "The paper account has no NetLiquidation value in USD. The paper account has the base currency EUR and IBKR "
-        "sent no EUR to USD exchange rate: No market data permissions."
-    )
-
-
-@pytest.mark.anyio
 async def test_cancel_mode_cancels_the_orders_without_a_live_node(
     web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
 ) -> None:
@@ -437,7 +368,8 @@ async def test_a_cancel_without_confirmation_ends_with_an_error(
     assert exit_code == 1
     listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
     assert listed["error_message"] == (
-        "The open orders were not cancelled: IB Gateway did not confirm the cancel of order 8 in time."
+        "The open orders were not cancelled or their fills were not saved: "
+        "IB Gateway did not confirm the cancel of order 8 in time."
     )
 
 
@@ -460,6 +392,167 @@ async def test_a_restart_cancels_the_old_orders_before_the_live_node_starts(
     assert exit_code == 0
     assert live_node.open_order_ids_at_start == [3]
     assert opened_client_ids == [10, 10]
+
+
+@pytest.mark.anyio
+async def test_a_restart_saves_the_fills_of_an_earlier_child_before_the_live_node_starts(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    gateway_connection = make_forward_test_gateway()
+    # A fill that the earlier child did not read before its crash.
+    gateway_connection.executions = [
+        make_execution(
+            ACCOUNT_ID,
+            order_id=8,
+            quantity="10",
+            price="20.5",
+            client_id=FORWARD_TEST_CLIENT_ID,
+            commission="1.25",
+            order_ref=f"O-20260102-030405-001-FT{forward_test['id']}-1",
+        )
+    ]
+    live_node = FakeLiveNode(gateway_connection)
+    run_fake_live_node = live_node.run_live_node
+    fills_at_start: list[tuple[str, str, Decimal, Decimal]] = []
+
+    async def run_live_node(live_node_input: LiveNodeInput, stop_requested: asyncio.Event) -> LiveNodeEnd:
+        fills_at_start.extend(read_ledger_fills(database_url))
+        return await run_fake_live_node(live_node_input, stop_requested)
+
+    live_node.run_live_node = run_live_node  # pyright: ignore[reportAttributeAccessIssue]
+
+    exit_code, _ = await run_child(
+        make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node
+    )
+
+    assert exit_code == 0
+    assert fills_at_start == [("AAPL", "NASDAQ", Decimal(10), Decimal("1.25"))]
+
+
+@pytest.mark.anyio
+async def test_the_stop_saves_only_the_fills_of_this_forward_test_after_the_cancel(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    order_ref = f"O-20260102-030405-001-FT{forward_test['id']}-1"
+    gateway_connection = make_forward_test_gateway()
+    gateway_connection.open_orders.append(
+        make_forward_test_order(ACCOUNT_ID, forward_test_id=forward_test["id"], order_id=8, client_id=10)
+    )
+    other_executions = [
+        make_execution(ACCOUNT_ID, order_id=3, quantity="1", price="1", order_ref=MANUAL_ORDER_REF),
+        make_execution(ACCOUNT_ID, order_id=4, quantity="2", price="1", order_ref="O-20260102-030405-001-FT99-1"),
+        # Not an instrument of this forward test.
+        make_execution(ACCOUNT_ID, order_id=5, quantity="3", price="1", order_ref=order_ref, symbol="MSFT"),
+    ]
+    gateway_connection.executions = [
+        *other_executions,
+        make_execution(ACCOUNT_ID, order_id=6, quantity="5", price="30", side="SLD", order_ref=order_ref),
+    ]
+    cancel_order_and_wait = gateway_connection.cancel_order_and_wait
+
+    async def fill_and_cancel(order_id: int) -> None:
+        # The fill of the order comes after the last read of the LiveNode, just before the cancel.
+        gateway_connection.executions.append(
+            make_execution(ACCOUNT_ID, order_id=order_id, quantity="10", price="20", order_ref=order_ref)
+        )
+        await cancel_order_and_wait(order_id)
+
+    gateway_connection.cancel_order_and_wait = fill_and_cancel  # pyright: ignore[reportAttributeAccessIssue]
+    settings = make_settings(database_url, frontend_build_dir)
+
+    exit_code, _ = await run_child(settings, forward_test["id"], "cancel_orders", FakeLiveNode(gateway_connection))
+    # The worker tries a failed stop again. The insert is idempotent.
+    await run_child(settings, forward_test["id"], "cancel_orders", FakeLiveNode(gateway_connection))
+
+    assert exit_code == 0
+    assert read_ledger_fills(database_url) == [
+        ("AAPL", "NASDAQ", Decimal(10), Decimal(0)),
+        ("AAPL", "NASDAQ", Decimal(-5), Decimal(0)),
+    ]
+
+
+def make_held_execution(forward_test_id: int, *, time_utc: datetime) -> Execution:
+    execution = make_execution(
+        ACCOUNT_ID,
+        order_id=8,
+        quantity="10",
+        price="20.5",
+        client_id=FORWARD_TEST_CLIENT_ID,
+        execution_id=HELD_EXECUTION_ID,
+        order_ref=f"O-20260102-030405-001-FT{forward_test_id}-1",
+        is_held=True,
+    )
+    return replace(execution, time_utc=time_utc)
+
+
+@pytest.mark.anyio
+async def test_a_stop_with_a_held_fill_fails_and_the_retry_saves_the_fill(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    gateway_connection = make_forward_test_gateway()
+    held = make_held_execution(forward_test["id"], time_utc=CHILD_NOW_UTC - timedelta(minutes=1))
+    gateway_connection.executions = [held]
+    settings = make_settings(database_url, frontend_build_dir)
+
+    exit_code, _ = await run_child(settings, forward_test["id"], "cancel_orders", FakeLiveNode(gateway_connection))
+
+    assert exit_code == HELD_FILL_EXIT_CODE
+    assert read_ledger_fills(database_url) == []
+    listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
+    assert HELD_EXECUTION_ID in listed["error_message"]
+
+    gateway_connection.executions = [replace(held, commission=Decimal("1.25"), is_held=False)]
+    retry_exit_code, _ = await run_child(
+        settings, forward_test["id"], "cancel_orders", FakeLiveNode(gateway_connection)
+    )
+
+    assert retry_exit_code == 0
+    assert read_ledger_fills(database_url) == [("AAPL", "NASDAQ", Decimal(10), Decimal("1.25"))]
+
+
+@pytest.mark.anyio
+async def test_a_restart_with_a_held_fill_waits_for_the_report_and_is_not_a_crash(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    gateway_connection = make_forward_test_gateway()
+    held = make_held_execution(forward_test["id"], time_utc=CHILD_NOW_UTC - timedelta(minutes=1))
+    gateway_connection.executions = [held]
+    read_executions = gateway_connection.read_executions
+
+    async def read_and_then_report(*, include_held: bool = False) -> list[Execution]:
+        executions = await read_executions(include_held=include_held)
+        gateway_connection.executions = [replace(held, commission=Decimal("1.25"), is_held=False)]
+        return executions
+
+    gateway_connection.read_executions = read_and_then_report  # pyright: ignore[reportAttributeAccessIssue]
+    live_node = FakeLiveNode(gateway_connection)
+    run_fake_live_node = live_node.run_live_node
+    fills_at_start: list[tuple[str, str, Decimal, Decimal]] = []
+
+    async def run_live_node(live_node_input: LiveNodeInput, stop_requested: asyncio.Event) -> LiveNodeEnd:
+        fills_at_start.extend(read_ledger_fills(database_url))
+        stop_requested.set()
+        return await run_fake_live_node(live_node_input, stop_requested)
+
+    live_node.run_live_node = run_live_node  # pyright: ignore[reportAttributeAccessIssue]
+
+    exit_code, opened_client_ids = await run_child(
+        make_settings(database_url, frontend_build_dir),
+        forward_test["id"],
+        "run",
+        live_node,
+        ChildRunOptions(is_stop_requested_at_start=False),
+    )
+
+    assert exit_code == 0
+    assert fills_at_start == [("AAPL", "NASDAQ", Decimal(10), Decimal("1.25"))]
+    assert len(opened_client_ids) == 3
+    [listed] = (await web_client.get(FORWARD_TESTS_PATH)).json()
+    assert [interruption["ended_at_utc"] is not None for interruption in listed["interruptions"]] == [True]
 
 
 @pytest.mark.anyio

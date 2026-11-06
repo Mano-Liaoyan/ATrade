@@ -1,9 +1,11 @@
 """The daily bar update of the `web` process (docs/architecture/market_data.md section 8.11).
 
-At 18:00 ET of each US trading day, the update reads the daily bars of the current quarter's US universe, the HK
-instrument list, and the watchlist from IBKR into ibkr_bar, and updates the daily bar summary. 18:00 ET is after the
-US close and after the Hong Kong close of the same day. When IB Gateway is not reachable, the update does not run
-that day.
+At 21:00 ET of each US trading day, the update reads the daily bars of the current quarter's US universe, the HK
+instrument list, and the watchlist from IBKR into ibkr_bar, and updates the daily bar summary. 21:00 ET is after the
+US close and after the Hong Kong close of the same day. It is also after 00:00 UTC of the next day in all seasons, so
+the read range holds the daily bar of the day. When IB Gateway is not reachable, the update does not run that day.
+After a start, the update waits for the first connection of the process. An update that stops on a lost connection
+runs again in a later minute of the day, after the connection returns.
 """
 
 import asyncio
@@ -22,13 +24,17 @@ from atrade.market_data import bar_store, hk_instrument_list_store
 from atrade.market_data.bar_source import BarSource
 from atrade.market_data.daily_bar_summary import select_last_daily_bars, update_daily_bar_summaries
 from atrade.market_data.stock_split_evidence import record_evidence, to_stored_form
-from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, is_trading_day
-from atrade.market_data.us_universe import MEMBER_COUNT, read_us_universe_members, to_utc_day
+from atrade.market_data.us_trading_days import is_trading_day
+from atrade.market_data.us_universe import MEMBER_COUNT, read_current_us_universe_quarter, read_us_universe_members
 
 logger = logging.getLogger(__name__)
 NEW_YORK = ZoneInfo("America/New_York")
-UPDATE_TIME_ET = time(18, 0)
+UPDATE_TIME_ET = time(21, 0)
 CHECK_INTERVAL_SECONDS = 60.0
+# After a lost IBKR link, the link check runs within 70 seconds (ibkr/gateway_connection.py).
+IBKR_LINK_WAIT_SECONDS = 75.0
+# A timeout costs 135 seconds with its wait, so a run of timeouts must not take the rest of the day.
+MAX_CONSECUTIVE_TIMEOUTS = 3
 # An instrument without IBKR daily bars gets the daily bars of 1 year, the warm-up of section 8.12.
 FIRST_READ_LENGTH = timedelta(days=366)
 
@@ -49,6 +55,8 @@ class DailyBarUpdate:
         self.gateway_connection = gateway_connection
         self.read_watchlist_instruments = read_watchlist_instruments
         self.last_update_day: date | None = None
+        self.waiting_day: date | None = None
+        self.stopped_day: date | None = None
 
     async def keep_updating(self) -> None:
         """Runs until the caller cancels it. An error is logged, and the update runs again on the next trading day."""
@@ -71,17 +79,36 @@ class DailyBarUpdate:
         due_day = self.find_due_day(self.clock.read_now_utc())
         if due_day is None:
             return False
+        if self.gateway_connection.read_connection_number() == 0:
+            # The process just started. The check of each minute runs the update after the first connection.
+            if due_day != self.waiting_day:
+                self.waiting_day = due_day
+                logger.warning("The daily bar update of %s waits for the first connection to IB Gateway.", due_day)
+            return False
+        is_connected = self.gateway_connection.is_connected()
+        if not is_connected and due_day == self.stopped_day:
+            return False
         self.last_update_day = due_day
-        if not self.gateway_connection.is_connected():
+        if not is_connected:
             logger.warning("IB Gateway is not reachable. The daily bar update of %s does not run.", due_day)
             return False
-        await self.update(due_day)
+        if not await self.update(due_day):
+            if due_day != self.stopped_day:
+                logger.warning("The daily bar update of %s stops. It runs again in a later minute.", due_day)
+            self.stopped_day = due_day
+            self.last_update_day = None
         return True
 
-    async def read_update_instruments(self, connection: psycopg.AsyncConnection, day: date) -> list[Instrument]:
-        quarter_start_utc = to_utc_day(find_first_trading_day_of_quarter(day))
-        members = await read_us_universe_members(
-            database_url=self.database_url, quarter_start_utc=quarter_start_utc, top_n=MEMBER_COUNT
+    async def read_update_instruments(self, connection: psycopg.AsyncConnection) -> list[Instrument]:
+        quarter_start_utc = await read_current_us_universe_quarter(
+            database_url=self.database_url, now_utc=self.clock.read_now_utc()
+        )
+        members = (
+            []
+            if quarter_start_utc is None
+            else await read_us_universe_members(
+                database_url=self.database_url, quarter_start_utc=quarter_start_utc, top_n=MEMBER_COUNT
+            )
         )
         hk_members = await hk_instrument_list_store.select_members(connection)
         watchlist = await self.read_watchlist_instruments()
@@ -113,9 +140,19 @@ class DailyBarUpdate:
         if stored_bars:
             await record_evidence(connection, instrument, stored_bars[-1], ibkr_bars, self.clock.read_now_utc())
 
-    async def update(self, day: date) -> None:
+    async def wait_for_connection(self) -> bool:
+        """After a timeout, requests fail at once until the IBKR link check gets an answer. False when it gets none."""
+        if not self.gateway_connection.is_connected():
+            await asyncio.sleep(IBKR_LINK_WAIT_SECONDS)
+        return self.gateway_connection.is_connected()
+
+    async def update(self, day: date) -> bool:
+        """Returns False when a lost connection or timeouts stopped the update. The instruments before the stop stay
+        updated."""
+        is_complete = True
+        timeout_count = 0
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            instruments = await self.read_update_instruments(connection, day)
+            instruments = await self.read_update_instruments(connection)
             updated_instruments: list[Instrument] = []
             for instrument in instruments:
                 time_range = await self.find_read_range(connection, instrument)
@@ -125,7 +162,13 @@ class DailyBarUpdate:
                     bars = await self.gateway_connection.read_historical_bars(instrument, BarPeriod.ONE_DAY, time_range)
                 except GatewayRequestError:
                     logger.exception("The daily bar update did not read the daily bars of %s.", instrument)
-                    continue
+                    # A timeout marks the IBKR link as lost. An answer with an error does not.
+                    timeout_count = 0 if self.gateway_connection.is_connected() else timeout_count + 1
+                    if timeout_count < MAX_CONSECUTIVE_TIMEOUTS and await self.wait_for_connection():
+                        continue
+                    is_complete = False
+                    break
+                timeout_count = 0
                 await self.record_evidence_a(connection, instrument, bars)
                 stored_form_bars = await to_stored_form(connection, instrument, bars)
                 await bar_store.save_bars_of_range(
@@ -134,3 +177,4 @@ class DailyBarUpdate:
                 updated_instruments.append(instrument)
             await update_daily_bar_summaries(connection, updated_instruments)
         logger.info("The daily bar update of %s saved the daily bars of %d instruments.", day, len(updated_instruments))
+        return is_complete

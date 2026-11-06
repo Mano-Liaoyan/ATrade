@@ -20,8 +20,8 @@ routes of an allow-list.
 
 This section is the target. Most of it is not implemented. #178 adds the
 service skeleton and the networks (25.2, 25.3.1). #179 adds the
-conversations, the titles, `/ws/assistant` with `prompt`, `steer`, and
-`abort`, and the first 5 browser routes (25.8, 25.10, 25.11). #184 adds the
+conversations, the titles, `/ws/assistant` with `prompt` and `abort`, and
+the first 5 browser routes (25.8, 25.10, 25.11). #184 adds the
 system prompt, the prompt versions, their 2 routes, and the "Prompt" dialog
 component (25.9). The tickets name facts
 that nobody ran. Section 25.15 lists them.
@@ -228,9 +228,9 @@ prompt does not list the tools.
 | `create_strategy` | Creates a strategy with version 1 from the template. | The new strategy. |
 | `save_strategy_version` | Saves code as a new strategy version (25.5). | The new version. On `422`, the problem list `{"problems": [{"line", "message"}]}` of the checks before save (strategy section 9.3). |
 | `run_backtest` | Queues a backtest of a saved strategy version and waits for its end (25.4.2). | The backtest ID and its status. When it finished, the same content as `read_backtest`. |
-| `list_backtests` | Lists the backtests. | The answer of `GET /api/backtests`. Each backtest with an error message also has `error_summary`. |
-| `read_backtest` | Reads one backtest. | The metrics, a summary of the equity curve, a summary of the trades, and `error_summary` of a backtest with an error message. |
-| `compare_backtests` | Compares 2 backtests. | The answer of the comparison route. |
+| `list_backtests` | Lists the newest 50 backtests. | The newest 50 backtests of `GET /api/backtests`. Each backtest with an error message also has `error_summary`. A longer list also has `backtest_count_total` and `left_out`. |
+| `read_backtest` | Reads one backtest. | The metrics, a summary of the equity curve, of the trades, and of the instruments, and `error_summary` of a backtest with an error message. |
+| `compare_backtests` | Compares 2 backtests. | The answer of the comparison route, with the content of `read_backtest` and `code` for each backtest. |
 
 - The AI assistant does not change the rules of the rule builder. It changes
   only code. ATrade treats a code change of the AI assistant like a code
@@ -251,6 +251,21 @@ prompt does not list the tools.
   `equity_curve_point_count` gives the full count. `trades` has the first 50
   trades with all their fields (`time_utc`, `side`, `quantity_shares`,
   `price_usd`, `commission_usd`). `trade_count_total` gives the full count.
+  `instruments` has the first 50 instruments, sorted by symbol.
+  `instrument_count_total` gives the full count. When the summaries leave out
+  items, `left_out` says which items. No tool reads these items, so the note
+  names the backtest page.
+- Decided: `compare_backtests` uses the summaries of `read_backtest` for both
+  backtests. The full comparison of a 6-month 1-minute backtest had 6,030,133
+  bytes.
+- Decided: `list_backtests` returns the newest 50 backtests. `left_out` tells
+  the AI assistant to read an older backtest with `read_backtest`.
+- Decided: `textResult` in `assistant/src/tool_results.ts` limits the text of
+  each tool result to 100,000 characters
+  (`MAX_TOOL_RESULT_CHARACTERS`). It cuts a longer text and adds a note with
+  the full length. Compaction is off, so each later user message sends all
+  earlier tool results to the model again. A result that is too large stops
+  each later message of the conversation with "prompt is too long".
 - Decided: a backtest with an error message (for example a failed
   backtest with a Python traceback) also has `error_summary`, the last line
   of `error_message` that is not empty, in `read_backtest`, in the
@@ -267,6 +282,7 @@ prompt does not list the tools.
 - While it waits, the tool sends the queue state and the run state with the
   pi `onUpdate` call. The browser shows them as a tool step (25.10).
 - After 15 minutes, the tool returns "still running" and the backtest ID.
+  A stopped run or a `web` restart during the wait gives the same result.
   The AI assistant can read the result later with `read_backtest`.
 - The backtests of the AI assistant and of the user use one queue and the
   same backtest limits.
@@ -737,10 +753,16 @@ editable part.
 
 | Part | Content | The user can edit it |
 |---|---|---|
-| Editable part | The role of the AI assistant, how to write a strategy (the file format and the template of strategy section 9.2), and the answer rules. One answer rule: an answer about a backtest result names the metrics. It also names the out-of-sample result. | Yes. Each save makes a prompt version. |
-| Fixed part | The forbidden actions: no paper order, no forward test start, no promise of returns. The context of the conversation start: the ID and name of the open strategy, the open version number, and the IDs of the last 3 backtests. | No. The page shows it read-only. |
+| Editable part | The role of the AI assistant, how to write a strategy (the file format, the template of strategy section 9.2, and the multi-instrument rule with an example), and the answer rules. One answer rule: an answer about a backtest result names the metrics. It also names the out-of-sample result. | Yes. Each save makes a prompt version. |
+| Fixed part | The forbidden actions: no paper order, no forward test start, no promise of returns. Strategy code must not use `self.portfolio.account` (strategy section 9.8.2), and it must use only market and limit orders (forward test section 12.19). These rules are in the fixed part because a saved prompt version does not change. The context of the conversation start: the ID and name of the open strategy, the open version number, and the IDs of the last 3 backtests. | No. The page shows it read-only. |
 
 - The default editable part is in English and is in the code.
+- The multi-instrument rule: a strategy for a `screen` or `list` universe has
+  no `instrument_id` and no `bar_type` in its configuration. It calls
+  `subscribe_data(DataType("UniverseUpdate"))` and reads the members from
+  `data.data.bar_types` (backtest section 10.10.8). A real backtest in the
+  tests runs the example of the prompt. A saved prompt version keeps its old
+  text, so the `run_backtest` description also has this rule.
 - The forbidden actions in the prompt only tell the model. They are not a
   security control. The allow-list of port 8001 is the control (25.3).
 
@@ -865,7 +887,6 @@ Browser to server:
 | `type` | Content |
 |---|---|
 | `prompt` | A new user message. |
-| `steer` | A user message while the AI assistant runs. |
 | `abort` | Stop the current run (the "Stop" button). |
 | `login_answer` | The answer to a `login_step` of kind `prompt`. |
 | `login_start` | Start a login (#183). |
@@ -892,7 +913,6 @@ Fields (#179). Each message is a JSON object with `type`.
 | `type` | Direction | Fields |
 |---|---|---|
 | `prompt` | Browser to server | `text`, `provider`, `model`, `credential_id`, `thinking_level` |
-| `steer` | Browser to server | `text` |
 | `abort` | Browser to server | — |
 | `message_delta` | Server to browser | `text` |
 | `message_end` | Server to browser | `text`, `provider`, `model`, `credential_name`, `thinking_level` |
@@ -905,8 +925,8 @@ Fields (#179). Each message is a JSON object with `type`.
   exist, the server sends `error` and closes the socket with code 1008.
 - `web` sends `run_state` `running` before the run and `settled` after the
   run, also after an `abort` or an error.
-- A `prompt` during a run, a `steer` without a run, and a message that is
-  not valid each get an `error` message. A `prompt` during a run does not
+- A `prompt` during a run and a message that is not valid each get an
+  `error` message. A `prompt` during a run does not
   start a second run.
 - When the browser leaves during a run, `web` stops the run (`abort`).
 - Decided (#182): the fields of the tool messages:
@@ -936,14 +956,14 @@ Login fields (#183):
 | `login_step` | Server to browser | `step` (`auth_url`, `device_code`, `progress`, `info`, `prompt`), `message`, `url`, `user_code`, `prompt_id`, `prompt_type` (`text`, `secret`, `select`, `manual_code`), `options` (`[{id, label}]`); a field that the step does not use is null |
 | `login_end` | Server to browser | `credential` (the fields of `GET /api/assistant/credentials`) |
 
-- A socket without `conversation_id` is for the login only. A `prompt`,
-  `steer`, or `abort` on it gets an `error`.
+- A socket without `conversation_id` is for the login only. A `prompt` or
+  `abort` on it gets an `error`.
 - One login runs at a time on one socket. A failed login sends `error`.
 - No message to the browser holds a secret. The error of a message that is
   not valid does not repeat its input, because a `login_answer` can hold an
   API key. `web` does not log the answers.
 - `ASSISTANT_SOCKET_MESSAGE_MODELS` (`atrade.assistant`) lists the messages
-  of both directions. Message model names: `PromptMessage`, `SteerMessage`,
+  of both directions. Message model names: `PromptMessage`,
   `AbortMessage`, `MessageDeltaMessage`, `MessageEndMessage`,
   `RunStateMessage`, `ToolStepMessage`, `StrategyVersionSavedMessage`,
   `BacktestFinishedMessage`, `ScreenSavedMessage`,
@@ -1109,8 +1129,11 @@ Implemented (#185):
 - The browser opens one `/ws/assistant` socket for the open conversation
   (`conversation_socket.ts`). The socket does not connect again after a
   close. Each `error` message goes to the Output tab of the "Problems and
-  output" panel with the UTC time. After `run_state` `settled`, the page
-  reads the conversation list again after 1 second for the generated title.
+  output" panel with the UTC time. After `run_state` `settled`, `web` calls
+  the title model. The page reads the conversation list again after 1
+  second for the generated title. While the open conversation has
+  `title_state` `generating` and the socket is open, the page reads the list
+  again each second, at most 125 times.
 
 Decided (each workbench page has the column):
 
@@ -1129,6 +1152,10 @@ Decided (each workbench page has the column):
   column opens the newest conversation.
 - Each page reads the conversation list again when it opens. When the
   socket of the open conversation is closed, the page opens a new socket.
+- A socket close during a run ends the run in the log, because `web` stops
+  the run (25.10) and no `settled` message comes. "Stop" changes to the
+  disabled "Send" with its reason. A running tool step shows "Failed". A
+  running backtest step shows "Interrupted", because the backtest can go on.
 - "Send" stays disabled ("connecting") until the socket is open and the
   saved messages are read, so a sent message is not lost when the saved
   messages replace the log.
@@ -1362,7 +1389,6 @@ columns behave the same (section 13).
   | Request | Answer |
   |---|---|
   | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, thinking_level, system_prompt}` (`system_prompt` since #184). A `thinking_level` that is not a level of pi gets `400`. | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name, thinking_level}`, `error` `{message}`, and (#182) `tool_step`, `strategy_version_saved`, and `backtest_finished` with the fields of 25.10. The answer ends when the run ends. |
-  | `POST /conversations/{id}/steer` `{text}` | `204`, or `409` without an active run. |
   | `POST /conversations/{id}/abort` | `204`. |
   | `POST /conversations/{id}/title` `{provider, model, credential_id}` | `{title}`, or `502` `{detail}`. |
   | `GET /conversations/{id}/messages` | `{messages}`. |
@@ -1372,6 +1398,11 @@ columns behave the same (section 13).
   `/data/conversations/`. A wrong body gets `400`. The run has no read
   timeout, because a tool can wait 15 minutes (25.4.2). `web` changes the
   events into the messages of 25.10.
+- `assistant/tests/event_lines.json` holds one JSON line for each event of
+  this protocol. It is the contract check of the event lines.
+  `assistant/tests/event_lines.test.ts` proves that the service emits these
+  lines. `backend/tests/assistant/test_event_lines.py` proves that `web`
+  reads each line as a known event. When an event changes, change the file.
 - Decided (#183): the credential and login part of the same protocol:
 
   | Request | Answer |

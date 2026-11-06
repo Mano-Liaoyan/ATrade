@@ -26,6 +26,11 @@ export function canDrawLiveBar(bars: readonly Bar[], liveBar: Bar): boolean {
   return lastBar === undefined || liveBar.time >= lastBar.time;
 }
 
+/** The live bars of the chart, oldest first, with `liveBar` as the newest. A new value of a bar replaces the old value. */
+export function addDrawnLiveBar(drawnLiveBars: readonly Bar[], liveBar: Bar): Bar[] {
+  return [...drawnLiveBars.filter((bar) => bar.time < liveBar.time), liveBar];
+}
+
 const MILLISECONDS_PER_SECOND = 1000;
 // "2026-01-02T03:00" is the first 16 characters of the ISO text.
 const ISO_MINUTE_LENGTH = 16;

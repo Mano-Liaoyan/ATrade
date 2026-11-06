@@ -134,7 +134,7 @@
   </SideColumn>
 
   {#if comparison === null}
-    <div class="empty-main">
+    <div class="atrade-run-empty">
       {#if errorMessage !== ''}
         <InlineNotification kind="error" title="Backtests not compared" subtitle={errorMessage} lowContrast />
       {/if}
@@ -146,7 +146,7 @@
         {#if id === 'chart'}
           <Panel {...state} label={title}>
             {#snippet header()}
-              <h1 class="run-title">
+              <h1 class="atrade-run-title atrade-run-title--numbers">
                 <span>{title}</span>
                 <a class="cds--link" href={resolve('/strategies/[strategyId]', { strategyId: String(compared.strategy_id) })}
                   >{compared.strategy_name}</a
@@ -160,7 +160,7 @@
                 {/snippet}
                 {@render instrumentLink(findSharedInstrument(compared.first, compared.second))}
                 {#if compared.first.bar_period === compared.second.bar_period}
-                  <span class="run-period">{formatBarPeriod(compared.first.bar_period)}</span>
+                  <span class="atrade-run-period">{formatBarPeriod(compared.first.bar_period)}</span>
                 {/if}
               </h1>
             {/snippet}
@@ -229,28 +229,6 @@
 </Workbench>
 
 <style>
-  .empty-main {
-    flex: 1;
-    min-inline-size: 0;
-  }
-
-  .run-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--cds-spacing-04);
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* One type size in the heading: Carbon links set their own size. */
-  .run-title > :global(*) {
-    font: inherit;
-    letter-spacing: inherit;
-  }
-
-  .run-period {
-    color: var(--cds-text-secondary);
-  }
-
   /* The metrics over the chart: the chart keeps at least 6rem, and the metrics take the rest up to their full height.
      In a low panel the metrics scroll in their own region (ComparedKeyMetrics) with a visible track. */
   .compare-area {

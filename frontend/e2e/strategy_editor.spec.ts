@@ -35,6 +35,21 @@ async function replaceCode(page: Page, code: string): Promise<void> {
   await page.keyboard.insertText(code);
 }
 
+// Holds the POST of a save until the returned function runs.
+async function holdSave(page: Page): Promise<() => void> {
+  let finishSave = (): void => undefined;
+  const saveMayFinish = new Promise<void>((resolve) => {
+    finishSave = resolve;
+  });
+  await page.route('**/api/strategies/*/versions', async (route) => {
+    if (route.request().method() === 'POST') {
+      await saveMayFinish;
+    }
+    await route.fallback();
+  });
+  return finishSave;
+}
+
 // Before each screenshot, Playwright waits for document.fonts.ready. In WebKit, on this page, that promise can stay
 // pending for many seconds after all font files have loaded (the CI trace shows no font request after the page load).
 // Then the screenshot does not finish. This environment variable of Playwright stops that wait. The test loads the font
@@ -81,7 +96,7 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await createStrategy(page, createUniqueName(currentTest, 'Select'));
     const line = page
       .getByRole('textbox', { name: 'Strategy code' })
-      .locator('.cm-line', { hasText: 'class MovingAverageStrategy(Strategy):' });
+      .locator('.cm-line', { hasText: 'Moving average cross: buy when the close' });
     const drawnSelection = page.locator('.cm-selectionBackground').first();
 
     // Under the load of the parallel tests, the editor can still change its lines (it loads the strategy version) when
@@ -156,7 +171,7 @@ test('creates a strategy that starts from the template as version 1', async ({ p
   await createStrategy(page, name);
 
   await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v1');
-  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('Moving average cross: buy when the close');
   // The open strategy is the current row of the list, with its latest version.
   const list = page.getByRole('complementary', { name: 'Strategies' });
   await expect(list.getByRole('link', { name, exact: true })).toHaveAttribute('aria-current', 'page');
@@ -202,6 +217,40 @@ test('shows the line and the reason when the checks refuse the code', async ({ p
   await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
 });
 
+test('disables the version list during a save', async ({ page }, currentTest) => {
+  await createStrategy(page, createUniqueName(currentTest, 'Busy'));
+  await replaceCode(page, VALID_CODE);
+  const finishSave = await holdSave(page);
+
+  await page.getByRole('button', { name: 'Save version' }).click();
+  await expect(page.getByRole('combobox', { name: 'Version' })).toBeDisabled();
+  finishSave();
+
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v2');
+  await expect(page.getByRole('combobox', { name: 'Version' })).toBeEnabled();
+});
+
+test('keeps the text typed during a save when the new version does not open', async ({ page }, currentTest) => {
+  const name = createUniqueName(currentTest, 'Typed');
+  await createStrategy(page, name);
+  await replaceCode(page, VALID_CODE);
+  const finishSave = await holdSave(page);
+  await page.route('**/api/strategies/*/versions/*', (route) => route.fulfill({ status: 500, json: { detail: 'Read failed' } }));
+
+  await page.getByRole('button', { name: 'Save version' }).click();
+  await expect(page.getByRole('button', { name: 'Saving version…' })).toBeVisible();
+  await replaceCode(page, `${VALID_CODE}# typed during the save\n`);
+  finishSave();
+  await expectOutputLine(page, `Saved as ${name} v2.`);
+  await page.unrouteAll();
+  await page.reload();
+
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v2');
+  await page.getByRole('combobox', { name: 'Version' }).click();
+  await page.getByRole('option', { name: 'v1' }).click();
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('# typed during the save');
+});
+
 test('keeps unsaved edits in the browser after a reload', async ({ page }, currentTest) => {
   const name = createUniqueName(currentTest, 'Draft');
   await createStrategy(page, name);
@@ -212,6 +261,24 @@ test('keeps unsaved edits in the browser after a reload', async ({ page }, curre
 
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
   await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
+});
+
+test('shows the code and keeps edits when the browser storage is not available', async ({ page }, currentTest) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      get() {
+        throw new DOMException('The storage is not available.', 'SecurityError');
+      },
+    });
+  });
+  await createStrategy(page, createUniqueName(currentTest, 'Blocked storage'));
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('Moving average cross: buy when the close');
+
+  await replaceCode(page, VALID_CODE);
+
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
+  await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'Draft not saved' })).toBeVisible();
 });
 
 test('opens an older version from the version list', async ({ page }, currentTest) => {
@@ -225,7 +292,7 @@ test('opens an older version from the version list', async ({ page }, currentTes
   await page.getByRole('option', { name: 'v1' }).click();
 
   await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v1');
-  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('Moving average cross: buy when the close');
 });
 
 test('deletes a strategy only after the confirmation', async ({ page }, currentTest) => {

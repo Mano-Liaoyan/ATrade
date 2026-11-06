@@ -21,8 +21,10 @@ from atrade.market_data import (
     DatabentoImportReport,
     ImportCheckError,
     check_import_detections,
+    import_databento_files,
     read_saved_bars,
 )
+from atrade.market_data.databento_import_adjustment import DetectedSplit, record_stock_splits
 from tests.databento_import_runs import import_and_check_splits
 from tests.fakes.databento import (
     CLOSE_PRICE,
@@ -122,9 +124,9 @@ async def run_import(
     return await import_and_check_splits(database_url, write_dbn_files(tmp_path, files), gateway)
 
 
-async def read_bars(database_url: str, symbol: str, exchange: str = "NASDAQ") -> list[Bar]:
+async def read_bars(database_url: str, symbol: str, exchange: str = "NASDAQ", end: date = PURCHASE_END) -> list[Bar]:
     instrument = Instrument(symbol=symbol, exchange=exchange, currency="USD")
-    time_range = TimeRange(utc_day(PURCHASE_START), utc_day(PURCHASE_END))
+    time_range = TimeRange(utc_day(PURCHASE_START), utc_day(end))
     saved_bars = await read_saved_bars(
         database_url=database_url,
         bar_request=BarRequest(instrument, BarPeriod.ONE_DAY, time_range),
@@ -213,6 +215,84 @@ async def test_the_detection_rule_finds_a_stock_split_of_an_instrument_that_stop
     assert [bar.close for bar in bars] == [Decimal(80), Decimal(80), Decimal(41), Decimal(42)]
 
 
+def insert_ibkr_evidence_split(
+    database_url: str, ex_date_utc: datetime, confirmation: str, split_ratio: Decimal = Decimal(2)
+) -> None:
+    with psycopg.connect(database_url) as connection:
+        connection.execute(
+            """
+            INSERT INTO stock_split (
+                symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc
+            )
+            VALUES (
+                'GONE', 'NASDAQ', 'USD', %(ex_date_utc)s, %(split_ratio)s, 'ibkr_evidence', %(confirmation)s,
+                %(recorded_at_utc)s
+            )
+            """,
+            {
+                "ex_date_utc": ex_date_utc,
+                "split_ratio": split_ratio,
+                "confirmation": confirmation,
+                "recorded_at_utc": CHECKED_AT_UTC,
+            },
+        )
+
+
+# The import finds the stock split of GONE on Monday 2020-01-13. Evidence A has the ex-date Saturday 2020-01-11.
+GONE_EX_DATE = TRADING_DAYS[5]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("days_earlier", "applied_split", "expected_new_rows"),
+    [
+        (2, ("both_evidences", "2"), 0),
+        (2, ("user_apply", "2"), 0),
+        (5, ("bar_evidence", "2"), 0),
+        (2, ("both_evidences", "2.05"), 0),
+        (2, ("both_evidences", "0.1"), 1),
+        (6, ("both_evidences", "2"), 1),
+        (2, ("import_rejected", "2"), 1),
+    ],
+)
+async def test_the_import_records_no_second_row_for_a_stock_split_that_is_applied_at_an_earlier_ex_date(
+    database_url: str, tmp_path: Path, days_earlier: int, applied_split: tuple[str, str], expected_new_rows: int
+) -> None:
+    confirmation, applied_ratio = applied_split
+    ex_date_utc = utc_day(GONE_EX_DATE) - timedelta(days=days_earlier)
+    insert_ibkr_evidence_split(database_url, ex_date_utc, confirmation, Decimal(applied_ratio))
+    gone_bars = create_bars(
+        "GONE",
+        [TRADING_DAYS[4], GONE_EX_DATE],
+        [("80", "80", 1000), ("40", "41", 2100)],
+    )
+    other_bars = create_bars("OTHR", TRADING_DAYS, [("10", "10", 500)] * len(TRADING_DAYS))
+
+    report = import_databento_files(
+        database_url=database_url, file_paths=write_dbn_files(tmp_path, create_history_files([*gone_bars, *other_bars]))
+    )
+
+    new_rows = [row for row in read_table(database_url, STOCK_SPLIT_QUERY) if row[5] == "databento_import"]
+    assert len(new_rows) == expected_new_rows
+    assert len(report.stock_splits) == expected_new_rows
+
+
+@pytest.mark.anyio
+async def test_the_stock_split_window_has_5_utc_days_also_across_a_dst_change_of_the_session_time_zone(
+    database_url: str,
+) -> None:
+    # New York goes to daylight saving time on 2020-03-08, between the 2 ex-dates.
+    ex_date = date(2020, 3, 9)
+    insert_ibkr_evidence_split(database_url, utc_day(ex_date) - timedelta(days=5), "both_evidences")
+    split = DetectedSplit(Instrument("GONE", "NASDAQ", "USD"), ex_date, Decimal(2), None)
+
+    with psycopg.connect(database_url) as connection:
+        connection.execute("SET TIME ZONE 'America/New_York'")
+        inserted_splits = record_stock_splits(connection, [split])
+
+    assert inserted_splits == []
+
+
 @pytest.mark.anyio
 async def test_a_price_drop_without_a_volume_rise_is_no_stock_split(
     database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
@@ -259,6 +339,74 @@ async def test_the_import_links_an_old_symbol_to_a_new_symbol_and_saves_the_old_
     bars = await read_bars(database_url, "XYZ")
     assert [bar.start_utc.date() for bar in bars] == TRADING_DAYS
     assert await read_bars(database_url, "SQ") == []
+
+
+def create_summary_file(prices: list[tuple[str, date, str]]) -> DbnFile:
+    """An EQUS.SUMMARY file. `prices` holds (symbol, day, price): the open and the close of that day."""
+    records = [
+        DailyRecord(symbol, day, Decimal(price), Decimal(price), Decimal(price), Decimal(price), 1000)
+        for symbol, day, price in prices
+    ]
+    return DbnFile("EQUS.SUMMARY", DAILY_SCHEMA, PURCHASE_END, date(2025, 12, 31), daily_records=records)
+
+
+# Monday 2025-03-03 to Friday 2025-03-07.
+SUMMARY_DAYS = [date(2025, 3, 3) + timedelta(days=offset) for offset in range(5)]
+RENAME_IN_SUMMARY = create_summary_file(
+    [("SQ", SUMMARY_DAYS[0], "100"), ("SQ", SUMMARY_DAYS[1], "100")]
+    + [("XYZ", SUMMARY_DAYS[2], "100.5"), ("XYZ", SUMMARY_DAYS[3], "101")]
+)
+
+
+@pytest.mark.anyio
+async def test_a_symbol_renamed_in_the_equs_summary_period_is_a_new_listing_and_the_check_moves_no_bar(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    history = create_history_files(create_bars("SQ", TRADING_DAYS[:2], [("100", "100", 1000)] * 2))
+    import_databento_files(database_url=database_url, file_paths=write_dbn_files(tmp_path / "history", history))
+
+    summary_path = write_dbn_files(tmp_path / "summary", [RENAME_IN_SUMMARY])
+    report = import_databento_files(database_url=database_url, file_paths=summary_path)
+    check_import_detections(database_url=database_url, rejected_split_ids=set(), checked_at_utc=CHECKED_AT_UTC)
+    second_report = import_databento_files(database_url=database_url, file_paths=summary_path)
+
+    assert read_table(database_url, SYMBOL_LINK_QUERY) == [("SQ", "XYZ", "NASDAQ", SUMMARY_DAYS[2], CHECKED_AT_UTC)]
+    assert [link.is_moved for link in report.symbol_links] == [False]
+    assert report.symbols_without_listing_exchange == []
+    assert second_report.symbols_without_listing_exchange == []
+    assert [bar.start_utc.date() for bar in await read_bars(database_url, "XYZ", end=date(2025, 12, 31))] == [
+        *SUMMARY_DAYS[2:4],
+    ]
+    assert [bar.start_utc.date() for bar in await read_bars(database_url, "SQ", end=date(2025, 12, 31))] == [
+        *TRADING_DAYS[:2],
+        *SUMMARY_DAYS[:2],
+    ]
+    assert read_table(database_url, "SELECT DISTINCT symbol FROM databento_bar_saved_range ORDER BY symbol") == [
+        ("SQ",),
+        ("XYZ",),
+    ]
+    assert read_table(database_url, "SELECT symbol FROM daily_bar_summary ORDER BY symbol") == [("SQ",), ("XYZ",)]
+
+
+def test_a_new_symbol_with_2_possible_old_symbols_stays_without_a_listing_exchange(
+    database_url: str, tmp_path: Path
+) -> None:
+    history = create_history_files(
+        [
+            *create_bars("SQ", TRADING_DAYS[:1], [("100", "100", 1000)]),
+            *create_bars("OLD", TRADING_DAYS[:1], [("100", "100", 1000)]),
+        ]
+    )
+    summary = create_summary_file(
+        [("SQ", SUMMARY_DAYS[0], "100"), ("OLD", SUMMARY_DAYS[0], "100"), ("XYZ", SUMMARY_DAYS[1], "100")]
+    )
+
+    report = import_databento_files(
+        database_url=database_url, file_paths=write_dbn_files(tmp_path, [*history, summary])
+    )
+
+    assert report.symbols_without_listing_exchange == ["XYZ"]
+    assert report.symbol_links == []
 
 
 @pytest.mark.anyio

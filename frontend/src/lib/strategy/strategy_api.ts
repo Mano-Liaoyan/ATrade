@@ -3,8 +3,10 @@
 import type { components } from '#lib/api';
 import {
   BACKEND_NOT_REACHABLE,
+  jsonRequest,
   readErrorMessage,
-  requestJson as requestBackendJson,
+  requestJson,
+  sendCommand,
   sendRequest,
   type RequestResult,
 } from '#lib/foundation/http_request';
@@ -42,20 +44,12 @@ const HTTP_UNPROCESSABLE_CONTENT = 422;
 // The strategy routes answer 404 and 409 with ErrorResponse {"detail": "<message>"}.
 const FAILED_ACTION = 'The strategy request';
 
-function requestJson<T>(fetchFunction: typeof fetch, path: string, init?: RequestInit): Promise<RequestResult<T>> {
-  return requestBackendJson<T>(fetchFunction, FAILED_ACTION, path, init);
-}
-
-function createJsonRequest(method: string, body: unknown): RequestInit {
-  return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
-}
-
 export function listStrategies(fetchFunction: typeof fetch): Promise<RequestResult<StrategyListItem[]>> {
-  return requestJson(fetchFunction, STRATEGIES_PATH);
+  return requestJson(fetchFunction, FAILED_ACTION, STRATEGIES_PATH);
 }
 
 export function readStrategy(fetchFunction: typeof fetch, strategyId: number): Promise<RequestResult<StrategyDetail>> {
-  return requestJson(fetchFunction, `${STRATEGIES_PATH}/${String(strategyId)}`);
+  return requestJson(fetchFunction, FAILED_ACTION, `${STRATEGIES_PATH}/${String(strategyId)}`);
 }
 
 export function readStrategyVersion(
@@ -63,11 +57,11 @@ export function readStrategyVersion(
   strategyId: number,
   versionNumber: number,
 ): Promise<RequestResult<StrategyVersion>> {
-  return requestJson(fetchFunction, `${STRATEGIES_PATH}/${String(strategyId)}/versions/${String(versionNumber)}`);
+  return requestJson(fetchFunction, FAILED_ACTION, `${STRATEGIES_PATH}/${String(strategyId)}/versions/${String(versionNumber)}`);
 }
 
 export function listStrategyTemplates(fetchFunction: typeof fetch): Promise<RequestResult<StrategyTemplate[]>> {
-  return requestJson(fetchFunction, TEMPLATES_PATH);
+  return requestJson(fetchFunction, FAILED_ACTION, TEMPLATES_PATH);
 }
 
 export async function createStrategy(
@@ -77,8 +71,9 @@ export async function createStrategy(
 ): Promise<{ kind: 'created'; strategy: StrategyDetail } | { kind: 'failed'; message: string }> {
   const result = await requestJson<StrategyDetail>(
     fetchFunction,
+    FAILED_ACTION,
     STRATEGIES_PATH,
-    createJsonRequest('POST', { name, start_from: startFrom }),
+    jsonRequest('POST', { name, start_from: startFrom }),
   );
   if (result.kind === 'failed') {
     return result;
@@ -109,7 +104,7 @@ async function sendVersion(
   body: { code: string } | { rules: StrategyRules },
 ): Promise<SaveResult> {
   const path = `${STRATEGIES_PATH}/${String(strategyId)}/versions`;
-  const response = await sendRequest(fetchFunction, path, createJsonRequest('POST', body));
+  const response = await sendRequest(fetchFunction, path, jsonRequest('POST', body));
   if (response === null) {
     return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
   }
@@ -126,17 +121,11 @@ async function sendVersion(
 
 /** Makes the code from the rules (`POST /api/strategy-rules/code`). Nothing is saved. */
 export async function generateRulesCode(fetchFunction: typeof fetch, rules: StrategyRules): Promise<RequestResult<string>> {
-  const result = await requestJson<RulesCodeResponse>(fetchFunction, RULES_CODE_PATH, createJsonRequest('POST', { rules }));
+  const result = await requestJson<RulesCodeResponse>(fetchFunction, FAILED_ACTION, RULES_CODE_PATH, jsonRequest('POST', { rules }));
   return result.kind === 'failed' ? result : { kind: 'ok', value: result.value.code };
 }
 
 export async function deleteStrategy(fetchFunction: typeof fetch, strategyId: number): Promise<DeleteResult> {
-  const response = await sendRequest(fetchFunction, `${STRATEGIES_PATH}/${String(strategyId)}`, { method: 'DELETE' });
-  if (response === null) {
-    return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
-  }
-  if (!response.ok) {
-    return { kind: 'failed', message: await readErrorMessage(response, FAILED_ACTION) };
-  }
-  return { kind: 'deleted' };
+  const result = await sendCommand(fetchFunction, FAILED_ACTION, `${STRATEGIES_PATH}/${String(strategyId)}`, { method: 'DELETE' });
+  return result.kind === 'failed' ? result : { kind: 'deleted' };
 }

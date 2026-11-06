@@ -281,6 +281,21 @@ async def select_running_member_lists(connection: psycopg.AsyncConnection) -> di
     return member_lists
 
 
+async def select_running_single_instruments(connection: psycopg.AsyncConnection) -> dict[int, Instrument]:
+    """The instrument of each single-instrument forward test that holds a client ID."""
+    cursor = await connection.execute(
+        """
+        SELECT id, symbol, exchange, currency FROM forward_test
+        WHERE client_id IS NOT NULL AND symbol IS NOT NULL
+        ORDER BY id
+        """
+    )
+    return {
+        forward_test_id: Instrument(symbol=symbol, exchange=exchange, currency=currency)
+        for forward_test_id, symbol, exchange, currency in await cursor.fetchall()
+    }
+
+
 async def select_forward_tests(connection: psycopg.AsyncConnection) -> list[ForwardTestRow]:
     async with connection.cursor(row_factory=class_row(ForwardTestRow)) as cursor:
         await cursor.execute(f"SELECT {FORWARD_TEST_COLUMNS} FROM forward_test ORDER BY id DESC")
@@ -483,17 +498,4 @@ async def write_error_message(connection: psycopg.AsyncConnection, *, forward_te
     await connection.execute(
         "UPDATE forward_test SET error_message = %(error_message)s WHERE id = %(id)s",
         {"error_message": error_message, "id": forward_test_id},
-    )
-
-
-async def write_start_balance(
-    connection: psycopg.AsyncConnection, *, forward_test_id: int, start_balance_usd: Decimal
-) -> None:
-    """The balance at the first start. A restart keeps the first value (section 12.1)."""
-    await connection.execute(
-        """
-        UPDATE forward_test SET start_balance_usd = %(start_balance_usd)s
-        WHERE id = %(id)s AND start_balance_usd IS NULL
-        """,
-        {"start_balance_usd": start_balance_usd, "id": forward_test_id},
     )

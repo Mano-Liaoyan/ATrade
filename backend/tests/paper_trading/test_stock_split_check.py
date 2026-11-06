@@ -166,6 +166,20 @@ async def test_evidence_that_does_not_agree_gives_the_split_check_needed_state(
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("account_quantity", ["0", "-5"])
+async def test_an_ibkr_position_of_0_or_less_without_evidence_a_is_no_split(
+    database_url: str, clock: FixedClock, account_quantity: str
+) -> None:
+    write_ledger_start(database_url)
+    write_owner_fill(database_url, forward_test_id=1, quantity=10, price="30")
+
+    result = await run_check(database_url, clock, account_quantity=account_quantity, candidate=None)
+
+    assert result == ("no_split", [])
+    assert read_split_checks(database_url) == []
+
+
+@pytest.mark.anyio
 async def test_incomplete_evidence_waits_for_the_next_try_before_the_last_try(
     database_url: str, clock: FixedClock
 ) -> None:

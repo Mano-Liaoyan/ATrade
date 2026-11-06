@@ -273,8 +273,13 @@ problem `["name"]` with the reason "A screen with the name '<name>' exists.".
 The market is a problem `["market"]` when it is not `US` or `HK`.
 
 A condition or the order can hold a reference to a custom indicator
-(indicator.md section 23.10). One name with 2 expressions in one definition is
-a problem at the second reference.
+(indicator.md section 23.10).
+
+One column name means one reference. A result names its columns by the
+indicator name, and a name does not show each parameter: `bars_per_year` of
+realized volatility is not in the name (section 23.3). So 2 references in one
+definition with one name and different parameters or expressions are a problem
+at the second reference. A missing parameter counts as its default.
 
 ## 24.7 HTTP routes
 
@@ -290,7 +295,7 @@ Decided (#205): the paths and the field names of this table are final.
 | `PUT /api/screens/{screen_id}` | Body `{"name", "definition"}`. `200` with the screen. `422` with the problem list. `404` when the screen does not exist. On the AI assistant port, `403` for each screen that section 24.8 does not allow. |
 | `DELETE /api/screens/{screen_id}` | `204`. Also deletes the screen results of the screen. `404` when the screen does not exist. Not on the AI assistant port. Discard of the condition card uses it (#210). |
 | `POST /api/screens/{screen_id}/keep` | Keep of the condition card (#210). `200` with the screen, as `GET /api/screens/{screen_id}` gives it, with `kept` true. A screen that is kept already also gets `200`. `updated_at_utc` does not change. `404` when the screen does not exist. Not on the AI assistant port. |
-| `POST /api/screens/{screen_id}/runs` | Runs the saved screen. With the optional body `{market, definition}`, runs that market and definition in place of the saved ones and does not change the saved screen (#212). `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
+| `POST /api/screens/{screen_id}/runs` | Runs the saved screen. With the optional body `{market, definition}`, runs that market and definition in place of the saved ones and does not change the saved screen (#212). `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist, also when a delete comes during the run. The run then saves no screen result. On the AI assistant port, `404` also when a delete of the conversation comes during the run. |
 | `GET /api/screen-indicators` | `200` with the indicator catalog of section 23.3, in its order, then the custom indicators by name: `[{"key", "name", "short_name", "chart_placement", "parameters": [{"name", "value_type" ("int" or "float"), "default", "minimum", "maximum", "is_in_name"}], "outputs", "value_description", "formula"}]`. Only a custom indicator has `formula` (indicator.md section 23.10). `value_description` gives the meaning, the range, and the unit of the value (section 23.3, #373). It is the same body as `GET /api/market-data/indicators` (indicator.md section 23.9.6, #327). The edit popover of the screen page reads it (#212). The AI assistant port has the route too (section 24.8). |
 | `GET /api/screen-results/{screen_result_id}?offset=&limit=` | `200` with the summary and one page of rows. Default `limit` 50. `404` when the screen result does not exist. |
 
@@ -391,6 +396,24 @@ kinds:
 - A point-in-time run uses the rules of sections 23.1 and 24.5 with a date.
   It uses only bars that close at or before the rebalance. Its filter
   values must equal the values that the daily bar summary had at that date.
+- A stock split changes the stored bars in place (market_data.md section
+  8.13.3). Thus a stock split after the rebalance can change a stored value of
+  that date. The filters do not change:
+  - `last_price` is the real close of that date. The summary multiplies the
+    stored close by the split ratio of each confirmed stock split with a
+    later ex-date that changed the bar table of the last bar (market_data.md
+    section 8.11).
+  - `average_trading_value_20` uses close × volume. A stock split does not
+    change this value.
+  - `still_trading` and `exchange` use no price.
+- Limit: the summary does not multiply an IBKR close for a stock split of
+  the IBKR stock split check. The bar does not show if IBKR adjusted it. When
+  IBKR adjusted the bar, a later stock split changes `last_price`.
+- Limit: the indicator values of a point-in-time run stay adjusted for all
+  confirmed stock splits. A later stock split can change a `compare` or
+  `rank` condition on an absolute-price indicator, for example ATR compared
+  to a number. `close_versus_line` compares the adjusted close to an adjusted
+  line, so a later stock split does not change it.
 - Done in #208: `POST /api/backtests` takes a fixed list by
   `screen_result_id` (backtest.md section 10.10.6). The public entry of
   `screen` exports `read_screen_result_members(*, database_url,
@@ -404,8 +427,10 @@ kinds:
   before `as_of_utc` (`read_daily_bar_summaries_before` of `market_data`,
   the same calculation as the saved summary) and reads the indicator bars
   only before `as_of_utc`. It saves no screen result. The start list of
-  `quarter_universe` is the last quarter that starts at or before
-  `as_of_utc`. The other start lists are the lists of today. The form source
+  `quarter_universe` is the last quarter whose calendar month starts at or
+  before `as_of_utc`. A quarter starts on its first trading day, so
+  2025-01-01 reads the quarter of 2025-01-02. That list ranks only days
+  before its quarter start, so this adds no look-ahead. The other start lists are the lists of today. The form source
   "Screen" and the screen page buttons are in `backtest.md` section 10.10.7.
 - Done in #413: the prefilter of a point-in-time run. Step 2 reads up to 252
   daily bars of each instrument that step 1 keeps. Before this read,
@@ -440,7 +465,8 @@ kinds:
     between the processes.
   - The result stays in period order. The first failed period raises its
     error in the child, so the backtest is `failed` with this error. The
-    periods that wait do not start. A period that runs goes on until its end.
+    periods that wait do not start, and the run kills the workers of the periods
+    that run, so a period that does not end cannot hold the failed backtest.
   - [`backtest.md`](backtest.md) section 10.1 has the isolation controls of
     the workers and the stop of the process group.
 - Each worker writes one log line for each period of a `screen` universe to
@@ -609,7 +635,11 @@ Behavior:
   "<name> copy" (or "<name> copy N" when that name is in use).
 - Decided (#212): how the user runs a screen again after new daily bars:
   "Apply" in any edit popover runs the screen again, also without a change.
-  The page adds no "Run screen" button (#145).
+  Only a screen without a run shows a "Run screen" button. A failed first
+  run and a screen that the AI assistant did not run need it, because the
+  edit popovers need a screen result (#145).
+- A failed run or save keeps the condition bar. The error notification
+  "Screen not run" or "Screen not saved" shows the reason above the bar.
 - Decided (#206): what the result does when more than 500 instruments
   pass (section 24.5).
 - Decided (#206): the rank method for ties in a percentile (section 24.5).

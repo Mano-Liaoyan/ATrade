@@ -17,14 +17,19 @@ from nautilus_trader.adapters.interactive_brokers import (
 from nautilus_trader.common import Environment
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.live import LiveExecutionEngineConfig, LiveNode, LiveNodeBuilder, LiveNodeConfig
-from nautilus_trader.model import BarType, InstrumentId, Symbol, TraderId, Venue
+from nautilus_trader.model import BarType, InstrumentId, TraderId
 from nautilus_trader.persistence import DataCatalogConfig
 
 from atrade.backtest import write_look_back_catalog
+from atrade.forward_test.atrade_instruments import create_instrument_id
 from atrade.forward_test.atrade_live_node import add_atrade_clients
 from atrade.forward_test.forward_test_child import LiveNodeEnd, LiveNodeInput
 from atrade.forward_test.forward_test_recorder import ForwardTestRecorder, RecorderInput
-from atrade.forward_test.owner_ledger_execution_client import OwnerLedgerExecutionClientFactory, OwnerLedgerInput
+from atrade.forward_test.owner_ledger_execution_client import (
+    OrderGateway,
+    OwnerLedgerExecutionClientFactory,
+    OwnerLedgerInput,
+)
 from atrade.foundation.clock import SystemClock
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import IbAsyncGatewayConnection
@@ -44,9 +49,9 @@ GATEWAY_PROBE_TIMEOUT_SECONDS = 5.0
 class GatewayWatch:
     """When IB Gateway is not reachable for `lost_after_seconds` in a row, the LiveNode stops (section 12.7).
 
-    The NautilusTrader 2.0.0rc7 LiveNode does not show the connection state of its IB execution client to Python.
-    So the child opens a TCP connection to the Gateway port every `check_interval_seconds`. A Gateway that does not
-    accept connections cannot keep the execution client connected.
+    Every `check_interval_seconds`, the child opens a TCP connection to the Gateway port and reads the state of the
+    connection of the ATrade execution client. The port alone is not enough: after a Gateway restart it answers
+    before, and also without, a new API connection.
     """
 
     check_interval_seconds: float = 30.0
@@ -62,12 +67,16 @@ async def can_reach_gateway(host: str, port: int) -> bool:
     return True
 
 
-async def wait_for_gateway_loss(live_node_input: LiveNodeInput, gateway_watch: GatewayWatch) -> None:
-    """Returns when IB Gateway was not reachable for `gateway_watch.lost_after_seconds` in a row."""
+async def wait_for_gateway_loss(
+    live_node_input: LiveNodeInput, gateway_watch: GatewayWatch, gateway: OrderGateway
+) -> None:
+    """Returns when IB Gateway was not reachable, or `gateway` had no socket, for `gateway_watch.lost_after_seconds`
+    in a row."""
     loop = asyncio.get_running_loop()
     unreachable_since: float | None = None
     while True:
-        if await can_reach_gateway(live_node_input.gateway_host, live_node_input.gateway_port):
+        has_socket = gateway.read_status() != "unreachable"
+        if has_socket and await can_reach_gateway(live_node_input.gateway_host, live_node_input.gateway_port):
             unreachable_since = None
         else:
             now = loop.time()
@@ -83,12 +92,6 @@ def read_node_instrument(live_node_input: LiveNodeInput) -> Instrument:
         message = f"Forward test {live_node_input.forward_test_id} has no single instrument."
         raise ValueError(message)
     return live_node_input.instrument
-
-
-def create_instrument_id(live_node_input: LiveNodeInput) -> InstrumentId:
-    # The IB instrument provider uses the simplified symbology: SYMBOL.PRIMARY_EXCHANGE, for example AAPL.NASDAQ.
-    instrument = read_node_instrument(live_node_input)
-    return InstrumentId(Symbol(instrument.symbol), Venue(instrument.exchange))
 
 
 def create_live_node_builder(
@@ -114,8 +117,8 @@ def create_live_node_builder(
     return LiveNodeBuilder.from_config(f"forward-test-{live_node_input.forward_test_id}", config)  # pyright: ignore[reportUnknownMemberType]
 
 
-def create_execution_client_factory(live_node_input: LiveNodeInput) -> OwnerLedgerExecutionClientFactory:
-    """The ATrade execution client with the client ID of the forward test and the owner ledger (section 12.19)."""
+def create_ledger_connection(live_node_input: LiveNodeInput) -> tuple[ForwardTestLedger, IbAsyncGatewayConnection]:
+    """The owner ledger in PostgreSQL and one ib_async connection with the client ID of the forward test."""
     gateway_connection = IbAsyncGatewayConnection(
         host=live_node_input.gateway_host, port=live_node_input.gateway_port, client_id=live_node_input.client_id
     )
@@ -126,6 +129,12 @@ def create_execution_client_factory(live_node_input: LiveNodeInput) -> OwnerLedg
         gateway_connection=gateway_connection,
         clock=SystemClock(),
     )
+    return ledger, gateway_connection
+
+
+def create_execution_client_factory(live_node_input: LiveNodeInput) -> OwnerLedgerExecutionClientFactory:
+    """The ATrade execution client with the client ID of the forward test and the owner ledger (section 12.19)."""
+    ledger, gateway_connection = create_ledger_connection(live_node_input)
     ledger_input = OwnerLedgerInput(
         forward_test_id=live_node_input.forward_test_id,
         client_id=live_node_input.client_id,
@@ -136,7 +145,10 @@ def create_execution_client_factory(live_node_input: LiveNodeInput) -> OwnerLedg
 
 
 def build_live_node(
-    live_node_input: LiveNodeInput, instrument_id: InstrumentId, warm_up_catalog: DataCatalogConfig
+    live_node_input: LiveNodeInput,
+    instrument_id: InstrumentId,
+    warm_up_catalog: DataCatalogConfig,
+    execution_factory: OwnerLedgerExecutionClientFactory,
 ) -> LiveNode:
     """The IB data client for the live bars of this 1 instrument, and the ATrade execution client (section 12.24)."""
     instrument_provider = InteractiveBrokersInstrumentProviderConfig(load_ids={instrument_id})
@@ -148,12 +160,12 @@ def build_live_node(
     )
     builder = create_live_node_builder(live_node_input, instrument_id, warm_up_catalog)
     builder = builder.add_data_client(IB_CLIENT_NAME, InteractiveBrokersDataClientFactory(), data_client_config)
-    builder = add_atrade_clients(builder, None, create_execution_client_factory(live_node_input))
+    builder = add_atrade_clients(builder, None, execution_factory)
     return builder.build()
 
 
 def create_bar_type(live_node_input: LiveNodeInput, instrument_id: InstrumentId) -> BarType:
-    return BarType.from_str(f"{instrument_id}-{live_node_input.bar_period.value}-LAST-EXTERNAL")
+    return BarType.from_str(live_node_input.bar_period.external_bar_type(instrument_id))
 
 
 def create_recorder(live_node_input: LiveNodeInput, instrument_id: InstrumentId) -> ForwardTestRecorder:
@@ -187,11 +199,15 @@ def create_strategy_config(
 
 
 async def wait_for_end_or_stop(
-    live_node: LiveNode, live_node_input: LiveNodeInput, stop_requested: asyncio.Event, gateway_watch: GatewayWatch
+    live_node: LiveNode,
+    live_node_input: LiveNodeInput,
+    stop_requested: asyncio.Event,
+    gateway_watch: GatewayWatch,
+    gateway: OrderGateway,
 ) -> LiveNodeEnd:
     run_task = asyncio.create_task(live_node.run_async())
     stop_task = asyncio.create_task(stop_requested.wait())
-    gateway_loss_task = asyncio.create_task(wait_for_gateway_loss(live_node_input, gateway_watch))
+    gateway_loss_task = asyncio.create_task(wait_for_gateway_loss(live_node_input, gateway_watch, gateway))
     await asyncio.wait({run_task, stop_task, gateway_loss_task}, return_when=asyncio.FIRST_COMPLETED)
     is_gateway_lost = gateway_loss_task.done() and not stop_requested.is_set()
     if stop_requested.is_set() or is_gateway_lost:
@@ -207,7 +223,7 @@ async def run_live_node(
     live_node_input: LiveNodeInput, stop_requested: asyncio.Event, *, gateway_watch: GatewayWatch | None = None
 ) -> LiveNodeEnd:
     """Runs until `stop_requested` is set, until IB Gateway is lost, or until the LiveNode ends by itself."""
-    instrument_id = create_instrument_id(live_node_input)
+    instrument_id = create_instrument_id(read_node_instrument(live_node_input))
     with tempfile.TemporaryDirectory(prefix=f"atrade-forward-test-{live_node_input.forward_test_id}-") as directory:
         strategy_class, config_class = load_strategy_classes(live_node_input.strategy_code, Path(directory))
         warm_up_catalog = write_look_back_catalog(
@@ -216,12 +232,13 @@ async def run_live_node(
             live_node_input.bar_period,
             Path(directory),
         )
-        live_node = build_live_node(live_node_input, instrument_id, warm_up_catalog)
+        execution_factory = create_execution_client_factory(live_node_input)
+        live_node = build_live_node(live_node_input, instrument_id, warm_up_catalog, execution_factory)
         live_node.add_strategy(strategy_class(create_strategy_config(config_class, live_node_input, instrument_id)))
         live_node.add_actor(create_recorder(live_node_input, instrument_id))
         try:
             return await wait_for_end_or_stop(
-                live_node, live_node_input, stop_requested, gateway_watch or GatewayWatch()
+                live_node, live_node_input, stop_requested, gateway_watch or GatewayWatch(), execution_factory.gateway
             )
         finally:
             live_node.dispose()

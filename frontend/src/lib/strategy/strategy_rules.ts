@@ -1,6 +1,6 @@
 // The rules of the rule builder (docs/architecture/strategy.md section 9.8.2). The backend checks them and makes the
 // code from them. This module gives the choices of the "Rules" tab (section 9.8.5): the prices, the indicators of the
-// catalog (backend/src/atrade/indicator/indicator_catalog.py) with their parameters and lines, and the comparisons.
+// catalog response with their parameters and lines, and the comparisons.
 
 import type { components } from '#lib/api';
 
@@ -12,8 +12,8 @@ export type RuleCondition = Schemas['RuleCondition'];
 export type LeftOperand = Schemas['LeftOperand'];
 export type RightOperand = Schemas['RightOperand'];
 export type IndicatorOperand = Schemas['IndicatorOperand'];
-/** A custom indicator of the catalog: the rule builder has the built-in choices below and reads these from the backend. */
-export type CustomIndicatorChoice = Pick<Schemas['IndicatorResponse'], 'key' | 'name' | 'formula'>;
+/** One indicator of the catalog response, built-in or custom. */
+export type CatalogIndicator = Schemas['IndicatorResponse'];
 export type Comparison = Schemas['Comparison'];
 export type PriceName = Schemas['PriceName'];
 export type GroupMatch = Schemas['GroupMatch'];
@@ -50,66 +50,11 @@ export interface IndicatorChoice {
   lines: [string, string][];
 }
 
-const MAXIMUM_PERIOD = 1000;
+const LINE_LABELS: Record<string, string> = { value: 'MACD line', signal: 'Signal line', histogram: 'Histogram' };
 
-function period(choice: { default: number; name?: string; minimum?: number }): IndicatorParameterChoice {
-  return {
-    name: choice.name ?? 'period',
-    isInteger: true,
-    default: choice.default,
-    minimum: choice.minimum ?? 1,
-    maximum: MAXIMUM_PERIOD,
-  };
+function readLineLabel(output: string): string {
+  return LINE_LABELS[output] ?? output.charAt(0).toUpperCase() + output.slice(1);
 }
-
-const THREE_LINES: [string, string][] = [
-  ['upper', 'Upper'],
-  ['middle', 'Middle'],
-  ['lower', 'Lower'],
-];
-
-// The order and the defaults of the catalog. A parameter that the catalog leaves out of the name (bars_per_year of
-// realized volatility) keeps its default: the builder does not show it.
-export const INDICATOR_CHOICES: IndicatorChoice[] = [
-  { key: 'sma', label: 'SMA', parameters: [period({ default: 50 })], lines: [] },
-  { key: 'ema', label: 'EMA', parameters: [period({ default: 20 })], lines: [] },
-  {
-    key: 'momentum_12_1',
-    label: '12-1 momentum',
-    parameters: [
-      period({ name: 'look_back', default: 252 }),
-      { name: 'skip', isInteger: true, default: 21, minimum: 0, maximum: MAXIMUM_PERIOD - 1 },
-    ],
-    lines: [],
-  },
-  { key: 'distance_to_52_week_high', label: 'Distance to 52-week high', parameters: [period({ default: 252 })], lines: [] },
-  { key: 'realized_volatility', label: 'Realized volatility', parameters: [period({ default: 60, minimum: 2 })], lines: [] },
-  { key: 'atr', label: 'ATR', parameters: [period({ default: 14 })], lines: [] },
-  { key: 'average_trading_value', label: 'Average trading value', parameters: [period({ default: 20 })], lines: [] },
-  { key: 'rsi', label: 'RSI', parameters: [period({ default: 14 })], lines: [] },
-  {
-    key: 'macd',
-    label: 'MACD',
-    parameters: [
-      period({ name: 'fast_period', default: 12 }),
-      period({ name: 'slow_period', default: 26, minimum: 2 }),
-      period({ name: 'signal_period', default: 9 }),
-    ],
-    lines: [
-      ['value', 'MACD line'],
-      ['signal', 'Signal line'],
-      ['histogram', 'Histogram'],
-    ],
-  },
-  {
-    key: 'bollinger_bands',
-    label: 'Bollinger Bands',
-    parameters: [period({ default: 20 }), { name: 'k', isInteger: false, default: 2, minimum: 0.1, maximum: 10 }],
-    lines: THREE_LINES,
-  },
-  { key: 'donchian_channel', label: 'Donchian channel', parameters: [period({ default: 20 })], lines: THREE_LINES },
-  { key: 'adr_percent', label: 'ADR%', parameters: [period({ default: 20 })], lines: [] },
-];
 
 export const PRICE_CHOICES: [PriceName, string][] = [
   ['close', 'Close'],
@@ -132,30 +77,48 @@ export type OperandChoice = `price:${PriceName}` | `indicator:${string}` | 'numb
 
 // The rank of the universe mode takes an indicator only.
 // A deleted custom indicator stays in the list of its operand: the operand holds the expression (indicator.md section 23.10).
-function listDeletedIndicator(customIndicators: readonly CustomIndicatorChoice[], operand: RightOperand | undefined): CustomIndicatorChoice[] {
-  if (operand?.type !== 'indicator' || customIndicators.some((choice) => choice.key === operand.indicator)) {
+function listDeletedIndicator(catalog: readonly CatalogIndicator[], operand: RightOperand | undefined): { key: string; name: string }[] {
+  if (operand?.type !== 'indicator' || catalog.some((choice) => choice.key === operand.indicator)) {
     return [];
   }
-  return operand.formula ? [{ key: operand.indicator, name: operand.formula.name, formula: operand.formula }] : [];
+  return operand.formula ? [{ key: operand.indicator, name: operand.formula.name }] : [];
 }
 
 export function listOperandChoices(
   side: 'left' | 'right' | 'rank',
-  customIndicators: readonly CustomIndicatorChoice[] = [],
+  catalog: readonly CatalogIndicator[],
   operand?: RightOperand,
 ): { value: OperandChoice; label: string }[] {
   const prices = side === 'rank' ? [] : PRICE_CHOICES.map(([name, label]) => ({ value: `price:${name}` as const, label }));
-  const indicators = INDICATOR_CHOICES.map((choice) => ({ value: `indicator:${choice.key}` as const, label: choice.label }));
-  const custom = [...customIndicators, ...listDeletedIndicator(customIndicators, operand)].map((choice) => ({
+  const indicators = [...catalog, ...listDeletedIndicator(catalog, operand)].map((choice) => ({
     value: `indicator:${choice.key}` as const,
     label: choice.name,
   }));
   const numbers = side === 'right' ? [{ value: 'number' as const, label: 'Number' }] : [];
-  return [...prices, ...indicators, ...custom, ...numbers];
+  return [...prices, ...indicators, ...numbers];
 }
 
-export function findIndicatorChoice(key: string): IndicatorChoice | undefined {
-  return INDICATOR_CHOICES.find((choice) => choice.key === key);
+/** The parameters and lines of a built-in indicator. A custom indicator has none. A parameter that the catalog leaves
+ * out of the name (bars_per_year of realized volatility) keeps its default: the builder does not show it. */
+export function findIndicatorChoice(key: string, catalog: readonly CatalogIndicator[]): IndicatorChoice | undefined {
+  const indicator = catalog.find((choice) => choice.key === key);
+  if (indicator === undefined || indicator.formula) {
+    return undefined;
+  }
+  return {
+    key,
+    label: indicator.name,
+    parameters: indicator.parameters
+      .filter((parameter) => parameter.is_in_name)
+      .map((parameter) => ({
+        name: parameter.name,
+        isInteger: parameter.value_type === 'int',
+        default: parameter.default,
+        minimum: parameter.minimum,
+        maximum: parameter.maximum,
+      })),
+    lines: indicator.outputs.length > 1 ? indicator.outputs.map((output) => [output, readLineLabel(output)]) : [],
+  };
 }
 
 export function readOperandChoice(operand: RightOperand): OperandChoice {
@@ -168,7 +131,7 @@ export function readOperandChoice(operand: RightOperand): OperandChoice {
   return 'number';
 }
 
-export function createOperand(choice: OperandChoice, customIndicators: readonly CustomIndicatorChoice[] = []): RightOperand {
+export function createOperand(choice: OperandChoice, catalog: readonly CatalogIndicator[]): RightOperand {
   if (choice === 'number') {
     return { type: 'number', value: 0 };
   }
@@ -176,11 +139,11 @@ export function createOperand(choice: OperandChoice, customIndicators: readonly 
   if (kind === 'price') {
     return { type: 'price', price: name as PriceName };
   }
-  const formula = customIndicators.find((item) => item.key === name)?.formula;
+  const formula = catalog.find((item) => item.key === name)?.formula;
   if (formula) {
     return { type: 'indicator', indicator: name, parameters: {}, formula };
   }
-  const indicator = findIndicatorChoice(name);
+  const indicator = findIndicatorChoice(name, catalog);
   const parameters = Object.fromEntries((indicator?.parameters ?? []).map((parameter) => [parameter.name, parameter.default]));
   const operand: IndicatorOperand = { type: 'indicator', indicator: name, parameters };
   const firstLine = indicator?.lines[0];
@@ -191,9 +154,9 @@ export function createOperand(choice: OperandChoice, customIndicators: readonly 
  * The operand with the formula of the catalog. Null when the operand already has it or the indicator is deleted. The
  * Select cannot do this: a click on the selected item changes nothing.
  */
-export function readCurrentOperand(operand: RightOperand, customIndicators: readonly CustomIndicatorChoice[]): IndicatorOperand | null {
+export function readCurrentOperand(operand: RightOperand, catalog: readonly CatalogIndicator[]): IndicatorOperand | null {
   const formula = operand.type === 'indicator' ? operand.formula : null;
-  const current = operand.type === 'indicator' ? customIndicators.find((item) => item.key === operand.indicator)?.formula : null;
+  const current = operand.type === 'indicator' ? catalog.find((item) => item.key === operand.indicator)?.formula : null;
   if (operand.type !== 'indicator' || !formula || !current) {
     return null;
   }
@@ -207,7 +170,7 @@ export function createCondition(): RuleCondition {
     type: 'condition',
     left: { type: 'price', price: 'close' },
     comparison: 'above',
-    right: createOperand('indicator:sma'),
+    right: { type: 'indicator', indicator: 'sma', parameters: { period: 50 } },
   };
 }
 

@@ -27,7 +27,7 @@ from atrade.market_data import (
     read_last_daily_bars,
 )
 from atrade.paper_trading import owner_ledger_store, split_check_store
-from atrade.paper_trading.manual_order_ledger import OrderAmounts
+from atrade.paper_trading.manual_order_ledger import OrderAmounts, find_owner_positions
 from atrade.paper_trading.owner_ledger_store import LedgerEntry, Owner, OwnerPosition
 from atrade.paper_trading.split_check_store import NewSplitCheck, SplitCheck
 from atrade.paper_trading.stock_split_rules import calculate_split_adjustments, find_split_evidence
@@ -59,7 +59,8 @@ class InstrumentCheck:
 @dataclass(frozen=True)
 class InstrumentCheckOutcome:
     result: CheckResult
-    # The forward tests that held the instrument before a confirmed stock split. The worker restarts them.
+    # The forward tests that held the instrument before a confirmed stock split. The check adds the flat forward tests
+    # of the instrument, and the worker restarts them all.
     forward_test_ids: list[int]
 
 
@@ -78,12 +79,6 @@ def find_forward_test_ids(owner_quantities: dict[Owner, Decimal]) -> list[int]:
     return [owner.forward_test_id for owner in owner_quantities if owner.forward_test_id is not None]
 
 
-def find_instrument_positions(entries: list[LedgerEntry], instrument: Instrument) -> list[OwnerPosition]:
-    return [
-        position for position in owner_ledger_store.sum_owner_positions(entries) if position.instrument == instrument
-    ]
-
-
 @dataclass(frozen=True)
 class LedgerChange:
     account: str
@@ -96,7 +91,7 @@ class StockSplitLedger:
     def __init__(self, *, database_url: str, gateway_connection: GatewayConnection, clock: Clock) -> None:
         self.database_url = database_url
         self.clock = clock
-        self.amounts = OrderAmounts(gateway_connection=gateway_connection, clock=clock)
+        self.amounts = OrderAmounts(database_url=database_url, gateway_connection=gateway_connection, clock=clock)
 
     async def check_instrument(self, check: InstrumentCheck) -> InstrumentCheckOutcome:
         """Section 11.11 for one instrument. Raises GatewayRequestError when IBKR does not answer."""
@@ -213,7 +208,7 @@ class StockSplitLedger:
                         resolved_at_utc=now_utc,
                     )
             entries = await owner_ledger_store.select_entries(connection, account=ledger_change.account)
-        return find_instrument_positions(entries, change.instrument)
+        return find_owner_positions(entries, change.instrument)
 
     async def read_needed_check(self, split_check_id: int) -> SplitCheck:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:

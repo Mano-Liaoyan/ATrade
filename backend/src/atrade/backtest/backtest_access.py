@@ -9,21 +9,35 @@ from typing import Final
 import psycopg
 
 from atrade.backtest import backtest_store
-from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
-from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus, UniversePeriod
+from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint, clip_to_bars
+from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus, UniversePeriod
 from atrade.backtest.backtest_universe import check_universe
-from atrade.market_data import BarRequest, check_source_order, has_saved_bars, read_source_order
+from atrade.foundation.bar import TimeRange, find_bar_end
+from atrade.market_data import (
+    BarRequest,
+    check_source_order,
+    has_saved_bars,
+    read_daily_bar_summaries_of_currency,
+    read_saved_bar_coverage,
+    read_source_order,
+)
 
 
 @dataclass(frozen=True)
-class BacktestOutcome:
-    """A backtest with its result. `metrics` is None and the lists are empty until the backtest finished."""
+class BacktestSummary:
+    """A backtest without its equity curve and trades. `metrics` is None until the backtest finished."""
 
     id: int
     request: BacktestRequest
     status: BacktestStatus
     error_message: str | None
     metrics: BacktestMetrics | None
+
+
+@dataclass(frozen=True)
+class BacktestOutcome(BacktestSummary):
+    """A backtest with its result. The lists are empty until the backtest finished."""
+
     equity_curve: list[EquityPoint]
     trades: list[BacktestTrade]
 
@@ -106,6 +120,37 @@ async def add_global_source_order(*, database_url: str, request: BacktestRequest
     return replace(request, source_order=await read_source_order(database_url=database_url))
 
 
+async def find_bar_range(
+    *, database_url: str, request: BacktestRequest, universe_periods: list[UniversePeriod] | None
+) -> TimeRange:
+    """The request range clipped to the first and the last saved bar in the range, for the split time (section 10.9.4).
+    A screen universe has no members before its run, so all instruments of its currency count."""
+    if request.universe is None:
+        instruments = [request.single_instrument]
+    elif request.universe.screen is not None:
+        summaries = await read_daily_bar_summaries_of_currency(
+            database_url=database_url, currency=request.universe.currency
+        )
+        instruments = [summary.instrument for summary in summaries]
+    else:
+        instruments = list(dict.fromkeys(member for period in universe_periods or [] for member in period.members))
+    coverage = [
+        item
+        for instrument_coverage in await read_saved_bar_coverage(
+            database_url=database_url, instruments=instruments, time_range=request.time_range
+        )
+        for item in instrument_coverage
+        if item.bar_period == request.bar_period
+    ]
+    if not coverage:
+        return request.time_range
+    return clip_to_bars(
+        request.time_range,
+        min(item.first_start_utc for item in coverage),
+        find_bar_end(max(item.last_start_utc for item in coverage), request.bar_period),
+    )
+
+
 async def queue_backtest(
     *,
     database_url: str,
@@ -117,15 +162,27 @@ async def queue_backtest(
     """Adds a queued backtest and returns its ID. The backtest runner of the Web process starts it. Without a source
     order in the request, the backtest saves and uses the global source order."""
     request = await add_global_source_order(database_url=database_url, request=request)
+    bar_range = await find_bar_range(database_url=database_url, request=request, universe_periods=universe_periods)
     async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
         row = await backtest_store.insert_backtest(
             connection,
             request=request,
+            bar_range=bar_range,
             created_at_utc=created_at_utc,
             universe_periods=universe_periods,
             conversation_id=conversation_id,
         )
     return row.id
+
+
+def to_summary(row: BacktestRow) -> BacktestSummary:
+    return BacktestSummary(
+        id=row.id,
+        request=backtest_store.read_request(row),
+        status=row.status,
+        error_message=row.error_message,
+        metrics=backtest_store.read_metrics(row),
+    )
 
 
 async def read_backtest_outcome(*, database_url: str, backtest_id: int) -> BacktestOutcome | None:
@@ -135,15 +192,14 @@ async def read_backtest_outcome(*, database_url: str, backtest_id: int) -> Backt
             return None
         equity_curve = await backtest_store.select_equity_curve(connection, backtest_id)
         trades = await backtest_store.select_trades(connection, backtest_id)
-    return BacktestOutcome(
-        id=row.id,
-        request=backtest_store.read_request(row),
-        status=row.status,
-        error_message=row.error_message,
-        metrics=backtest_store.read_metrics(row),
-        equity_curve=equity_curve,
-        trades=trades,
-    )
+    return BacktestOutcome(**vars(to_summary(row)), equity_curve=equity_curve, trades=trades)
+
+
+async def read_backtest_summaries(*, database_url: str, backtest_ids: list[int]) -> list[BacktestSummary]:
+    """The backtests with these IDs, the newest first. An unknown ID gives no summary."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        rows = await backtest_store.select_backtests_by_id(connection, backtest_ids)
+    return [to_summary(row) for row in rows]
 
 
 async def read_last_backtest_ids(*, database_url: str, strategy_version_ids: list[int], count: int) -> list[int]:

@@ -27,7 +27,7 @@ async function createStrategy(page: Page, name: string): Promise<void> {
   await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
   // The toolbar works when the editor has the code of the open version.
-  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('Moving average cross: buy when the close');
 }
 
 // The shortcuts use Cmd on macOS and Ctrl elsewhere, like the code editor. The page reads the platform of the browser.
@@ -337,13 +337,13 @@ test('the version address opens that version, not the latest one', async ({ page
   const firstVersion = (await (await request.get(`${strategyPath}/versions/1`)).json()) as { code: string };
   await request.post(`${strategyPath}/versions`, {
     // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
-    data: { code: `${firstVersion.code}\n# Version 2.\n` },
+    data: { code: `# Version 2.\n${firstVersion.code}` },
   });
 
   await page.goto(`/strategies/${String(strategy.id)}/versions/1`);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
   await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v1');
-  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('Moving average cross: buy when the close');
   await expect(page.getByRole('textbox', { name: 'Strategy code' })).not.toContainText('# Version 2.');
 
   // Another version in the toolbar changes the address to that version, so that a reload opens it again.

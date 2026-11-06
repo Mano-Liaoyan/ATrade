@@ -48,7 +48,7 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_status()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_exchange_rate(currency, quote_currency)`, `read_daily_exchange_rates(currency, quote_currency, time_range)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_status()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_exchange_rate(currency, quote_currency)`, `read_daily_exchange_rates(currency, quote_currency, time_range)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `place_order_and_wait(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
 | `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
 | `GatewayStatus` | `connected`, `unreachable` (no API connection), or `no_ibkr_connection` (the API connection is there, but IB Gateway has no connection to the IBKR servers). |
 | `AccountValue` | One account value from IBKR: `account`, `tag` (for example `NetLiquidation`), `value` (text), `currency`. |
@@ -71,7 +71,9 @@ The public entry `atrade.ibkr` exports:
   (section 7.4). Each request then waits for its timeout. The connection
   thus keeps an IBKR link state:
   - Lost: IB Gateway sends code `1100` or `2110`, or a historical data
-    request gets no answer before its timeout.
+    request gets no answer before its timeout. A live bar subscription
+    without an answer does not change the state, because one instrument can
+    have no answer.
   - Restored: IB Gateway sends code `1101` or `1102`, or a historical data
     request gets an answer. An IBKR API error is also an answer.
   - A new API connection starts with the link restored.
@@ -82,7 +84,8 @@ The public entry `atrade.ibkr` exports:
 - While the link is lost, `read_status()` returns `no_ibkr_connection` and
   `is_connected()` is false. So the routes return `503` at once. The order
   functions, the historical data requests, and the live bar subscription
-  raise `GatewayRequestError` at once. Each 60 seconds, 1 request can try
+  raise `GatewayRequestError` at once. An open live bar stream raises it
+  within 1 second. Each 60 seconds, 1 request can try
   again. So a connection without `keep_connected()` (a forward test child)
   also finds a link that came back.
 - `read_connection_number()` counts the successful connections. A new
@@ -101,7 +104,8 @@ The public entry `atrade.ibkr` exports:
   the same functions. Its data stays in memory. Tests set
   `is_gateway_reachable`, `connected`, `has_ibkr_connection`, `port`, `managed_accounts`,
   `account_values`, `portfolio`, `instruments`, `search_error_message`,
-  `historical_bars_error_message`, `open_orders`, `order_error_message`, `cancel_error_message`, `executions`,
+  `historical_bars_error_message`, `open_orders`, `order_error_message`, `order_rejection_message`,
+  `cancel_error_message`, `executions`,
   `exchange_rates`, `exchange_rate_error_message`, and `daily_exchange_rates` (one rate for each
   day of the range) directly. It records each rate request in `exchange_rate_requests`, and each
   daily rate request in `daily_exchange_rate_requests`. Each change of `connected` from false to true gives a new
@@ -112,6 +116,14 @@ The public entry `atrade.ibkr` exports:
   primary exchange of the instrument, and returns the IBKR order ID. It does
   not check the account. The caller (`paper_trading`) runs the paper account
   check first.
+- `place_order_and_wait(request)` is `place_order` for orders by hand. It
+  waits at most 2 seconds for a working or ended status (a warning of IBKR
+  sets `ValidationError`, and the wait continues), and raises
+  `GatewayRequestError` with the IBKR message when the status is `Cancelled`
+  or `Inactive`,
+  for example after error 201. Without an answer in the time, it returns the
+  ID. A forward test uses `place_order` and finds an ended order in its open
+  order check.
 - `read_open_orders()` calls `reqAllOpenOrders` and returns the orders that
   are not done, from all client IDs. A lock allows only one request at a
   time, because ib_async keeps one result per request type. The timeout is
@@ -129,8 +141,31 @@ The public entry `atrade.ibkr` exports:
   more needs no cancel.
 - `read_executions()` calls `reqExecutions` and returns `Execution` values
   (`execution_id`, `order_id`, `client_id`, `account`, `time_utc`, `side`,
-  `quantity`, `price`, `commission`). `paper_trading` uses it for the fills
-  of orders by hand.
+  `quantity`, `price`, `commission`, `is_held`, `order_ref`,
+  `symbol`, `currency`).
+  `paper_trading` uses it for the fills of orders by hand. `forward_test`
+  uses it for the fills of a forward test. `symbol` and `currency` come from
+  the contract of the execution. The commission comes from the fill that
+  `ib_async` stores for the execId, because the `reqExecutions` answer holds
+  an empty report for an execId that the connection already knows. A fill
+  without its commission report is a held fill. It stays out of the list
+  until its report arrives. `include_held=True` adds it with `is_held` True.
+  The function waits up to 2 seconds for a missing report, because a report
+  can come after the end of the answer. It waits only one time for each fill
+  on a connection and then logs a warning with the execId, so a fill without
+  a report does not slow each later read.
+- A hold ends at 5 minutes (`COMMISSION_REPORT_LIMIT`): `read_executions()`
+  then returns the fill with commission 0 and logs one warning with the
+  execId. All callers get this limit, because a lost fill gives a wrong
+  owner position, and a wrong commission costs less. The owner ledger does
+  not repair the commission when the report comes later.
+- The age is the older of 2 values: the time since the execution, and the
+  time since the first wait of this connection. `ib_async` reads a time
+  without a zone as local time, because ATrade does not set `TimezoneTWS`,
+  and gives it a zone, so ATrade cannot see this case. The wait of the
+  connection limits a time that is too late. A time that is too early ends
+  the hold after the 2 second wait. A new child process has a new connection,
+  so only the execution time ends a hold across its retries.
 - The order functions raise `GatewayRequestError` when the connection is
   not there.
 - `read_exchange_rate(currency, quote_currency)` returns the IBKR forex

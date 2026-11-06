@@ -3,27 +3,38 @@
 
 - The ledger starts at the first passed paper account check with a USD cash value: the positions of the account and
   its cash go to "By hand" as `ledger_start` rows.
-- The Web process records the fills of its orders by hand from reqExecutions before each order by hand and each second
-  while /ws/paper-trading is open. A fill before the ledger start is already in the start positions.
+- The Web process records the fills of its orders by hand from reqExecutions before each order by hand, each second
+  while /ws/paper-trading is open, and each 60 seconds without a page. A fill before the ledger start is already in the
+  start positions.
 - Rule 2 uses the limit price, or the last daily close for a market order, without the commission. Amounts of other
   currencies are converted to USD with the IBKR forex rate.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
 from typing import Literal
 
+import anyio
 import psycopg
 
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import read_order_source
-from atrade.ibkr import Execution, GatewayConnection, GatewayRequestError, OpenOrder, OrderSide
+from atrade.ibkr import (
+    SMART_ROUTING_EXCHANGE,
+    Execution,
+    GatewayConnection,
+    GatewayRequestError,
+    OpenOrder,
+    OrderSide,
+)
 from atrade.paper_trading import manual_order_store, owner_ledger_store, split_check_store
 from atrade.paper_trading.owner_ledger_store import BY_HAND, LedgerEntry, Owner, OwnerPosition
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
+from atrade.watchlist import read_watchlist_instruments
 
 USD = "USD"
 BY_HAND_LABEL = "By hand"
@@ -31,6 +42,10 @@ BY_HAND_LABEL = "By hand"
 LAST_CLOSE_DAYS = 10
 CENT = Decimal("0.01")
 BOUGHT_SIDE = "BOT"
+# reqExecutions returns only the fills of the current day, so the recording does not wait for a page or an order.
+FILL_RECORD_INTERVAL_SECONDS = 60.0
+
+logger = logging.getLogger("atrade.paper_trading")
 
 type LedgerRule = Literal["sell_more_than_position", "buy_more_than_cash", "ledger_not_started", "split_check_needed"]
 
@@ -66,9 +81,7 @@ async def find_split_check_refusal(
         return None
     return OrderRefusal(
         rule="split_check_needed",
-        detail=(
-            f"{instrument.symbol} needs a split check. Apply the split or keep the ledger on the paper trading page."
-        ),
+        detail=f"{instrument.symbol} needs a split check. Apply the split or keep the ledger on the Home page.",
     )
 
 
@@ -98,6 +111,17 @@ class ManualOrderLedger:
             await connection.commit()
             return await owner_ledger_store.select_entries(connection, account=account)
 
+    async def keep_recording_fills(self) -> None:
+        """Runs until the caller cancels it. A database error is logged, and the next run tries again."""
+        while True:
+            account = self.paper_account_monitor.read_checked_account_id()
+            if account is not None:
+                try:
+                    await self.record_fills(account)
+                except psycopg.Error:
+                    logger.exception("The fills of orders by hand were not recorded.")
+            await anyio.sleep(FILL_RECORD_INTERVAL_SECONDS)
+
     async def record_fills(self, account: str) -> None:
         """Writes the fills of the orders by hand of this Web client ID. IBKR errors leave them for the next time."""
         entries = await self.read_entries(account)
@@ -115,7 +139,10 @@ class ManualOrderLedger:
                 for order in await manual_order_store.select_manual_orders(connection)
                 if order.account == account
             }
-            for execution in executions:
+            recorded_ids = {
+                fill.ibkr_execution_id for fill in await owner_ledger_store.select_owner_fills(connection, BY_HAND)
+            }
+            for execution in [item for item in executions if item.execution_id not in recorded_ids]:
                 order = orders.get(execution.order_id)
                 if (
                     order is None
@@ -182,11 +209,19 @@ class ManualOrderLedger:
             quantity=Decimal(order.quantity),
             limit_price=order.limit_price,
         )
-        amounts = OrderAmounts(gateway_connection=self.paper_account_monitor.gateway_connection, clock=self.clock)
+        amounts = OrderAmounts(
+            database_url=self.database_url,
+            gateway_connection=self.paper_account_monitor.gateway_connection,
+            clock=self.clock,
+        )
         return await check_owner_order(amounts, entries, open_orders, owner_order)
 
     async def convert_to_usd(self, amount: Decimal, currency: str) -> Decimal:
-        amounts = OrderAmounts(gateway_connection=self.paper_account_monitor.gateway_connection, clock=self.clock)
+        amounts = OrderAmounts(
+            database_url=self.database_url,
+            gateway_connection=self.paper_account_monitor.gateway_connection,
+            clock=self.clock,
+        )
         return await amounts.convert_to_usd(amount, currency)
 
 
@@ -208,7 +243,8 @@ class OrderAmounts:
     """The USD amount of a buy order for rule 2 (section 11.13): the limit price, or the last daily close for a market
     order, without the commission. Other currencies use the IBKR forex rate."""
 
-    def __init__(self, *, gateway_connection: GatewayConnection, clock: Clock) -> None:
+    def __init__(self, *, database_url: str, gateway_connection: GatewayConnection, clock: Clock) -> None:
+        self.database_url = database_url
         self.gateway_connection = gateway_connection
         self.clock = clock
 
@@ -247,6 +283,31 @@ async def check_owner_order(
     return await check_buy(amounts, entries, owner_open_orders, order)
 
 
+async def find_order_instrument(
+    amounts: OrderAmounts, entries: list[LedgerEntry], open_order: OpenOrder, order: LedgerOrder
+) -> Instrument | None:
+    """The instrument for the daily bars of an open market order. ib_async decodes no primary exchange for an open order
+    of an earlier session, and IBKR can refuse SMART as a primary exchange. Thus the exchange comes from the new order,
+    the ledger, or the watchlist, by symbol and currency. None when no one of them has the instrument."""
+    instrument = open_order.instrument
+    if instrument.exchange != SMART_ROUTING_EXCHANGE or open_order.limit_price is not None:
+        return instrument
+    ledger_instruments = [position.instrument for position in owner_ledger_store.sum_owner_positions(entries)]
+    known_instruments = [
+        order.instrument,
+        *ledger_instruments,
+        *await read_watchlist_instruments(database_url=amounts.database_url),
+    ]
+    return next(
+        (
+            known
+            for known in known_instruments
+            if known.has_same_symbol_and_currency(instrument) and known.exchange != SMART_ROUTING_EXCHANGE
+        ),
+        None,
+    )
+
+
 async def check_buy(
     amounts: OrderAmounts, entries: list[LedgerEntry], owner_open_orders: list[OpenOrder], order: LedgerOrder
 ) -> OrderRefusal | None:
@@ -254,8 +315,18 @@ async def check_buy(
     open_buy_amount = Decimal(0)
     for open_order in owner_open_orders:
         if open_order.side == "BUY":
+            instrument = await find_order_instrument(amounts, entries, open_order, order)
+            if instrument is None:
+                symbol = open_order.instrument.symbol
+                return OrderRefusal(
+                    rule="buy_more_than_cash",
+                    detail=(
+                        f"{order.owner_label} has an open market buy order for {symbol} from an earlier session, and"
+                        f" ATrade does not know its exchange. Add {symbol} to the watchlist or cancel the order."
+                    ),
+                )
             open_buy_amount += await amounts.find_amount_usd(
-                open_order.instrument, open_order.quantity - open_order.filled_quantity, open_order.limit_price
+                instrument, open_order.quantity - open_order.filled_quantity, open_order.limit_price
             )
     amount = await amounts.find_amount_usd(order.instrument, order.quantity, order.limit_price)
     if amount <= cash - open_buy_amount:
@@ -284,7 +355,7 @@ def check_sell(
         (
             open_order.quantity - open_order.filled_quantity
             for open_order in owner_open_orders
-            if open_order.side == "SELL" and open_order.instrument == order.instrument
+            if open_order.side == "SELL" and open_order.instrument.has_same_symbol_and_currency(order.instrument)
         ),
         Decimal(0),
     )

@@ -811,6 +811,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -974,6 +984,16 @@
               }
             },
             "description": "Unprocessable Content"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
           }
         }
       },
@@ -2111,6 +2131,57 @@
             }
           }
         }
+      },
+      "delete": {
+        "summary": "Delete Sweep",
+        "description": "A true delete of the sweep and its runs. 409 while a run is queued or running, and for a run that is the\nsame-period backtest of a forward test.",
+        "operationId": "delete_sweep_api_sweeps__sweep_id__delete",
+        "parameters": [
+          {
+            "name": "sweep_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sweep Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/sweeps/{sweep_id}/cancel": {
@@ -2618,6 +2689,78 @@
         }
       }
     },
+    "/api/screen-results/{screen_result_id}": {
+      "get": {
+        "summary": "Read Screen Result",
+        "operationId": "read_screen_result_api_screen_results__screen_result_id__get",
+        "parameters": [
+          {
+            "name": "screen_result_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Screen Result Id"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenResultResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/screens/{screen_id}/keep": {
       "post": {
         "summary": "Keep Screen",
@@ -2731,78 +2874,6 @@
               }
             },
             "description": "Unprocessable Content"
-          }
-        }
-      }
-    },
-    "/api/screen-results/{screen_result_id}": {
-      "get": {
-        "summary": "Read Screen Result",
-        "operationId": "read_screen_result_api_screen_results__screen_result_id__get",
-        "parameters": [
-          {
-            "name": "screen_result_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Screen Result Id"
-            }
-          },
-          {
-            "name": "offset",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "default": 0,
-              "title": "Offset"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "maximum": 500,
-              "minimum": 1,
-              "default": 50,
-              "title": "Limit"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ScreenResultResponse"
-                }
-              }
-            }
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            },
-            "description": "Not Found"
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
           }
         }
       }
@@ -3746,6 +3817,17 @@
             "type": "boolean",
             "title": "Has Split Check Pending"
           },
+          "fill_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Warning"
+          },
           "sweep_id": {
             "anyOf": [
               {
@@ -3840,6 +3922,7 @@
           "bar_count_by_source",
           "survivorship_bias",
           "has_split_check_pending",
+          "fill_warning",
           "sweep_id",
           "parameters",
           "equity_curve",
@@ -4280,6 +4363,17 @@
             "type": "boolean",
             "title": "Has Split Check Pending"
           },
+          "fill_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Warning"
+          },
           "sweep_id": {
             "anyOf": [
               {
@@ -4333,6 +4427,7 @@
           "bar_count_by_source",
           "survivorship_bias",
           "has_split_check_pending",
+          "fill_warning",
           "sweep_id",
           "parameters"
         ],
@@ -4857,6 +4952,17 @@
             "type": "boolean",
             "title": "Has Split Check Pending"
           },
+          "fill_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Warning"
+          },
           "sweep_id": {
             "anyOf": [
               {
@@ -4955,6 +5061,7 @@
           "bar_count_by_source",
           "survivorship_bias",
           "has_split_check_pending",
+          "fill_warning",
           "sweep_id",
           "parameters",
           "equity_curve",
@@ -5024,25 +5131,6 @@
         ],
         "title": "ComparedBacktestSummaryResponse"
       },
-      "ComparedEquityPointResponse": {
-        "properties": {
-          "time_utc": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Time Utc"
-          },
-          "equity_usd": {
-            "type": "string",
-            "title": "Equity Usd"
-          }
-        },
-        "type": "object",
-        "required": [
-          "time_utc",
-          "equity_usd"
-        ],
-        "title": "ComparedEquityPointResponse"
-      },
       "ComparedInterruptionResponse": {
         "properties": {
           "start_utc": {
@@ -5069,10 +5157,6 @@
           "final_equity_usd": {
             "type": "string",
             "title": "Final Equity Usd"
-          },
-          "net_profit_usd": {
-            "type": "string",
-            "title": "Net Profit Usd"
           },
           "total_return_percent": {
             "type": "string",
@@ -5224,12 +5308,15 @@
             },
             "type": "object",
             "title": "Missing Reasons"
+          },
+          "net_profit_usd": {
+            "type": "string",
+            "title": "Net Profit Usd"
           }
         },
         "type": "object",
         "required": [
           "final_equity_usd",
-          "net_profit_usd",
           "total_return_percent",
           "max_drawdown_percent",
           "trade_count",
@@ -5245,7 +5332,8 @@
           "exposure_percent",
           "turnover_per_year",
           "win_rate_percent",
-          "missing_reasons"
+          "missing_reasons",
+          "net_profit_usd"
         ],
         "title": "ComparedMetricsResponse",
         "description": "The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the\nfinal equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10)."
@@ -6026,14 +6114,14 @@
           },
           "forward_test_equity_curve": {
             "items": {
-              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+              "$ref": "#/components/schemas/EquityPointResponse"
             },
             "type": "array",
             "title": "Forward Test Equity Curve"
           },
           "backtest_equity_curve": {
             "items": {
-              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+              "$ref": "#/components/schemas/EquityPointResponse"
             },
             "type": "array",
             "title": "Backtest Equity Curve"
@@ -6082,7 +6170,7 @@
           },
           "equity_curve": {
             "items": {
-              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+              "$ref": "#/components/schemas/EquityPointResponse"
             },
             "type": "array",
             "title": "Equity Curve"
@@ -9085,18 +9173,21 @@
             "type": "string",
             "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Symbol"
           },
           "exchange": {
             "type": "string",
             "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Exchange"
           },
           "currency": {
             "type": "string",
             "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Currency"
           },
           "side": {
@@ -9104,6 +9195,7 @@
           },
           "quantity": {
             "type": "integer",
+            "maximum": 2147483647.0,
             "exclusiveMinimum": 0.0,
             "title": "Quantity"
           },
@@ -9114,6 +9206,7 @@
             "anyOf": [
               {
                 "type": "number",
+                "exclusiveMaximum": 1000000000000.0,
                 "exclusiveMinimum": 0.0
               },
               {
@@ -11562,27 +11655,6 @@
           "account_quantity_after"
         ],
         "title": "SplitCheckMessage",
-        "type": "object"
-      },
-      "SteerMessage": {
-        "description": "Browser to server: a user message while the AI assistant runs.",
-        "properties": {
-          "type": {
-            "const": "steer",
-            "default": "steer",
-            "title": "Type",
-            "type": "string"
-          },
-          "text": {
-            "minLength": 1,
-            "title": "Text",
-            "type": "string"
-          }
-        },
-        "required": [
-          "text"
-        ],
-        "title": "SteerMessage",
         "type": "object"
       },
       "StrategyVersionSavedMessage": {

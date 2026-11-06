@@ -15,7 +15,7 @@ from atrade.market_data import (
     BarRequest,
     BarSource,
     has_saved_bars,
-    read_saved_bars,
+    read_saved_bars_of_many,
     read_us_universe_members,
     read_us_universe_quarter_starts,
 )
@@ -112,8 +112,8 @@ async def run_screen_periods(
     """Runs the copy of the screen at each period start on the daily bars that start before it. The result rows are
     the members of the period (docs/architecture/screen.md section 24.9). A period can have no member.
 
-    The periods run at the same time in worker processes. The first failed period raises its error and stops the
-    periods that wait. The child already has the threads of its libraries, so the workers come from a forkserver.
+    The periods run at the same time in worker processes. The first failed period raises its error and kills the
+    workers. The child already has the threads of its libraries, so the workers come from a forkserver.
     """
     period_starts = find_screen_period_starts(time_range, rebalance_period)
     pool = ProcessPoolExecutor(
@@ -137,7 +137,8 @@ async def run_screen_periods(
             )
         )
     finally:
-        pool.shutdown(cancel_futures=True)
+        # Not `shutdown`: it waits on the event loop, and a period that does not end would stop the end of the backtest.
+        pool.kill_workers()
     return [
         UniversePeriod(start_utc=start_utc, members=members)
         for start_utc, members in zip(period_starts, members_of_periods, strict=True)
@@ -196,17 +197,50 @@ def find_universe_look_back_length(bar_period: BarPeriod, single_look_back: time
 
 @dataclass(frozen=True)
 class MemberBars:
-    """The bars of one member in its universe periods, and its look-back bars before the start of each range."""
+    """The bars of one member in its universe periods, and its look-back bars before the start of each range.
+
+    `open_bars` holds the member's bars of the whole backtest range. Only their open prices go to the engine.
+    """
 
     instrument: Instrument
     bars: list[Bar]
     look_back_bars: list[Bar]
+    open_bars: list[Bar]
 
 
 @dataclass(frozen=True)
 class UniverseBars:
     members: list[MemberBars]
     bar_count_by_source: dict[BarSource, int]
+
+
+def merge_bars(bar_lists: list[list[Bar]]) -> list[Bar]:
+    bars_by_start = {bar.start_utc: bar for bars in bar_lists for bar in bars}
+    return [bars_by_start[start_utc] for start_utc in sorted(bars_by_start)]
+
+
+def merge_listings(listings: list[MemberBars]) -> MemberBars:
+    """One member with the bars of all listings of a symbol, on the exchange of the last bar."""
+    last_listing = max(
+        (listing for listing in listings if listing.open_bars),
+        key=lambda listing: listing.open_bars[-1].start_utc,
+        default=listings[0],
+    )
+    return MemberBars(
+        instrument=last_listing.instrument,
+        bars=merge_bars([listing.bars for listing in listings]),
+        look_back_bars=merge_bars([listing.look_back_bars for listing in listings]),
+        open_bars=merge_bars([listing.open_bars for listing in listings]),
+    )
+
+
+def merge_symbol_members(members: list[MemberBars]) -> list[MemberBars]:
+    """A listing move saves one symbol on 2 exchanges, and each listing can be a member. The simulated venue has one
+    instrument for each symbol (ADR 0003), so a symbol is one member with all its bars (section 10.10.1)."""
+    listings_by_symbol: dict[str, list[MemberBars]] = {}
+    for member in members:
+        listings_by_symbol.setdefault(member.instrument.symbol, []).append(member)
+    return [merge_listings(listings) for listings in listings_by_symbol.values()]
 
 
 async def read_universe_bars(
@@ -221,35 +255,39 @@ async def read_universe_bars(
     each range of periods (section 10.10.1)."""
     bar_count_by_source = dict.fromkeys(source_order, 0)
     members: list[MemberBars] = []
-    for member, ranges in find_member_ranges(periods, request.time_range.end_utc).items():
+    member_ranges = find_member_ranges(periods, request.time_range.end_utc)
+    bar_requests: list[BarRequest] = []
+    for member, ranges in member_ranges.items():
+        for time_range in ranges:
+            look_back_range = TimeRange(start_utc=time_range.start_utc - look_back_length, end_utc=time_range.start_utc)
+            bar_requests.append(BarRequest(instrument=member, bar_period=request.bar_period, time_range=time_range))
+            bar_requests.append(
+                BarRequest(instrument=member, bar_period=request.bar_period, time_range=look_back_range)
+            )
+        if ranges != [request.time_range]:
+            bar_requests.append(
+                BarRequest(instrument=member, bar_period=request.bar_period, time_range=request.time_range)
+            )
+    saved_bars_of_requests = iter(
+        await read_saved_bars_of_many(database_url=database_url, bar_requests=bar_requests, source_order=source_order)
+    )
+    for member, ranges in member_ranges.items():
         bars: list[Bar] = []
         look_back_by_start: dict[datetime, Bar] = {}
-        for time_range in ranges:
-            saved = await read_saved_bars(
-                database_url=database_url,
-                bar_request=BarRequest(instrument=member, bar_period=request.bar_period, time_range=time_range),
-                source_order=source_order,
-            )
+        for _ in ranges:
+            saved = next(saved_bars_of_requests)
             bars.extend(saved.bars)
             for bar_source, count in saved.bar_counts.items():
                 bar_count_by_source[bar_source] = bar_count_by_source.get(bar_source, 0) + count
-            look_back = await read_saved_bars(
-                database_url=database_url,
-                bar_request=BarRequest(
-                    instrument=member,
-                    bar_period=request.bar_period,
-                    time_range=TimeRange(
-                        start_utc=time_range.start_utc - look_back_length, end_utc=time_range.start_utc
-                    ),
-                ),
-                source_order=source_order,
-            )
+            look_back = next(saved_bars_of_requests)
             look_back_by_start.update((bar.start_utc, bar) for bar in look_back.bars)
         members.append(
             MemberBars(
                 instrument=member,
                 bars=bars,
                 look_back_bars=[look_back_by_start[start_utc] for start_utc in sorted(look_back_by_start)],
+                # A member that leaves still sells at its next open, also outside its periods.
+                open_bars=bars if ranges == [request.time_range] else next(saved_bars_of_requests).bars,
             )
         )
-    return UniverseBars(members=members, bar_count_by_source=bar_count_by_source)
+    return UniverseBars(members=merge_symbol_members(members), bar_count_by_source=bar_count_by_source)

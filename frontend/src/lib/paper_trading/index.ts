@@ -5,7 +5,7 @@ export { default as InstrumentOrderPanel } from './InstrumentOrderPanel.svelte';
 export { default as PositionTable } from './PositionTable.svelte';
 export { default as OpenOrderList } from './OpenOrderList.svelte';
 export { default as FilledManualOrderList } from './FilledManualOrderList.svelte';
-export { PaperAccountFeed } from './paper_account_feed.svelte';
+export { paperAccountFeed } from './paper_account_feed.svelte';
 export {
   describeBalanceCurrency,
   describePaperAccountCheck,
@@ -13,8 +13,6 @@ export {
   findPaperAccountCheckKind,
   formatAmount,
   listBalanceMetrics,
-  readPaperAccountMessage,
-  PAPER_TRADING_SOCKET_PATH,
 } from './paper_account';
 export type { BalanceMetric, PaperAccountBalance, PaperAccountCheck, PaperAccountMessage, PaperPosition } from './paper_account';
 export { readPaperCapital } from './paper_capital';

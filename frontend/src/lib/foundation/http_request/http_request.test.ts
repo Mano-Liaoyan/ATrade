@@ -1,6 +1,6 @@
 // Sends HTTP requests to the backend and turns a failed answer into a message for the user.
 import { describe, expect, it } from 'vite-plus/test';
-import { BACKEND_NOT_REACHABLE, describeErrorBody, readErrorMessage, requestJson, sendRequest } from './index';
+import { BACKEND_NOT_REACHABLE, describeErrorBody, jsonRequest, readErrorMessage, requestJson, sendCommand, sendRequest } from './index';
 
 function respondWith(status: number, body: unknown): typeof fetch {
   return () => Promise.resolve(new Response(JSON.stringify(body), { status }));
@@ -78,5 +78,50 @@ describe('requestJson', () => {
 
     expect(result).toEqual({ kind: 'failed', message: BACKEND_NOT_REACHABLE });
     expect(BACKEND_NOT_REACHABLE).toBe('The backend is not reachable.');
+  });
+
+  it('returns a message when a successful answer has no JSON body', async () => {
+    const answerWithHtml: typeof fetch = () => Promise.resolve(new Response('<html></html>', { status: 200 }));
+
+    const result = await requestJson(answerWithHtml, 'The item request', '/api/items');
+
+    expect(result).toEqual({ kind: 'failed', message: 'The item request failed with HTTP status 200.' });
+  });
+
+  it('returns a message when the connection stops during the body', async () => {
+    const stoppedBody = new ReadableStream({
+      start: (controller) => {
+        controller.error(new TypeError('network error'));
+      },
+    });
+    const answerWithStoppedBody: typeof fetch = () => Promise.resolve(new Response(stoppedBody, { status: 200 }));
+
+    const result = await requestJson(answerWithStoppedBody, 'The item request', '/api/items');
+
+    expect(result).toEqual({ kind: 'failed', message: 'The item request failed with HTTP status 200.' });
+  });
+});
+
+describe('sendCommand', () => {
+  it('does not read the empty body of an accepted command', async () => {
+    const accepted: typeof fetch = () => Promise.resolve(new Response(null, { status: 204 }));
+
+    expect(await sendCommand(accepted, 'The item request', '/api/items/3', { method: 'DELETE' })).toEqual({ kind: 'ok', value: undefined });
+  });
+
+  it('returns the error message of a refused command', async () => {
+    const result = await sendCommand(respondWith(409, { detail: 'Item in use.' }), 'The item request', '/api/items/3');
+
+    expect(result).toEqual({ kind: 'failed', message: 'Item in use.' });
+  });
+
+  it('says that the backend is not reachable', async () => {
+    expect(await sendCommand(failingFetch, 'The item request', '/api/items/3')).toEqual({ kind: 'failed', message: BACKEND_NOT_REACHABLE });
+  });
+});
+
+describe('jsonRequest', () => {
+  it('writes the method, the JSON header, and the body', () => {
+    expect(jsonRequest('PUT', { id: 3 })).toEqual({ method: 'PUT', headers: { 'content-type': 'application/json' }, body: '{"id":3}' });
   });
 });

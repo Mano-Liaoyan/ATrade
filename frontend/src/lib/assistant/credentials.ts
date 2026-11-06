@@ -3,12 +3,7 @@
 // characters of an API key. An API key goes from the password field to /ws/assistant as a login_answer.
 import type { components } from '#lib/api';
 import type { SelectItem, StatusKind } from '#lib/foundation/carbon';
-import {
-  readErrorMessage,
-  requestJson,
-  sendRequest,
-  type RequestResult,
-} from '#lib/foundation/http_request';
+import { requestJson, sendCommand, type RequestResult } from '#lib/foundation/http_request';
 import { readSocketMessage } from '#lib/foundation/live_socket';
 
 export type Credential = components['schemas']['CredentialResponse'];
@@ -35,11 +30,8 @@ export function listProviders(fetchFunction: typeof fetch): Promise<RequestResul
 /** Deletes a credential. Null when it is deleted, else the error message. */
 export async function deleteCredential(fetchFunction: typeof fetch, credentialId: string): Promise<string | null> {
   const path = `${ASSISTANT_PATH}/credentials/${encodeURIComponent(credentialId)}`;
-  const response = await sendRequest(fetchFunction, path, { method: 'DELETE' });
-  if (response === null) {
-    return 'The backend is not reachable.';
-  }
-  return response.ok ? null : readErrorMessage(response, FAILED_ACTION);
+  const result = await sendCommand(fetchFunction, FAILED_ACTION, path, { method: 'DELETE' });
+  return result.kind === 'failed' ? result.message : null;
 }
 
 /** The key column: the last 4 characters of an API key. Empty for a subscription login. */

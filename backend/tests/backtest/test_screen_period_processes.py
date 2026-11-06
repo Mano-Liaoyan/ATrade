@@ -10,6 +10,7 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from collections.abc import AsyncGenerator, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -43,6 +44,8 @@ MAX_PROCESS_WAIT_SECONDS = 30
 # Long enough for the child to start and for the test to read /proc on a loaded CI runner.
 TIMEOUT_SECONDS = 20
 LONG_TIMEOUT_SECONDS = 600
+SECOND_PERIOD_START_UTC = datetime(2026, 2, 15, tzinfo=UTC)
+HELD_PERIOD_SECONDS = 40
 
 
 @dataclass(frozen=True)
@@ -147,6 +150,28 @@ async def test_parallel_periods_equal_a_serial_run_in_the_same_order(database_ur
         serial_members.append((start_utc, [row.instrument for row in outcome.rows]))
     assert [(period.start_utc, period.members) for period in periods] == serial_members
     assert any(period.members for period in periods)
+
+
+def fail_first_period_and_hold_the_others(*, as_of_utc: datetime, **_: object) -> list[Instrument]:
+    """In place of `run_screen_period`. The pool finds this function by name in the worker."""
+    if as_of_utc < SECOND_PERIOD_START_UTC:
+        message = "The first period failed."
+        raise ValueError(message)
+    time.sleep(HELD_PERIOD_SECONDS)
+    return []
+
+
+@pytest.mark.anyio
+async def test_a_failed_period_ends_the_run_while_another_worker_still_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("atrade.backtest.backtest_universe.run_screen_period", fail_first_period_and_hold_the_others)
+    screen = UniverseScreen(screen_id=1, name="Test", market="US", definition=make_definition())
+    time_range = TimeRange(start_utc=datetime(2026, 2, 1, tzinfo=UTC), end_utc=datetime(2026, 5, 1, tzinfo=UTC))
+    run_start = time.monotonic()
+
+    with pytest.raises(ValueError, match="The first period failed"):
+        await run_screen_periods(database_url="unused", screen=screen, rebalance_period="month", time_range=time_range)
+
+    assert time.monotonic() - run_start < HELD_PERIOD_SECONDS / 2
 
 
 @pytest.mark.anyio

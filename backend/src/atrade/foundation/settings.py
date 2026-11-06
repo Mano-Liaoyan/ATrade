@@ -25,7 +25,8 @@ def require_usable_client_id(client_id: int) -> None:
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="ATRADE_", frozen=True)
+    # A validation error must not print input values: they include secrets (section 15).
+    model_config = SettingsConfigDict(env_prefix="ATRADE_", frozen=True, hide_input_in_errors=True)
 
     # The backtest child process gets DATABASE_URL by this exact name (section 10), so it has no prefix.
     database_url: str = Field(validation_alias=AliasChoices("DATABASE_URL", "database_url"))

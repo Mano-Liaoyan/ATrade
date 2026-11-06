@@ -3,30 +3,30 @@
 The real service is tested in assistant/tests/assistant_server.test.ts with the same paths and fields.
 """
 
-import dataclasses
 import json
+from collections.abc import AsyncIterator
 
 import httpx
 import pytest
 
 from atrade.assistant import (
+    AssistantErrorMessage,
     AssistantServiceClient,
     AssistantServiceError,
-    BacktestFinished,
+    BacktestFinishedMessage,
     ConversationMessage,
-    CredentialSummary,
-    LoginEnd,
-    LoginStep,
-    MessageEnd,
+    CredentialResponse,
+    LoginEndMessage,
+    LoginStepMessage,
+    MessageDeltaMessage,
+    MessageEndMessage,
     ModelSelection,
     ProviderModel,
     ProviderSummary,
-    RunError,
-    ScreenRunFinished,
-    ScreenSaved,
-    StrategyVersionSaved,
-    TextDelta,
-    ToolStep,
+    ScreenRunFinishedMessage,
+    ScreenSavedMessage,
+    StrategyVersionSavedMessage,
+    ToolStepMessage,
 )
 
 SELECTION = ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1", thinking_level="high")
@@ -64,11 +64,11 @@ async def test_run_reads_the_json_lines_and_skips_unknown_events() -> None:
     events = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
 
     assert events == [
-        TextDelta(text="Hel"),
-        MessageEnd(
+        MessageDeltaMessage(text="Hel"),
+        MessageEndMessage(
             text="Hello.", provider="fake", model="fake-model", credential_name="Fake key", thinking_level="high"
         ),
-        RunError(message="Bad key"),
+        AssistantErrorMessage(message="Bad key"),
     ]
     assert str(requests[0].url) == "http://assistant:8002/conversations/7/runs"
     assert json.loads(requests[0].content) == {
@@ -111,18 +111,18 @@ async def test_run_reads_the_tool_events() -> None:
     events = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
 
     assert events == [
-        ToolStep(
+        ToolStepMessage(
             tool_call_id="call_1", tool_name="run_backtest", status="running", backtest_id=None, backtest_status=None
         ),
-        ToolStep(
+        ToolStepMessage(
             tool_call_id="call_1", tool_name="run_backtest", status="running", backtest_id=11, backtest_status="queued"
         ),
-        StrategyVersionSaved(strategy_id=3, strategy_version_id=103, version_number=3),
-        BacktestFinished(backtest_id=11),
-        ScreenSaved(
+        StrategyVersionSavedMessage(strategy_id=3, strategy_version_id=103, version_number=3),
+        BacktestFinishedMessage(backtest_id=11),
+        ScreenSavedMessage(
             screen_id=5, name="Momentum (AI)", market="US", definition={"start": "watchlist"}, previous_definition=None
         ),
-        ScreenRunFinished(
+        ScreenRunFinishedMessage(
             screen_id=5,
             screen_result_id=9,
             start_count=500,
@@ -131,6 +131,26 @@ async def test_run_reads_the_tool_events() -> None:
             result_count=20,
         ),
     ]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("character", ["\u2028", "\u2029", "\u0085"])
+async def test_run_splits_lines_only_at_the_newline(character: str) -> None:
+    deltas = [f"a{character}b", "c"]
+    lines = [json.dumps({"type": "text_delta", "delta": delta}, ensure_ascii=False) + "\n" for delta in deltas]
+    body = "".join(lines).encode()
+    # The chunk boundary is in the bytes of the character.
+    boundary = body.index(character.encode()) + 1
+
+    async def read_chunks() -> AsyncIterator[bytes]:
+        yield body[:boundary]
+        yield body[boundary:]
+
+    client = client_for(httpx.Response(200, content=read_chunks()), [])
+
+    events = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
+
+    assert events == [MessageDeltaMessage(text=delta) for delta in deltas]
 
 
 @pytest.mark.anyio
@@ -164,13 +184,12 @@ async def test_title_returns_the_title_or_raises_the_reason() -> None:
 
 
 @pytest.mark.anyio
-async def test_read_messages_and_steer_and_delete_use_the_conversation_paths() -> None:
+async def test_read_messages_and_delete_use_the_conversation_paths() -> None:
     requests: list[httpx.Request] = []
     message = {"role": "assistant", "text": "Hi.", "provider": "fake", "model": "m", "credential_name": "Key"}
     message["thinking_level"] = "low"
 
     messages = await client_for(httpx.Response(200, json={"messages": [message]}), requests).read_messages(7)
-    is_steered = await client_for(httpx.Response(409, json={"detail": "No run."}), requests).steer(7, "Use SMA 50.")
     await client_for(httpx.Response(204), requests).delete_conversation(7)
 
     assert messages == [
@@ -178,18 +197,16 @@ async def test_read_messages_and_steer_and_delete_use_the_conversation_paths() -
             role="assistant", text="Hi.", provider="fake", model="m", credential_name="Key", thinking_level="low"
         )
     ]
-    assert is_steered is False
     assert [(request.method, request.url.path) for request in requests] == [
         ("GET", "/conversations/7/messages"),
-        ("POST", "/conversations/7/steer"),
         ("DELETE", "/conversations/7"),
     ]
 
 
-CREDENTIAL = CredentialSummary(
+CREDENTIAL = CredentialResponse(
     id="c1", name="Work", provider="anthropic", type="api_key", key_last4="7a9f", state="ready", state_message=None
 )
-CREDENTIAL_BODY = dataclasses.asdict(CREDENTIAL)
+CREDENTIAL_BODY = CREDENTIAL.model_dump()
 
 
 @pytest.mark.anyio
@@ -214,8 +231,16 @@ async def test_login_reads_the_login_steps_and_the_end() -> None:
     events = [event async for event in client.login("anthropic", "api_key", "Work")]
 
     assert events == [
-        LoginStep(step="prompt", message="Enter API key", prompt_id="p1", prompt_type="secret"),
-        LoginEnd(credential=CREDENTIAL),
+        LoginStepMessage(
+            step="prompt",
+            message="Enter API key",
+            url=None,
+            user_code=None,
+            prompt_id="p1",
+            prompt_type="secret",
+            options=None,
+        ),
+        LoginEndMessage(credential=CREDENTIAL),
     ]
     assert str(requests[0].url) == "http://assistant:8002/logins"
     assert json.loads(requests[0].content) == {"provider": "anthropic", "method": "api_key", "name": "Work"}

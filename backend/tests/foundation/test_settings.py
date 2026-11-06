@@ -112,3 +112,14 @@ def test_refuses_a_bar_fetcher_client_id_inside_the_forward_test_range() -> None
 def test_refuses_a_bar_fetcher_client_id_equal_to_the_web_client_id() -> None:
     with pytest.raises(ValidationError, match="bar fetcher client ID 1 is equal to the Web client ID"):
         Settings(database_url=DATABASE_URL, ibkr_bar_fetcher_client_id=1)
+
+
+def test_a_settings_error_does_not_show_the_databento_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", DATABASE_URL)
+    monkeypatch.setenv("ATRADE_IBKR_WEB_CLIENT_ID", "10")
+    monkeypatch.setenv("DATABENTO_API_KEY", "db-" + "a" * 40 + "keytail")
+
+    with pytest.raises(ValidationError) as refusal:
+        Settings()  # pyright: ignore[reportCallIssue] readability-exception: pydantic-settings fills required fields from the environment.
+
+    assert "keytail" not in str(refusal.value)

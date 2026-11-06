@@ -70,8 +70,15 @@ class Execution:
     side: str
     quantity: Decimal
     price: Decimal
-    # The commission of the IBKR commission report. 0 when the report did not come yet.
+    # The commission of the IBKR commission report. 0 without a report.
     commission: Decimal
+    # True for a fill that waits for its commission report. `read_executions` returns it only with `include_held`.
+    is_held: bool
+    # The orderRef of the order. It tells the source of the order (`read_order_source`).
+    order_ref: str
+    # The contract of the execution. Its exchange is the execution venue, not the primary exchange of an instrument.
+    symbol: str
+    currency: str
 
 
 def build_contract(instrument: Instrument) -> Contract:
@@ -102,13 +109,19 @@ def build_order(request: OrderRequest) -> Order:
 
 
 def read_price(price: float | Decimal | None) -> Decimal | None:
-    if price is None or abs(float(price)) >= UNSET_PRICE_LIMIT:
+    # IBKR sends 0.0 as the limit price of a market order, and a very large value for other unset prices.
+    if price is None or float(price) == 0 or abs(float(price)) >= UNSET_PRICE_LIMIT:
         return None
     # str() first, so that the Decimal has the short form of the float, for example 1.1 and not 1.0999...
     return Decimal(str(price))
 
 
-def convert_fill(fill: Fill) -> Execution:
+def has_commission_report(fill: Fill) -> bool:
+    """The empty report of ib_async has no execId. A report can have the commission 0."""
+    return bool(fill.commissionReport.execId)
+
+
+def convert_fill(fill: Fill, *, is_held: bool) -> Execution:
     execution = fill.execution
     return Execution(
         execution_id=execution.execId,
@@ -120,6 +133,10 @@ def convert_fill(fill: Fill) -> Execution:
         quantity=Decimal(str(execution.shares)),
         price=Decimal(str(execution.price)),
         commission=Decimal(str(fill.commissionReport.commission)),
+        is_held=is_held,
+        order_ref=execution.orderRef,
+        symbol=fill.contract.symbol,
+        currency=fill.contract.currency,
     )
 
 

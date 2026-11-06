@@ -1,18 +1,22 @@
-"""Isolation of the backtest child process: timeout, queue, environment allow list, oom_score_adj, and nice.
+"""Isolation of the backtest child process: timeout, queue, environment allow list, parent read block, oom_score_adj,
+and nice.
 
 The tests run real child processes with the test strategy `strategies/write_process_facts.py`. The strategy
 writes its environment, `oom_score_adj`, niceness, and process ID to a log file in the test directory.
 """
 
 import asyncio
+import ctypes
 import json
 import os
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
 
+from atrade.foundation.process_protection import PR_SET_DUMPABLE, block_process_reads
 from tests.backtest.real_runner import (
     TEST_DIRECTORY,
     TEST_STRATEGY_FILE,
@@ -32,6 +36,17 @@ IBKR_TEST_VARIABLES = {
     "ATRADE_IBKR_ACCOUNT_ID": "DU1234567",
     "ATRADE_IBKR_HOST": "ib-gateway",
 }
+
+
+DUMPABLE = 1
+
+
+@pytest.fixture
+def blocked_test_process() -> Iterator[None]:
+    """The test process is the parent of the child. It gets the block that `web` sets at start, for 1 test only."""
+    block_process_reads()
+    yield
+    assert ctypes.CDLL(None).prctl(PR_SET_DUMPABLE, DUMPABLE) == 0
 
 
 def make_process_facts_code(process_facts_file: Path, *, loop_forever_in_on_bar: bool) -> str:
@@ -101,6 +116,27 @@ async def test_child_process_gets_no_ibkr_variables(
 
 
 @pytest.mark.anyio
+@pytest.mark.usefixtures("blocked_test_process")
+async def test_child_process_cannot_read_the_environment_of_its_parent(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, tmp_path: Path
+) -> None:
+    save_test_bars(database_url)
+    process_facts_file = tmp_path / "process_facts.json"
+    backtest_id = await start_backtest(
+        web_client, make_process_facts_code(process_facts_file, loop_forever_in_on_bar=False)
+    )
+
+    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=60):
+        backtest = await wait_for_final_status(web_client, backtest_id)
+
+    assert backtest["status"] == "finished", backtest["error_message"]
+    process_facts = read_process_facts(process_facts_file)
+    assert process_facts["parent_environment"] == "refused"
+    # The block ends at exec, so the child can still write its own /proc/self/oom_score_adj.
+    assert process_facts["oom_score_adj"] == 1000
+
+
+@pytest.mark.anyio
 async def test_child_process_is_the_first_to_stop_when_memory_is_low_and_runs_with_nice_10(
     web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, tmp_path: Path
 ) -> None:
@@ -128,7 +164,9 @@ async def test_with_concurrency_1_the_second_backtest_waits_in_the_queue(
     first_backtest_id = await start_backtest(web_client, endless_code)
     second_backtest_id = await start_backtest(web_client, TEST_STRATEGY_FILE.read_text(), strategy_name="Second")
 
-    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=3, concurrency=1):
+    async with run_backtest_runner(
+        web_client, database_url, clock, timeout_seconds=LOOPING_BACKTEST_TIMEOUT_SECONDS, concurrency=1
+    ):
         await wait_for_status(web_client, first_backtest_id, "running")
         await asyncio.sleep(1)
         second_backtest_while_first_runs = (await web_client.get(f"/api/backtests/{second_backtest_id}")).json()

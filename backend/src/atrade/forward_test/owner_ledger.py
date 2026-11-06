@@ -7,9 +7,9 @@ in-memory fake ledger.
 from decimal import Decimal
 from typing import Protocol
 
-from atrade.paper_trading import OwnerFill, OwnerOrder, OwnerPosition
+from atrade.paper_trading import ForwardTestPosition, OwnerFill, OwnerOrder
 
-__all__ = ["OwnerFill", "OwnerLedger", "OwnerOrder", "OwnerPosition"]
+__all__ = ["ForwardTestPosition", "OwnerFill", "OwnerLedger", "OwnerOrder"]
 
 
 class OwnerLedger(Protocol):
@@ -20,7 +20,7 @@ class OwnerLedger(Protocol):
 
     async def save_fill(self, fill: OwnerFill) -> None: ...
 
-    async def read_positions(self, forward_test_id: int) -> list[OwnerPosition]:
+    async def read_positions(self, forward_test_id: int) -> list[ForwardTestPosition]:
         """The owner positions of the forward test that are not 0."""
         ...
 

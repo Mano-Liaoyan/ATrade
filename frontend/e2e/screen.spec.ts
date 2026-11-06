@@ -3,7 +3,7 @@
 // bias warning, the backtest buttons that open the New backtest form (#208), and the edits of the condition bar
 // (#212). The tests make the screens and their screen results with the API. The bar chart saves the daily bars of AAPL
 // first: the IBKR fake of backend/tests/e2e_server.py has one daily bar for each day.
-import { expect, test, type APIRequestContext, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page, type TestInfo, type WebSocketRoute } from '@playwright/test';
 
 interface ScreenResultSummary {
   start_count: number;
@@ -16,7 +16,7 @@ const SMA_3 = { indicator: 'sma', parameters: { period: 3 }, output: 'value' };
 
 function uniqueName(currentTest: TestInfo, name: string): string {
   // The e2e database is not cleared between tests and browser projects.
-  return `${name} ${currentTest.project.name} ${String(Date.now())}`;
+  return `${name} ${currentTest.project.name} ${String(currentTest.workerIndex)} ${String(Date.now())}`;
 }
 
 async function createScreen(
@@ -29,6 +29,16 @@ async function createScreen(
   const response = await request.post('/api/screens', { data: { name, market, definition } });
   expect(response.status()).toBe(201);
   return ((await response.json()) as { id: number }).id;
+}
+
+// The default name of "New screen" comes from the list, and tests of other workers add screens to the same database.
+async function nameCreatedScreens(page: Page, name: string): Promise<void> {
+  await page.route('**/api/screens', async (route) => {
+    const request = route.request();
+    const body = request.postDataJSON() as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- `postData` is a route option of Playwright.
+    await route.fallback(request.method() === 'POST' ? { postData: { ...body, name } } : {});
+  });
 }
 
 async function runScreen(request: APIRequestContext, screenId: number): Promise<ScreenResultSummary> {
@@ -122,14 +132,17 @@ test('/screens opens the last opened screen, and a long screen list scrolls in i
 
   const list = page.getByRole('region', { name: 'Screen list' });
   // The list has the last changed screen first; other projects can add screens before ours, not after.
-  const lastScreen = list.getByRole('listitem').last();
+  const lastHref = await list.getByRole('listitem').last().getByRole('link').first().getAttribute('href');
+  const lastScreen = list.locator(`a[href="${String(lastHref)}"]`);
   await expect(lastScreen).not.toBeInViewport();
   const scrollTrack = page.getByRole('scrollbar', { name: 'Screen list scroll bar' });
   await expect(scrollTrack).toBeVisible();
   await scrollTrack.focus();
-  await page.keyboard.press('End');
-  await expect(lastScreen).toBeInViewport();
-  await expect(scrollTrack).toHaveAttribute('aria-valuenow', '100');
+  // A /ws/screens push can add rows at the top after a key press, so the press repeats until the last row shows.
+  await expect(async () => {
+    await page.keyboard.press('End');
+    await expect(lastScreen).toBeInViewport({ timeout: 500 });
+  }).toPass();
 });
 
 // #212: the edit popover of each tag, "Add condition", the run at once after each change, and the save buttons.
@@ -407,7 +420,7 @@ test('adds Close, changes Avg trading value (20) and Exchange, removes each othe
 });
 
 // The "New screen" button of the "Screens" side column creates a US screen of the quarter universe and opens its run.
-test('"New screen" shows the reason of a failed create, then creates a screen and opens its run', async ({ page }) => {
+test('"New screen" shows the reason of a failed create, then creates a screen and opens its run', async ({ page }, currentTest) => {
   await page.goto('/screens');
   const newScreenButton = page.getByRole('button', { name: 'New screen', exact: true });
 
@@ -422,6 +435,7 @@ test('"New screen" shows the reason of a failed create, then creates a screen an
   const failure = page.getByRole('alert').filter({ hasText: 'Screen not created' });
   await expect(failure).toContainText('The name is in use.');
   await page.unroute('**/api/screens');
+  await nameCreatedScreens(page, `New screen ${String(currentTest.workerIndex)}${String(Date.now())}`);
 
   const created = page.waitForResponse(
     (response) => response.url().endsWith('/api/screens') && response.request().method() === 'POST',
@@ -440,4 +454,189 @@ test('"New screen" shows the reason of a failed create, then creates a screen an
   await expect(failure).toHaveCount(0);
   const openRow = page.getByRole('region', { name: 'Screen list' }).locator('a[aria-current="page"]');
   await expect(openRow.locator('.screen-name')).toHaveText(screen.name);
+});
+
+const WATCHLIST_DEFINITION = { start: 'watchlist', filters: [], indicator_conditions: [], order: { indicator: SMA_3, direction: 'descending' } };
+const RUNS_ROUTE = '**/api/screens/*/runs';
+
+// A list push must not open the first screen of the list while the run of "New screen" waits for its answer.
+test('a list push during "New screen" does not take the page from the new screen', async ({ page, request }, currentTest) => {
+  const sockets: WebSocketRoute[] = [];
+  await page.routeWebSocket(/\/ws\/screens$/, (socket) => {
+    sockets.push(socket);
+  });
+  let isListEmpty = true;
+  await page.route('**/api/screens', async (route) => {
+    await (route.request().method() === 'GET' && isListEmpty ? route.fulfill({ json: [] }) : route.fallback());
+  });
+  const name = uniqueName(currentTest, 'New screen');
+  await nameCreatedScreens(page, name);
+  let finishRun = (): void => undefined;
+  const runCanFinish = new Promise<void>((resolve) => {
+    finishRun = resolve;
+  });
+  await page.route(RUNS_ROUTE, async (route) => {
+    await runCanFinish;
+    await route.fallback();
+  });
+  await page.goto('/screens');
+
+  const created = page.waitForResponse(
+    (response) => response.url().endsWith('/api/screens') && response.request().method() === 'POST',
+  );
+  const runStarted = page.waitForRequest((runRequest) => runRequest.url().endsWith('/runs'));
+  await page.getByRole('button', { name: 'New screen', exact: true }).click();
+  const screen = (await (await created).json()) as { id: number };
+  await runStarted;
+
+  const otherName = uniqueName(currentTest, 'Other screen');
+  await createScreen(request, otherName, 'US', WATCHLIST_DEFINITION);
+  isListEmpty = false;
+  await expect.poll(() => sockets.length).toBeGreaterThan(0);
+  for (const socket of sockets) {
+    socket.send(JSON.stringify({ type: 'changed' }));
+  }
+  await expect(page.getByRole('region', { name: 'Screen list' }).getByRole('link', { name: otherName })).toBeVisible();
+
+  finishRun();
+  await expect(page).toHaveURL(new RegExp(`/screens/${String(screen.id)}\\?result=\\d+$`));
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
+});
+
+test('"Delete screen" on the open screen leaves the page on another screen', async ({ page, request }, currentTest) => {
+  await saveAaplDailyBars(page, request);
+  const deletedName = uniqueName(currentTest, 'Deleted screen');
+  await createScreen(request, uniqueName(currentTest, 'Kept screen'), 'US', WATCHLIST_DEFINITION);
+  const deletedId = await createScreen(request, deletedName, 'US', WATCHLIST_DEFINITION);
+  await runScreen(request, deletedId);
+
+  await page.goto(`/screens/${String(deletedId)}`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(deletedName);
+  const list = page.getByRole('region', { name: 'Screen list' });
+  await list.getByRole('link', { name: deletedName }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Delete screen' }).click();
+  await page.getByRole('dialog', { name: `Delete ${deletedName}` }).getByRole('button', { name: 'Delete screen' }).click();
+
+  await expect(page).not.toHaveURL(new RegExp(`/screens/${String(deletedId)}$`));
+  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(deletedName);
+  await expect(list.getByRole('link', { name: deletedName })).toHaveCount(0);
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
+});
+
+test('"Run screen" runs a screen without a run, and a failed run shows its reason', async ({ page, request }, currentTest) => {
+  await saveAaplDailyBars(page, request);
+  const screenId = await createScreen(request, uniqueName(currentTest, 'First run'), 'US', WATCHLIST_DEFINITION);
+  await page.goto(`/screens/${String(screenId)}`);
+  await expect(page.getByText('No runs')).toBeVisible();
+
+  await page.route(RUNS_ROUTE, (route) => route.fulfill({ status: 500, json: { detail: 'The run stopped' } }));
+  const runButton = page.getByRole('button', { name: 'Run screen', exact: true });
+  await runButton.click();
+  const failure = page.getByRole('alert').filter({ hasText: 'Screen not run' });
+  await expect(failure).toBeVisible();
+  await page.unroute(RUNS_ROUTE);
+
+  await runButton.click();
+  await expectRunDone(page);
+  await expect(failure).toHaveCount(0);
+  await expect(page.getByRole('tablist', { name: 'Market' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Recent runs' }).getByRole('listitem')).toHaveCount(1);
+});
+
+for (const button of ['Run screen', 'New screen']) {
+  test(`a "${button}" run that ends after the user leaves does not pull the user back`, async ({ page, request }, currentTest) => {
+    await saveAaplDailyBars(page, request);
+    const screenId = await createScreen(request, uniqueName(currentTest, 'Left'), 'US', WATCHLIST_DEFINITION);
+    await page.goto(`/screens/${String(screenId)}`);
+    let finishRun = (): void => undefined;
+    const runMayFinish = new Promise<void>((resolve) => {
+      finishRun = resolve;
+    });
+    await page.route(RUNS_ROUTE, async (route) => {
+      await runMayFinish;
+      await route.fallback();
+    });
+    await nameCreatedScreens(page, uniqueName(currentTest, 'Left new'));
+
+    const runRequest = page.waitForRequest(RUNS_ROUTE);
+    await page.getByRole('button', { name: button, exact: true }).click();
+    await runRequest;
+    await page.getByRole('link', { name: 'Backtests', exact: true }).click();
+    await expect(page).toHaveURL(/\/backtests/);
+    const runAnswer = page.waitForResponse(RUNS_ROUTE);
+    finishRun();
+    await runAnswer;
+    // The stale run could change the URL only after its answer.
+    await page.waitForTimeout(500);
+
+    await expect(page).toHaveURL(/\/backtests/);
+  });
+}
+
+test('a failed run keeps the condition bar, and a live change keeps the unsaved edits', async ({ page, request }, currentTest) => {
+  const name = uniqueName(currentTest, 'Live');
+  const definition = { ...WATCHLIST_DEFINITION, filters: [{ field: 'last_price', operator: '>', value: '0' }] };
+  const screenId = await openNewScreen(page, request, name, definition);
+  const bar = conditionBar(page);
+  const saveScreen = page.getByRole('button', { name: 'Save screen' });
+
+  await page.route(RUNS_ROUTE, (route) => route.fulfill({ status: 500, json: { detail: 'The run stopped' } }));
+  await page.getByRole('button', { name: 'Remove Close > 0', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Screen not run' })).toBeVisible();
+  await expect(bar).toBeVisible();
+  await page.unroute(RUNS_ROUTE);
+
+  // Another tab or the AI assistant changes the screen and runs it.
+  const renamed = `${name} renamed`;
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const changed = await request.put(`/api/screens/${String(screenId)}`, { data: { name: renamed, definition } });
+  expect(changed.status()).toBe(200);
+  await runScreen(request, screenId);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(renamed);
+  await expect(page.getByRole('list', { name: 'Recent runs' }).getByRole('listitem')).toHaveCount(2);
+  await expect(bar).not.toContainText('Close');
+
+  // "Save screen" keeps the new name and writes the unsaved edits.
+  const put = page.waitForResponse((response) => response.request().method() === 'PUT');
+  await saveScreen.click();
+  const saved = (await (await put).json()) as { name: string; definition: { filters: unknown[] } };
+  await expect(saveScreen).toHaveCount(0);
+  expect(saved.name).toBe(renamed);
+  expect(saved.definition.filters).toEqual([]);
+});
+
+test('a run without a change leaves no draft, so a live change shows no "Save screen"', async ({ page, request }, currentTest) => {
+  const name = uniqueName(currentTest, 'Rerun');
+  const filters = [{ field: 'last_price', operator: '>', value: '0' }];
+  const screenId = await openNewScreen(page, request, name, { ...WATCHLIST_DEFINITION, filters });
+
+  const popover = await editTag(page, 'Close > 0');
+  await popover.getByRole('button', { name: 'Apply' }).click();
+  await expect(page).toHaveURL(/\?result=\d+$/);
+
+  const renamed = `${name} renamed`;
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const changed = await request.put(`/api/screens/${String(screenId)}`, { data: { name: renamed, definition: WATCHLIST_DEFINITION } });
+  expect(changed.status()).toBe(200);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(renamed);
+  await expect(page.getByRole('button', { name: 'Save screen' })).toHaveCount(0);
+});
+
+test('"Save as new screen" stays disabled until the new screen opens', async ({ page, request }, currentTest) => {
+  const name = uniqueName(currentTest, 'Copy');
+  await openNewScreen(page, request, name, WATCHLIST_DEFINITION);
+  let finishRun = (): void => undefined;
+  const runMayFinish = new Promise<void>((resolve) => {
+    finishRun = resolve;
+  });
+  await page.route(RUNS_ROUTE, async (route) => {
+    await runMayFinish;
+    await route.fallback();
+  });
+
+  await page.getByRole('button', { name: 'Save as new screen' }).click();
+  await expect(page.getByRole('region', { name: 'Screen list' })).toContainText(`${name} copy`);
+  await expect(page.getByRole('button', { name: 'Saving screen…' })).toBeDisabled();
+  finishRun();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${name} copy`);
 });

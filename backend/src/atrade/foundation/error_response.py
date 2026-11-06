@@ -5,12 +5,18 @@ Routes declare it with `responses=` (ERROR_RESPONSE), so the frontend gets the t
 """
 
 import json
+import logging
 from typing import Any
 
+import psycopg
 from fastapi import FastAPI, Request, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+
+UNSTORABLE_VALUE_MESSAGE = "The database cannot store a value of the request: a NUL character or a number out of range."
 
 
 class ErrorResponse(BaseModel):
@@ -27,15 +33,25 @@ REFUSED_OR_NOT_VALID_RESPONSE: dict[str, Any] = {
 
 def add_validation_error_handler(app: FastAPI) -> None:
     """FastAPI's 422 body without `input`. json.dumps writes each text as ASCII, so a lone surrogate in the request
-    gives a 422 and not a 500 at encoding."""
+    gives a 422 and not a 500 at encoding.
 
-    async def send_validation_error(_request: Request, error: Exception) -> Response:
-        errors = jsonable_encoder(error.errors() if isinstance(error, RequestValidationError) else [])
-        detail = [{key: value for key, value in item.items() if key != "input"} for item in errors]
+    The same 422 for a value that passes the route and that PostgreSQL refuses. This one handler covers all routes."""
+
+    def send_field_errors(detail: list[dict[str, Any]]) -> Response:
         return Response(
             json.dumps({"detail": detail}),
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             media_type="application/json",
         )
 
+    async def send_validation_error(_request: Request, error: Exception) -> Response:
+        errors = jsonable_encoder(error.errors() if isinstance(error, RequestValidationError) else [])
+        return send_field_errors([{key: value for key, value in item.items() if key != "input"} for item in errors])
+
+    async def send_unstorable_value_error(_request: Request, error: Exception) -> Response:
+        # The DataError can also come from a value of the server, so the log keeps the traceback.
+        logger.warning("PostgreSQL refused a value of a request: %s", error, exc_info=error)
+        return send_field_errors([{"type": "value_error", "loc": ["request"], "msg": UNSTORABLE_VALUE_MESSAGE}])
+
     app.add_exception_handler(RequestValidationError, send_validation_error)
+    app.add_exception_handler(psycopg.DataError, send_unstorable_value_error)

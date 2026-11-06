@@ -81,6 +81,15 @@ async function readVersions(page: Page, strategyId: number): Promise<StrategyBod
   return strategy.versions;
 }
 
+test('the Rules tab shows a failed read of the indicator catalog', async ({ page }, currentTest) => {
+  await page.route('**/api/market-data/indicators', (route) => route.fulfill({ status: 500, json: { detail: 'Catalog read failed' } }));
+  await createStrategy(page, createUniqueName(currentTest, 'Catalog'));
+
+  await page.getByRole('tablist', { name: 'Files' }).getByRole('tab', { name: 'Rules' }).click();
+
+  await expect(page.getByRole('alert').filter({ hasText: 'Indicators not read' })).toBeVisible();
+});
+
 test('the Rules tab warns when the code changed after the rules and shows the diff before the save', async ({
   page,
 }, currentTest) => {
@@ -158,4 +167,25 @@ test('the Rules tab shows the universe mode settings and makes multi-instrument 
 
   await page.getByRole('spinbutton', { name: 'Hold' }).fill('3');
   await expect(code).toContainText('hold_count: int = 3');
+});
+
+test('the Rules tab shows an error when the backend makes no code, until the next code', async ({ page }, currentTest) => {
+  await createStrategy(page, createUniqueName(currentTest, 'Rules code error'));
+  await page.getByRole('tablist', { name: 'Files' }).getByRole('tab', { name: 'Rules' }).click();
+  const code = page.getByRole('region', { name: 'Code from the rules' });
+  await expect(code).toContainText('class RulesConfig(StrategyConfig)');
+  await page.route('**/api/strategy-rules/code', async (route) => {
+    await route.fulfill({ status: 500, json: { detail: 'The code is not available.' } });
+  });
+
+  await page.getByRole('button', { name: 'Add condition to Entry' }).click();
+
+  const alert = page.getByRole('alert').filter({ hasText: 'Code not made' });
+  await expect(alert).toContainText('The code is not available.');
+
+  await page.unroute('**/api/strategy-rules/code');
+  await page.getByRole('spinbutton', { name: 'Entry condition 1 right side SMA period' }).fill('20');
+
+  await expect(code).toContainText('WARM_UP_BAR_COUNT = 20');
+  await expect(alert).toHaveCount(0);
 });

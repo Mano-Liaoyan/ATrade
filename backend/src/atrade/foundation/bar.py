@@ -32,6 +32,10 @@ class BarPeriod(StrEnum):
         """The name in messages, for example "1 min". The frontend shows the same names."""
         return BAR_PERIOD_LABELS[self]
 
+    def external_bar_type(self, instrument_id: object) -> str:
+        """The NautilusTrader bar type name of an instrument ID, for example `AAPL.NASDAQ-1-DAY-LAST-EXTERNAL`."""
+        return f"{instrument_id}-{self.value}-LAST-EXTERNAL"
+
 
 BAR_PERIOD_SECONDS = {
     BarPeriod.ONE_MINUTE: SECONDS_PER_MINUTE,
@@ -77,6 +81,12 @@ def floor_to_bar_start(time_utc: datetime, bar_period: BarPeriod) -> datetime:
     period_seconds = BAR_PERIOD_SECONDS[bar_period]
     unix_seconds = int(time_utc.timestamp())
     return datetime.fromtimestamp(unix_seconds - unix_seconds % period_seconds, tz=UTC)
+
+
+def find_bar_end(start_utc: datetime, bar_period: BarPeriod) -> datetime:
+    """Returns the end of the bar period that contains `start_utc`. The first hourly bar of a day that opens at 9:30
+    has only 30 minutes: it ends at 10:00, when the next bar starts."""
+    return floor_to_bar_start(start_utc, bar_period) + bar_period.length
 
 
 def ceil_to_bar_start(time_utc: datetime, bar_period: BarPeriod) -> datetime:

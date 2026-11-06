@@ -272,8 +272,39 @@ async def test_one_name_with_2_expressions_is_refused(web_client: httpx.AsyncCli
     add_condition(body, custom_reference("open"))
     response = await web_client.post("/api/screens", json=body)
     assert response.status_code == 422
-    assert "has 2 expressions" in response.json()["problems"][0]["message"]
+    assert "has 2 different references" in response.json()["problems"][0]["message"]
     assert "Use current expression" in response.json()["problems"][0]["message"]
+
+
+def volatility(**parameters: int) -> dict[str, Any]:
+    return {"indicator": "realized_volatility", "parameters": {"period": 20, **parameters}, "output": "value"}
+
+
+@pytest.mark.anyio
+async def test_one_column_name_with_2_references_is_refused(web_client: httpx.AsyncClient) -> None:
+    """`bars_per_year` is not in the name, so both references have the column name "Realized volatility(20)"."""
+    body = make_body()
+    position = len(body["definition"]["indicator_conditions"])
+    add_condition(body, volatility(bars_per_year=252))
+    add_condition(body, volatility(bars_per_year=52))
+
+    response = await web_client.post("/api/screens", json=body)
+
+    assert response.status_code == httpx.codes.UNPROCESSABLE_ENTITY
+    problem = response.json()["problems"][0]
+    assert problem["location"] == [*CONDITIONS, position + 1, "indicator"]
+    assert "'Realized volatility(20)' has 2 different references" in problem["message"]
+
+
+@pytest.mark.anyio
+async def test_a_default_parameter_and_the_same_written_value_are_one_reference(web_client: httpx.AsyncClient) -> None:
+    body = make_body()
+    add_condition(body, volatility())
+    add_condition(body, volatility(bars_per_year=252))
+
+    response = await web_client.post("/api/screens", json=body)
+
+    assert response.status_code == httpx.codes.CREATED
 
 
 @pytest.mark.parametrize("name", ["A\x00B", "A\ud800B"])

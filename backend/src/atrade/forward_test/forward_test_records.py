@@ -1,6 +1,6 @@
-"""SQL for the record tables of a forward test: forward_test_fill and forward_test_equity_point (section 12.8), and
-forward_test_same_period_backtest (section 12.10). The fills of a new forward test are in the owner ledger of
-`paper_trading`. forward_test_fill keeps only the fills of the forward tests before the owner ledger (section 12.24).
+"""SQL for the record tables of a forward test: forward_test_equity_point (section 12.8) and
+forward_test_same_period_backtest (section 12.10). The fills of a forward test are in the owner ledger of
+`paper_trading`.
 
 The DataActor in the child process writes them with a synchronous connection, because NautilusTrader calls `on_bar`
 synchronously. The Web process reads them with an asynchronous connection.
@@ -8,7 +8,7 @@ synchronously. The Web process reads them with an asynchronous connection.
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Final, Literal
+from typing import Literal
 
 import psycopg
 from psycopg.rows import class_row
@@ -16,8 +16,6 @@ from psycopg.rows import class_row
 from atrade.backtest import BacktestTrade, EquityPoint
 from atrade.foundation.instrument import Instrument
 from atrade.paper_trading import LedgerFill, read_forward_test_fills, read_forward_test_fills_blocking
-
-FILL_COLUMNS: Final = "time_utc, side, quantity_shares, price_usd, commission_usd"
 
 
 def save_equity_point(connection: psycopg.Connection, *, forward_test_id: int, equity_point: EquityPoint) -> None:
@@ -83,39 +81,19 @@ def convert_ledger_fill(fill: LedgerFill) -> ForwardTestFill:
 
 
 def list_trades(fills: list[ForwardTestFill]) -> list[BacktestTrade]:
-    """The trades of the fills, without the split adjustments: the metrics and the comparison count fills only."""
-    return [fill.trade for fill in fills if fill.kind == "fill"]
+    """All ledger rows as trades. A split adjustment changes the position and adds the cash in lieu, so without it
+    a round trip does not end. Its price is 0, so the turnover does not change. It is not a trade: the trade counts
+    must count only the rows with the kind "fill" (section 12.16)."""
+    return [fill.trade for fill in fills]
 
 
 def select_ledger_fills_blocking(connection: psycopg.Connection, forward_test_id: int) -> list[ForwardTestFill]:
     return [convert_ledger_fill(fill) for fill in read_forward_test_fills_blocking(connection, forward_test_id)]
 
 
-async def select_forward_test_fills(
-    connection: psycopg.AsyncConnection,
-    *,
-    forward_test_id: int,
-    instrument: Instrument | None,
-    uses_owner_ledger: bool,
-) -> list[ForwardTestFill]:
-    """The fills from the owner ledger (section 12.8). A forward test of the time before the owner ledger keeps its
-    fills in forward_test_fill, on its one instrument (section 12.24). A multi-instrument forward test (instrument
-    None) always uses the owner ledger."""
-    if uses_owner_ledger or instrument is None:
-        return [convert_ledger_fill(fill) for fill in await read_forward_test_fills(connection, forward_test_id)]
-    return [ForwardTestFill(instrument, trade) for trade in await select_fills(connection, forward_test_id)]
-
-
-async def select_fills(connection: psycopg.AsyncConnection, forward_test_id: int) -> list[BacktestTrade]:
-    async with connection.cursor(row_factory=class_row(BacktestTrade)) as cursor:
-        await cursor.execute(
-            f"""
-            SELECT {FILL_COLUMNS} FROM forward_test_fill
-            WHERE forward_test_id = %(forward_test_id)s ORDER BY time_utc, trade_id
-            """,
-            {"forward_test_id": forward_test_id},
-        )
-        return await cursor.fetchall()
+async def select_forward_test_fills(connection: psycopg.AsyncConnection, forward_test_id: int) -> list[ForwardTestFill]:
+    """The fills from the owner ledger (section 12.8)."""
+    return [convert_ledger_fill(fill) for fill in await read_forward_test_fills(connection, forward_test_id)]
 
 
 async def select_equity_curve(connection: psycopg.AsyncConnection, forward_test_id: int) -> list[EquityPoint]:

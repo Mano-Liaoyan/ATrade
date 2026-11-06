@@ -1,10 +1,11 @@
 """The code from rule builder rules runs in a real backtest child on the bars of `tests/backtest/bars/` (#172).
 
 The closes of the 20 bars from 2026-03-02: 100, 102, 104, 106, 108, 110, 108, 106, 104, 102, 100, 98, 96, 98,
-100, 102, 104, 106, 108, 110. A market order fills at the close of its bar, at the bar end time (the next day).
+100, 102, 104, 106, 108, 110. A market order fills at the open of the next bar.
 """
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from tests.backtest.test_strategy_template_backtest import (
     BAR_COUNT,
     FIRST_BAR_UTC,
     PAPER_CAPITAL_USD,
+    make_bar,
     make_request,
     make_wave_bars,
 )
@@ -78,14 +80,14 @@ async def test_the_look_back_follows_the_longest_indicator_of_the_rules(
 ) -> None:
     # SMA(200) needs 200 bars. With the earlier look-back of 60 days, it had no value in the 20 bars of the range,
     # and the strategy never traded. Now the look-back gives the last 200 saved bars at 50, so SMA(200) is 50 on
-    # the first bar of the range (close 100), and the strategy buys on it. The order fills at the bar end.
+    # the first bar of the range (close 100), and the strategy buys on it. The order fills at the next open.
     save_test_bars(database_url)
     save_bars_before_the_start(database_url, 300)
     rules = make_rules(group("all_of", condition(price(), "above", indicator("sma", period=200))))
 
     backtest = await run_saved_rules(web_client, database_url, clock, rules)
 
-    assert backtest["trades"][0]["time_utc"] == "2026-03-03T00:00:00Z"
+    assert backtest["trades"][0]["time_utc"] == "2026-03-03T00:00:00.001000Z"
     assert backtest["trades"][0]["side"] == "BUY"
     # Look-back bars make no fill and no equity point (section 10.3.1).
     assert backtest["equity_curve"][0]["time_utc"] == "2026-03-03T00:00:00Z"
@@ -96,13 +98,13 @@ async def test_without_saved_bars_before_the_start_the_indicators_warm_up_on_the
     web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
 ) -> None:
     # The same behaviour as before: SMA(3) has its first value on the third bar of the range (03-04, close 104),
-    # and the order fills at the end of that bar.
+    # and the order fills at the next open.
     save_test_bars(database_url)
     rules = make_rules(group("all_of", condition(price(), "above", indicator("sma", period=3))))
 
     backtest = await run_saved_rules(web_client, database_url, clock, rules)
 
-    assert backtest["trades"][0]["time_utc"] == "2026-03-05T00:00:00Z"
+    assert backtest["trades"][0]["time_utc"] == "2026-03-05T00:00:00.001000Z"
 
 
 @pytest.mark.anyio
@@ -174,3 +176,33 @@ def test_each_exit_item_runs_in_the_engine(tmp_path: Path) -> None:
     trades = run_strategy_on_bars(run, tmp_path)
 
     assert [trade.side for trade in trades[:4]] == ["BUY", "SELL", "BUY", "SELL"]
+
+
+def run_first_bar_cross(look_back_closes: list[int], first_close: int, work_directory: Path) -> list[str]:
+    """The sides of the trades of "close crosses above SMA(3)" on 1 first bar and later bars with the same close."""
+    entry = group("all_of", condition(price(), "crosses_above", indicator("sma", period=3)))
+    start_utc = datetime(2026, 2, 1, tzinfo=UTC)
+    look_back_bars = [
+        make_bar(start_utc - timedelta(days=len(look_back_closes) - index), Decimal(close))
+        for index, close in enumerate(look_back_closes)
+    ]
+    bars = [make_bar(start_utc + timedelta(days=index), Decimal(first_close)) for index in range(5)]
+    trades = run_strategy_on_bars(
+        StrategyRun(
+            code=make_rules_code(StrategyRules.model_validate(make_rules(entry))),
+            request=make_request(start_utc, len(bars)),
+            starting_cash=PAPER_CAPITAL_USD,
+            bars=bars,
+            look_back_bars=look_back_bars,
+        ),
+        work_directory,
+    )
+    return [trade.side for trade in trades]
+
+
+def test_a_cross_at_the_first_bar_after_the_look_back_bars_fills(tmp_path: Path) -> None:
+    assert run_first_bar_cross([100, 100, 100], 120, tmp_path) == ["BUY"]
+
+
+def test_a_close_that_stays_above_the_average_after_the_look_back_bars_is_no_cross(tmp_path: Path) -> None:
+    assert run_first_bar_cross([110, 120, 130], 140, tmp_path) == []

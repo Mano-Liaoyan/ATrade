@@ -153,7 +153,7 @@ test('"Use current expression" gives a saved screen the changed expression, and 
   await expect(useCurrent).toBeHidden();
   await page.getByRole('button', { name: 'Apply' }).click();
   const bar = page.getByRole('list', { name: 'Conditions' });
-  await expect(bar.getByRole('alert')).toContainText('has 2 expressions');
+  await expect(bar.getByRole('alert')).toContainText('has 2 different references');
 
   await page.getByRole('button', { name: 'Edit Close ratio > 0', exact: true }).click();
   await useCurrent.click();

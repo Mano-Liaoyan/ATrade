@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, ParameterValues, UniversePeriod
+from atrade.foundation.bar import TimeRange
 from atrade.strategy import StrategyParameter
 
 MAX_SWEEP_PARAMETERS = 3
@@ -100,6 +101,7 @@ async def insert_sweep(  # noqa: PLR0913 readability-exception: the keywords of 
     connection: psycopg.AsyncConnection,
     *,
     request: BacktestRequest,
+    bar_range: TimeRange,
     grid: list[GridEntry],
     combinations: list[ParameterValues],
     universe_periods: list[UniversePeriod],
@@ -128,6 +130,7 @@ async def insert_sweep(  # noqa: PLR0913 readability-exception: the keywords of 
             await backtest_store.insert_backtest(
                 connection,
                 request=replace(request, parameters=combination),
+                bar_range=bar_range,
                 created_at_utc=created_at_utc,
                 universe_periods=universe_periods,
                 sweep_id=sweep_id,
@@ -167,3 +170,22 @@ async def cancel_queued_runs(connection: psycopg.AsyncConnection, *, sweep_id: i
         """,
         {"id": sweep_id, "ended_at_utc": ended_at_utc},
     )
+
+
+async def delete_sweep(connection: psycopg.AsyncConnection, sweep_id: int) -> str | None:
+    """Deletes the sweep and its runs with their result rows (ON DELETE CASCADE). Returns the reason of a refusal, or
+    None after the delete. The row locks stop the start of a queued run after the check. Section 10.11.2."""
+    async with connection.transaction():
+        cursor = await connection.execute(
+            "SELECT status FROM backtest WHERE sweep_id = %(id)s FOR UPDATE", {"id": sweep_id}
+        )
+        if any(status in ("queued", "running") for (status,) in await cursor.fetchall()):
+            return f"Parameter sweep #{sweep_id} has queued or running runs. Wait for their end."
+        try:
+            async with connection.transaction():
+                await connection.execute("DELETE FROM backtest WHERE sweep_id = %(id)s", {"id": sweep_id})
+                await connection.execute("DELETE FROM parameter_sweep WHERE id = %(id)s", {"id": sweep_id})
+        except psycopg.errors.RestrictViolation:
+            # Only forward_test_same_period_backtest refuses the delete (ON DELETE RESTRICT); the result tables cascade.
+            return f"A run of parameter sweep #{sweep_id} is the same-period backtest of a forward test."
+    return None

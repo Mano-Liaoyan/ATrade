@@ -83,8 +83,11 @@ puts the new parts of this section in phases.
   selected bar period (section 10.6). It has no free-text symbol, exchange,
   or currency fields, so a request cannot name an instrument that has no
   bars by a typing error.
-- The isolation goal is to prevent accidents, not to stop hostile code. Only
-  one user writes strategies.
+- The isolation goal is to prevent accidents and to keep the secrets of the
+  parent process out of strategy code. It is not a full sandbox. The user and
+  the AI assistant both write strategy code, and ADR 0004 lets the AI
+  assistant save and backtest code without a user acceptance. So do not think
+  that all strategy code is safe. Section 10.1.1 lists the remaining gaps.
 
 | Control | Rule |
 |---|---|
@@ -93,7 +96,8 @@ puts the new parts of this section in phases.
 | Defaults | The user can change the timeout and the concurrency in the UI. PostgreSQL stores them. |
 | Memory | Do not use `RLIMIT_AS`. The `web` container has a memory limit. The child sets `oom_score_adj` to 1000, so the kernel stops the backtest first when memory is low. The worker processes of a `screen` universe inherit this value. |
 | CPU | The child runs with `nice 10`. Its worker processes inherit this value. |
-| Environment | Allow list: `PATH`, `HOME`, `TZ`, `DATABASE_URL`. IBKR and Cloudflare secrets are not passed. The worker processes inherit this environment. CPython can add `LC_CTYPE` for its locale. |
+| Environment | Allow list: `PATH`, `HOME`, `TZ`, `DATABASE_URL`. IBKR and Cloudflare secrets are not passed. `create_child_environment()` of `foundation/process_protection.py` makes the list. The forward test child, the language server, and ruff use the same function. The worker processes inherit this environment. CPython can add `LC_CTYPE` for its locale. |
+| Parent process | At start, `web` and the forward-test worker call `prctl(PR_SET_DUMPABLE, 0)` (`foundation/process_protection.py`, Linux only). A child cannot read `/proc/<parent>/environ`, and the parent writes no core dump. |
 | Network | No network isolation. The child must connect to PostgreSQL. |
 | File system | The container root file system is read-only. Only `/tmp` is writable. |
 
@@ -138,6 +142,25 @@ Implementation of the controls:
   two such backtests can reach the 8 GB limit. Tests cannot check the
   out-of-memory order. Section 17.8 has the manual check.
 
+### 10.1.1 Remaining isolation gaps
+
+Strategy code can do these things. The results come from a real backtest in the
+`web` image, with no IB Gateway, unless the item says "by reading".
+
+- HTTP routes: a child calls `127.0.0.1:8000` and `127.0.0.1:8001` with no
+  credentials. `RefuseAssistantSubnet` refuses only the assistant subnet. The
+  child listed strategies, created a strategy, and changed the backtest limits.
+  `POST /api/paper-trading/orders` got to the route and stopped only because
+  IB Gateway was not connected.
+- Database: a child has the full `DATABASE_URL`. The role `atrade` is the
+  PostgreSQL superuser, so the child can read and change all tables.
+- Exec into the container: the prctl block ends at exec, and `docker exec` starts
+  a process with the full environment. In a run with a test value, a child read
+  the key from such a process. The Compose health check of `web` starts with
+  `env -i`, so the key is in that check only until the exec of `env`.
+- Other hosts, by reading: a child can connect to `ib-gateway:4004` and to the
+  internet.
+
 ## 10.2 Tables
 
 Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
@@ -170,6 +193,7 @@ New columns are null on existing rows, except where a default is given.
 | 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). Done (#180): migration `4a6c8e1b3d57_backtest_add_conversation_id.py`. |
 | 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2 (done in #199: `universe_top_n`, migration `d7b9c5d5e28d_backtest_add_universe.py`; a multi-instrument backtest has null `symbol` and `exchange`, and `currency` holds the currency of all members), `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). Done in #208 (migration `4dbfcca36529_backtest_add_screen_universe.py`): `universe_screen` (`jsonb`, the copy `{"screen_id", "name", "market", "definition"}`, no foreign key) and `universe_rebalance_period` (`quarter` or `month`). Both are set only for `universe_kind` `screen` (CHECK). |
 | 3 | `backtest` | Add `source_order` (JSON list of bar sources) and `bar_count_by_source` (JSON object), section 10.12. Done in #197: migration `2f6b8d1c4e97_backtest_add_bar_source_columns.py`, 2 `jsonb` columns. |
+| 3 | `backtest` | Add `fill_warning` (text, null without a changed order), section 10.10.3. Migration `a9d3e7c15b42_backtest_add_fill_warning.py`. |
 | 3 | `backtest_universe_member` | New. `backtest_id`, `period_start_utc`, `symbol`, `exchange`. One row for each member of the universe in each universe period (section 10.10.2). `ON DELETE CASCADE` with its backtest. Done in #199. |
 | 3 | `backtest_trade` | Add `symbol` and `exchange`. The exchange is the real exchange, not the simulated venue `SMART` ([ADR 0003](../adr/0003-one-simulated-venue-per-currency.md)). Done in #199: a single-instrument backtest writes its instrument too. Trades from before the migration have null. |
 | 3 | `parameter_sweep` | New. Done in #203 (migration `b22fc9704bfc_backtest_create_parameter_sweep.py`): `id`, `strategy_version_id` (foreign key to `strategy_version` with no `ON DELETE` action), `grid` (JSON, section 10.11.1), `created_at_utc`. The runs hold the universe, the bar period, the range, `paper_capital_usd`, and `out_of_sample_share`, so the table does not repeat them. The same migration adds `backtest.sweep_id`, `backtest.parameters` (`jsonb`), and the status `cancelled`. |
@@ -201,8 +225,9 @@ New columns are null on existing rows, except where a default is given.
 4. The child converts the bars to Arrow bytes (`decimal128(38, 16)` prices
    and volume, `uint64` times). The stock split adjustment of Databento bars
    gives more than 16 decimal places, so the conversion rounds half-even to
-   16 places. `ts_event` is the bar end, so a strategy sees a bar only after
-   its period. `BarDataWrangler` makes NautilusTrader bars from the bytes.
+   16 places. `ts_event` is the bar end (`find_bar_end`), so a strategy sees
+   a bar only after its period. `BarDataWrangler` makes NautilusTrader bars
+   from the bytes.
    The engine drops a bar with a fractional volume and fills no order on a
    bar with volume 0, so the child rounds the volumes of the bars of the
    range up to whole shares. The saved bars do not change.
@@ -232,6 +257,9 @@ Failures that the user sees in `error_message`:
   When the file is not empty, the backtest fails with its content.
   `logger_flush()` does not wait for the log writer thread, so the file can
   still be empty after an error in `on_bar`.
+- A single-instrument strategy on a universe: a message that tells the user
+  to use one instrument or a multi-instrument strategy. Its configuration
+  needs `instrument_id` or `bar_type`, and a universe gives neither.
 - No saved bars in the range: a message that tells the user to open the bar
   chart of the instrument, which loads the bars from IBKR. The start route
   refuses such a request first. The child checks again, because it reads the
@@ -240,6 +268,9 @@ Failures that the user sees in `error_message`:
   USD (section 10.8). The start route refuses such a request first.
 - A Web restart during a run: the runner sets the `running` backtests to
   `failed` at start, because their children ended with the old process.
+- A lost PostgreSQL connection: the runner writes a warning and tries again.
+  The running children continue. A backtest stays `running` until the
+  runner can write its end.
 
 Limits of this stage:
 
@@ -247,6 +278,9 @@ Limits of this stage:
 - `request_bars` gets only the look-back bars of the backtest bar type
   (section 10.3.1).
 - Cash dividends are not in the backtest (section 10.1).
+- If the database commits the start of a queued backtest and the connection
+  stops before the answer, the row stays `running` without a child until the
+  next `web` start.
 
 Phase 3 changes steps 1, 3, and 5 for a backtest with a universe (section
 10.10.4) and for the source order (section 10.12).
@@ -266,7 +300,10 @@ in a forward test, and it can trade on the first bar of the range.
   last N saved bars before the start. N is the largest look-back count of
   the indicators in its rules ([`indicator.md`](indicator.md) section 23.4,
   `find_warm_up_bar_count()` in `strategy/rules_code.py`).
-  `read_strategy_version()` gives N as `warm_up_bar_count`. The child reads
+  `StrategyVersion.count_warm_up_bars(parameters)` gives N. In a parameter
+  sweep run, N comes from the values of the run, and
+  `StrategyVersion.make_run_code(parameters)` puts N in the
+  `WARM_UP_BAR_COUNT` of the code. The child reads
   the saved bars of the range `start_utc` minus `N × bar period × factor`
   (factor 2 for 1-day bars, 6 for intraday bars, because a bar comes only
   in the trading hours), and at least the default length below, to
@@ -358,7 +395,11 @@ reason why the request cannot run, or `None`: an empty time range;
 request, created_at_utc)` (returns the ID of a queued backtest), and
 `read_backtest_outcome(*, database_url, backtest_id)` (`BacktestOutcome`:
 the request, status, error message, metrics, equity curve, and trades, or
-`None`). They are in `backtest_access.py`.
+`None`), and `read_backtest_summaries(*, database_url, backtest_ids)`
+(`BacktestSummary` without the equity curve and trades, newest first, with
+one query). They are in `backtest_access.py`. The public entry also exports
+`BacktestMetricsResponse` and `EquityPointResponse`. The forward test
+comparison uses them in its responses.
 
 The public entry also exports `create_backtest_router(*, database_url,
 clock, exchange_rate_reader)`, `BacktestRunner(*, database_url, clock, process_command)` with
@@ -394,7 +435,7 @@ Changes of later phases:
 | 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. Done (#180): each backtest of `GET /api/backtests` and `GET /api/backtests/{backtest_id}` has `conversation_id` (null for a backtest of the user). The route of port 8000 never sets it. The public entry exports `start_backtest(*, database_url, exchange_rate_reader, request, created_at_utc, universe_periods, conversation_id)`: it makes the checks of `POST /api/backtests` and returns the ID of the queued backtest or a `BacktestRefusal` (`detail`). Port 8001 calls it with the conversation ID (#181). |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6, done in #199 for `single`, `rule`, and `list`) and can contain `source_order` (section 10.12, done in #197): a list of `BarSource` values, only for this backtest. Without it, the route saves the global source order. `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source; then no row is added. The saved-bar check of the start route reads through this source order. |
 | 3 | `GET /api/backtests` | Without the query `sweep_id`, the list has no sweep runs. With `sweep_id`, it has only the runs of that sweep. Done in #203: the list has no sweep runs. The query `sweep_id` is not there yet; `GET /api/sweeps/{sweep_id}` lists the runs. |
-| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), `has_split_check_pending` (boolean, section 10.12, done in #324, also in `GET /api/backtests`), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. Done in #204: `sweep_id` and `parameters` (null for a backtest that is not a sweep run), also in `GET /api/backtests`. Done in #200: `instruments`, a list of `{"symbol", "exchange", "trade_count", "net_profit_usd", "quarter_count"}`, one item for each universe member by symbol, empty for a single-instrument backtest. `net_profit_usd` is the sum of the round trips that ended, after commissions. `quarter_count` is the number of universe periods of the member. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
+| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), `has_split_check_pending` (boolean, section 10.12, done in #324, also in `GET /api/backtests`), `fill_warning` (text or null, section 10.10.3, also in `GET /api/backtests`), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. Done in #204: `sweep_id` and `parameters` (null for a backtest that is not a sweep run), also in `GET /api/backtests`. Done in #200: `instruments`, a list of `{"symbol", "exchange", "trade_count", "net_profit_usd", "quarter_count"}`, one item for each universe member by symbol, empty for a single-instrument backtest. `net_profit_usd` is the sum of the round trips that ended, after commissions. `quarter_count` is the number of universe periods of the member. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
 | 3 | `/api/sweeps` | New routes, section 10.11.3. |
 
 The JSON names of the Phase 1 and Phase 3 fields are choices of this
@@ -654,9 +695,11 @@ backtest run and no new data source.
 The backend calculates the metrics. Backtests and forward tests save them
 and use the same functions (section 10.4). `E_0` is the paper capital.
 `E_end` is the final equity. `years` is the number of calendar days of the
-range divided by 365.25. Decided (#165): the range goes from `start_utc` to
-`end_utc` of the backtest request. A forward test uses its start and its stop
-(or now). The mean equity of the turnover is the mean of all equity points.
+range divided by 365.25. Decided (#165, changed): the range goes from the
+start of the first bar to the end of the last bar inside `start_utc` and
+`end_utc` of the backtest request. A range beyond the saved bars thus gives
+the same CAGR, Calmar ratio, and turnover as the range of the saved bars. A
+forward test uses its start and its stop (or now). The mean equity of the turnover is the mean of all equity points.
 
 | Metric | Definition |
 |---|---|
@@ -716,7 +759,11 @@ longer bars first.
   The default is 30. The range is 0 to 50. 0 means no split.
 - The out-of-sample part is the last `out_of_sample_share` percent of the
   backtest range. The split time is the start of the out-of-sample part.
-- The start route calculates `split_time_utc`. After the start, nobody can
+- The start route calculates `split_time_utc` from the part of the request
+  range between the first and the last saved bar in that range. Thus the
+  split time is always inside the bars, also with a gap in the bars. A saved
+  row keeps its split time and its metrics. A screen universe has no members before its run,
+  so all instruments of its currency count. After the start, nobody can
   change it. To use a different share, the user starts a new backtest.
   Reason: the user must not move the split time after the user sees the
   result.
@@ -732,12 +779,14 @@ longer bars first.
   a backtest.
 - A forward test has no split.
 - Decided (#166): the out-of-sample share is a share of the calendar time
-  of the range: `split_time_utc = start_utc + (end_utc − start_utc) ×
-  (100 − out_of_sample_share) / 100`. The split time does not align to a bar
+  of the range with bars: `split_time_utc = first + (last − first) ×
+  (100 − out_of_sample_share) / 100`, where `first` and `last` are the start
+  of the first saved bar and the end of the last saved bar in the request
+  range. The split time does not align to a bar
   end. An equity point or a fill at or before the split time is in sample.
   A round trip is in the part where it ends. The in-sample range goes from
-  `start_utc` to the split time, and the out-of-sample range from the split
-  time to `end_utc`. The out-of-sample part starts with the equity of the
+  the first bar to the split time, and the out-of-sample range from the
+  split time to the last bar. The out-of-sample part starts with the equity of the
   last in-sample point (the paper capital when there is none) and with the
   position that is open at the split time. Reason: it is the simplest, and
   it needs no bars.
@@ -764,7 +813,9 @@ longer bars first.
   period. The time range does not matter. A change of the code and a change
   of a parameter both count. Phase 3: each run of a parameter sweep counts.
 - ATrade calculates `N` when it reads a backtest. Thus a later backtest
-  makes the DSR of an earlier backtest lower.
+  makes the DSR of an earlier backtest lower. A delete of a parameter sweep
+  removes its runs, so it lowers `N`, and the DSR of the other backtests can
+  go up.
 - When `N` is 1, the page shows PSR(0). When `N` is above 1, the page shows
   the DSR.
 - The functions use the daily Sharpe ratio (not annualized) of each trial.
@@ -884,6 +935,11 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 - The bar period is 1 day or 1 hour. One backtest uses one bar period.
 - The child reads the bars of each instrument only for the universe periods
   in which it is a member, plus its look-back bars.
+- A listing move saves one symbol on 2 exchanges, and each listing can be a
+  member. After the bar read, the child merges the listings of one symbol
+  into one member with all bars, on the exchange of the last bar. The trade
+  table records that exchange. The rank of the listings does not change, so
+  the symbol can fill 2 ranks of a top-N universe.
 - The look-back length of a multi-instrument backtest on 1-day bars is
   1 year ([#146](https://github.com/Mano-Liaoyan/ATrade/issues/146)).
 
@@ -926,22 +982,100 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
   not added.
 - In one multi-currency account, USD cash cannot pay for an HKD instrument.
   The engine does not convert cash, also with a USD/HKD pair in the account.
-- A market order fills at the open of the next bar. The cash of a sell is
-  free only after its fill. A buy that the strategy sends at the same time
-  as a sell can use only the cash from before the sell.
+- A market order fills at the open of the next bar of its instrument. The
+  engine alone does not do this. It fills an order on a bar at the close of
+  that bar, also with a `StaticLatencyModel`. Checked on 2.0.0rc7: signal
+  close 120, next open 150, next close 200, fill 200. So ATrade adds these
+  2 parts to the engine run, in `backtest/strategy_engine_run.py`:
+  - `make_open_ticks` adds 1 trade tick at the open of each bar, 1
+    millisecond after the bar start. A bar without volume also gets a tick,
+    with a size of 1 share, because `on_bar` runs on such a bar.
+    `make_last_close_tick` adds 1 trade tick at the close of the last bar
+    of each instrument, 1 nanosecond before the bar end. This tick comes
+    before the OHLC of that bar, so a stop that the bar crosses on the last
+    bar fills at the close, not at the stop price.
+  - `NextOpenOrders` holds each market order of `submit_order` and each
+    `close_position` until the next open tick of the instrument. All
+    instruments of one rebalance thus fill on one price basis, and the
+    `add_data` order has no effect.
+- Book updates in place of trade ticks do not work. The engine ignores them
+  on the `L1_MBP` book that bar execution needs (checked on 2.0.0rc7).
+- Limit: a strategy can see the open ticks. At `on_bar`, the last price of an
+  instrument is the open of that bar, not its close. Only the last bar of an
+  instrument has its close as the last price. This changes the values that
+  use the last price: `portfolio.net_exposure`,
+  `portfolio.unrealized_pnl`, and `cache.price` with `PriceType.LAST`. For
+  example, at a bar with open 120 and close 130, 10 shares give a net
+  exposure of 1200, not 1300. A strategy that subscribes to trades also
+  gets the ticks in `on_trade`. A strategy reads the close from the bar.
+  The first-party templates and the rule builder code read cash, position
+  quantity, and `bar.close`, so this limit does not change them.
+- The time of such a fill is the bar start plus 1 millisecond. It is later
+  than the end of the bar before. So the fill counts in the equity point at
+  the end of its bar, with the close of that bar. The trade mark goes on the
+  fill bar, because `Date.parse` keeps a millisecond and drops a
+  microsecond. The trade tables show the bar start.
+- A held order is not in the engine cache. The strategy reads
+  `HeldOrderCache`: `orders_inflight_count` counts each held order, so
+  a strategy that checks for an order does not send it a second time. The
+  other cache reads do not show a held order. Until the open tick,
+  `close_position` of the same instrument does nothing.
+- The held orders go 1 nanosecond apart, in the order of the strategy calls.
+  Each order sees the cash after the fill of the order before. So a buy
+  sent after a sell can use the cash of that sell.
+- An order without a next open fills at once at the last close. This
+  applies to an order on the last bar of the run, and to a sell of a member
+  without later saved bars. The last close tick makes this close the last
+  price, so the cash check and the pre-trade check use the price of the
+  fill.
+- Cash: the engine ends a run with `RuntimeError` when a fill makes the cash
+  negative. The check before each market order of `submit_order` uses the
+  price of the fill: the open, or the last close. A buy that the free cash
+  pays only in part becomes a smaller order of the whole shares that the
+  cash pays. A tick holds 1/4 of the bar volume, and the engine fills the
+  rest of an order 1 price step higher. So the check adds this step for an
+  order above the tick size. A buy without the cash for 1 share goes to the
+  engine, and the engine refuses it with `OrderDenied`. IBKR refuses such an
+  order and does not reduce it. The backtest reduces it, because a strategy
+  that buys with all its cash would else lose each entry on a gap up.
+- `backtest.fill_warning` gives the count of the changed orders and the
+  oldest of them. A changed order is an order that the cash check reduced,
+  or an order with `OrderDenied` or `OrderRejected`. A rejected stop of a
+  bracket order counts, because the position then has no exit.
+- `submit_order_list` is not held, and the cash check does not change it.
+  The orders go to the engine at once, so the entry of a bracket order
+  keeps the fill at the close of the current bar. The stop rests from that
+  close, and a gap through the stop fills at the open. A hold makes a list
+  wrong: the venue rejects a stop that a gap passed, and the position then
+  has no exit. The venue also rejects a post-only limit entry at a gap. The
+  first-party templates and the rule builder code use no order lists.
+- Not held: `close_all_positions`, and limit and stop orders of
+  `submit_order`. A market order of `close_all_positions` fills at the close
+  of the current bar.
+- The pre-trade check of an order that is not held uses the open of the
+  current bar, because the last price is this open. On a bar that closes
+  below its open, the engine can thus refuse a market entry of a list with
+  almost all the cash. The refusal is in `fill_warning`.
+- 2 cases can still end the run with the `RuntimeError`. One is a buy stop
+  order over a gap. The other is a market entry of a list with almost all
+  the cash on a bar that closes above its open.
+- Backtest results from before this rule are not directly comparable with
+  new results.
 - One fill uses at most 1/4 of the bar volume. The engine fills the rest of
   the order in one more fill, at a price 1 tick different. All orders end as
   `FILLED`. Thus a test can have more trades than orders (29 trades for 23
   orders).
 - 500 instruments × 2,500 daily bars: `run()` takes 2.45 seconds, with a
-  peak memory of about 2 GB.
+  peak memory of about 2 GB. The open ticks change a measured run from
+  5.5 seconds to about 10 seconds, with the build of the ticks. The peak
+  memory goes from 2.6 GB to 3.2 GB.
 - Custom data (checked in #198): `subscribe_data(DataType(...))` without a
   client ID gets the custom data that `add_data` added. With a client ID,
   the backtest engine finds no data client and logs an error. Data items
   with the same time come in the order of the `add_data` calls.
 - Estimate, not checked: a universe of 500 instruments on 1-hour bars has
   about 7.35 million bars (about 2,100 trading days × 7 bars). One run then
-  takes about 15 seconds, with a peak memory of 4 to 5 GB.
+  takes about 30 seconds, with a peak memory of 5 to 6 GB.
 
 ### 10.10.4 Run flow changes
 
@@ -1018,7 +1152,7 @@ does not exist, when a symbol of `symbols` is not in the screen result, when
 `survivorship_bias` true (section 10.12): its members are chosen at the end
 of the range. Done in #208 for `screen`: `screen_id` and `rebalance_period`
 (default `quarter`). The route saves a copy of the screen and writes no
-members (section 10.10.8). `422` (no row) when the screen does not exist,
+members (section 10.10.8). `422` (no row) when the screen does not exist or fails `check_screen`,
 when `screen_id` is missing, or when `screen_id` or `rebalance_period` comes
 with another kind. Each backtest of `GET /api/backtests` and
 `GET /api/backtests/{backtest_id}` has `universe_screen` (the copy, null for
@@ -1142,8 +1276,10 @@ with universe data from the new route `GET /api/us-universe/range`
   as `top_n`.
 - Decided (#199): all members are on the simulated venue `SMART`, also for
   a currency that is not USD. A strategy that sells a member at the period
-  start in which it leaves gets a fill at the last close of that member: the
-  child reads no bars of the member after its last period.
+  start in which it leaves gets a fill at the next open of that member. The
+  child reads the bars of each member for the whole range. It uses the bars
+  outside the member periods only for the open ticks. Without a later saved
+  bar, the fill is at the last close of the member.
 - Decided (#208): the header line text of a `screen` universe is
   "Screen <name>, each quarter" (or "each month"). The Instruments tab column
   of a monthly `screen` universe is "Months"; it counts the periods of the
@@ -1222,6 +1358,9 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 - The user can cancel a sweep. The queued runs get the status `cancelled`.
   A running run continues to its end. A sweep has no status column: its
   status is the run count of each status (#203).
+- The user can delete a sweep when no run is queued or running. The delete
+  removes the runs and their result rows. Then a strategy without other uses
+  can be deleted.
 - A sweep run uses the `out_of_sample_share` of the request, the same as
   one backtest (#203).
 - A run opens on the backtest page like any other backtest.
@@ -1250,6 +1389,7 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 | `GET /api/sweeps` | `200` with all sweeps, the newest first. Each sweep has `id`, `strategy_version_id`, `strategy_id`, `strategy_name`, `version_number` (#204), `grid`, `created_at_utc`, `run_count`, and `status_counts` (the number of runs in each status that has runs). |
 | `GET /api/sweeps/{sweep_id}` | `200` with the sweep and `runs` (`[{"backtest_id", "parameters", "status", "metrics"}]`). `404` when the sweep does not exist. |
 | `POST /api/sweeps/{sweep_id}/cancel` | `200` with the sweep. The queued runs get `cancelled`. `404` when the sweep does not exist. |
+| `DELETE /api/sweeps/{sweep_id}` | A true delete of the sweep, its runs, and their result rows. `204` when deleted. `404` when the sweep does not exist. `409` with the reason: "Parameter sweep #<id> has queued or running runs. Wait for their end." or "A run of parameter sweep #<id> is the same-period backtest of a forward test." |
 
 - `strategy` exports the function that reads the parameters with the AST.
   `backtest` already imports `strategy`.
@@ -1274,6 +1414,11 @@ chart is hard to read on flat Carbon surfaces.
   - A status line with the number of finished, failed, running, and queued
     runs: each count follows its status icon, and the status word is the
     tooltip of the icon.
+  - The "Delete parameter sweep" icon button opens a danger `Dialog` with only
+    the title ("Delete parameter sweep #<id>?") and the buttons "Cancel" and
+    "Delete parameter sweep". It sends `DELETE /api/sweeps/{id}`. An inline
+    error notification ("Parameter sweep not deleted") shows a refusal. After
+    the delete, `/sweeps` opens the newest sweep that is left.
   - With 1 parameter: a point chart. With 2 or 3 parameters: a heat map.
   - A "Metric" select. The default is Total return. With 3 parameters, a
     second select chooses the value of the third parameter.
@@ -1436,8 +1581,7 @@ Phase 2 ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)):
   10.8), like port 8000. The rule "cannot load bars" is about bars only. A
   backtest without saved bars gets `422` (section 10.1).
 - Decided (#182): only the tool `run_backtest` counts the 5 backtests of a
-  user message. Port 8001 does not count them. A steer message is a new
-  user message, so it starts a new count. Only a backtest that
+  user message. Port 8001 does not count them. Only a backtest that
   `POST /api/backtests` accepted counts. A `422` does not count. The tool
   counts a backtest before its POST, so parallel tool calls of one model
   turn also start at most 5.

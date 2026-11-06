@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Final
 
 from nautilus_trader.model import Bar as NautilusBar
-from nautilus_trader.model import CustomData, Equity, Venue
-from nautilus_trader.persistence import BarDataWrangler, DataCatalogConfig, ParquetDataCatalog
+from nautilus_trader.model import CustomData, Equity, TradeTick, Venue
+from nautilus_trader.persistence import DataCatalogConfig, ParquetDataCatalog
 
 from atrade.backtest.arrow_bars import convert_bars_to_arrow_bytes
 from atrade.backtest.backtest_metrics import BacktestTrade
@@ -21,10 +21,13 @@ from atrade.backtest.backtest_universe import MemberBars
 from atrade.backtest.strategy_engine_run import (
     CATALOG_FIRST_NS,
     CATALOG_LAST_NS,
-    ENGINE_VOLUME_PRECISION,
     LOOK_BACK_CATALOG_DIRECTORY_NAME,
+    EngineInputs,
     create_engine,
     create_instrument,
+    create_wrangler,
+    make_last_close_tick,
+    make_open_ticks,
     read_trades,
     round_up_volumes,
     run_engine,
@@ -51,7 +54,7 @@ class UniverseRun:
 
 
 def find_bar_type_name(instrument: Instrument, bar_period: BarPeriod) -> str:
-    return f"{instrument.symbol}.{SIMULATED_VENUE}-{bar_period.value}-LAST-EXTERNAL"
+    return bar_period.external_bar_type(f"{instrument.symbol}.{SIMULATED_VENUE}")
 
 
 @dataclass(frozen=True)
@@ -61,9 +64,11 @@ class MemberData:
 
 
 def make_universe_updates(run: UniverseRun) -> list[CustomData]:
+    """A symbol is one bar type on the simulated venue, also with 2 listings in a period."""
     return [
         make_universe_update(
-            period.start_utc, [find_bar_type_name(member, run.bar_period) for member in period.members]
+            period.start_utc,
+            list(dict.fromkeys(find_bar_type_name(member, run.bar_period) for member in period.members)),
         )
         for period in run.periods
     ]
@@ -80,23 +85,27 @@ def create_universe_catalog(look_back_bars: list[list[NautilusBar]], work_direct
     return DataCatalogConfig(str(catalog_path))
 
 
-def run_universe_strategy(run: UniverseRun, work_directory: Path) -> list[BacktestTrade]:
+def run_universe_strategy(
+    run: UniverseRun, work_directory: Path, changed_orders: list[str] | None = None
+) -> list[BacktestTrade]:
     """Returns the trades of the strategy on the bars of all members, in `run.currency`, with the real exchange.
 
-    Raises StrategyFailedError with the strategy error.
+    `changed_orders` gets the lines of the fill warning. Raises StrategyFailedError with the strategy error.
     """
     instruments: list[Equity] = []
     member_data: list[MemberData] = []
+    open_ticks: list[list[TradeTick]] = []
+    last_close_ticks: list[TradeTick] = []
     for member in run.members:
         all_bars = member.look_back_bars + member.bars
         if not all_bars:
             continue
-        nautilus_instrument = create_instrument(member.instrument, all_bars, SIMULATED_VENUE)
-        wrangler = BarDataWrangler(
-            find_bar_type_name(member.instrument, run.bar_period),
-            nautilus_instrument.price_precision,
-            ENGINE_VOLUME_PRECISION,
-        )
+        # The open bars of the whole range hold more bars than `all_bars`: their prices also need a precision.
+        nautilus_instrument = create_instrument(member.instrument, all_bars + member.open_bars, SIMULATED_VENUE)
+        open_ticks.append(make_open_ticks(nautilus_instrument, member.open_bars))
+        if member.open_bars:
+            last_close_ticks.append(make_last_close_tick(nautilus_instrument, member.open_bars, run.bar_period))
+        wrangler = create_wrangler(nautilus_instrument, run.bar_period)
         instruments.append(nautilus_instrument)
         member_data.append(
             MemberData(
@@ -127,5 +136,9 @@ def run_universe_strategy(run: UniverseRun, work_directory: Path) -> list[Backte
     # Data with the same time comes in the order of the `add_data` calls. The bars come first, so the bar that closes
     # at a period start comes before the list of that period (section 10.10.3).
     engine.add_data(make_universe_updates(run))
-    run_engine(engine, run.code, work_directory, dict(run.parameters))
+    run_engine(
+        engine,
+        EngineInputs(run.code, dict(run.parameters), open_ticks, last_close_ticks, changed_orders),
+        work_directory,
+    )
     return read_trades(engine, {member.instrument.symbol: member.instrument.exchange for member in run.members})

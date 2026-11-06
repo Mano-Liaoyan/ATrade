@@ -3,7 +3,7 @@
      (docs/architecture.md section 13.1). The parent places the track (for example along the bottom edge of the strip).
      The track shows only while the content is wider than the element. A drag on the thumb scrolls, a click on the track
      scrolls one page, and the arrow keys, Home, and End scroll when the track has the focus. A vertical mouse wheel on
-     the element scrolls it sideways. -->
+     the element scrolls it sideways, unless `wheelScrolls` is false. -->
 <script lang="ts">
   import { computeScrollThumb, computeScrollTopForThumbTop, type ScrollThumb } from './scroll_thumb';
 
@@ -16,10 +16,12 @@
     content: HTMLElement | undefined;
     /** The ID of the viewport, for aria-controls. */
     viewportId: string;
+    /** False: a vertical parent keeps the mouse wheel, for example a table with rows that scroll. */
+    wheelScrolls?: boolean;
     class?: string;
   }
 
-  const { label, viewport, content, viewportId, class: className }: Props = $props();
+  const { label, viewport, content, viewportId, wheelScrolls = true, class: className }: Props = $props();
 
   const ARROW_KEY_STEP_PIXELS = 40;
   const PERCENT = 100;
@@ -46,7 +48,7 @@
 
   // A vertical wheel step scrolls the strip sideways, because the strip has no vertical scroll.
   function scrollWithWheel(event: WheelEvent): void {
-    if (viewport === undefined || viewport.scrollWidth <= viewport.clientWidth || event.deltaY === 0) {
+    if (!wheelScrolls || viewport === undefined || viewport.scrollWidth <= viewport.clientWidth || event.deltaY === 0) {
       return;
     }
     if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) {

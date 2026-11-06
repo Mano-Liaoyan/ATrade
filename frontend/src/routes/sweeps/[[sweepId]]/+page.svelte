@@ -7,17 +7,20 @@
      cell shows its value on a Carbon sequential color. Bottom panel "Runs": the parameter values, the status icon, and
      the key metrics of each run. Each column sorts the rows, and a click on a row opens its backtest. A right-click on
      a sweep row opens its context menu ("Open in new tab"). The page reads the
-     list again after each change that /ws/sweeps pushes, and the open sweep when its list row changes.
+     list again after each change that /ws/sweeps pushes, and the open sweep when its list row changes. The
+     "Delete parameter sweep" button opens a danger dialog; the backend can refuse the delete, and the page shows the reason.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
+  import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { navigating, page } from '$app/state';
+  import { page } from '$app/state';
   import { describeBacktestStatus, findBacktestStatusKind } from '#lib/backtest';
   import {
     ContextMenu,
     DataTable,
+    Dialog,
     IconButton,
     InlineNotification,
     readSequentialColor,
@@ -28,13 +31,13 @@
     type TableColumn,
   } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { readOnChange } from '#lib/foundation/live_socket';
-  import { ScrollRegion } from '#lib/foundation/scroll_region';
+  import { HorizontalScrollTrack, ScrollRegion } from '#lib/foundation/scroll_region';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { formatVersionLabel } from '#lib/strategy';
   import {
     DEFAULT_SWEEP_METRIC,
     SWEEPS_SOCKET_PATH,
+    deleteSweep,
     formatSweepMetric,
     listSweeps,
     readParameterNames,
@@ -54,6 +57,8 @@
   import StartSweepDialog from '../StartSweepDialog.svelte';
   import SweepPointChart from '../SweepPointChart.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
+  import { RunWorkbench } from '../../run_workbench.svelte';
+  import RunCenter from '../../RunCenter.svelte';
 
   const PANELS: PanelSpec[] = [
     { id: 'overview', minPixels: 160 },
@@ -69,75 +74,32 @@
   const routeSweepId = $derived(page.params['sweepId']);
   const sweepId = $derived(routeSweepId === undefined ? null : Number(routeSweepId));
 
-  let sweeps = $state<Sweep[]>([]);
-  let isListRead = $state(false);
-  let listMessage = $state('');
-  let sweep = $state<SweepDetail | null>(null);
-  let detailMessage = $state('');
+  // /ws/sweeps pushes each change of a sweep or of one of its runs. The open sweep reads again when its list row changes
+  // (the run counts).
+  const workbench = new RunWorkbench<Sweep, SweepDetail>({
+    socketPath: SWEEPS_SOCKET_PATH,
+    list: () => listSweeps(fetch),
+    readDetail: (id) => readSweep(fetch, id),
+    href: (id) => resolve('/sweeps/[[sweepId]]', { sweepId: String(id) }),
+    openId: () => sweepId,
+  });
   let metric = $state<SweepMetricKey>(DEFAULT_SWEEP_METRIC);
   let sliceValue = $state<ParameterValue | null>(null);
   let sortColumn = $state<string>(DEFAULT_SWEEP_METRIC);
   let sortDirection = $state<SortDirection>('descending');
-  let isStartDialogOpen = $state(false);
+  let isDeleteDialogOpen = $state(false);
+  let isDeleting = $state(false);
+  let runsRegion = $state<HTMLDivElement>();
+  let runsTable = $state<HTMLTableElement>();
+  let deleteMessage = $state('');
 
-  const shownSweep = $derived(sweep !== null && sweep.id === sweepId ? sweep : null);
+  const shownSweep = $derived(workbench.detail !== null && workbench.detail.id === sweepId ? workbench.detail : null);
   const parameterNames = $derived(shownSweep === null ? [] : readParameterNames(shownSweep));
   const chart = $derived(shownSweep === null ? null : readSweepChart(shownSweep, metric, sliceValue));
   const metricLabel = $derived(SWEEP_METRICS.find((item) => item.value === metric)?.label ?? '');
   const sortedRows = $derived(
     shownSweep === null ? [] : sortSweepRows(readSweepRows(shownSweep), sortColumn, sortDirection),
   );
-
-  // /ws/sweeps pushes each change of a sweep or of one of its runs.
-  $effect(() =>
-    readOnChange({
-      socketPath: SWEEPS_SOCKET_PATH,
-      read: () => listSweeps(fetch),
-      onResult: (result) => {
-        isListRead = true;
-        if (result.kind === 'failed') {
-          listMessage = result.message;
-          return;
-        }
-        listMessage = '';
-        sweeps = result.value;
-      },
-    }),
-  );
-
-  // /sweeps opens the newest sweep, like /backtests.
-  $effect(() => {
-    const newest = sweeps[0];
-    if (navigating.to === null && sweepId === null && newest !== undefined) {
-      void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(newest.id) }), { replace: true, reset: false });
-    }
-  });
-
-  // The open sweep reads again when its list row changes (the run counts): the list comes from /ws/sweeps.
-  const openListRowText = $derived(JSON.stringify(sweeps.find((item) => item.id === sweepId) ?? null));
-
-  $effect(() => {
-    if (sweepId === null) {
-      return;
-    }
-    openListRowText satisfies string;
-    const id = sweepId;
-    let isActive = true;
-    void readSweep(fetch, id).then((result) => {
-      if (!isActive) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        detailMessage = result.message;
-        return;
-      }
-      detailMessage = '';
-      sweep = result.value;
-    });
-    return () => {
-      isActive = false;
-    };
-  });
 
   function sortBy(column: string): void {
     if (sortColumn === column) {
@@ -172,6 +134,21 @@
     ];
   }
 
+  // After a delete, /sweeps opens the newest sweep that is left.
+  async function deleteOpenSweep(id: number): Promise<void> {
+    isDeleting = true;
+    const result = await deleteSweep(fetch, id);
+    isDeleting = false;
+    isDeleteDialogOpen = false;
+    if (result.kind === 'failed') {
+      deleteMessage = result.message;
+      return;
+    }
+    deleteMessage = '';
+    workbench.removeItem(id);
+    await goto(resolve('/sweeps/[[sweepId]]', { sweepId: undefined }), { replace: true });
+  }
+
   function openStartedSweep(started: SweepDetail): void {
     void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(started.id) }));
   }
@@ -184,243 +161,268 @@
         label="New parameter sweep"
         icon={Add16}
         onclick={() => {
-          isStartDialogOpen = true;
+          workbench.isStartDialogOpen = true;
         }}
       />
     {/snippet}
-    {#if listMessage !== ''}
-      <InlineNotification kind="error" title="Parameter sweeps not read" subtitle={listMessage} lowContrast />
-    {:else}
-      <div class="table-region sweep-list">
-        <ContextMenu readLabel={(key: string) => `Parameter sweep #${key}`} readItems={readMenuItems}>
-          <ScrollRegion label="Parameter sweep list" fill>
-            <DataTable columns={LIST_COLUMNS} size="sm">
-              {#snippet rows()}
-                {#each sweeps as item (item.id)}
-                  {@const status = readSweepStatus(item.status_counts)}
-                  <tr
-                    data-context-key={item.id}
-                    class={['link-row', item.id === sweepId && 'cds--data-table--selected']}
-                    onclick={(event) => {
-                      if (!(event.target instanceof Element && event.target.closest('a') !== null)) {
-                        void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) }));
-                      }
-                    }}
-                  >
-                    <th scope="row" align="right">
-                      <span class="status-id">
-                        <StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} align="right" />
-                        <a
-                          class="row-link"
-                          href={resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) })}
-                          aria-current={item.id === sweepId ? 'page' : undefined}>#{item.id}</a
-                        >
-                      </span>
-                    </th>
-                    <td>
-                      <span class="ellipsis" title={formatVersionLabel(item.strategy_name, item.version_number)}
-                        >{formatVersionLabel(item.strategy_name, item.version_number)}</span
+    <div class="table-region sweep-list">
+      <ContextMenu readLabel={(key: string) => `Parameter sweep #${key}`} readItems={readMenuItems}>
+        <ScrollRegion label="Parameter sweep list" fill>
+          <DataTable columns={LIST_COLUMNS} size="sm">
+            {#snippet rows()}
+              {#each workbench.items as item (item.id)}
+                {@const status = readSweepStatus(item.status_counts)}
+                <tr
+                  data-context-key={item.id}
+                  class={['link-row', item.id === sweepId && 'cds--data-table--selected']}
+                  onclick={(event) => {
+                    if (!(event.target instanceof Element && event.target.closest('a') !== null)) {
+                      void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) }));
+                    }
+                  }}
+                >
+                  <th scope="row" align="right">
+                    <span class="status-id">
+                      <StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} align="right" />
+                      <a
+                        class="row-link"
+                        href={resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) })}
+                        aria-current={item.id === sweepId ? 'page' : undefined}>#{item.id}</a
                       >
-                    </td>
-                    <td align="right">{item.status_counts['finished'] ?? 0} / {item.run_count}</td>
-                  </tr>
-                {/each}
-              {/snippet}
-            </DataTable>
-          </ScrollRegion>
-        </ContextMenu>
-      </div>
-    {/if}
+                    </span>
+                  </th>
+                  <td>
+                    <span class="ellipsis" title={formatVersionLabel(item.strategy_name, item.version_number)}
+                      >{formatVersionLabel(item.strategy_name, item.version_number)}</span
+                    >
+                  </td>
+                  <td align="right">{item.status_counts['finished'] ?? 0} / {item.run_count}</td>
+                </tr>
+              {/each}
+            {/snippet}
+          </DataTable>
+        </ScrollRegion>
+      </ContextMenu>
+    </div>
   </SideColumn>
 
-  {#if shownSweep === null || chart === null}
-    <div class="empty-main">
-      {#if detailMessage !== ''}
-        <InlineNotification kind="error" title="Parameter sweep not read" subtitle={detailMessage} lowContrast />
-      {:else if isListRead && sweeps.length === 0 && listMessage === ''}
-        <EmptyText text="No parameter sweeps" />
-      {/if}
-    </div>
-  {:else}
-    {@const detail = shownSweep}
-    {@const shownChart = chart}
-    <PanelSplit storageKey="atrade.sweep-page.panel-split" panels={PANELS}>
-      {#snippet panel(id, state)}
-        {#if id === 'overview'}
-          <Panel {...state} label={`Parameter sweep #${String(detail.id)}`}>
-            {#snippet header()}
-              <h1 class="run-title">
-                <span class="run-number">#{detail.id}</span>
-                <a
-                  class="cds--link"
-                  href={resolve('/strategies/[strategyId]/versions/[versionNumber]', {
-                    strategyId: String(detail.strategy_id),
-                    versionNumber: String(detail.version_number),
-                  })}>{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
-                >
-              </h1>
-              <span class="status-line" role="status" aria-label="Run counts">
-                {#each STATUS_LINE as status (status)}
-                  <span class="status-count"
-                    ><StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} />{String(
-                      detail.status_counts[status] ?? 0,
-                    )}</span
+  <RunCenter {workbench} listTitle="Parameter sweeps not read" detailTitle="Parameter sweep not read">
+    {#if deleteMessage !== ''}
+      <InlineNotification
+        kind="error"
+        title="Parameter sweep not deleted"
+        subtitle={deleteMessage}
+        lowContrast
+        onClose={() => {
+          deleteMessage = '';
+        }}
+      />
+    {/if}
+    {#if shownSweep === null || chart === null}
+      <div class="atrade-run-empty">
+        {#if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === '' && workbench.detailMessage === ''}
+          <EmptyText text="No parameter sweeps" />
+        {/if}
+      </div>
+    {:else}
+      {@const detail = shownSweep}
+      {@const shownChart = chart}
+      <PanelSplit storageKey="atrade.sweep-page.panel-split" panels={PANELS}>
+        {#snippet panel(id, state)}
+          {#if id === 'overview'}
+            <Panel {...state} label={`Parameter sweep #${String(detail.id)}`}>
+              {#snippet header()}
+                <h1 class="atrade-run-title">
+                  <span class="atrade-run-number">#{detail.id}</span>
+                  <a
+                    class="cds--link"
+                    href={resolve('/strategies/[strategyId]/versions/[versionNumber]', {
+                      strategyId: String(detail.strategy_id),
+                      versionNumber: String(detail.version_number),
+                    })}>{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
                   >
-                {/each}
-              </span>
-            {/snippet}
-            <div class="chart-toolbar">
-              <Select
-                label="Metric"
-                size="sm"
-                items={[...SWEEP_METRICS]}
-                value={metric}
-                onValueChange={(value: SweepMetricKey) => {
-                  metric = value;
-                }}
-              />
-              {#if shownChart.kind === 'heatmap' && shownChart.slice !== null}
-                {@const slice = shownChart.slice}
-                <Select
-                  label={slice.parameter}
-                  size="sm"
-                  items={slice.values.map((value) => ({ value: String(value), label: String(value) }))}
-                  value={String(slice.value)}
-                  onValueChange={(value: string) => {
-                    sliceValue = slice.values.find((item) => String(item) === value) ?? null;
+                </h1>
+                <span class="status-line" role="status" aria-label="Run counts">
+                  {#each STATUS_LINE as status (status)}
+                    <span class="status-count"
+                      ><StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} />{String(
+                        detail.status_counts[status] ?? 0,
+                      )}</span
+                    >
+                  {/each}
+                </span>
+                <IconButton
+                  label="Delete parameter sweep"
+                  icon={TrashCan16}
+                  onclick={() => {
+                    isDeleteDialogOpen = true;
                   }}
                 />
-              {/if}
-            </div>
-            {#if shownChart.kind === 'points'}
-              <div class="point-chart">
-                <SweepPointChart parameter={shownChart.parameter} points={shownChart.points} {metric} {metricLabel} />
+              {/snippet}
+              <div class="chart-toolbar">
+                <Select
+                  label="Metric"
+                  size="sm"
+                  items={[...SWEEP_METRICS]}
+                  value={metric}
+                  onValueChange={(value: SweepMetricKey) => {
+                    metric = value;
+                  }}
+                />
+                {#if shownChart.kind === 'heatmap' && shownChart.slice !== null}
+                  {@const slice = shownChart.slice}
+                  <Select
+                    label={slice.parameter}
+                    size="sm"
+                    items={slice.values.map((value) => ({ value: String(value), label: String(value) }))}
+                    value={String(slice.value)}
+                    onValueChange={(value: string) => {
+                      sliceValue = slice.values.find((item) => String(item) === value) ?? null;
+                    }}
+                  />
+                {/if}
               </div>
-            {:else}
-              {@const heatmap = shownChart.heatmap}
-              <div class="table-region">
-                <ScrollRegion label="Heatmap" fill>
-                  <table class="cds--data-table cds--data-table--xs heatmap" aria-label={`${metricLabel} heatmap`}>
-                    <thead>
-                      <tr>
-                        <th scope="col"><div class="cds--table-header-label">{shownChart.rowParameter} \ {shownChart.columnParameter}</div></th>
-                        {#each heatmap.columns as column (column)}
-                          <th scope="col" align="right"><div class="cds--table-header-label">{String(column)}</div></th>
-                        {/each}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each heatmap.rows as row, rowIndex (row)}
-                        <tr>
-                          <th scope="row" align="right">{String(row)}</th>
-                          {#each heatmap.cells[rowIndex] ?? [] as cell, columnIndex (columnIndex)}
-                            {#if cell === null}
-                              <td align="right">{formatSweepMetric(metric, null)}</td>
-                            {:else}
-                              {@const color = readSequentialColor(heatmap.step(cell))}
-                              <td align="right" style:background-color={color.background} style:color={color.text}
-                                >{formatSweepMetric(metric, cell)}</td
-                              >
-                            {/if}
-                          {/each}
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </ScrollRegion>
-              </div>
-            {/if}
-          </Panel>
-        {:else}
-          <Panel {...state} label="Runs">
-            <div class="table-region">
-              <ScrollRegion label="Runs" fill>
-                <div class="cds--data-table-container">
-                  <table class="cds--data-table cds--data-table--sm cds--data-table--sort runs">
-                    <thead>
-                      <tr>
-                        {#each parameterNames as name (name)}
-                          <SortHeader
-                            label={name}
-                            align="right"
-                            direction={sortColumn === name ? sortDirection : null}
-                            onSort={() => {
-                              sortBy(name);
-                            }}
-                          />
-                        {/each}
-                        <SortHeader
-                          label="Status"
-                          direction={sortColumn === SWEEP_STATUS_COLUMN ? sortDirection : null}
-                          onSort={() => {
-                            sortBy(SWEEP_STATUS_COLUMN);
-                          }}
-                        />
-                        {#each SWEEP_METRICS as item (item.value)}
-                          <SortHeader
-                            label={item.label}
-                            align="right"
-                            direction={sortColumn === item.value ? sortDirection : null}
-                            onSort={() => {
-                              sortBy(item.value);
-                            }}
-                          />
-                        {/each}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each sortedRows as row (row.backtestId)}
-                        <tr
-                          class="link-row"
-                          onclick={(event) => {
-                            openRun(event, row.backtestId);
-                          }}
-                        >
-                          {#each parameterNames as name, index (name)}
-                            <td align="right">
-                              {#if index === 0}
-                                <a class="row-link" href={resolve('/backtests/[[backtestId]]', { backtestId: String(row.backtestId) })}>{String(row.values[name])}</a>
-                              {:else}
-                                {String(row.values[name])}
-                              {/if}
-                            </td>
-                          {/each}
-                          <td>
-                            <StatusIndicator label={describeBacktestStatus(row.status)} kind={findBacktestStatusKind(row.status)} />
-                          </td>
-                          {#each SWEEP_METRICS as item (item.value)}
-                            <td align="right">{formatSweepMetric(item.value, (row.values[item.value] ?? null) as number | null)}</td>
-                          {/each}
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
+              {#if shownChart.kind === 'points'}
+                <div class="point-chart">
+                  <SweepPointChart parameter={shownChart.parameter} points={shownChart.points} {metric} {metricLabel} />
                 </div>
-              </ScrollRegion>
-            </div>
-          </Panel>
-        {/if}
-      {/snippet}
-    </PanelSplit>
-  {/if}
+              {:else}
+                {@const heatmap = shownChart.heatmap}
+                <div class="table-region">
+                  <ScrollRegion label="Heatmap" fill>
+                    <table class="cds--data-table cds--data-table--xs heatmap" aria-label={`${metricLabel} heatmap`}>
+                      <thead>
+                        <tr>
+                          <th scope="col"><div class="cds--table-header-label">{shownChart.rowParameter} \ {shownChart.columnParameter}</div></th>
+                          {#each heatmap.columns as column (column)}
+                            <th scope="col" align="right"><div class="cds--table-header-label">{String(column)}</div></th>
+                          {/each}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each heatmap.rows as row, rowIndex (row)}
+                          <tr>
+                            <th scope="row" align="right">{String(row)}</th>
+                            {#each heatmap.cells[rowIndex] ?? [] as cell, columnIndex (columnIndex)}
+                              {#if cell === null}
+                                <td align="right">{formatSweepMetric(metric, null)}</td>
+                              {:else}
+                                {@const color = readSequentialColor(heatmap.step(cell))}
+                                <td align="right" style:background-color={color.background} style:color={color.text}
+                                  >{formatSweepMetric(metric, cell)}</td
+                                >
+                              {/if}
+                            {/each}
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </ScrollRegion>
+                </div>
+              {/if}
+            </Panel>
+          {:else}
+            <Panel {...state} label="Runs">
+              <div class="table-region">
+                <ScrollRegion label="Runs" fill bind:viewport={runsRegion}>
+                  <div class="cds--data-table-container">
+                    <table class="cds--data-table cds--data-table--sm cds--data-table--sort runs" bind:this={runsTable}>
+                      <thead>
+                        <tr>
+                          {#each parameterNames as name (name)}
+                            <SortHeader
+                              label={name}
+                              align="right"
+                              direction={sortColumn === name ? sortDirection : null}
+                              onSort={() => {
+                                sortBy(name);
+                              }}
+                            />
+                          {/each}
+                          <SortHeader
+                            label="Status"
+                            direction={sortColumn === SWEEP_STATUS_COLUMN ? sortDirection : null}
+                            onSort={() => {
+                              sortBy(SWEEP_STATUS_COLUMN);
+                            }}
+                          />
+                          {#each SWEEP_METRICS as item (item.value)}
+                            <SortHeader
+                              label={item.label}
+                              align="right"
+                              direction={sortColumn === item.value ? sortDirection : null}
+                              onSort={() => {
+                                sortBy(item.value);
+                              }}
+                            />
+                          {/each}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each sortedRows as row (row.backtestId)}
+                          <tr
+                            class="link-row"
+                            onclick={(event) => {
+                              openRun(event, row.backtestId);
+                            }}
+                          >
+                            {#each parameterNames as name, index (name)}
+                              <td align="right">
+                                {#if index === 0}
+                                  <a class="row-link" href={resolve('/backtests/[[backtestId]]', { backtestId: String(row.backtestId) })}>{String(row.values[name])}</a>
+                                {:else}
+                                  {String(row.values[name])}
+                                {/if}
+                              </td>
+                            {/each}
+                            <td>
+                              <StatusIndicator label={describeBacktestStatus(row.status)} kind={findBacktestStatusKind(row.status)} />
+                            </td>
+                            {#each SWEEP_METRICS as item (item.value)}
+                              <td align="right">{formatSweepMetric(item.value, (row.values[item.value] ?? null) as number | null)}</td>
+                            {/each}
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </div>
+                </ScrollRegion>
+                <HorizontalScrollTrack label="Runs columns" viewport={runsRegion} content={runsTable} viewportId={runsRegion?.id ?? ''} wheelScrolls={false} />
+              </div>
+            </Panel>
+          {/if}
+        {/snippet}
+      </PanelSplit>
+    {/if}
+  </RunCenter>
 
   <AssistantColumn />
 </Workbench>
 
 <StartSweepDialog
-  open={isStartDialogOpen}
-  onOpenChange={(open: boolean) => {
-    isStartDialogOpen = open;
-  }}
+  open={workbench.isStartDialogOpen}
+  onOpenChange={workbench.changeStartDialog}
   onStarted={openStartedSweep}
 />
 
-<style>
-  .empty-main {
-    flex: 1;
-    min-inline-size: 0;
-  }
+{#if sweepId !== null}
+  {@const id = sweepId}
+  <Dialog
+    open={isDeleteDialogOpen}
+    onOpenChange={(open: boolean) => {
+      isDeleteDialogOpen = open;
+    }}
+    title={`Delete parameter sweep #${String(id)}?`}
+    primaryText="Delete parameter sweep"
+    primaryKind="danger"
+    busy={isDeleting}
+    onPrimary={() => {
+      void deleteOpenSweep(id);
+    }}
+  />
+{/if}
 
+<style>
   .table-region {
     display: flex;
     flex: 1;
@@ -440,10 +442,16 @@
     white-space: nowrap;
   }
 
-  /* Fixed column widths: the tables are never wider than their region. Long text ends with an ellipsis. */
+  /* Fixed column widths. Long text ends with an ellipsis. */
   .sweep-list :global(table),
   .runs {
     table-layout: fixed;
+  }
+
+  /* All Runs columns stay readable: a narrow region scrolls them sideways with its own track. The scroll region is the
+     one scroll container for both axes, so the sticky header stays at its top. */
+  .runs {
+    min-inline-size: 54rem;
   }
 
   /* The status icon and the number. */
@@ -492,22 +500,6 @@
   .row-link:focus-visible {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
-  }
-
-  .run-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--cds-spacing-04);
-  }
-
-  .run-title > :global(*) {
-    font: inherit;
-    letter-spacing: inherit;
-  }
-
-  .run-number {
-    font-variant-numeric: tabular-nums;
-    color: var(--cds-text-secondary);
   }
 
   .status-line {

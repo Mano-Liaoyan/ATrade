@@ -7,8 +7,7 @@ from nautilus_trader.indicators import (
 )
 from nautilus_trader.model import Bar as NautilusBar
 
-from atrade.foundation.bar import Bar
-from atrade.indicator.wrapped_indicator import make_nautilus_bar, read_output
+from atrade.indicator.wrapped_indicator import read_output
 
 
 class SMA:
@@ -28,9 +27,6 @@ class SMA:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._sma.handle_bar(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._sma.handle_bar(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._sma.reset()
@@ -53,9 +49,6 @@ class EMA:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._ema.handle_bar(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._ema.handle_bar(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._ema.reset()
@@ -90,9 +83,6 @@ class MACD:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._macd.handle_bar(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._macd.handle_bar(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._macd.reset()

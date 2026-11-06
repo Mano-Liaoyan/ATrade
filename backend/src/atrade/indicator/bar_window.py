@@ -1,7 +1,7 @@
 """The window of the last bars that the indicator classes written by ATrade keep (#162).
 
-Each class holds one `BarWindow` and calculates its value from the window. The strategy path `handle_bar` and the
-screen path `update` (through `make_nautilus_bar`) add the same prices (docs/architecture/indicator.md section 23.5).
+Each class holds one `BarWindow` and calculates its value from the window. The strategy path and the screen path
+(through `make_nautilus_bar`) add the same prices (docs/architecture/indicator.md section 23.5).
 """
 
 from collections import deque

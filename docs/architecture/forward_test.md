@@ -41,6 +41,11 @@ Until Phase 3 is done, the rules marked "until Phase 3" stay in force.
   1 user `Strategy`, and 1 client ID.
 - Input: a strategy version, 1 instrument, 1 bar type, and an optional end
   time. The start time is always "now".
+- The instruments must be in USD. The cash of a forward test is in USD, and
+  the strategy and the equity read prices in the instrument currency. A forward
+  test has no exchange rates, so another currency gives wrong order sizes and a
+  wrong equity. `POST /api/forward-tests` refuses another currency with `422`,
+  also for one member of a `rule` or `list` universe (section 12.13).
 - Without an end time, the forward test runs until the user stops it.
 - The end time is a date and a time. The browser shows it in the local time
   zone. The database stores UTC. The end time cannot change while the forward
@@ -113,7 +118,9 @@ This replaces the rules above:
 - The LiveNode of a forward test uses the ATrade execution client
   (section 12.19), not the IB execution client. The execution client reports
   the owner position and the owner cash for reconciliation, not the account
-  values.
+  values. Before each fill event it reports the owner cash again, so the account
+  balance of the strategy is the ledger cash. The balance shows 0 when the
+  owner cash is below 0, because NautilusTrader refuses a negative balance.
 - The migration drops the partial unique index
   `forward_test_one_per_instrument`. `find_forward_test_on_instrument()` and
   the `409` "already runs on" refusal of `POST /api/forward-tests` go away.
@@ -201,7 +208,9 @@ This replaces the rules above:
 2. The child connects with `ib_async` and the same client ID.
 3. The child reads the open orders of this client ID with `reqOpenOrders`.
 4. The child cancels each order and waits for the confirmation.
-5. The child exits.
+5. The child reads the executions and saves the fills of this forward test in
+   the owner ledger.
+6. The child exits.
 
 - Positions stay open. The user handles them by hand.
 - Phase 3 (#146): the stop steps do not change. After the stop ends with the
@@ -212,23 +221,55 @@ This replaces the rules above:
   the positions with paper orders by hand.
 - Do not use `manage_stop`. It closes positions. `LiveNode.stop()` does not
   cancel orders.
-- When a cancellation fails, the status is "stop failed". The client ID stays
-  taken. The worker retries the cancellation.
+- When a cancellation or the save of a fill fails, the status is "stop
+  failed". The client ID stays taken. The worker retries the stop steps.
+- Step 5 and restart step 1 (section 12.7) find a fill after a crash, a lost
+  IB Gateway, or the last read of the `LiveNode`. The `orderRef` tells the
+  forward test. The symbol and the currency of the contract tell the
+  instrument, because the exchange of an execution is the execution venue,
+  not the primary exchange. An execution without an instrument of the forward
+  test gets a warning in the log and no ledger row. The owner ledger stores
+  each execId once, so a fill that the execution client saved adds no row.
+  `reqExecutions` returns only the current day, so a fill stays lost when no
+  child reads it on its day.
+- A held fill (`ibkr.md`, no commission report yet) of the forward test fails
+  step 5 with exit code 5: the status is `stop_failed`, and the worker runs
+  the stop steps again on a new connection. No transfer to "By hand" happens
+  before the fill is in the ledger. End condition: the retries end when the
+  report arrives, or when `read_executions()` ends the hold at 5 minutes and
+  returns the fill with commission 0.
 
 ## 12.7 Recovery after restart
 
-- Daily IB Gateway restart: NautilusTrader reconnects and subscribes to bars
-  again. When the IB execution client is disconnected for more than 5 minutes,
-  the child exits. The worker waits for the Gateway (section 12.5) and starts
-  it again. This does not count toward the 3-crash limit.
+- Daily IB Gateway restart: the IB data client of NautilusTrader connects again
+  and subscribes to bars again. `ib_async` does not connect again by itself, so
+  the fill check of the ATrade execution client (section 12.19) connects again,
+  at most once every 10 seconds, and then reads the fills of the gap. Open
+  orders stay at IBKR and keep their order IDs, so these fills reach the owner
+  ledger. While the socket is down, the owner ledger check denies each order.
+  When IB Gateway is not reachable or the execution client has no socket for
+  more than 5 minutes, the child exits. The worker waits for the Gateway
+  (section 12.5) and starts it again. This does not count toward the 3-crash
+  limit.
+- A new connection does not run the paper account check again. The check runs
+  before each `LiveNode` start (section 12.5). Each order names the checked
+  paper account, and IBKR refuses it on any other login.
 - Other stops are a restart of the `forward-test` service, a server restart,
   or a child crash. After each of them, the worker restarts the forward test.
   It uses the same client ID and the same strategy version.
 - After 3 crashes in a row, the status is "failed". The worker stops the
   restarts.
+- A PostgreSQL restart does not stop the worker. The worker writes a warning
+  and compares again. The children continue. The worker keeps an ended child
+  until it can write the result of that child.
 - Restart steps:
   1. Cancel all open orders of this client ID (section 12.6). This prevents
-     duplicate orders.
+     duplicate orders. Then save the fills of this forward test (step 5 of
+     section 12.6), so that the owner position is correct before the
+     `LiveNode` starts. A held fill is not a crash: the child runs the start
+     steps again every 30 seconds with the status `waiting_for_gateway`, with
+     the end condition of section 12.6. The `gateway` interruption of this
+     wait ends at the `LiveNode` start or at the stop.
   2. Start the `LiveNode`. Set `external_order_instrument_ids` and
      `reconciliation_instrument_ids` to the instrument. The account position
      on this instrument belongs to this strategy (section 12.2).
@@ -251,13 +292,15 @@ This replaces the rules above:
   current quarter.
 - Phase 3 (#149): the stock split check restarts the forward tests that trade
   an instrument after it changes the owner ledger for a stock split
-  (section 12.22). This restart does not count toward the 3-crash limit.
+  (section 12.22). This restart does not count toward the 3-crash limit,
+  also when the old child ends with a held fill (exit code 5).
 - An event table records the start and the end of each interruption.
 
 Implementation (#77):
 
 - A crash is the end of a `run` child without a stop request, with an exit
-  code other than 3 (paper account check) or 4 (IB Gateway). The worker adds
+  code other than 3 (paper account check) or 4 (IB Gateway), and not a stock
+  split restart with exit code 0 or 5. The worker adds
   1 to `crash_count`, opens a `crash` interruption, and writes `starting`.
   The next comparison starts a new `run` child. At `crash_count = 3` the
   status is `failed`, the client ID stays taken, and there is no restart.
@@ -267,14 +310,14 @@ Implementation (#77):
   memory.
 - Each `run` child cancels the open orders of its client ID after the paper
   account check and before the `LiveNode` start (step 1), on the same
-  connection. A failed cancel there ends the child with exit code 1, which
-  is a crash.
-- IB Gateway lost: the child opens a TCP connection to the Gateway port every
-  30 seconds while the `LiveNode` runs. After 5 minutes without a
-  connection, it stops the `LiveNode` and exits with code 4
-  (`GATEWAY_UNREACHABLE_EXIT_CODE`) without the stop steps. The NautilusTrader
-  2.0.0rc7 `LiveNode` does not show the connection state of its IB execution
-  client to Python, so the probe is the replacement. The worker writes
+  connection. A failed cancel or a failed save of a fill there ends the child
+  with exit code 1, which is a crash.
+- IB Gateway lost: the child opens a TCP connection to the Gateway port and
+  reads the socket state of the ATrade execution client every 30 seconds while
+  the `LiveNode` runs. The port alone is not enough, because it answers after a
+  Gateway restart before a new API connection exists. After 5 minutes without
+  both, it stops the `LiveNode` and exits with code 4
+  (`GATEWAY_UNREACHABLE_EXIT_CODE`) without the stop steps. The worker writes
   `waiting_for_gateway`, opens a `gateway` interruption, and starts a new
   `run` child, which waits for IB Gateway (section 12.5). `crash_count` does
   not change.
@@ -328,14 +371,8 @@ Implementation (#77):
   - The bar end is the bar `ts_event`. The backtest engine gives the actor a
     bar before the strategy, so a fill at a bar close counts in the equity
     from the next bar on.
-  - The equity starts at `start_balance_usd`, not at the paper account
-    balance. Other positions of the paper account do not change it. The
-    start balance is `NetLiquidation` converted to USD (section 11.9 of
-    `paper_trading.md`). A child that has no `NetLiquidation` value in USD at
-    the first start, for example a EUR account without an exchange rate,
-    writes "The paper account has no NetLiquidation value in USD." and the
-    reason of the balance, and ends with exit code 3 before the `LiveNode`
-    starts.
+  - The equity starts at `allocated_capital_usd`, not at the paper account
+    balance. Other positions of the paper account do not change it.
 - Tables (migration `3e7a1c5d9b78_forward_test_create_record_tables.py`,
   `ON DELETE CASCADE` from `forward_test`). Each insert has
   `ON CONFLICT DO NOTHING`, so a restart that reads a fill or a bar again
@@ -343,7 +380,6 @@ Implementation (#77):
 
 | Table | Columns |
 |---|---|
-| `forward_test_fill` | `forward_test_id`, `trade_id` (NautilusTrader `TradeId`), `time_utc`, `side`, `quantity_shares`, `price_usd`, `commission_usd`. Primary key `(forward_test_id, trade_id)`. |
 | `forward_test_equity_point` | `forward_test_id`, `time_utc` (bar end), `equity_usd`. Primary key `(forward_test_id, time_utc)`. |
 
 Phase 3 changes (#146, #149):
@@ -367,8 +403,7 @@ Phase 3 changes (#146, #149):
 - A stock split adjustment is a ledger record, not a fill (section 12.22). The
   "Fills" table shows it as a row (section 12.16).
 - The forward test routes read the fills of the forward test from the owner
-  ledger. Whether `forward_test_fill` stays, and what happens to its old
-  rows, is left to the implementation (section 12.24).
+  ledger. Migration `d7b2f4a9c613` drops `forward_test_fill` (section 12.24).
 - Implemented (#215): at each bar, the recorder reads the fills of the
   forward test on its instrument with `read_forward_test_fills_blocking()` of
   `paper_trading` and calculates the equity point with
@@ -412,7 +447,8 @@ Phase 3 changes (#146, #149):
 - The comparison page uses the comparison view of section 9.5 ([`strategy.md`](strategy.md)): one key
   metric row for each test and both equity and drawdown curves on one chart.
 - A fill table shows, for each bar, the fill price on each side and the
-  difference.
+  difference. A stock split adjustment is not a fill, so it is not in this
+  table.
 - The chart marks interruptions in grey.
 - Forward test metrics use the same metric functions that `backtest` exports.
 - Phase 1 (#137): the forward test metrics include the new metrics of
@@ -468,8 +504,9 @@ Phase 3 changes (#146, #149):
     is `start_balance_usd`. `422` without a start balance, for each
     refusal of `check_backtest_request` (an empty period), and for an
     instrument that is not in USD: a forward test has no exchange rates, so
-    its values are in the instrument currency and would not compare with a
-    backtest in USD (`backtest.md` section 10.8). The
+    an old forward test in another currency does not compare with a backtest
+    in USD (`backtest.md` section 10.8). A new start refuses such an instrument
+    (section 12.1). The
     backtest reads only saved bars: without saved bars of the period it
     fails with the message of section 10.
   - The comparison page `/forward-tests/{id}/comparison/{backtest_id}` reads
@@ -483,12 +520,13 @@ Phase 3 changes (#146, #149):
     backtest period (the comparison route calculates it, #170).
   - Metrics: `calculate_metrics` with `start_balance_usd`, the range from
     the forward test start to its stop (or to now while it runs), the
-    recorded equity points, and the recorded fills.
+    recorded equity points, and all ledger rows of the forward test.
   - Decided (#170): the exposure counts the recorded equity points as the
     bars, because a forward test has no saved bars and the DataActor
     records one point at each bar end (section 12.8). The recorded fills
-    go to `find_round_trips` with no change: `select_fills` gives
-    `BacktestTrade` rows.
+    go to `find_round_trips` with no change: `list_trades` gives
+    `BacktestTrade` rows, also for the stock split adjustments. Without them
+    the position after a split does not reach 0 (section 12.16).
   - Decided (#170): the forward test metrics have the fields of the backtest
     `metrics` (backtest section 10.5, Phase 1 row) and `net_profit_usd`
     (the final equity minus `start_balance_usd`). They have no
@@ -507,7 +545,9 @@ Phase 3 changes (#146, #149):
     calculation.
   - Fill table: a fill belongs to the last bar end (of both equity curves) at
     or before its time, so a live fill just after a bar close and the
-    backtest fill at that bar close are in one row. One row for each bar end
+    backtest fill at the next open are in one row: the backtest fill time is
+    the start of the next bar plus 1 millisecond (`backtest.md` section
+    10.10.3). One row for each bar end
     and side. More fills in one row give the total quantity and the average
     price weighted by quantity (4 decimal places). The difference is the
     forward test price minus the backtest price, only when both sides have a
@@ -538,7 +578,11 @@ The public entry `atrade.forward_test` exports:
 - Entry points: `app/forward_test_worker.py` (Compose service
   `forward-test`) runs the worker with a start function that runs
   `python -m atrade.app.forward_test_process <ID> <run|cancel_orders>`. The
-  stop request is `SIGTERM`. The child gets the environment of the worker.
+  stop request is `SIGTERM`. The child gets `PATH`, `HOME`, `TZ`,
+  `DATABASE_URL`, `ATRADE_TRADING_MODE`, `ATRADE_IBKR_HOST`,
+  `ATRADE_IBKR_PAPER_PORT`, and `ATRADE_IBKR_ACCOUNT_ID` (the paper account
+  check reads it). It does not get `DATABENTO_API_KEY`
+  (`docs/architecture/backtest.md` section 10.1).
   The `forward-test` service has no IBKR user name or password.
 - The child loads the strategy code with `load_strategy_classes()` of
   `strategy` (section 9). `backtest` uses the same function.
@@ -551,7 +595,7 @@ this document. The implementation can change them.
 | Name | Purpose |
 |---|---|
 | `OwnerLedgerExecutionClient`, `OwnerLedgerExecutionClientFactory(ledger_input, ledger, gateway)`, `OwnerLedgerInput` | The ATrade NautilusTrader execution client of section 12.19 (#213). `OwnerLedgerInput` has `forward_test_id`, `client_id`, `account_id`, `instruments`, and `fill_check_interval_seconds` (default 1). `gateway` is an `OrderGateway`: the order functions of the `ibkr` GatewayConnection. |
-| `OwnerLedger`, `OwnerOrder`, `OwnerFill`, `OwnerPosition` | The owner ledger interface of the execution client (#213). |
+| `OwnerLedger`, `OwnerOrder`, `OwnerFill`, `ForwardTestPosition` | The owner ledger interface of the execution client (#213). |
 | `BarStoreDataClient`, `BarStoreDataClientFactory(bar_store_input)`, `BarStoreInput` | The ATrade NautilusTrader data client of section 12.19 (#213). `BarStoreInput` has `database_url` and `instruments`. The factory keeps the created client in `client`, for `send_new_bars()`. |
 | `add_atrade_clients(builder, data_client_factory, execution_client_factory)` | Adds both clients to a `LiveNodeBuilder` as the default route. Without a data client factory, it adds only the execution client (#213). |
 | `BarFetcher(*, database_url, clock, open_gateway_connection, read_member_lists, sleep)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. `fill_warm_up()` reads the warm-up before a start. |
@@ -563,7 +607,7 @@ this document. The implementation can change them.
   the cash of "By hand" in the owner ledger
   ([`paper_trading.md`](paper_trading.md) section 11.13), so `paper_trading`
   does not need the allocated capital. `OwnerOrder`, `OwnerFill`, and
-  `OwnerPosition` come from `paper_trading`. `OwnerFill` also has
+  `ForwardTestPosition` come from `paper_trading`. `OwnerFill` also has
   `execution_id`, `ibkr_order_id`, and `commission`.
 
 ## 12.12 Table
@@ -623,19 +667,17 @@ Phase 3 table changes (#146). The column names are choices of this document.
 |---|---|
 | `starting` | The Web process inserted the row, or a crash happened. The worker did not start a child yet. |
 | `running` | A `run` child runs. |
-| `waiting_for_gateway` | IB Gateway is not reachable. The child retries every 30 seconds, or the worker starts a new child after a lost Gateway. The client ID stays taken. |
+| `waiting_for_gateway` | IB Gateway is not reachable, or a fill waits for its commission report before the `LiveNode` start (section 12.7). The child retries every 30 seconds, or the worker starts a new child after a lost Gateway. The client ID stays taken. |
 | `stopping` | The worker sent the stop request, or a `cancel_orders` child runs. |
 | `stopped` | The orders are cancelled and the child ended. The client ID is free. |
-| `stop_failed` | A cancel failed. The client ID stays taken. The next comparison starts a `cancel_orders` child again. |
+| `stop_failed` | A cancel or the save of a fill failed. The client ID stays taken. The next comparison starts a `cancel_orders` child again. |
 | `failed` | The paper account check failed (client ID free, no retry), or 3 crashes in a row (client ID taken until a stop cancels the orders). |
 
 - Writers: the Web process inserts the row (`desired_state = running`,
   `status = starting`, the client ID, `end_time_utc`,
   `allocated_capital_usd`) and after that writes only `desired_state`. The worker writes `status`, `client_id`,
   `crash_count`, `stopped_at_utc`, and the `crash` and `worker_restart`
-  interruptions. The child writes `start_balance_usd` only for an old row
-  without `allocated_capital_usd` (the `NetLiquidation` converted to USD
-  after the paper account check, only the first value), `error_message`, the `gateway` interruptions, and two statuses:
+  interruptions. The child writes `error_message`, the `gateway` interruptions, and two statuses:
   `waiting_for_gateway` (only from `starting`, `running`, or
   `waiting_for_gateway`) and `running` at the `LiveNode` start (only from
   `starting`, `running`, or `waiting_for_gateway`; it also clears
@@ -657,14 +699,14 @@ Phase 3 table changes (#146). The column names are choices of this document.
 | `POST /api/forward-tests/{id}/stop` | `202`. Writes `desired_state = stopped`. `404` for an unknown ID. |
 | `POST /api/forward-tests/{id}/same-period-backtests` | `201` with `{"backtest_id"}`: a queued backtest of the same period (section 12.10). `404` for an unknown ID. `422` without a start balance (`"The forward test has no start balance yet. The backtest uses it as the paper capital."`), for a currency that is not USD, or for an empty period. |
 | `GET /api/forward-tests/{id}/comparison/{backtest_id}` | `200` with `ForwardTestComparisonResponse`: `forward_test`, `backtest` (`id`, `status`, `error_message`, `start_utc`, `end_utc`, `paper_capital_usd`, `metrics` or null), `forward_test_metrics` (null without a start balance; the fields of section 12.10, with the win rate in the backtest period, #170), `forward_test_equity_curve`, `backtest_equity_curve`, `fills` (`bar_end_utc`, `side`, quantity and price of each side or null, `price_difference_usd` or null), and `interruptions` (`start_utc`, `end_utc`). `404` for an unknown forward test or backtest. `422` when the backtest has another strategy version, instrument, or bar period. |
-| `/ws/forward-tests` | The change socket of architecture.md section 13 "Live updates": `{"type": "changed"}` after each change of `forward_test`, `forward_test_interruption`, `forward_test_equity_point`, `forward_test_fill`, or `forward_test_same_period_backtest`, and `{"type": "heartbeat"}` after 10 seconds without a change. The page then reads `GET /api/forward-tests`, which reads the full list with a fixed number of database connections (not connections for each row). The browser sends nothing. |
+| `/ws/forward-tests` | The change socket of architecture.md section 13 "Live updates": `{"type": "changed"}` after each change of `forward_test`, `forward_test_interruption`, `forward_test_equity_point`, `forward_test_same_period_backtest`, or `owner_ledger_entry`, and `{"type": "heartbeat"}` after 10 seconds without a change. The fills of a forward test are in `owner_ledger_entry`, so a fill of "By hand" also sends the message. The page then reads `GET /api/forward-tests`, which reads the full list with a fixed number of database connections (not connections for each row). The browser sends nothing. |
 
 Phase 3 route changes (#146, #149). The field names, the new route path,
 and the status codes of the new refusals are choices of this document.
 
 | Route | Change |
 |---|---|
-| `POST /api/forward-tests` | `StartForwardTestRequest` gets `universe` (`kind`: `single`, `rule`, or `list`, then `symbol`, `exchange`, and `currency` for `single`, or `top_n` from 1 to 500 for `rule`) and `allocated_capital_usd` (decimal text, larger than 0). `422` for a `rule` or `list` universe with a bar period other than `1-DAY`, for `top_n` out of range, for an empty watchlist, or for an `allocated_capital_usd` that is not larger than 0. `409` with `StartRefusedResponse` (`detail`, `forward_test_id` null, `unallocated_usd`) when the allocated capital is larger than the unallocated amount, for example `"The allocated capital 30,000.00 USD is larger than the unallocated 21,250.00 USD."`. `409` when the paper account check did not pass or IBKR sent no `NetLiquidation` in USD, because ATrade cannot calculate the unallocated amount. The "already runs on" `409` goes away (section 12.2). |
+| `POST /api/forward-tests` | `StartForwardTestRequest` gets `universe` (`kind`: `single`, `rule`, or `list`, then `symbol`, `exchange`, and `currency` for `single`, or `top_n` from 1 to 500 for `rule`) and `allocated_capital_usd` (decimal text, larger than 0). `422` for a `rule` or `list` universe with a bar period other than `1-DAY`, for `top_n` out of range, for an empty watchlist, for an instrument or a member that is not in USD (`"A forward test supports only USD instruments, because a forward test has no exchange rates. Not in USD: 700 HKD."`), or for an `allocated_capital_usd` that is not larger than 0. `409` with `StartRefusedResponse` (`detail`, `forward_test_id` null, `unallocated_usd`) when the allocated capital is larger than the unallocated amount, for example `"The allocated capital 30,000.00 USD is larger than the unallocated 21,250.00 USD."`. `409` when the paper account check did not pass or IBKR sent no `NetLiquidation` in USD, because ATrade cannot calculate the unallocated amount. `409` when the code has an order that works only in a backtest (section 12.19), for example `"Line 12: stop_market works only in a backtest. A forward test sends only market and limit orders."`. The "already runs on" `409` goes away (section 12.2). |
 | `GET /api/forward-tests/capital` (new) | `200` with `{"net_liquidation_usd", "allocated_usd", "unallocated_usd"}`. `allocated_usd` is the sum of `allocated_capital_usd` of the forward tests that hold a client ID. `unallocated_usd` is `net_liquidation_usd` minus `allocated_usd`. All 3 are `null` when the paper account check did not pass or no USD value is available. The start dialog reads it. |
 | `GET /api/forward-tests`, `GET /api/forward-tests/{id}` | `ForwardTestResponse` gets `universe_kind`, `universe_top_n`, `allocated_capital_usd`, and `split_checks_needed` (a list of `symbol`, `exchange` of the instruments of the forward test in the "Split check needed" state). `ForwardTestDetailResponse` gets `instruments` (section 12.16) and `fills` rows with `symbol`, `exchange`, and `kind` (`fill` or `split_adjustment`). |
 | `POST /api/forward-tests/{id}/same-period-backtests` | Uses `allocated_capital_usd` and the recorded members (section 12.10). `422` "no start balance" only for an old row without `allocated_capital_usd` and without a start balance. `422` (`"The forward test has no recorded members in its period."`) for a multi-instrument forward test without recorded members. |
@@ -722,10 +764,18 @@ and the status codes of the new refusals are choices of this document.
   it. The forward test panel has the "Equity" / "Bars" switcher; "Bars" shows
   the bars from `created_at_utc` to `stopped_at_utc`, or to now. Done in
   #332: `round_trip_net_profit_usd` of each fill row, from
-  `find_round_trip_net_profits` on the `fill` rows (the rule of the
-  Instruments tab). A split adjustment row has null.
+  `find_round_trip_net_profits` on all ledger rows (the rule of the
+  Instruments tab). A split adjustment row that ends a round trip has its net
+  profit, for example a 1:10 reverse split of 5 shares. So the values of the
+  rows add up to the net profit of the Instruments tab. The chart has no mark
+  for a split adjustment row, because the row has no price.
 
 ## 12.14 Worker comparison
+
+An error in a comparison goes to the log, and the next comparison tries
+again. The error does not end the worker process, because that end stops all
+children without their stop steps. An error in one row does not stop the
+comparison of the other rows. A row writes one log for each new error.
 
 Each comparison reads the rows that are not done. A row is done when it is
 `stopped`, or `failed` without a client ID. For each row:
@@ -758,7 +808,7 @@ than the worker clock.
 ## 12.15 Child process
 
 - `run`: connect with `ib_async` and the client ID of the row, call
-  `require_paper_account()`, read the balance, cancel the open orders of the
+  `require_paper_account()`, cancel the open orders of the
   client ID, disconnect, then `run_live_node()` with the same client ID until
   `SIGTERM`. Then the stop steps of section 12.6 and exit code 0. When IB
   Gateway is not reachable, it waits (section 12.5). `run_live_node()`
@@ -948,9 +998,16 @@ than the worker clock.
     shows the split, for example "Split 4:1". The quantity column shows the
     change of the share count. The price column is empty. The amount column
     shows the cash in lieu.
+  - A stock split adjustment counts in the metrics, the
+    `round_trip_net_profit_usd` of the fills, and the net profit of the
+    Instruments tab: its shares change the position and its cash in lieu adds
+    to the profit of the round trip. Its price is 0, so the turnover does not
+    change. `trade_count` of the metrics and of the Instruments tab counts the
+    fills only. A round trip that a split adjustment ends has no
+    `round_trip_net_profit_usd` on a row, but it counts in the other values.
 - Phase 3 (#149): when an instrument of the forward test is in the
   "Split check needed" state, the header line shows a warning icon before
-  "#<id>" with the tooltip "Split check needed: AAPL". The paper trading page has the actions
+  "#<id>" with the tooltip "Split check needed: AAPL". The Home page has the actions
   ([`paper_trading.md`](paper_trading.md) section 11.7).
 - Implemented (#220): the "Fills" table has one more column, "Amount (USD)":
   the quantity times the price of a fill, or the cash in lieu of a split
@@ -1110,8 +1167,9 @@ Execution client (`OwnerLedgerExecutionClient`,
 - An order on an instrument in the "Split check needed" state also gets
   `OrderDenied` ([`paper_trading.md`](paper_trading.md) section 11.11).
 - It reports only the orders and the fills of its own client ID.
-- It writes each fill into the owner ledger, with the forward test as the
-  owner.
+- It writes each fill of the orders of its run into the owner ledger, with
+  the forward test as the owner. The child saves all other fills of the
+  forward test (section 12.6).
 - For reconciliation, it reports the owner position of each instrument
   (`PositionStatusReport` with `quantity` and `avg_px_open`) and the owner
   cash (section 12.18). It does not report the account positions or the
@@ -1134,6 +1192,20 @@ Execution client (`OwnerLedgerExecutionClient`,
   price precision of the instrument in the NautilusTrader cache: the IB data
   client loads IB instruments (#215).
 - Each order adds 1 PostgreSQL query. The time is not measured.
+- Each 60 s, it compares the sent orders with the open orders of its client
+  ID. It reads the open orders first and the executions after them, also the
+  held fills. The strategy gets `OrderCanceled` for an open order that IBKR
+  no longer has and that has no unsaved fill, so the strategy does not wait
+  for an order that IBKR ended, for example a day order at the market close.
+  An order that is younger than 60 s waits for the next check. After a
+  reconnect, the first empty list waits for the next check: IBKR can send the
+  list late after an IB Gateway restart, and a wrong cancel makes the strategy
+  send the order again.
+- It sends only market and limit orders. A stop order gets `OrderDenied`, and
+  `submit_order_list` reaches no IBKR order. So `POST /api/forward-tests`
+  refuses code with such a call with an AST check: a call on `order_factory`,
+  or `submit_order_list`. A method of the user with the same name passes, for
+  example `self.bracket()`. A backtest runs this code.
 
 Data client (`BarStoreDataClient`,
 `backend/src/atrade/forward_test/bar_store_data_client.py`):
@@ -1229,8 +1301,9 @@ Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-
   is not used, because 5000 candidate instruments need about 5000 IBKR
   requests (about 42 minutes), and IBKR filters the volume of historical
   bars.
-- The worker downloads the data and calculates the universe at 06:00 ET on
-  the first trading day of the quarter.
+- The worker downloads the data and calculates the universe from 06:00 ET on
+  the first trading day of the quarter, on any day while the quarter has no
+  members.
 - When the daily bar of the previous trading day is not available yet, the
   worker tries again every 15 minutes until 09:00 ET.
 - When the bar is still missing at 09:00 ET, the worker uses the 63 trading
@@ -1265,7 +1338,9 @@ section 8.13 has the stock split table and the change of the stored bars.
 - The check runs before the market opens on each trading day: 08:00 ET for
   US instruments, 08:30 HKT for HK instruments.
 - It checks each instrument that has a paper account position or an owner
-  position.
+  position, or that a running forward test trades: the instrument of a
+  single-instrument forward test, or a member of the last recorded quarter of
+  a multi-instrument forward test.
 - Evidence A: the ratio between a stored daily close and the new IBKR
   `TRADES` close of the same day. IBKR adjusts `TRADES` bars for stock splits,
   not for dividends.
@@ -1282,8 +1357,10 @@ section 8.13 has the stock split table and the change of the stored bars.
   2. Change the owner ledger in one transaction
      ([`paper_trading.md`](paper_trading.md) section 11.11).
   3. Restart the child processes of the forward tests that trade the
-     instrument. The restart cancels their open orders (section 12.7) and
-     restores the strategy positions from the new ledger.
+     instrument, also when they hold no position: the indicators of a flat
+     strategy hold prices from before the stock split. The restart cancels
+     their open orders (section 12.7) and restores the strategy positions
+     from the new ledger.
 - The restart avoids a position report with a new quantity in a running
   LiveNode. Nobody checked what a running LiveNode does with it.
 - The restart time is not measured. The estimate is 1 minute or less for
@@ -1306,17 +1383,23 @@ Implemented (#220) with the IBKR fake only:
 - Each try connects with the bar fetcher client ID (one connection of the 2
   jobs at a time), runs the paper account check, reads the IBKR positions of
   the market, and reads evidence A again for each instrument with an IBKR
-  position or an owner position (`record_stock_split_evidence()` of
-  `market_data`). So a retry can find evidence A that the daily bar update
-  of the evening before did not have. Then it gives each instrument, and
+  position or an owner position, and for each instrument of a running forward
+  test (`record_stock_split_evidence()` of `market_data`). So a retry can find evidence A that the daily bar update
+  of the evening before did not have. `read_portfolio` is 1 read for all
+  positions. A flat instrument of a running forward test is read only in the
+  first try of a day, because evidence A is 1 IBKR read for each instrument.
+  Limit: a universe of 500 flat members thus makes 500 reads in the first try
+  of a day, under the connection lock. Then it gives each instrument, and
   each candidate of the market, to `StockSplitLedger.check_instrument()` of
   `paper_trading`.
 - Evidence that is not complete (`position_only` or `bar_ratio_only`) waits
   for the next try. At the last try it gives the "Split check needed"
   state. The other 3 cases give the state at once.
-- After a confirmed stock split, the check asks the worker to restart the
-  forward tests that held the instrument (`ForwardTestWorker.request_restart`).
-  The worker asks the child to stop. When it ends with exit code 0, the
+- After a confirmed stock split, or after "Apply split", the check asks the
+  worker to restart the forward tests that held the instrument and the
+  running forward tests of the instrument
+  (`ForwardTestWorker.request_restart`).
+  The worker asks the child to stop. When it ends with exit code 0 or 5, the
   worker writes `starting` and the next comparison starts a new child. The
   restart adds nothing to `crash_count`. The new child cancels the open
   orders of its client ID (section 12.7) and gets the new owner positions
@@ -1334,12 +1417,12 @@ Implemented (#220) with the IBKR fake only:
 ## 12.23 Limits and later work
 
 - Version 1 does not handle cash dividends. A cash dividend changes the
-  paper account cash without a fill. The paper trading page shows the
+  paper account cash without a fill. The Home page shows the
   difference as "Unattributed" ([`paper_trading.md`](paper_trading.md)
   section 11.12). Cash dividends are in the "Not yet specified" list of the
   planning map.
 - Spin-offs, mergers, symbol changes, and delistings are not handled. The
-  paper trading page shows the difference as "Unattributed".
+  Home page shows the difference as "Unattributed".
 - The owner ledger is long only (section 12.18).
 - Later work: a multi-instrument forward test on hourly bars. First measure
   the time that the bar fetcher needs to read the hourly bars of 500
@@ -1397,8 +1480,10 @@ simplest option and records it in this document.
   is stored.
   Decided (#217): `422` with `"The US universe has no saved members for the
   quarter from <calendar quarter start>."`. The current quarter is the last
-  stored `quarter_start_utc` on or after the start of the calendar quarter
-  that contains now (the stored start is the first trading day).
+  saved quarter of `read_current_us_universe_quarter()`
+  ([`market_data.md`](market_data.md) section 8.9), when it starts on or after
+  the start of the calendar quarter that contains now (the stored start is
+  the first trading day).
 - Decided (#192): without `DATABENTO_API_KEY`, the quarterly update does not
   run, and the `forward-test` log tells why.
 - How ATrade maps a Databento symbol to the IBKR primary exchange.
@@ -1422,11 +1507,17 @@ simplest option and records it in this document.
   the quarters.
 - Whether `forward_test_fill` stays as a copy of the ledger fills, and the
   migration of the old rows and of `start_balance_usd`.
-  Decided (#215): `forward_test_fill` is not a copy. It keeps only the fills
-  of the old rows (without `allocated_capital_usd`), and the routes read it
-  only for them. The old rows keep `start_balance_usd`, and no migration
-  changes them. A forward test that runs during the upgrade has no
-  allocated capital in the owner ledger: stop it before the upgrade.
+  Decided (#215): `forward_test_fill` is not a copy. A forward test that
+  runs during the upgrade has no allocated capital in the owner ledger: stop
+  it before the upgrade.
+  Changed: no program wrote `forward_test_fill`, and production had 0 rows.
+  Migration `d7b2f4a9c613` drops the table, so the routes read the fills of
+  all rows from the owner ledger. The same migration sets
+  `allocated_capital_usd` to `start_balance_usd` for each old row without a
+  client ID. The child no longer writes `start_balance_usd`. The column and
+  `ForwardTestRow.start_capital_usd` stay for an old row without an allocated
+  capital. A forward test that holds a client ID must have an allocated
+  capital, or its child crashes at the start.
 - Whether a stock split restart opens an interruption.
   Decided (#220): no. The restart is before the open and misses no bar.
 - What the stock split check does when IB Gateway is not reachable until

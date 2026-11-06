@@ -2,6 +2,18 @@
 # Variables come from the .env file in the repository root. .env.example lists them.
 name: atrade
 
+# The settings of web and forward-test.
+x-backend-environment: &backend-environment
+  DATABASE_URL: postgresql://atrade:${ATRADE_POSTGRES_PASSWORD}@postgres:5432/atrade
+  ATRADE_TRADING_MODE: ${ATRADE_TRADING_MODE:-paper}
+  ATRADE_IBKR_ACCOUNT_ID: ${ATRADE_IBKR_ACCOUNT_ID:-}
+  ATRADE_IBKR_HOST: ${ATRADE_IBKR_HOST:-ib-gateway}
+  ATRADE_IBKR_PAPER_PORT: ${ATRADE_IBKR_PAPER_PORT:-4004}
+  ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
+  ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
+  ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
+  ATRADE_IBKR_BAR_FETCHER_CLIENT_ID: ${ATRADE_IBKR_BAR_FETCHER_CLIENT_ID:-20}
+
 services:
   postgres:
     image: postgres:18.3
@@ -63,15 +75,7 @@ services:
       dockerfile: deploy/web.Dockerfile
     image: atrade-web:local
     environment:
-      DATABASE_URL: postgresql://atrade:${ATRADE_POSTGRES_PASSWORD}@postgres:5432/atrade
-      ATRADE_TRADING_MODE: ${ATRADE_TRADING_MODE:-paper}
-      ATRADE_IBKR_ACCOUNT_ID: ${ATRADE_IBKR_ACCOUNT_ID:-}
-      ATRADE_IBKR_HOST: ${ATRADE_IBKR_HOST:-ib-gateway}
-      ATRADE_IBKR_PAPER_PORT: ${ATRADE_IBKR_PAPER_PORT:-4004}
-      ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
-      ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
-      ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
-      ATRADE_IBKR_BAR_FETCHER_CLIENT_ID: ${ATRADE_IBKR_BAR_FETCHER_CLIENT_ID:-20}
+      <<: *backend-environment
       ATRADE_LOCAL_PAPER_CAPITAL_USD: ${ATRADE_LOCAL_PAPER_CAPITAL_USD:-100000}
       # The Databento import program runs in this service with "docker compose run" (README.md).
       DATABENTO_API_KEY: ${DATABENTO_API_KEY:-}
@@ -90,7 +94,8 @@ services:
     pids_limit: 2048
     # The forward-test service waits for this check: web runs the database migrations before it serves HTTP.
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      # env -i: strategy code in a child can read the environment of this process (docs/architecture/backtest.md 10.1.1).
+      test: ["CMD", "/usr/bin/env", "-i", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
       interval: 5s
       timeout: 5s
       retries: 60
@@ -106,15 +111,7 @@ services:
     image: atrade-web:local
     command: ["python", "-m", "atrade.app.forward_test_worker"]
     environment:
-      DATABASE_URL: postgresql://atrade:${ATRADE_POSTGRES_PASSWORD}@postgres:5432/atrade
-      ATRADE_TRADING_MODE: ${ATRADE_TRADING_MODE:-paper}
-      ATRADE_IBKR_ACCOUNT_ID: ${ATRADE_IBKR_ACCOUNT_ID:-}
-      ATRADE_IBKR_HOST: ${ATRADE_IBKR_HOST:-ib-gateway}
-      ATRADE_IBKR_PAPER_PORT: ${ATRADE_IBKR_PAPER_PORT:-4004}
-      ATRADE_IBKR_WEB_CLIENT_ID: ${ATRADE_IBKR_WEB_CLIENT_ID:-1}
-      ATRADE_FORWARD_TEST_CLIENT_ID_FIRST: ${ATRADE_FORWARD_TEST_CLIENT_ID_FIRST:-10}
-      ATRADE_FORWARD_TEST_CLIENT_ID_LAST: ${ATRADE_FORWARD_TEST_CLIENT_ID_LAST:-13}
-      ATRADE_IBKR_BAR_FETCHER_CLIENT_ID: ${ATRADE_IBKR_BAR_FETCHER_CLIENT_ID:-20}
+      <<: *backend-environment
       # The quarterly US universe update downloads EQUS.SUMMARY bars to /tmp. Empty: the update does not run.
       DATABENTO_API_KEY: ${DATABENTO_API_KEY:-}
     depends_on:

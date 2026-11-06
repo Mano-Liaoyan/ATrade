@@ -7,8 +7,9 @@ port 8000 (the browser) and port 8001 (the assistant service, docs/architecture/
 import asyncio
 import logging
 import sys
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager, suppress
+from collections.abc import AsyncGenerator, Coroutine
+from contextlib import asynccontextmanager
+from typing import Any
 
 import psycopg
 import uvicorn
@@ -16,7 +17,12 @@ from fastapi import FastAPI
 from pydantic import ValidationError
 
 from atrade.app.access_session_routes import create_access_session_router
-from atrade.app.assistant_port import ASSISTANT_PORT, RefuseAssistantSubnet, create_assistant_port_app
+from atrade.app.assistant_port import (
+    ASSISTANT_PORT,
+    RefuseAssistantSubnet,
+    RefuseOtherSite,
+    create_assistant_port_app,
+)
 from atrade.app.backtest_process import BACKTEST_PROCESS_COMMAND
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.frontend_files import create_frontend_router
@@ -43,6 +49,7 @@ from atrade.forward_test import (
 )
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.error_response import add_validation_error_handler
+from atrade.foundation.process_protection import block_process_reads
 from atrade.foundation.settings import Settings
 from atrade.foundation.table_changes import TableChangeFeed, create_change_socket_router
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
@@ -54,7 +61,7 @@ from atrade.market_data import (
     LiveDailyBarHub,
     create_market_data_router,
 )
-from atrade.paper_trading import PaperAccountMonitor, create_paper_trading_router
+from atrade.paper_trading import ManualOrderLedger, PaperAccountMonitor, create_paper_trading_router
 from atrade.screen import SCREEN_CHANGE_SOCKET, create_screen_router
 from atrade.strategy import (
     STRATEGY_CHANGE_SOCKET,
@@ -81,6 +88,18 @@ DATABASE_CHECK_TIMEOUT_SECONDS = 10
 START_CONTEXT_BACKTEST_COUNT = 3
 
 logger = logging.getLogger("atrade.web")
+
+
+def log_dead_task(task: asyncio.Task[None]) -> None:
+    """The background tasks run until the shutdown cancels them, so each other end is an error."""
+    if not task.cancelled():
+        logger.error("The background task %s ended.", task.get_name(), exc_info=task.exception())
+
+
+def start_background_task(coroutine: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+    task = asyncio.create_task(coroutine, name=coroutine.__qualname__)
+    task.add_done_callback(log_dead_task)
+    return task
 
 
 def create_start_context_reader(database_url: str) -> StartContextReader:
@@ -117,6 +136,9 @@ def create_web_app(
     live_daily_bar_hub: the shared live daily bars of the watchlist. Default: the IBKR limits of a real account.
     """
     paper_account_monitor = PaperAccountMonitor(settings=settings, gateway_connection=gateway_connection)
+    manual_order_ledger = ManualOrderLedger(
+        paper_account_monitor=paper_account_monitor, database_url=settings.database_url, clock=clock
+    )
     backtest_runner = BacktestRunner(
         database_url=settings.database_url,
         clock=clock,
@@ -135,24 +157,30 @@ def create_web_app(
     @asynccontextmanager
     async def keep_gateway_connected(_app: FastAPI) -> AsyncGenerator[None]:
         # The Web process starts without IB Gateway. The connection task connects again after each loss.
-        connection_task = asyncio.create_task(gateway_connection.keep_connected())
+        connection_task = start_background_task(gateway_connection.keep_connected())
         # The paper account check runs after each connection, also when no browser is open.
-        check_task = asyncio.create_task(paper_account_monitor.keep_checking())
-        backtest_task = asyncio.create_task(backtest_runner.keep_running())
-        daily_bar_task = asyncio.create_task(daily_bar_update.keep_updating())
-        table_change_task = asyncio.create_task(table_change_feed.keep_listening())
-        yield
-        for task in (table_change_task, daily_bar_task, backtest_task, check_task, connection_task):
-            task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
-        live_daily_bar_hub.stop()
-        gateway_connection.disconnect()
+        check_task = start_background_task(paper_account_monitor.keep_checking())
+        # The fills of orders by hand reach the ledger on their day, also when no browser is open.
+        fill_task = start_background_task(manual_order_ledger.keep_recording_fills())
+        backtest_task = start_background_task(backtest_runner.keep_running())
+        daily_bar_task = start_background_task(daily_bar_update.keep_updating())
+        table_change_task = start_background_task(table_change_feed.keep_listening())
+        try:
+            yield
+        finally:
+            for task in (table_change_task, daily_bar_task, backtest_task, fill_task, check_task, connection_task):
+                task.cancel()
+                # `wait` does not raise the error of a dead task, so the disconnect always runs.
+                await asyncio.wait([task])
+            live_daily_bar_hub.stop()
+            gateway_connection.disconnect()
 
     app = FastAPI(title="ATrade", lifespan=keep_gateway_connected)
     add_validation_error_handler(app)
     # The assistant service can call only port 8001 (docs/architecture/assistant.md 25.3.2).
     app.add_middleware(RefuseAssistantSubnet)
+    # A page of another site must not reach the WebSockets and the changing routes (docs/architecture.md section 6).
+    app.add_middleware(RefuseOtherSite)
     app.include_router(create_health_router(database_url=settings.database_url, clock=clock))
     app.include_router(create_access_session_router())
     app.include_router(
@@ -273,6 +301,7 @@ def main() -> None:
     clock = SystemClock()
     app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
     assistant_app = create_assistant_port_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    block_process_reads()
     asyncio.run(serve_both(app, assistant_app))
 
 

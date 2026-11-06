@@ -1,0 +1,66 @@
+{
+  "text_delta": { "type": "text_delta", "delta": "Hello." },
+  "message_end": {
+    "type": "message_end",
+    "text": "Hello.",
+    "provider": "fake",
+    "model": "fake-model",
+    "credential_name": "Fake API key · first",
+    "thinking_level": "off"
+  },
+  "error": { "type": "error", "message": "The credential missing does not exist." },
+  "tool_step": {
+    "type": "tool_step",
+    "tool_call_id": "call_1",
+    "tool_name": "run_backtest",
+    "status": "succeeded",
+    "backtest_id": 11,
+    "backtest_status": "finished"
+  },
+  "strategy_version_saved": {
+    "type": "strategy_version_saved",
+    "strategy_id": 3,
+    "strategy_version_id": 103,
+    "version_number": 3
+  },
+  "backtest_finished": { "type": "backtest_finished", "backtest_id": 11 },
+  "screen_saved": {
+    "type": "screen_saved",
+    "screen_id": 5,
+    "name": "Momentum (AI)",
+    "market": "US",
+    "definition": { "start": "watchlist" },
+    "previous_definition": null
+  },
+  "screen_run_finished": {
+    "type": "screen_run_finished",
+    "screen_id": 5,
+    "screen_result_id": 9,
+    "start_count": 500,
+    "after_filters_count": 300,
+    "after_indicator_conditions_count": 40,
+    "result_count": 20
+  },
+  "login_step": {
+    "type": "login_step",
+    "step": "auth_url",
+    "message": "Open the link.",
+    "url": "https://login.example.test/authorize",
+    "user_code": null,
+    "prompt_id": null,
+    "prompt_type": null,
+    "options": null
+  },
+  "login_end": {
+    "type": "login_end",
+    "credential": {
+      "id": "fake-id",
+      "name": "Personal",
+      "provider": "fake-oauth",
+      "type": "oauth",
+      "key_last4": null,
+      "state": "ready",
+      "state_message": null
+    }
+  }
+}

@@ -19,7 +19,20 @@ const PUBLIC_ENTRY_ONLY = {
 
 // F3: a capability or foundation module imports only #lib/foundation/<module> and the generated API types (#lib/api).
 // Only src/routes/ composes capabilities.
-const LIB_FOLDERS = ['foundation', 'market_data', 'watchlist', 'strategy', 'backtest', 'paper_trading', 'forward_test'];
+const LIB_FOLDERS = [
+  'foundation',
+  'market_data',
+  'watchlist',
+  'strategy',
+  'strategy_language_server',
+  'backtest',
+  'paper_trading',
+  'forward_test',
+  'screen',
+  'assistant',
+  'sweep',
+  'ibkr',
+];
 const FOUNDATION_ONLY = {
   regex: '^#lib/(?!foundation/|api$)',
   message: 'A capability must not import another capability. Compose capabilities in src/routes/.',

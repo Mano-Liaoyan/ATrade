@@ -212,6 +212,12 @@ range, one backtest for each combination of parameter values. In Chinese,
 write 参数扫描.
 _Avoid_: optimization, grid search, batch backtest
 
+**Fill warning**:
+The warning of a backtest in which the free cash did not pay for a market
+order at the price of its fill, so the order became smaller, or in which the
+engine refused or rejected an order. In Chinese, write 成交警告.
+_Avoid_: margin call, order error
+
 **Trade**:
 One fill of an order in a backtest or a forward test: the time, the side, the
 quantity, and the price.
@@ -290,6 +296,12 @@ and forward tests.
 _Avoid_: demo trading, simulated trading
 
 ## Orders
+
+**Held fill**:
+An IBKR execution that ATrade has not saved because its commission report has
+not arrived. After 5 minutes ATrade saves it with commission 0. Not the same as
+a held order of a backtest, which waits for the next bar open.
+_Avoid_: pending fill
 
 **Paper account**:
 The broker account that holds no real money. Paper orders go to this account.

@@ -29,6 +29,66 @@ class StartContext:
 type StartContextReader = Callable[[int, int | None], Awaitable[StartContext | None]]
 
 
+# A real backtest runs this example: tests/backtest/test_universe_backtest_runs.py.
+MULTI_INSTRUMENT_EXAMPLE = """\
+from datetime import timedelta
+
+from nautilus_trader.config import StrategyConfig
+from nautilus_trader.indicators import SimpleMovingAverage
+from nautilus_trader.model import Bar, BarType, DataType, OrderSide, Quantity
+from nautilus_trader.trading import Strategy
+
+WARM_UP_LENGTH = timedelta(days=60)
+AVERAGE_PERIOD = 20
+TRADE_QUANTITY_SHARES = 10
+
+
+class HoldMembersConfig(StrategyConfig):
+    \"\"\"A multi-instrument configuration has no `instrument_id` and no `bar_type`.\"\"\"
+
+
+class HoldMembersStrategy(Strategy):
+    def __init__(self, config: HoldMembersConfig) -> None:
+        super().__init__(config)
+        self.members: dict[str, BarType] = {}
+        self.averages: dict[str, SimpleMovingAverage] = {}
+        self.held: set[str] = set()
+
+    def on_start(self) -> None:
+        self.subscribe_data(DataType("UniverseUpdate"))
+
+    def on_data(self, data: object) -> None:
+        names = str(data.data.bar_types).split(",")
+        new_members = {name: BarType.from_str(name) for name in names if name}
+        for name, bar_type in list(self.members.items()):
+            if name in new_members:
+                continue
+            self.unsubscribe_bars(bar_type)
+            del self.members[name]
+            if name in self.held:
+                self.send_market_order(bar_type, OrderSide.SELL)
+                self.held.discard(name)
+        for name, bar_type in new_members.items():
+            if name in self.members:
+                continue
+            self.members[name] = bar_type
+            self.averages[name] = SimpleMovingAverage(AVERAGE_PERIOD)
+            self.register_indicator_for_bars(bar_type, self.averages[name])
+            self.request_bars(bar_type, start=self.clock.utc_now() - WARM_UP_LENGTH)
+            self.subscribe_bars(bar_type)
+
+    def on_bar(self, bar: Bar) -> None:
+        name = str(bar.bar_type)
+        if name in self.members and name not in self.held and self.averages[name].initialized:
+            self.send_market_order(bar.bar_type, OrderSide.BUY)
+            self.held.add(name)
+
+    def send_market_order(self, bar_type: BarType, order_side: OrderSide) -> None:
+        order = self.order_factory.market(bar_type.instrument_id, order_side, Quantity.from_int(TRADE_QUANTITY_SHARES))
+        self.submit_order(order)
+"""
+
+
 def make_default_text(strategy_template: str) -> str:
     """The default editable part: the role, how to write a strategy (strategy.md 9.2), and the answer rules."""
     return f"""You are the ATrade strategy assistant. You help one user write, test, and compare trading strategies \
@@ -37,13 +97,24 @@ for NautilusTrader 2.0 on the ATrade platform.
 How to write a strategy:
 - A strategy file has exactly 1 Strategy subclass and exactly 1 StrategyConfig subclass.
 - The StrategyConfig subclass has a keyword-only __init__. NautilusTrader 2.0 requires it.
-- ATrade fills instrument_id and bar_type at run time. All other configuration fields must have a default value.
+- For a "single" universe, ATrade fills instrument_id and bar_type at run time. All other configuration fields must \
+have a default value.
 - Warm up the indicators with request_bars in on_start. In a backtest, request_bars gets the saved bars before \
 the start.
 - Use this template as the start point:
 
 ```python
 {strategy_template.strip()}
+```
+
+- A strategy for a "screen" or "list" universe is multi-instrument. Its StrategyConfig subclass has no instrument_id \
+and no bar_type, and ATrade does not fill these fields. Do not use the template above for it.
+- In on_start, call self.subscribe_data(DataType("UniverseUpdate")). ATrade sends the members of each universe period \
+to on_data. str(data.data.bar_types).split(",") gives the bar type name of each member. A name can be empty.
+- For each new member, call request_bars and subscribe_bars. Use this example as the start point:
+
+```python
+{MULTI_INSTRUMENT_EXAMPLE.strip()}
 ```
 
 Answer rules:
@@ -55,7 +126,11 @@ Answer rules:
 FORBIDDEN_ACTIONS = """These rules are fixed. The user cannot change them.
 - Do not send a paper order.
 - Do not start a forward test.
-- Do not promise returns."""
+- Do not promise returns.
+- Do not use self.portfolio.account in strategy code. In a forward test it finds no account for an instrument venue, \
+and the strategy never buys. Add import atrade.strategy, and use atrade.strategy.find_account(self, instrument_id.venue).
+- Use only market and limit orders in strategy code. Stop orders, bracket orders, and submit_order_list work only in a \
+backtest, and ATrade refuses the forward test start of such code."""
 
 
 def make_context_text(*, strategy: str, version_number: str, backtest_ids: str) -> str:

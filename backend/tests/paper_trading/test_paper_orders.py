@@ -3,6 +3,8 @@
 ATrade runs the paper account check before each order (docs/architecture/paper_trading.md sections 11.2-11.4).
 """
 
+import asyncio
+import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,6 +15,7 @@ import pytest
 
 from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
+from atrade.ibkr import OpenOrder
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import (
     FakeGatewayConnection,
@@ -26,6 +29,7 @@ ACCOUNT_ID = "DU1234567"
 ORDERS_PATH = "/api/paper-trading/orders"
 MANUAL_ORDERS_PATH = "/api/paper-trading/manual-orders"
 FORWARD_TEST_CLIENT_ID = 10
+OPEN_ORDERS_READ_SECONDS = 0.05
 
 type JsonObject = dict[str, Any]
 
@@ -118,6 +122,34 @@ async def test_sends_a_limit_order_to_the_paper_account_and_lists_it_as_an_order
 
 
 @pytest.mark.anyio
+async def test_of_2_sell_orders_at_the_same_time_only_the_one_that_the_position_covers_goes_to_ibkr(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each order sells 60 of the 100 shares of "By hand". IBKR answers each read after a short time."""
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    read_open_orders = gateway_connection.read_open_orders
+
+    async def read_open_orders_with_delay() -> list[OpenOrder]:
+        orders = await read_open_orders()
+        await asyncio.sleep(OPEN_ORDERS_READ_SECONDS)
+        return orders
+
+    monkeypatch.setattr(gateway_connection, "read_open_orders", read_open_orders_with_delay)
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        responses = await asyncio.gather(
+            *[client.post(ORDERS_PATH, json={**MARKET_ORDER, "quantity": 60}) for _ in range(2)]
+        )
+
+    assert sorted(response.status_code for response in responses) == [201, 409], [r.text for r in responses]
+    assert len(gateway_connection.open_orders) == 1
+
+
+@pytest.mark.anyio
 async def test_stores_the_order_by_hand_without_status(
     database_url: str, clock: FixedClock, frontend_build_dir: Path
 ) -> None:
@@ -207,6 +239,7 @@ async def test_refuses_the_order_when_ib_gateway_is_not_connected(
         {"time_in_force": "IOC"},
         {"quantity": 0},
         {"limit_price": "-1"},
+        {"limit_price": "1e400"},
         {"side": "SHORT"},
         {"symbol": ""},
     ],
@@ -228,11 +261,57 @@ async def test_refuses_an_order_that_is_not_a_market_or_limit_order_with_day_or_
 
 
 @pytest.mark.anyio
-async def test_reports_an_ibkr_error_and_stores_no_order(
+@pytest.mark.parametrize(
+    "changed_fields",
+    [
+        {"quantity": 2**31, "limit_price": "0.0001"},
+        {"limit_price": "1e-20000"},
+        {"symbol": "A\x00B"},
+        {"exchange": "A\x00B"},
+        {"currency": "A\x00B"},
+    ],
+)
+async def test_refuses_a_value_that_the_order_table_cannot_store_before_the_send(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path, changed_fields: JsonObject
+) -> None:
+    """After the send, a value that PostgreSQL refuses leaves an order at IBKR without a row (section 11.3)."""
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        send_response = await client.post(ORDERS_PATH, json=LIMIT_ORDER | changed_fields)
+
+    assert send_response.status_code == 422, send_response.text
+    assert gateway_connection.open_orders == []
+
+
+@pytest.mark.anyio
+async def test_refuses_a_limit_price_that_is_too_large_for_a_float(
     database_url: str, clock: FixedClock, frontend_build_dir: Path
 ) -> None:
     gateway_connection = make_connected_gateway([ACCOUNT_ID])
-    gateway_connection.order_error_message = "Order rejected"
+    body = json.dumps(LIMIT_ORDER | {"limit_price": 0}).replace('"limit_price": 0', '"limit_price": 1e400')
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        send_response = await client.post(ORDERS_PATH, content=body, headers={"content-type": "application/json"})
+
+    assert send_response.status_code == 422
+    assert gateway_connection.open_orders == []
+
+
+@pytest.mark.anyio
+async def test_reports_an_order_that_ibkr_rejects_after_the_send_and_stores_no_order(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    gateway_connection.order_rejection_message = "Order rejected"
     async with open_client(
         database_url=database_url,
         clock=clock,
@@ -245,6 +324,7 @@ async def test_reports_an_ibkr_error_and_stores_no_order(
     assert send_response.status_code == 502
     assert "Order rejected" in send_response.json()["detail"]
     assert manual_orders_response.json() == {"manual_orders": []}
+    assert gateway_connection.open_orders == []
 
 
 @pytest.mark.anyio

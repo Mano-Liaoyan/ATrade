@@ -39,6 +39,8 @@ from nautilus_trader.config import StrategyConfig
 from nautilus_trader.model import Bar, BarType, DataType, InstrumentId, OrderSide, Quantity, Venue
 from nautilus_trader.trading import Strategy
 
+import atrade.strategy
+
 HOLD_COUNT = 50
 LOOK_BACK_BARS = 252
 SKIP_BARS = 21
@@ -89,9 +91,16 @@ class RankedUniverseStrategy(Strategy):
         self.position_scale = 1.0
         self.rank_again = False
         self.buy_after_sells = False
+        # The side and the quantity of each lost order, by instrument.
+        self.lost_orders: dict[str, tuple[OrderSide, int]] = {}
         self.venue: Venue | None = None
 
     def on_start(self) -> None:
+        # A forward test restart restores the positions, and the new strategy object must know them. A position can
+        # be outside the universe. Its bars give its sell a price.
+        for position in self.cache.positions_open(strategy_id=self.strategy_id):
+            self.shares[str(position.instrument_id)] = int(position.quantity.as_double())
+            self.add_instrument(BarType.from_str(f"{position.instrument_id}-1-DAY-LAST-EXTERNAL"))
         self.subscribe_data(DataType("UniverseUpdate"))
 
     def on_data(self, data: object) -> None:
@@ -107,12 +116,15 @@ class RankedUniverseStrategy(Strategy):
             instrument = str(bar_type.instrument_id)
             self.venue = bar_type.instrument_id.venue
             self.members.add(instrument)
-            if instrument in self.closes:
-                continue
-            self.closes[instrument] = deque(maxlen=LOOK_BACK_BARS + 1)
-            self.highs[instrument] = deque(maxlen=LOOK_BACK_BARS)
-            self.request_bars(bar_type, start=self.clock.utc_now() - WARM_UP_LENGTH)
-            self.subscribe_bars(bar_type)
+            if instrument not in self.closes:
+                self.add_instrument(bar_type)
+
+    def add_instrument(self, bar_type: BarType) -> None:
+        instrument = str(bar_type.instrument_id)
+        self.closes[instrument] = deque(maxlen=LOOK_BACK_BARS + 1)
+        self.highs[instrument] = deque(maxlen=LOOK_BACK_BARS)
+        self.request_bars(bar_type, start=self.clock.utc_now() - WARM_UP_LENGTH)
+        self.subscribe_bars(bar_type)
 
     def on_historical_bars(self, bars: Sequence[Bar]) -> None:
         for bar in bars:
@@ -123,19 +135,52 @@ class RankedUniverseStrategy(Strategy):
 
     def on_bar(self, bar: Bar) -> None:
         day = self.clock.utc_now().date()
+        month = (day.year, day.month)
+        is_new_month = month != self.last_rebalance_month
         if day != self.last_day:
             self.last_day = day
             self.equity_values.append(self.find_equity())
+            self.retry_lost_orders(is_new_month)
         self.add_bar(bar)
         if self.buy_after_sells:
             self.buy_after_sells = False
             self.buy()
-        month = (day.year, day.month)
-        is_new_month = month != self.last_rebalance_month
         if (is_new_month or self.rank_again) and self.open_sell_count == 0 and self.waiting_for_member(bar):
             self.last_rebalance_month = month
             self.rank_again = False
             self.rebalance()
+
+    def on_order_denied(self, event: object) -> None:
+        self.keep_lost_order(event)
+
+    def on_order_rejected(self, event: object) -> None:
+        self.keep_lost_order(event)
+
+    def on_order_canceled(self, event: object) -> None:
+        self.keep_lost_order(event)
+
+    def keep_lost_order(self, event: object) -> None:
+        order = self.cache.order(event.client_order_id)  # pyright: ignore[reportAttributeAccessIssue]
+        if order is not None:
+            self.lost_orders[str(order.instrument_id)] = (order.side, int(order.leaves_qty.as_double()))
+
+    def retry_lost_orders(self, is_new_month: bool) -> None:
+        """A denied, rejected, or ended order gives no fill, and a sell stops the rebalance through the sell count. The
+        check runs once a day, so that an order that fails again does not repeat on each bar of the day. A retry sends
+        only the lost orders, so that a refused buy does not rank all targets each day. A new month ranks all targets,
+        so a sell that stays lost does not stop the rebalance."""
+        if self.cache.orders_inflight_count(strategy_id=self.strategy_id) > 0:
+            return
+        if self.cache.orders_open_count(strategy_id=self.strategy_id) > 0:
+            return
+        lost_orders = self.lost_orders
+        self.lost_orders = {}
+        if is_new_month or (self.open_sell_count > 0 and not lost_orders):
+            self.open_sell_count = 0
+            self.rank_again = True
+            return
+        for name, (side, quantity) in lost_orders.items():
+            self.send_order(name, side, quantity)
 
     def waiting_for_member(self, bar: Bar) -> bool:
         return str(bar.bar_type.instrument_id) in self.members
@@ -147,7 +192,7 @@ class RankedUniverseStrategy(Strategy):
             self.highs[instrument].append(bar.high.as_double())
 
     def find_cash(self) -> float:
-        account = None if self.venue is None else self.portfolio.account(self.venue)
+        account = None if self.venue is None else atrade.strategy.find_account(self, self.venue)
         balance = None if account is None else account.balance_total()
         return 0.0 if balance is None else balance.as_double()
 
@@ -156,6 +201,7 @@ class RankedUniverseStrategy(Strategy):
         return self.find_cash() + held
 
     def rebalance(self) -> None:
+        self.lost_orders = {}
         scores: dict[str, float] = {}
         for name in self.members:
             score = find_score(list(self.closes[name]), list(self.highs[name]))

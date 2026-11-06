@@ -4,10 +4,14 @@ and writes the actual state (docs/architecture.md sections 12.3, 12.4, 12.6, 12.
 Real PostgreSQL. The function that starts a child process is a fake (section 17.4).
 """
 
+import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from unittest.mock import AsyncMock
 
+import anyio
 import httpx
 import psycopg
 import pytest
@@ -15,7 +19,10 @@ import pytest
 from atrade.forward_test import (
     GATEWAY_UNREACHABLE_EXIT_CODE,
     PAPER_CHECK_FAILED_EXIT_CODE,
+    ChildMode,
+    ForwardTestChild,
     ForwardTestWorker,
+    forward_test_store,
     read_running_member_lists,
 )
 from atrade.foundation.instrument import Instrument
@@ -32,6 +39,7 @@ type JsonObject = dict[str, Any]
 
 APPLE = Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")
 MICROSOFT = Instrument(symbol="MSFT", exchange="NASDAQ", currency="USD")
+UNREACHABLE_DATABASE_URL = "postgresql://atrade:wrong@127.0.0.1:1/atrade?connect_timeout=1"
 
 
 async def start_forward_test(web_client: httpx.AsyncClient, *, symbol: str = "AAPL") -> JsonObject:
@@ -320,6 +328,70 @@ async def test_a_new_worker_starts_the_running_forward_tests_again(
     ]
 
 
+@pytest.mark.anyio
+async def test_an_error_in_a_comparison_writes_a_log_and_does_not_end_the_comparison_loop(
+    web_client: httpx.AsyncClient,
+    database_url: str,
+    clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr("atrade.forward_test.forward_test_worker.COMPARE_INTERVAL_SECONDS", 0.01)
+    forward_test = await start_forward_test(web_client)
+    child_starter = FakeChildStarter()
+    worker = make_worker(database_url, clock, child_starter)
+    compare_states = worker.compare_states
+    errors = [ValueError("unexpected")]
+
+    async def compare_states_after_one_error() -> None:
+        if errors:
+            raise errors.pop()
+        await compare_states()
+
+    monkeypatch.setattr(worker, "compare_states", compare_states_after_one_error)
+    with caplog.at_level(logging.ERROR):
+        comparison_task = asyncio.create_task(worker.keep_comparing())
+        with anyio.fail_after(10):
+            while not child_starter.children and not comparison_task.done():
+                await asyncio.sleep(0.01)
+
+    assert not comparison_task.done()
+    assert child_starter.read_started() == [(forward_test["id"], "run")]
+    assert "The forward-test comparison failed" in caplog.text
+    comparison_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await comparison_task
+
+
+@pytest.mark.anyio
+async def test_a_failing_row_does_not_block_the_next_row_and_writes_one_log_for_each_error(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, caplog: pytest.LogCaptureFixture
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    for symbol in ["AAPL", "MSFT"]:
+        await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, symbol=symbol))
+    [healthy, failing] = (await web_client.get(FORWARD_TESTS_PATH)).json()
+    child_starter = FakeChildStarter()
+    error_text = "first error"
+
+    async def start_child_with_failing_row(forward_test_id: int, mode: ChildMode) -> ForwardTestChild:
+        if forward_test_id == failing["id"]:
+            raise ValueError(error_text)
+        return await child_starter.start_child(forward_test_id, mode)
+
+    worker = ForwardTestWorker(database_url=database_url, clock=clock, start_child=start_child_with_failing_row)
+
+    with caplog.at_level(logging.ERROR):
+        await worker.compare_states()
+        await worker.compare_states()
+        assert len(caplog.records) == 1
+        error_text = "second error"
+        await worker.compare_states()
+
+    assert len(caplog.records) == 2
+    assert child_starter.read_started() == [(healthy["id"], "run")]
+
+
 def read_owner_sums(database_url: str) -> list[tuple[object, ...]]:
     """(owner kind, symbol, quantity, cash) for each owner and instrument of the owner ledger."""
     with psycopg.connect(database_url) as connection:
@@ -397,4 +469,47 @@ async def test_the_child_of_a_multi_instrument_forward_test_starts_after_its_war
 
     filled_ids.add(forward_test["id"])
     await worker.compare_states()
+    assert child_starter.read_started() == [(forward_test["id"], "run")]
+
+
+@pytest.mark.anyio
+async def test_a_lost_database_does_not_stop_the_comparison_loop(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("atrade.forward_test.forward_test_worker.COMPARE_INTERVAL_SECONDS", 0.01)
+    forward_test = await start_forward_test(web_client)
+    child_starter = FakeChildStarter()
+    worker = make_worker(UNREACHABLE_DATABASE_URL, clock, child_starter)
+    comparison_task = asyncio.create_task(worker.keep_comparing())
+    await asyncio.sleep(0.05)
+    assert not comparison_task.done()
+
+    worker.database_url = database_url
+
+    with anyio.fail_after(10):
+        while not child_starter.children:
+            await asyncio.sleep(0.01)
+    assert child_starter.read_started() == [(forward_test["id"], "run")]
+    comparison_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await comparison_task
+
+
+@pytest.mark.anyio
+async def test_the_next_comparison_records_a_crash_that_a_lost_database_did_not_save(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    child_starter = FakeChildStarter()
+    worker = make_worker(database_url, clock, child_starter)
+    await worker.compare_states()
+    child_starter.children[0].exit_code = 1
+
+    with monkeypatch.context() as outage:
+        outage.setattr(forward_test_store, "write_crash", AsyncMock(side_effect=psycopg.OperationalError("lost")))
+        await worker.compare_states()
+    await worker.compare_states()
+
+    crashed = await read_forward_test(web_client, forward_test["id"])
+    assert (crashed["status"], crashed["crash_count"]) == ("starting", 1)
     assert child_starter.read_started() == [(forward_test["id"], "run")]

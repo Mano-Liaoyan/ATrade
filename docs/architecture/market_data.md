@@ -177,7 +177,10 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   whole hour from the UNIX epoch. The route widens hourly ranges the same as
   other ranges. The 9:30 ET bar is in the whole hour from 9:00 ET, so a
   range that includes 9:00 ET or 9:30 ET reads it. A range that starts at
-  10:00 ET does not read it. The saved ranges of `databento_bar` are whole
+  10:00 ET does not read it. This bar ends at 10:00 ET, not at 10:30 ET
+  (`find_bar_end`), so the backtest engine gets each bar before the next open
+  tick and the equity point of the bar is at the bar end of a forward test.
+  The saved ranges of `databento_bar` are whole
   days, so a widened hourly range of a bought day has no missing part.
 - Phase 3 (#188): the route reads through the global source order (section
   8.7.2). A part is missing only when no bar source in the source order saved
@@ -188,6 +191,12 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   `SavedBars(bars, bar_counts)`: the merged bars, oldest first, and the bar
   count of each bar source in the source order. Backtests use it (section
   10) with the global source order from `read_source_order(database_url)`.
+  `read_saved_bars_of_many(*, database_url, bar_requests, source_order)`
+  does the same for a list of bar requests on one connection. It returns one
+  `SavedBars` for each bar request, in the same order. The merge of the
+  source order applies to each range, so it runs the same queries for each
+  bar request. A multi-instrument backtest and the multi-instrument forward
+  test equity use it.
 - The public entry exports `save_received_bars(*, database_url, bar_request,
   bars)` (async) and `save_received_bars_blocking(...)` (the same, for
   synchronous callers). They save complete bars that a caller received from
@@ -259,6 +268,8 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   - Code: `older_bars.ts` (range, join, trigger) and `BarChart.svelte`
     (`onNeedOlderBars`). Backtest and forward test charts have a fixed range
     and read no older bars.
+  - The chart keeps the live bars that it drew and draws them again after
+    older bars, because the chart series is the only holder of these bars.
 - TradingView attribution: the chart shows the TradingView logo link
   (`attributionLogo`), the text under the chart links to
   `https://www.tradingview.com/`, and `BarChart.svelte` holds the
@@ -290,9 +301,14 @@ Source: [Live bars on the chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   of the list. IBKR sends an update about every 5 seconds. Updates that come
   at the same time are one update.
 - The generator raises `GatewayRequestError` when the request fails or when
-  the connection is lost (checked each second while no update comes). When
+  the connection or the IBKR link is lost (checked each second while no
+  update comes). A subscription without an answer before the historical data
+  timeout (60 seconds) also fails, because ib_async then cancels the request
+  and no update comes. That failure does not mark the IBKR link as lost. When
   the generator closes, it cancels the IBKR subscription
-  (`cancelHistoricalData`). Use `contextlib.aclosing`.
+  (`cancelHistoricalData`). Use `contextlib.aclosing`. A cancel before the
+  first answer leaves the request running, and the subscription ends at that
+  answer, because the list to cancel does not exist before it.
 - The live bars of `/ws/market-data` are not saved in PostgreSQL. The bars
   route saves only complete bars (section 8.4). A forward test saves each
   complete bar that its LiveNode receives (`docs/architecture/forward_test.md`
@@ -352,8 +368,9 @@ Source: [Live last price in each watchlist row](https://github.com/Mano-Liaoyan/
   the generator, which cancels the IBKR subscription), so a page change
   (home page to instrument page) does not request the bars again. A stream
   in its release delay gives its place to a new instrument.
-- A failed stream (no connection, no market data permission, a lost
-  connection) gives "no live bar" and starts again after the retry delay.
+- A failed stream gives "no live bar" and starts again after the retry
+  delay. The reasons are: no connection, no market data permission, a lost
+  connection, a lost IBKR link, or a subscription without an answer.
   The lifespan of port 8000 calls `hub.stop()`.
 - `/ws/watchlist-live-bars` is in `watchlist/live_bar_socket.py`. The socket
   reads the watchlist at the start and after each change of
@@ -666,7 +683,11 @@ undo the import.
   (section 8.14).
 - A second import adjusts its bars with all confirmed stock splits of the
   instrument, also the stock splits of the IBKR stock split check. A stock
-  split that is in `stock_split` keeps its row and its confirmation.
+  split that is in `stock_split` keeps its row and its confirmation. The
+  import records no row when an applied stock split of the instrument has
+  an ex-date up to 5 days earlier and a split ratio within 4%: evidence A
+  gives the day after the last stored bar as the ex-date, so that row is the
+  same stock split. A different split ratio is a different stock split.
 - Code (#191): `market_data/stock_split_detection.py` (the 2 rules),
   `market_data/databento_import_adjustment.py` (links and adjustment in
   the import), `market_data/import_check.py` (the user check), and the
@@ -788,21 +809,48 @@ daily close of each instrument and day. Primary key `symbol`, `exchange`,
   2. The last close of the old symbol and the first open of the new symbol
      differ by 1% or less.
   3. The listing exchange is the same.
-- The import saves all history of a linked old symbol under the new symbol,
-  the same as IBKR does.
+- A move has no undo, so a link moves bars only before 2024-07-01 and only
+  with proof. All these conditions must be true:
+  - The new symbol starts before 2024-07-01. Thus both listing exchanges come
+    from the statistics.
+  - The first open of the new symbol is not from 9.50 to 10.50 USD. A delisted
+    SPAC and a new IPO are both near 10 USD.
+  - The first volume of the new symbol is within 3 times of the last volume
+    of the old symbol.
+- Before 2024-07-01, a candidate without proof gets no link. The 2 symbols
+  stay 2 instruments.
+- A new symbol with a saved bar before its first bar of the import gets no
+  new link. It is a reused ticker or an old instrument, and a move would merge
+  2 histories. A second import of a recorded link still applies that link.
+- A link before 2024-07-01 saves all history of the old symbol in the import
+  under the new symbol, the same as IBKR does. The bars and stock splits that
+  an earlier import saved do not move.
+- In the EQUS.SUMMARY period (from 2024-07-01), a new symbol has no earlier
+  bar and thus no listing exchange (section 8.14). When conditions 1 and 2
+  are true for one old symbol that has a listing exchange, the new symbol gets
+  that exchange. This exchange is a copy, not a proof of condition 3, so no bar
+  moves. The new symbol is a new listing with its own bars, and the old bars
+  stay under the old symbol.
+- Limit: rank history restarts at a rename in the EQUS.SUMMARY period. The new
+  symbol has no history before the rename, so the universe ranking sees a new
+  listing.
+- A saved quarter that has the old symbol keeps it. The stopped member sells
+  at its last bar by the existing path for a member that stops trading.
 - The import writes each link to `databento_symbol_link`: `old_symbol`,
   `new_symbol`, `exchange`, `change_day`, `checked_at_utc` (empty until the
-  user checks it). `(old_symbol, new_symbol, exchange, change_day)` is
-  unique.
+  user checks it). `(old_symbol, new_symbol, exchange, change_day)` is unique.
+  A row with `change_day` from 2024-07-01 only records a rename for the user:
+  no bar moved. The quarterly update log and the check program show these
+  renames. An earlier link stays with its moved bars.
 - Adjacent trading days: no day of the import with a bar of any symbol is
   between the 2 days. A symbol with more than 1 candidate link gets no link.
   Links of 2 changes in a row go in the order of their change days, so the
   history ends under the last symbol.
 - The import links the symbols before it finds the stock splits, so the
   stock splits use the full history under the new symbol.
-- The user checks all detected links one time.
-- Thus a backtest does not see a symbol change as a stop of trading. The
-  new symbol has the history that the universe ranking needs.
+- The user checks all detected links one time. The check moves no bar.
+- Thus a backtest does not see a symbol change before 2024-07-01 as a stop of
+  trading. The new symbol has the history that the universe ranking needs.
 
 ## 8.9 Quarterly US universe
 
@@ -840,8 +888,8 @@ Table `us_universe_member`:
 
 Quarterly update in the `forward-test` worker:
 
-1. At 06:00 ET on the first trading day of the quarter, download the
-   EQUS.SUMMARY `ohlcv-1d` bars of the 100 calendar days to the previous
+1. From 06:00 ET on the first trading day of the quarter, on any day while
+   the quarter has no members, download the EQUS.SUMMARY `ohlcv-1d` bars of the 100 calendar days to the previous
    trading day (`ALL_SYMBOLS`). 100 days always hold 63 trading days, also
    when the previous quarter has fewer.
 2. Calculate the members and save them in one transaction.
@@ -850,13 +898,38 @@ Quarterly update in the `forward-test` worker:
 4. When the bar is still not available at 09:00 ET, use the 63 trading days
    that end 1 trading day earlier. Record the actual last day in
    `last_ranking_day_utc`.
-5. The strategies get the new members before the market opens.
+5. The strategies get the new members before the market opens. After a
+   missed first trading day, they get the members when the update saves them.
 
 - The cost is about 1.3 USD each quarter (`get_cost`: 1.23 to 1.36 USD).
+- A try after a failed import or save uses the downloaded file again. The
+  update keeps the path in memory, and only after a download without an
+  error. `download_daily_summary()` writes to a `partial-` file and renames
+  it at the end, so a partial file is never at the final path.
+- When `databento_bar` already holds the 63 trading days to the last ranking
+  day without a gap, the update does not download. It calculates the members
+  from the saved bars. Thus a restart after the import does not pay again.
+- One process makes at most 3 downloads that can bill for one quarter. A
+  download that stops before Databento sends data does not count, so an
+  outage does not use the limit. The update tries again each 15 minutes.
+  The update logs the new stock splits, the symbol links, and the symbols
+  without a listing exchange of each import, for the user check (section
+  8.14). At the limit, the update of the quarter stops and logs this 1 time. A
+  restart of the `forward-test` service clears the limit.
+- Limit: the count of downloads is in memory, and the file is on the `/tmp`
+  tmpfs. A process that stops between the start of a download and the commit
+  of its import leaves no record. Each restart in that state pays again
+  (about 1.3 USD), without a limit. A durable record needs a migration, so
+  ATrade does not have one.
+- The current quarter is the same for the daily bar update, screens, and
+  forward tests: `read_current_us_universe_quarter()` gives the last saved
+  quarter on or before now. Until the update saves a new quarter, the
+  readers keep the last saved quarter.
 - The update needs the setting `DATABENTO_API_KEY`. Without it, the update
   does not run, and the `forward-test` log tells why.
 - Code (#192): `market_data/us_universe.py` (`save_us_universe`,
-  `calculate_us_universe_history`, `read_us_universe_members`),
+  `calculate_us_universe_history`, `read_us_universe_members`,
+  `read_current_us_universe_quarter`),
   `market_data/us_universe_update.py` (`UsUniverseUpdate`),
   `market_data/us_trading_days.py`, and `market_data/us_etf_symbols.py`.
   The Databento client gets `read_daily_summary_end_utc()`
@@ -872,9 +945,10 @@ Quarterly update in the `forward-test` worker:
   window used. The calculation refuses a window with less than 63 days, or
   a window that starts more than 100 calendar days before the last ranking
   day (a gap in `databento_bar`), and saves nothing.
-- A saved quarter does not change. The history calculation adds only the
-  quarters without members, so a quarter that the update calculated with the
-  earlier window keeps it.
+- The members and the ranks of a saved quarter do not change. The history
+  calculation adds only the quarters without members, so a quarter that the
+  update calculated with the earlier window keeps it. A symbol link does not
+  change a saved symbol (section 8.8.4).
 
 ## 8.10 HK instrument list
 
@@ -947,6 +1021,14 @@ Phase 3. Sources:
 - It saves the bars in `ibkr_bar` and updates the daily bar summary.
 - When IB Gateway is not reachable, the update does not run that day. The
   screen page shows the last daily bar date, so the user sees old data.
+  After a start of the `web` process, the update first waits for the first
+  connection, because the process starts without IB Gateway.
+- After a failed read, the update checks the connection. When the connection
+  is lost, the update waits 75 seconds for the IBKR link check. When the
+  connection is still lost, the update stops, and the day stays due. The
+  check of each minute runs the update again after the connection returns,
+  until the end of the New York day. Also after 3 timeouts in a row, the
+  update stops, and the day stays due.
 - Each read of bars from IBKR also reads 1 stored daily bar again (stock
   split evidence, section 8.13).
 
@@ -972,7 +1054,9 @@ Table `daily_bar_summary`: one row for each instrument.
 - `read_last_daily_bars` of the `market_data` public entry reads the last n
   daily bars before a date for a list of instruments in one SQL statement.
   The statement reads the global source order too and applies the merge
-  rule of section 8.7.2. Screens (section 24.5) and the summary use it.
+  rule of section 8.7.2. It runs in a thread, because the rows of many
+  instruments stop the event loop for seconds. Screens (section 24.5) and the
+  summary use it.
 - Screens read the summary rows with `read_daily_bar_summaries` (a list of
   instruments) and `read_daily_bar_summaries_of_currency` (all instruments
   with saved daily bars in one currency, #206), and the HK instrument list
@@ -983,6 +1067,18 @@ Table `daily_bar_summary`: one row for each instrument.
   only the daily bars that start before `before_utc`, with the calculation of
   the saved summary. The point-in-time screen run of a backtest uses it
   (`screen.md` section 24.9). It saves nothing.
+- `read_daily_bar_summaries_before` gives the real close of the last day. It
+  multiplies the stored close by the split ratio of each confirmed stock
+  split (section 8.13.1) with an ex-date after that day, when that stock split
+  changed the bar table of the last bar. The average trading value does not
+  change, because a stock split does not change close × volume.
+  - `both_evidences`, `user_apply`, `import_check`, and `bar_evidence` with
+    the source `ibkr_evidence` change `ibkr_bar` and `databento_bar`
+    (section 8.13.3).
+  - `bar_evidence` with the source `databento_import` changes only
+    `databento_bar` (section 8.8.3.1). An IBKR bar before that ex-date can
+    have the real close or the adjusted close, and the bar does not show
+    which. The function does not multiply such a close.
 - Code (#195): `market_data/daily_bar_summary.py` (the bulk read and the
   summary), `market_data/daily_bar_update.py` (`DailyBarUpdate`, started by
   `app/web.py`). Tests: `tests/market_data/test_daily_bar_summary.py` and
@@ -1051,7 +1147,9 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 
 - Evidence A: each read of bars from IBKR also reads the daily bar of 1
   stored day again. The ratio of the stored close to the new IBKR close is
-  the split ratio. A ratio of 1 means no stock split.
+  the split ratio. A ratio within 8% of 1 means no stock split: evidence A
+  alone can confirm a stock split, and a thin stock can have such a close
+  gap on one day.
 - Evidence B is the paper account position divided by the sum of the owner
   positions. Evidence B is part of the owner ledger.
 - The owner ledger runs the check before the market opens: 08:00 ET for US
@@ -1117,23 +1215,28 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   stays with `import_rejected`, so the next import does not find it again,
   and the bars do not change.
 - Decided (#191, changed by #324): the import saves the bars before the
-  check. It applies the symbol links at once. The stock splits of the IBKR
-  stock split check change the bars when the check finds them. The stock
-  splits of the detection rule change the bars only after the user check.
-- Not done (#191): a command that undoes a wrong symbol link. The import
-  log and the check list show each link.
+  check. It applies the symbol links before 2024-07-01 at once. The stock
+  splits of the IBKR stock split check change the bars when the check finds
+  them. The stock splits of the detection rule change the bars only after the
+  user check.
+- Not done (#191): a command that undoes a symbol link that moved bars. The
+  import log and the check list show each link.
 - Decided (#191): symbol reuse (a different company uses the symbol later)
   is not detected. The bars of both companies are under the same
-  instrument. The link rule does not link them, because there is a gap of
-  trading days between the 2 companies. The detection rule can see the
+  instrument. The link rule does not link them, because the new symbol has
+  older saved bars (section 8.8.4). The detection rule can see the
   price gap as a stock split; the user rejects it in the check.
 - Decided (#190): the program `app/databento_import.py` runs the Databento
   import in the `web` image with `docker compose run`. The downloaded files
   are in `data/databento/` of the repository (in `.gitignore`), one
   directory for each batch job (`docs/architecture.md` section 22).
-- Decided (#190): the listing exchange of an EQUS.SUMMARY bar is the
-  exchange of the latest earlier Databento daily bar of the same symbol. A
-  symbol without an earlier bar gets no bar, and the import names it.
+- Decided (#190, changed for renames): the listing exchange of an
+  EQUS.SUMMARY bar is the exchange of the latest earlier Databento daily bar
+  of the same symbol. A renamed symbol has the exchange of its old symbol
+  (section 8.8.4), because a rename without bars loses data. It is a new
+  listing with its own bars: no bar moves, and rank history restarts at the
+  rename. Another symbol without an earlier bar gets no bar, and the import
+  names it.
 - Decided (#190): the trading day of an official open or close is the New
   York date of its `ts_event`. The import uses the latest new value
   (`update_action` 1) of each day.
@@ -1162,6 +1265,13 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   applies to the bars route, the daily bar update, and
   `save_received_bars`. Thus all stored bars before the ex-date have one
   form, and the change divides each of them 1 time.
+- The detection rule of the Databento import also finds a real crash, and
+  IBKR does not adjust the bars of a crash. Thus the old form applies only
+  when the IBKR bars show the stock split: the last IBKR bar before the
+  ex-date and the nearest stored daily close before the ex-date differ by a
+  ratio that is nearer to the split ratio than to 1 (in log). The stored close
+  must be within 10 days of that IBKR bar. Else the IBKR bars stay as IBKR
+  sent them, so a rejected detection leaves real prices.
 - Decided (#196): when a stock split with an ex-date after the stored day
   waits already, evidence A records no second candidate. `apply_stock_split()`
   does not confirm a Databento import split; the import check does. A failed
@@ -1199,19 +1309,21 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - Decided (#192): no table records each calculation. The `forward-test` log
   has the tries, the 09:00 ET fallback, and the errors. After an error, the
   update tries again after 15 minutes.
-- Decided (#195): the daily bar update runs 1 time at 18:00 ET
+- Decided (#195): the daily bar update runs 1 time at 21:00 ET
   (`America/New_York`) on each US trading day of `market_data/us_trading_days.py`
-  (weekdays without New Year's Day and Good Friday). 18:00 ET is after the
+  (weekdays without New Year's Day and Good Friday). 21:00 ET is after the
   US close and after the Hong Kong close of the same day, so 1 run reads
-  all instruments. On another holiday, IBKR returns no new bar. A Hong Kong
+  all instruments. It is also after 00:00 UTC of the next day in standard
+  time and in daylight saving time, so the read range holds the daily bar
+  of that day. On another holiday, IBKR returns no new bar. A Hong Kong
   trading day that is not a US trading day comes with the next run. The
-  `web` process runs the update after a start when 18:00 ET of the day has
+  `web` process runs the update after a start when 21:00 ET of the day has
   passed. After an IBKR error for one instrument, the update logs it and
   reads the next instrument.
 - Decided (#195): for each instrument, the update reads from the start of
   its last IBKR daily bar (read again, section 8.13) to the start of the
   current UTC day. An instrument without an IBKR daily bar gets 366 days.
-  When IB Gateway is not reachable at 18:00 ET, the update of that day does
+  When IB Gateway is not reachable at 21:00 ET, the update of that day does
   not run and the log names the day.
 - Decided (#195): `daily_bar_summary` has no status column. "Still trading"
   is a rule of `screen` on `last_day_start_utc`. After a change of the

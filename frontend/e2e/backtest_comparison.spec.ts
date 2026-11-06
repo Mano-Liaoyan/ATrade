@@ -32,7 +32,9 @@ interface StrategyVersion {
 
 async function createStrategy(request: APIRequestContext, name: string): Promise<{ id: number; version: StrategyVersion }> {
   // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
-  const strategy = (await (await request.post('/api/strategies', { data: { name } })).json()) as { id: number };
+  const response = await request.post('/api/strategies', { data: { name } });
+  expect(response.status(), await response.text()).toBe(201);
+  const strategy = (await response.json()) as { id: number };
   const version = (await (await request.get(`/api/strategies/${String(strategy.id)}/versions/1`)).json()) as StrategyVersion;
   return { id: strategy.id, version };
 }
@@ -55,7 +57,7 @@ async function startBacktest(
       paper_capital_usd: '10000',
     },
   });
-  expect(response.status()).toBe(201);
+  expect(response.status(), await response.text()).toBe(201);
   return ((await response.json()) as { id: number }).id;
 }
 
@@ -106,7 +108,7 @@ async function expectComparisonWorkbench(page: Page, chartPanel: Locator, labels
   await expect(tables.locator('.cm-mergeView')).toContainText(CHANGED_CODE_LINE);
   // Only the changed lines and a few lines around them show. The unchanged lines are collapsed.
   await expect(tables.locator('.cm-collapsedLines').first()).toBeVisible();
-  await expect(tables.locator('.cm-mergeView')).not.toContainText('class MovingAverageStrategy(Strategy):');
+  await expect(tables.locator('.cm-mergeView')).not.toContainText('Moving average cross: buy when the close');
   const diffTrack = tables.getByRole('scrollbar', { name: 'Code difference scroll bar' });
   await expect(diffTrack).toBeVisible();
   await expect(diffTrack.locator('.scroll-thumb')).toBeVisible();
@@ -143,11 +145,14 @@ test('compares two versions of the same strategy and refuses different strategie
   const firstBacktestId = await startBacktest(request, compared.version.id);
   const secondBacktestId = await startBacktest(request, secondVersion.id);
   const otherBacktestId = await startBacktest(request, other.version.id);
+  const backtestIds = [firstBacktestId, secondBacktestId, otherBacktestId];
   for (let fillerIndex = 0; fillerIndex < FILLER_BACKTEST_COUNT; fillerIndex += 1) {
-    await startBacktest(request, other.version.id, FILLER_RANGE);
+    backtestIds.push(await startBacktest(request, other.version.id, FILLER_RANGE));
   }
-  await waitUntilFinished(request, firstBacktestId);
-  await waitUntilFinished(request, secondBacktestId);
+  // The list changes while a backtest runs, and a click on a changing list can miss the checkbox.
+  for (const backtestId of backtestIds) {
+    await waitUntilFinished(request, backtestId);
+  }
 
   await page.goto(`/backtests/${String(firstBacktestId)}`);
   const list = page.getByRole('complementary', { name: 'Backtests' });
@@ -212,8 +217,11 @@ test('shows a note instead of an empty code difference for the same strategy ver
   await expect(page.locator('.cm-mergeView')).toContainText('from nautilus_trader.trading import Strategy');
   await expect(page.locator('.cm-collapsedLines')).toHaveCount(0);
   // The code scrolls inside its region, and CodeMirror draws the lines that the scroll shows.
-  await page.getByRole('region', { name: 'Code difference' }).evaluate((region) => {
-    region.scrollTop = region.scrollHeight;
-  });
-  await expect(page.locator('.cm-mergeView')).toContainText('self.submit_order(order)');
+  // The height of the lines that CodeMirror has not drawn is an estimate, so the scroll repeats until the end shows.
+  await expect(async () => {
+    await page.getByRole('region', { name: 'Code difference' }).evaluate((region) => {
+      region.scrollTop = region.scrollHeight;
+    });
+    await expect(page.locator('.cm-mergeView')).toContainText('self.submit_order(order)', { timeout: 500 });
+  }).toPass();
 });

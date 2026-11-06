@@ -83,7 +83,8 @@ orders only when all 4 conditions are true:
   "By hand". Before it sends the order, the Web process checks the order
   rules of the owner ledger (section 11.10) for "By hand". When a rule
   fails, the response is `409` with the reason. ATrade sends nothing and
-  stores nothing.
+  stores nothing. One lock of the Web process holds from the check to the
+  send, so 2 orders at the same time cannot both pass one check.
 - Implemented (#214): the ledger rules for orders by hand run after the
   paper account check.
 - Implemented (#215): the forward test refusal and `OrderBlockedResponse`
@@ -98,8 +99,12 @@ orders only when all 4 conditions are true:
   (section 11.5). When the check did not pass, or the connection is not
   there, ATrade does not send the order. The HTTP response is `403` with the
   reason, the actual accounts, and the expected account.
-- The quantity is a whole number larger than 0. A limit order needs a limit
-  price larger than 0. A market order has no limit price.
+- The quantity is a whole number larger than 0 and not larger than
+  2147483647. A limit order needs a limit price larger than 0 and smaller than
+  10^12, with at most 16383 decimal places. A market order has no limit price.
+  The symbol, the exchange, and the currency have no NUL character. The route
+  refuses these values before the send, because each value must fit the
+  `manual_order` row of the sent order.
 - ATrade sends each order to `SMART` routing with the primary exchange of the
   instrument, to the checked account, with the `orderRef` `ATRADE-BY-HAND`
   (section 12.9).
@@ -129,7 +134,9 @@ orders only when all 4 conditions are true:
   ID of the row, the Web client ID, and the account of the row. Both values
   are `null` when the check did not pass or IB Gateway does not answer.
   `reqExecutions` returns only the executions of the current day (section
-  21), so an older fill shows `filled_quantity` `"0"`.
+  21), so an older fill shows `filled_quantity` `"0"`. `filled_quantity` does
+  not include a held fill (`ibkr.md`): a fill without its commission report
+  counts when the report arrives or the hold ends at 5 minutes.
 - The "Filled today" tab of the home page and the instrument page shows the
   list "Filled orders by hand"
   (`FilledManualOrderList.svelte`, `ScrollRegion` with the same label): the
@@ -160,7 +167,7 @@ The public entry `atrade.paper_trading` exports:
 | `PaperAccountBalance` | The balance of `read_balance()` (section 11.9): `net_liquidation_usd`, `cash_usd`, `base_currency`, `net_liquidation_base`, `cash_base`, `usd_per_base_unit`, `exchange_rate_source`, `message`. |
 | `fetch_paper_capital_usd(paper_account_monitor)` | Async. The `NetLiquidation` value of the paper account in USD (section 11.9) after a passed check. Otherwise, and when no exchange rate is available, `settings.local_paper_capital_usd`. |
 | `create_paper_trading_router(*, paper_account_monitor, database_url, clock)` | The router of the order routes (section 11.8), of `GET /api/paper-trading/paper-capital`, and of `/ws/paper-trading`. `find_blocking_forward_test` is gone (#215). |
-| `ManualOrderLedger`, `ForwardTestLedger`, `OwnerOrder`, `OwnerFill`, `OwnerPosition`, `LedgerFill` | The owner ledger (#214, #215). `ManualOrderLedger.read_entries(account)` starts the ledger when needed. `ForwardTestLedger(*, database_url, account, forward_test_id, gateway_connection, clock)` is the `OwnerLedger` of the ATrade execution client (`check_order`, `save_fill`, `read_positions`, `read_cash_usd`). |
+| `ManualOrderLedger`, `ForwardTestLedger`, `OwnerOrder`, `OwnerFill`, `ForwardTestPosition`, `LedgerFill` | The owner ledger (#214, #215). `ManualOrderLedger.read_entries(account)` starts the ledger when needed. `ForwardTestLedger(*, database_url, account, forward_test_id, gateway_connection, clock)` is the `OwnerLedger` of the ATrade execution client (`check_order`, `save_fill`, `read_positions`, `read_cash_usd`). |
 | `write_capital_allocation(connection, *, account, forward_test_id, allocated_capital_usd, time_utc)`, `transfer_to_by_hand(connection, *, forward_test_id, time_utc)` | The `transfer` rows at the start and at the stop of a forward test (section 11.13). The caller commits. |
 | `read_forward_test_fills(connection, forward_test_id)`, `read_forward_test_fills_blocking(connection, forward_test_id)` | The fills of a forward test in the owner ledger, oldest first, for the routes and the recorder of `forward_test`. |
 | `PAPER_TRADING_SOCKET_MESSAGE_MODELS` | The models of `/ws/paper-trading` (`PaperAccountMessage`, `OpenOrdersMessage`, `HeartbeatMessage`) for the OpenAPI document. The frontend uses their generated types. |
@@ -283,8 +290,8 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   liquidation in the base currency and the rate, for example
   "USD per EUR 1.1139". Without a rate, the line shows the `message` of the
   balance as an error status, and the USD values show `–`.
-- The page uses `PaperAccountFeed` (`foundation/live_socket` for
-  reconnection and heartbeat) and `foundation/scroll_region` for the tables
+- The page reads the one `paperAccountFeed`, which the layout starts
+  (`foundation/live_socket` for reconnection and heartbeat), and `foundation/scroll_region` for the tables
   (section 13). The tables have 32px rows.
 - The "Paper order" column of the instrument page has the paper order panel
   (`InstrumentOrderPanel.svelte`, section 13): the order is for the instrument
@@ -341,7 +348,7 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   Implemented (#214): the notification "Order not sent" with the `detail`.
   When the instrument is in the "Split check needed" state, the review button
   is disabled and the panel says why, for example "AAPL needs a split check.
-  Apply the split or keep the ledger on the paper trading page.".
+  Apply the split or keep the ledger on the Home page.".
   Implemented (#220): `findInstrumentOrderBlock(account, instrument)` reads
   the `split_check` of the position of the instrument.
 - Phase 3: the review button no longer depends on `/ws/forward-tests`, because
@@ -356,7 +363,7 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
 
 | Route | Behavior |
 |---|---|
-| `POST /api/paper-trading/orders` | Body `SendOrderRequest`: `symbol`, `exchange`, `currency`, `side` (`BUY`, `SELL`), `quantity`, `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`). `201` with the stored row (`ManualOrderResponse`, with `ibkr_order_id`). `403` (`OrderRefusedResponse`: `detail`, `actual_accounts`, `expected_account`) when the paper account check did not pass or the connection is not there. `409` (`OrderRefusedByLedgerResponse`: `detail`, `rule`) when a ledger rule fails (section 11.10). `422` for a body that is not valid. `502` when IB Gateway refuses the request. |
+| `POST /api/paper-trading/orders` | Body `SendOrderRequest`: `symbol`, `exchange`, `currency`, `side` (`BUY`, `SELL`), `quantity`, `order_type` (`MKT`, `LMT`), `limit_price`, `time_in_force` (`DAY`, `GTC`). `201` with the stored row (`ManualOrderResponse`, with `ibkr_order_id`). `403` (`OrderRefusedResponse`: `detail`, `actual_accounts`, `expected_account`) when the paper account check did not pass or the connection is not there. `409` (`OrderRefusedByLedgerResponse`: `detail`, `rule`) when a ledger rule fails (section 11.10). `422` for a body that is not valid. `502` when IB Gateway refuses the request or IBKR rejects the order in the first 2 seconds, with the IBKR message in `detail`. ATrade then stores no row. |
 | `GET /api/paper-trading/orders` | `200` with `{"orders": [OpenOrderResponse]}`: the open orders of the checked account. Each order has `order_id`, `account`, `symbol`, `exchange`, `currency`, `side`, `quantity`, `order_type`, `limit_price`, `time_in_force`, `status` (IBKR text), `filled_quantity`, `source` (`kind`: `by_hand` or `forward_test`, `forward_test_id`), `can_cancel`. `502` when IB Gateway does not answer. |
 | `DELETE /api/paper-trading/orders/{order_id}` | `202` after ATrade sends the cancel request. IBKR confirms it later in the order list. `403` as for `POST`. `404` when no open order of the account has this ID, or when ATrade did not send it by hand. `409` for an order of a forward test or of another client. `502` when IB Gateway does not answer. |
 | Phase 3: `POST /api/paper-trading/orders` | The `409` with `OrderBlockedResponse` for a forward test goes away (implemented, #215). New `409` (`OrderRefusedByLedgerResponse`: `detail`, `rule`) when an order rule of section 11.10 fails (`rule`: `sell_more_than_position`, `buy_more_than_cash`) or the instrument is in the "Split check needed" state (`rule`: `split_check_needed`). Example `detail`: "By hand holds 40 AAPL and has open sell orders for 10. ATrade refuses a sell order for 50.". |
@@ -377,7 +384,7 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   not answer for the last close or the forex rate. An order by hand on an
   instrument in the state gets `409` with the `rule` `split_check_needed`
   and the `detail` "AAPL needs a split check. Apply the split or keep the
-  ledger on the paper trading page.". A cancel is not blocked. The tests are
+  ledger on the Home page.". A cancel is not blocked. The tests are
   in `backend/tests/paper_trading/test_stock_split_routes.py`.
 - Implemented (#214): `OrderRefusedByLedgerResponse` with `rule`
   `sell_more_than_position`, `buy_more_than_cash`, or `ledger_not_started`
@@ -447,7 +454,7 @@ Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-
 - The owner ledger is the record of the fills, positions, and cash of each
   owner in PostgreSQL. `paper_trading` owns its tables.
 - For each instrument, the IBKR position minus the sum of the owner
-  positions must be 0. When it is not 0, the paper trading page shows the
+  positions must be 0. When it is not 0, the Home page shows the
   difference as "Unattributed" (section 11.7).
 
 Owners and their cash:
@@ -551,7 +558,9 @@ The "Split check needed" state:
 
 - An instrument goes to this state when:
   - only evidence A shows a ratio, and the IBKR position did not change
-  - the IBKR position changed, and evidence A shows no ratio
+  - the IBKR position changed to a value above 0, and evidence A shows no
+    ratio. An IBKR position of 0 or less is not a stock split: the difference
+    stays as "Unattributed"
   - the 2 ratios are not the same
   - the IBKR share count is not the share count of the ledger change above
   - the ratio is not a usual split ratio (a whole number, 1 divided by a
@@ -559,7 +568,7 @@ The "Split check needed" state:
 - While an instrument is in this state, no owner can send an order on it.
   The strategy of a forward test gets `OrderDenied`. An order by hand gets
   `409` with the reason. Other instruments trade as usual.
-- The paper trading page shows the state in the Positions table
+- The Home page shows the state in the Positions table
   (section 11.7). The forward test page shows it in the header line
   ([`forward_test.md`](forward_test.md) section 12.16).
 - "Apply split 4:1" writes the ledger change above
@@ -611,11 +620,11 @@ Implemented (#220, migration `f66ac656f66b`):
 ## 11.12 Limits of the owner ledger (Phase 3)
 
 - Version 1 does not handle cash dividends. A cash dividend changes the
-  paper account cash without a fill. The paper trading page shows it as an
+  paper account cash without a fill. The Home page shows it as an
   "Unattributed" difference. Cash dividends are in the "Not yet specified"
   list of the planning map.
 - Spin-offs, mergers, symbol changes, and delistings are not handled. The
-  page shows the difference as "Unattributed".
+  Home page shows the difference as "Unattributed".
 - Version 1 is long only. No owner sells short or uses margin.
 - Nobody checked if IBKR refuses opposite orders of 2 owners on one
   instrument (self-trade prevention).
@@ -645,16 +654,28 @@ Decided (#214):
   (`read_exchange_rate(currency, "USD")`). Without a rate, the order gets
   `502`, and the fill is written at a later read.
 - The Web process records the fills of orders by hand from `reqExecutions`
-  before each order by hand and each second while `/ws/paper-trading` is
-  open (with the order list). A fill counts when it has the Web client ID,
+  before each order by hand, each second while `/ws/paper-trading` is open
+  (with the order list), and each 60 seconds in a background task
+  (`ManualOrderLedger.keep_recording_fills`), so that no page has to be open.
+  A fill counts when it has the Web client ID,
   the checked account, and an IBKR order ID of a `manual_order` row, and
   its time is not before the ledger start (the positions at the ledger start
   have the older fills). `reqExecutions` returns only the fills of the
-  current day (section 21), so a fill is lost when no page and no order by
-  hand reads it on its day. It then shows as "Unattributed".
+  current day (section 21), so a fill is lost when the Web process has no
+  connection to IB Gateway for the rest of its day. It then shows as
+  "Unattributed".
 - Fills from outside ATrade are not written into the ledger. They show as
   "Unattributed". Whether `reqExecutions` returns the fills of other client
   IDs is not checked (section 21).
+- Rule 1 compares the open sell orders by symbol and currency. ib_async
+  decodes no primary exchange for an open order of an earlier session, so
+  that order has the exchange `SMART`.
+- Rule 2 reads the daily bars of an open market buy order of an earlier
+  session with the exchange of the same symbol and currency in the new
+  order, the owner positions, or the watchlist. IBKR can refuse `SMART` as a
+  primary exchange. A market order has no price, so without such an
+  instrument rule 2 refuses the order (`buy_more_than_cash`) and tells the
+  user to add the symbol to the watchlist or cancel the order.
 - Rule 3 (no short sale) is part of rule 1: the position of "By hand" is
   never below 0, so a sell larger than the position fails rule 1 with
   `sell_more_than_position`.

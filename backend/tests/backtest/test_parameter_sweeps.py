@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import httpx
+import psycopg
 import pytest
 
 from tests.app.test_assistant_port import create_port_app
@@ -110,6 +111,91 @@ async def test_cancel_sets_the_queued_runs_to_cancelled(web_client: httpx.AsyncC
 async def test_read_and_cancel_of_a_missing_sweep_are_404(web_client: httpx.AsyncClient) -> None:
     assert (await web_client.get("/api/sweeps/999")).status_code == 404
     assert (await web_client.post("/api/sweeps/999/cancel")).status_code == 404
+
+
+def set_run_status(database_url: str, backtest_id: int, status: str) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "UPDATE backtest SET status = %(status)s WHERE id = %(id)s", {"status": status, "id": backtest_id}
+        )
+
+
+@pytest.mark.anyio
+async def test_delete_removes_the_sweep_and_its_runs_so_the_strategy_can_be_deleted(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    sweep = (await start_sweep(web_client, [QUANTITY_GRID])).json()
+    await web_client.post(f"/api/sweeps/{sweep['id']}/cancel")
+    refused = await web_client.delete(f"/api/strategies/{sweep['strategy_id']}")
+    assert refused.status_code == 409
+    assert refused.json() == {
+        "detail": "A backtest, parameter sweep, or forward test uses a version of this strategy. It cannot be deleted."
+    }
+
+    response = await web_client.delete(f"/api/sweeps/{sweep['id']}")
+
+    assert response.status_code == 204
+    assert (await web_client.get(f"/api/sweeps/{sweep['id']}")).status_code == 404
+    for run in sweep["runs"]:
+        assert (await web_client.get(f"/api/backtests/{run['backtest_id']}")).status_code == 404
+    assert (await web_client.delete(f"/api/strategies/{sweep['strategy_id']}")).status_code == 204
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", ["queued", "running"])
+async def test_delete_refuses_a_sweep_with_a_queued_or_running_run(
+    web_client: httpx.AsyncClient, database_url: str, status: str
+) -> None:
+    save_test_bars(database_url)
+    sweep = (await start_sweep(web_client, [QUANTITY_GRID])).json()
+    await web_client.post(f"/api/sweeps/{sweep['id']}/cancel")
+    set_run_status(database_url, sweep["runs"][1]["backtest_id"], status)
+
+    response = await web_client.delete(f"/api/sweeps/{sweep['id']}")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": f"Parameter sweep #{sweep['id']} has queued or running runs. Wait for their end."
+    }
+    assert (await web_client.get(f"/api/sweeps/{sweep['id']}")).json()["run_count"] == 3
+
+
+@pytest.mark.anyio
+async def test_delete_refuses_a_sweep_with_the_same_period_backtest_of_a_forward_test(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    sweep = (await start_sweep(web_client, [QUANTITY_GRID])).json()
+    await web_client.post(f"/api/sweeps/{sweep['id']}/cancel")
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        forward_test = connection.execute(
+            """
+            INSERT INTO forward_test (strategy_version_id, symbol, exchange, currency, bar_period, desired_state,
+                status, start_balance_usd, created_at_utc, stopped_at_utc)
+            VALUES (%(version_id)s, 'BTEST', 'ARCA', 'USD', '1-DAY', 'stopped', 'stopped', 10000, now(), now())
+            RETURNING id
+            """,
+            {"version_id": sweep["strategy_version_id"]},
+        ).fetchone()
+        assert forward_test is not None
+        connection.execute(
+            "INSERT INTO forward_test_same_period_backtest (forward_test_id, backtest_id) VALUES (%s, %s)",
+            (forward_test[0], sweep["runs"][0]["backtest_id"]),
+        )
+
+    response = await web_client.delete(f"/api/sweeps/{sweep['id']}")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": f"A run of parameter sweep #{sweep['id']} is the same-period backtest of a forward test."
+    }
+    assert (await web_client.get(f"/api/sweeps/{sweep['id']}")).json()["run_count"] == 3
+
+
+@pytest.mark.anyio
+async def test_delete_of_a_missing_sweep_is_404(web_client: httpx.AsyncClient) -> None:
+    assert (await web_client.delete("/api/sweeps/999")).status_code == 404
 
 
 @pytest.mark.anyio

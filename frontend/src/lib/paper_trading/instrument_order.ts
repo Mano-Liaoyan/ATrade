@@ -48,7 +48,7 @@ export function findInstrumentOrderBlock(
   if (findInstrumentPosition(account, instrument)?.split_check) {
     return {
       kind: 'warning',
-      text: `${instrument.symbol} needs a split check. Apply the split or keep the ledger on the paper trading page.`,
+      text: `${instrument.symbol} needs a split check. Apply the split or keep the ledger on the Home page.`,
     };
   }
   return null;

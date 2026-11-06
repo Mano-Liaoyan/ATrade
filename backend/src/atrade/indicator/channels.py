@@ -6,8 +6,7 @@ from nautilus_trader.indicators import BollingerBands as NautilusBollingerBands
 from nautilus_trader.indicators import DonchianChannel as NautilusDonchianChannel
 from nautilus_trader.model import Bar as NautilusBar
 
-from atrade.foundation.bar import Bar
-from atrade.indicator.wrapped_indicator import make_nautilus_bar, read_output
+from atrade.indicator.wrapped_indicator import read_output
 
 
 class BollingerBands:
@@ -38,9 +37,6 @@ class BollingerBands:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._bands.handle_bar(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._bands.handle_bar(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._bands.reset()
@@ -73,9 +69,6 @@ class DonchianChannel:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._channel.handle_bar(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._channel.handle_bar(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._channel.reset()

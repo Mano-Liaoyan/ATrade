@@ -13,16 +13,23 @@ from decimal import Decimal
 from typing import LiteralString
 
 import psycopg
+from psycopg import sql
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayConnection, GatewayRequestError
+from atrade.market_data.bar_source import BarSource, bar_table
 from atrade.market_data.daily_bar_summary import select_last_daily_bars
-from atrade.market_data.stock_split_detection import RATIO_STEP_TOLERANCE, find_split_ratio, to_decimal
+from atrade.market_data.stock_split_detection import find_split_ratio, to_decimal
 
 logger = logging.getLogger(__name__)
 
 ONE_DAY = timedelta(days=1)
+# A close ratio this near to 1 is no evidence: the closes of a thin stock can differ this much on one day. Evidence A
+# alone can confirm a stock split, and the change of the stored bars has no undo.
+MIN_EVIDENCE_STEP = Decimal("0.08")
+# A stored close further than this from the IBKR bars can have another price, so it does not show a stock split.
+MAX_CLOSE_DISTANCE = timedelta(days=10)
 
 INSERT_CANDIDATE: LiteralString = """
     INSERT INTO stock_split (
@@ -44,6 +51,23 @@ SELECT_WAITING_SPLITS: LiteralString = """
     WHERE confirmation IS NULL
         AND symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s
 """
+# The stored daily close nearest to a time, before the ex-date of a waiting stock split. All stored bars before that
+# ex-date are in the old form.
+STORED_CLOSES_TEMPLATE = sql.SQL("""
+    SELECT start_utc, close FROM {bar_table}
+    WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s AND bar_period = '1-DAY'
+        AND close > 0 AND start_utc < %(ex_date_utc)s
+        AND start_utc BETWEEN %(near_utc)s::timestamptz - %(max_distance)s
+            AND %(near_utc)s::timestamptz + %(max_distance)s
+""")
+SELECT_NEAREST_OLD_FORM_CLOSE = sql.SQL("""
+    SELECT close FROM ({stored_closes}) AS stored_close
+    ORDER BY abs(extract(epoch FROM start_utc - %(near_utc)s::timestamptz)) LIMIT 1
+""").format(
+    stored_closes=sql.SQL(" UNION ALL ").join(
+        STORED_CLOSES_TEMPLATE.format(bar_table=bar_table(bar_source)) for bar_source in BarSource
+    )
+)
 
 
 @dataclass(frozen=True)
@@ -58,11 +82,11 @@ class StockSplitCandidate:
 
 def find_evidence_ratio(stored_close: Decimal, ibkr_close: Decimal) -> Decimal | None:
     """The split ratio of the 2 closes of 1 day, or None when the ratio is 1. The IBKR close and the official close of
-    the Databento import can differ by about 1%, so a ratio within `RATIO_STEP_TOLERANCE` of 1 is 1."""
+    the Databento import can differ, so a ratio within `MIN_EVIDENCE_STEP` of 1 is 1."""
     if stored_close <= 0 or ibkr_close <= 0:
         return None
     raw_ratio = stored_close / ibkr_close
-    if abs(raw_ratio - 1) <= RATIO_STEP_TOLERANCE:
+    if abs(raw_ratio - 1) <= MIN_EVIDENCE_STEP:
         return None
     return to_decimal(find_split_ratio(raw_ratio))
 
@@ -136,11 +160,44 @@ async def select_waiting_splits(
 
 async def to_stored_form(connection: psycopg.AsyncConnection, instrument: Instrument, bars: list[Bar]) -> list[Bar]:
     """IBKR bars that start before the ex-date of a waiting stock split (a candidate, or a Databento import split)
-    get the old prices of the stored bars: the prices are multiplied by the split ratio and the volume is divided by it.
-    Thus all stored bars before the ex-date have one form, and the change of the stored bars (section 8.13.3) divides
-    each of them 1 time."""
-    waiting_splits = await select_waiting_splits(connection, instrument)
-    return [convert_bar(bar, waiting_splits) for bar in bars]
+    get the old prices of the stored bars, when these IBKR bars show the stock split: the prices are multiplied by the
+    split ratio and the volume is divided by it. Thus all stored bars before the ex-date have one form, and the change
+    of the stored bars (section 8.13.3) divides each of them 1 time."""
+    shown_splits = [
+        split
+        for split in await select_waiting_splits(connection, instrument)
+        if await shows_split(connection, instrument, split, bars)
+    ]
+    return [convert_bar(bar, shown_splits) for bar in bars]
+
+
+async def shows_split(
+    connection: psycopg.AsyncConnection, instrument: Instrument, split: tuple[datetime, Decimal], bars: list[Bar]
+) -> bool:
+    """The detection rule of the Databento import also finds a real crash. IBKR does not adjust the bars of a crash, so
+    these bars need no change. True when the last bar before the ex-date and the nearest stored close before the
+    ex-date differ by a ratio nearer to the split ratio than to 1 (in log). A stored close further than
+    `MAX_CLOSE_DISTANCE` does not count."""
+    ex_date_utc, split_ratio = split
+    last_bar = next((bar for bar in reversed(bars) if bar.start_utc < ex_date_utc), None)
+    if last_bar is None or last_bar.close <= 0:
+        return False
+    cursor = await connection.execute(
+        SELECT_NEAREST_OLD_FORM_CLOSE,
+        {
+            "symbol": instrument.symbol,
+            "exchange": instrument.exchange,
+            "currency": instrument.currency,
+            "ex_date_utc": ex_date_utc,
+            "near_utc": last_bar.start_utc,
+            "max_distance": MAX_CLOSE_DISTANCE,
+        },
+    )
+    row = await cursor.fetchone()
+    if row is None:
+        return False
+    close_ratio: Decimal = row[0] / last_bar.close
+    return (close_ratio**2 - split_ratio) * (split_ratio - 1) > 0
 
 
 def convert_bar(bar: Bar, candidates: list[tuple[datetime, Decimal]]) -> Bar:

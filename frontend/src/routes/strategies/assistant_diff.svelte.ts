@@ -14,6 +14,7 @@ export class AssistantDiff {
   diff = $state<VersionDiff | null>(null);
   /** The diff tab is the selected tab of the editor panel. */
   isSelected = $state(false);
+  #requestNumber = 0;
 
   readonly tab = $derived(
     this.diff === null
@@ -21,12 +22,18 @@ export class AssistantDiff {
       : { value: DIFF_TAB_VALUE, label: `v${String(this.diff.versionNumber - 1)} → v${String(this.diff.versionNumber)}` },
   );
 
-  /** Reads both versions and selects the diff tab. Returns the error text, or null. */
+  /** Reads both versions and selects the diff tab. Returns the error text, or null. A newer open or a close drops the
+   answer. */
   async open(fetcher: typeof fetch, strategyId: number, versionNumber: number): Promise<string | null> {
+    this.#requestNumber += 1;
+    const thisRequest = this.#requestNumber;
     const [before, after] = await Promise.all([
       readStrategyVersion(fetcher, strategyId, versionNumber - 1),
       readStrategyVersion(fetcher, strategyId, versionNumber),
     ]);
+    if (thisRequest !== this.#requestNumber) {
+      return null;
+    }
     if (before.kind === 'failed') {
       return before.message;
     }
@@ -40,6 +47,7 @@ export class AssistantDiff {
 
   /** Closes the diff tab. With a version number, only when the tab shows that version. */
   close(versionNumber?: number): void {
+    this.#requestNumber += 1;
     if (versionNumber === undefined || this.diff?.versionNumber === versionNumber) {
       this.diff = null;
       this.isSelected = false;

@@ -7,6 +7,7 @@ import {
   readBacktest,
   runBacktest,
   summarizeBacktestList,
+  summarizeComparison,
   type BacktestWait,
   type UserMessageBudget,
 } from './backtest_tools.ts';
@@ -150,6 +151,11 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
         '"screen" needs screen_id: the screen runs again at each rebalance_period start (quarter, the default, or ' +
         'month). Use "screen" for a backtest from a screen. ' +
         '"list" needs screen_result_id, and optionally symbols (a part of that screen result): a fixed list. ' +
+        'A "screen" or "list" backtest is multi-instrument. Its strategy code has no instrument_id and no bar_type ' +
+        'in the StrategyConfig, and ATrade does not fill these fields. In on_start, the code calls ' +
+        'self.subscribe_data(DataType("UniverseUpdate")). In on_data(self, data), ' +
+        'str(data.data.bar_types).split(",") gives the bar type name of each member. A name can be empty. For each ' +
+        'new member, the code calls BarType.from_str(name), request_bars, and subscribe_bars. ' +
         'A multi-instrument backtest needs 1-DAY or 1-HOUR bars. Only instruments and a bar period with saved bars ' +
         'can run. One user message can start at most 5 backtests.',
       parameters: Type.Object({
@@ -174,7 +180,8 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
       name: 'list_backtests',
       label: 'List backtests',
       description:
-        'Lists the backtests with their instrument, bar period, status, and metrics. ' +
+        'Lists the newest 50 backtests with their instrument, bar period, status, and metrics. ' +
+        'When there are more, the result has backtest_count_total and left_out. ' +
         'A failed backtest has error_summary, the last line of its error.',
       parameters: Type.Object({}),
       execute: async (_id, _params, signal) => {
@@ -186,7 +193,8 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
       name: 'read_backtest',
       label: 'Read backtest',
       description:
-        'Reads one backtest: the metrics, at most 50 points of the equity curve, and the first 50 trades. ' +
+        'Reads one backtest: the metrics, at most 50 points of the equity curve, the first 50 trades, and the first ' +
+        '50 instruments. left_out says which items the result does not have. ' +
         'A failed backtest has error_message (the full log) and error_summary (its last line).',
       parameters: Type.Object({ backtest_id: Id }),
       execute: (_id, params, signal) => readBacktest(client, params.backtest_id, signal),
@@ -194,11 +202,12 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
     defineTool({
       name: 'compare_backtests',
       label: 'Compare backtests',
-      description: 'Compares 2 backtests of the same strategy.',
+      description: 'Compares 2 backtests of the same strategy. Each backtest has its code and the content of read_backtest.',
       parameters: Type.Object({ first_backtest_id: Id, second_backtest_id: Id }),
       execute: async (_id, params, signal) => {
         const path = `/api/backtests/${String(params.first_backtest_id)}/comparison/${String(params.second_backtest_id)}`;
-        return answerResult(await client.request('GET', path, undefined, signal));
+        const answer = await client.request('GET', path, undefined, signal);
+        return isSuccess(answer) ? textResult(summarizeComparison(answer.body as Record<string, unknown>)) : answerResult(answer);
       },
     }),
   ];

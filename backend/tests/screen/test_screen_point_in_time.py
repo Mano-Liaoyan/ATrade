@@ -4,13 +4,23 @@ the daily bars that close at or before the date, and its filter values are the d
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
+import psycopg
 import pytest
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import BarRequest, read_daily_bar_summaries, read_last_daily_bars, save_received_bars
-from atrade.screen import run_screen_at
+from atrade.market_data import (
+    BarRequest,
+    StockSplitChange,
+    apply_stock_split,
+    read_daily_bar_summaries,
+    read_last_daily_bars,
+    save_received_bars,
+)
+from atrade.screen import run_screen_at, screen_point_in_time
+from atrade.screen.screen_point_in_time import read_quarter_start_at
 from atrade.screen.screen_run import ScreenOutcome, run_screen_steps
 from tests.screen.test_screen_run_routes import add_to_watchlist, make_definition
 
@@ -42,6 +52,53 @@ async def save_rising_bars(
     ]
     bar_request = BarRequest(instrument, BarPeriod.ONE_DAY, TimeRange(at_day(first_index), at_day(end_index)))
     await save_received_bars(database_url=database_url, bar_request=bar_request, bars=bars)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("as_of_utc", "quarter_start_utc"),
+    [
+        (datetime(2024, 12, 31, tzinfo=UTC), datetime(2024, 10, 1, tzinfo=UTC)),
+        (datetime(2025, 1, 1, tzinfo=UTC), datetime(2025, 1, 2, tzinfo=UTC)),
+        (datetime(2025, 3, 28, tzinfo=UTC), datetime(2025, 1, 2, tzinfo=UTC)),
+        (datetime(2025, 4, 1, tzinfo=UTC), datetime(2025, 4, 1, tzinfo=UTC)),
+    ],
+    ids=[
+        "last_day_of_a_quarter",
+        "calendar_start_of_a_quarter_without_trading",
+        "days_before_a_quarter_in_the_window",
+        "first_trading_day_of_a_quarter",
+    ],
+)
+async def test_a_point_in_time_run_reads_the_quarter_of_the_calendar_month_of_its_date(
+    database_url: str, as_of_utc: datetime, quarter_start_utc: datetime
+) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO us_universe_member (
+                quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+            )
+            VALUES ('2024-10-01', 1, 'AAA', 'NASDAQ', 'USD', 1, '2024-09-30'),
+                ('2025-01-02', 1, 'BBB', 'NASDAQ', 'USD', 1, '2024-12-31'),
+                ('2025-04-01', 1, 'CCC', 'NASDAQ', 'USD', 1, '2025-03-31')
+            """
+        )
+
+    assert await read_quarter_start_at(database_url, as_of_utc) == quarter_start_utc
+
+
+@pytest.mark.anyio
+async def test_the_month_of_a_quarter_start_is_the_utc_month(monkeypatch: pytest.MonkeyPatch) -> None:
+    """2025-04-01 00:00 UTC is in March in New York, so its local month would keep the quarter too early."""
+
+    async def read_starts(*, database_url: str, end_utc: datetime) -> list[datetime]:
+        assert (database_url, end_utc.tzinfo) == ("unused", UTC)
+        return [datetime(2025, 4, 1, tzinfo=UTC).astimezone(ZoneInfo("America/New_York"))]
+
+    monkeypatch.setattr(screen_point_in_time, "read_us_universe_quarter_starts", read_starts)
+
+    assert await read_quarter_start_at("unused", datetime(2025, 3, 28, tzinfo=UTC)) is None
 
 
 @pytest.mark.anyio
@@ -86,6 +143,83 @@ async def test_the_filter_values_of_a_point_in_time_run_are_the_daily_bar_summar
     assert row.last_price == summary_at_day_40.last_close == Decimal(40)
     assert row.average_trading_value_20 == summary_at_day_40.average_trading_value_20
     assert row.average_trading_value_20 is not None
+
+
+@pytest.mark.anyio
+async def test_a_later_stock_split_does_not_change_the_last_price_filter_of_a_point_in_time_run(
+    database_url: str,
+) -> None:
+    """Close 100 on the last day before the date. A 10:1 stock split after the date divides the stored bars by 10, and
+    the filter must still see 100 (ADR 0008 changes the stored bars in place)."""
+    bars = [
+        Bar(
+            start_utc=at_day(index),
+            open=Decimal(100),
+            high=Decimal(100),
+            low=Decimal(100),
+            close=Decimal(100),
+            volume=Decimal(1000),
+        )
+        for index in range(30)
+    ]
+    bar_request = BarRequest(AAA, BarPeriod.ONE_DAY, TimeRange(at_day(0), at_day(30)))
+    await save_received_bars(database_url=database_url, bar_request=bar_request, bars=bars)
+    add_to_watchlist(database_url, AAA)
+    definition = make_definition(filters=[{"field": "last_price", "operator": ">=", "value": "50"}])
+    before_split = await run_screen_at(
+        database_url=database_url, market="US", definition=definition, as_of_utc=at_day(20)
+    )
+
+    await apply_stock_split(
+        database_url=database_url,
+        change=StockSplitChange(AAA, at_day(25), Decimal(10)),
+        confirmation="bar_evidence",
+        recorded_at_utc=at_day(30),
+    )
+    after_split = await run_screen_at(
+        database_url=database_url, market="US", definition=definition, as_of_utc=at_day(20)
+    )
+
+    assert [row.instrument for row in after_split.rows] == [AAA]
+    assert after_split.rows[0].last_price == before_split.rows[0].last_price == Decimal(100)
+    assert after_split.rows[0].average_trading_value_20 == before_split.rows[0].average_trading_value_20
+
+
+@pytest.mark.anyio
+async def test_the_prefilter_gives_the_same_reads_and_the_restored_close_after_a_later_stock_split(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await save_rising_bars(database_url, 0, 60)
+    await save_rising_bars(database_url, 0, 60, instrument=BBB, volume_factor=100)
+    add_to_watchlist(database_url, AAA, BBB)
+    indicator = {"indicator": "average_trading_value", "parameters": {"period": 20}, "output": "value"}
+    definition = make_definition(
+        indicator_conditions=[{"kind": "compare", "indicator": indicator, "operator": ">=", "value": "963500"}]
+    )
+    reads: list[list[Instrument]] = []
+
+    async def count_reads(*, instruments: list[Instrument], **parts: Any) -> dict[Instrument, list[Bar]]:
+        reads.append(instruments)
+        return await read_last_daily_bars(instruments=instruments, **parts)
+
+    monkeypatch.setattr("atrade.screen.screen_point_in_time.read_last_daily_bars", count_reads)
+    before_split = await run_screen_at(
+        database_url=database_url, market="US", definition=definition, as_of_utc=at_day(40)
+    )
+
+    await apply_stock_split(
+        database_url=database_url,
+        change=StockSplitChange(AAA, at_day(50), Decimal(10)),
+        confirmation="bar_evidence",
+        recorded_at_utc=at_day(60),
+    )
+    after_split = await run_screen_at(
+        database_url=database_url, market="US", definition=definition, as_of_utc=at_day(40)
+    )
+
+    assert reads == [[AAA], [AAA]]
+    assert [row.instrument for row in after_split.rows] == [AAA]
+    assert after_split.rows[0].last_price == before_split.rows[0].last_price
 
 
 @pytest.mark.anyio
