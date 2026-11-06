@@ -3,12 +3,12 @@
 ATrade runs the paper account check before each order (docs/architecture/paper_trading.md sections 11.2-11.4).
 """
 
+import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-import json
 import httpx
 import pytest
 

@@ -18,9 +18,9 @@ from atrade.strategy import STRATEGY_TEMPLATE, load_strategy_classes
 from atrade.strategy.strategy_templates import TEMPLATES_BY_ID
 from tests.fakes.ibkr import LIVE_BAR_NOW_UTC, make_execution
 from tests.forward_test.atrade_clients_node import (
+    ACCOUNT_ID,
     APPLE,
     APPLE_ID,
-    ACCOUNT_ID,
     CLIENT_ID,
     DAY_BAR_TYPE,
     FORWARD_TEST_ID,

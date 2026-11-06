@@ -135,4 +135,7 @@ def test_a_template_exit_fills_at_the_open_of_the_next_bar_and_not_at_the_close_
         tmp_path,
     )
 
-    assert [(trade.side, trade.price_usd) for trade in trades] == [("BUY", Decimal("110.00")), ("SELL", Decimal("90.00"))]
+    assert [(trade.side, trade.price_usd) for trade in trades] == [
+        ("BUY", Decimal("110.00")),
+        ("SELL", Decimal("90.00")),
+    ]

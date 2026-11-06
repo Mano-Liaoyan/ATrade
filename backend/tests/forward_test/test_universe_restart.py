@@ -11,7 +11,6 @@ from typing import Any, override
 
 import httpx
 import pytest
-
 from nautilus_trader.model import Bar, BarType, OrderSide
 
 from atrade.forward_test import (
