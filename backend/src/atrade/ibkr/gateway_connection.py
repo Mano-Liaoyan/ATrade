@@ -283,7 +283,8 @@ class IbAsyncGatewayConnection:
         self.next_ibkr_link_check_at = 0.0
         try:
             await self.ib.connectAsync(self.host, self.port, clientId=self.client_id, timeout=CONNECT_TIMEOUT_SECONDS)
-        except (OSError, TimeoutError) as error:
+        # connectAsync reads the executions without return_exceptions. With RaiseRequestErrors, an IBKR error ends it.
+        except (OSError, TimeoutError, RequestError) as error:
             logger.warning(
                 "IB Gateway is not reachable at %s:%s (%s). Next try in %s seconds.",
                 self.host,

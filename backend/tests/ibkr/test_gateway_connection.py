@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 import anyio
 import pytest
-from ib_async import BarData, BarDataList
+from ib_async import BarData, BarDataList, RequestError
 
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
@@ -120,6 +120,25 @@ async def test_reports_connected_only_after_the_startup_synchronization(monkeypa
             while not connection.is_connected():
                 await anyio.sleep(0.01)
         assert connection.read_connection_number() == 1
+
+
+@pytest.mark.anyio
+async def test_a_request_error_in_the_startup_synchronization_is_a_failed_connection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # connectAsync reads the executions without return_exceptions, so a RequestError of IBKR leaves it.
+    connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=4004, client_id=1)
+
+    async def fail_synchronization(*_args: object, **_kwargs: object) -> None:
+        raise RequestError(1, 162, "Historical market data Service error message")
+
+    monkeypatch.setattr(connection.ib, "connectAsync", fail_synchronization)
+
+    await connection.try_to_connect()
+    with pytest.raises(GatewayRequestError):
+        await connection.connect()
+
+    assert connection.read_status() == "unreachable"
 
 
 class HistoricalDataGateway:
