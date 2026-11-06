@@ -1,6 +1,7 @@
 """The code templates restore their position state at a forward test restart (docs/architecture/strategy.md section
 9.2). A restart gives the strategy its position from the owner ledger, and new objects."""
 
+from datetime import timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -19,8 +20,13 @@ from tests.forward_test.atrade_clients_node import (
     DAY_BAR_TYPE,
     FORWARD_TEST_ID,
     ClientsWorld,
+    make_day_bar,
     make_world,
     run_node,
+    save_day_bars,
+    send_today_bar,
+    today_start_utc,
+    wait_until,
 )
 
 RESTORED_SHARES = 40
@@ -73,6 +79,23 @@ async def test_the_default_template_starts_flat_without_a_position(database_url:
 
     async with run_node(make_world(database_url), strategy, 1):
         assert strategy.is_long is False
+
+
+@pytest.mark.anyio
+async def test_the_default_template_exit_sells_all_restored_shares(database_url: str, tmp_path: Path) -> None:
+    """A stock split or a partial fill leaves another quantity than the trade quantity of 10 shares."""
+    world = await make_world_with_position(database_url)
+    first_bar_utc = today_start_utc() - timedelta(days=30)
+    await save_day_bars(database_url, [make_day_bar(first_bar_utc + timedelta(days=day), "100") for day in range(30)])
+    strategy_class, config_class = load_strategy_classes(STRATEGY_TEMPLATE, tmp_path)
+    strategy: Any = strategy_class(create_config(config_class, instrument_id=APPLE_ID, bar_type=DAY_BAR_TYPE))
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "50")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        orders = [(order.side, order.quantity) for order in world.gateway.open_orders]
+
+    assert orders == [("SELL", RESTORED_SHARES)]
 
 
 @pytest.mark.anyio

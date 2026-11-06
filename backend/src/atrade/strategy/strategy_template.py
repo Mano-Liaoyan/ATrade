@@ -72,16 +72,17 @@ class MovingAverageStrategy(Strategy):
             return
         close_price = bar.close.as_double()
         if close_price > self.average.value and not self.is_long:
-            self.send_market_order(OrderSide.BUY)
+            self.send_buy_order()
             self.is_long = True
         elif close_price < self.average.value and self.is_long:
-            self.send_market_order(OrderSide.SELL)
+            # A stock split or a partial fill changes the position, so the exit sells the position, not a fixed count.
+            self.close_all_positions(self.settings.instrument_id)
             self.is_long = False
 
-    def send_market_order(self, order_side: OrderSide) -> None:
+    def send_buy_order(self) -> None:
         order = self.order_factory.market(
             self.settings.instrument_id,
-            order_side,
+            OrderSide.BUY,
             Quantity.from_int(self.settings.trade_quantity_shares),
         )
         self.submit_order(order)
