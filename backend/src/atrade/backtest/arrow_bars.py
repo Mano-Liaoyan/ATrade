@@ -9,7 +9,7 @@ from decimal import Context, Decimal
 
 import pyarrow
 
-from atrade.foundation.bar import Bar, BarPeriod
+from atrade.foundation.bar import Bar, BarPeriod, find_bar_end
 
 NANOSECONDS_PER_SECOND = 1_000_000_000
 # BarDataWrangler reads prices and volumes as Arrow decimal128(38, 16).
@@ -31,7 +31,7 @@ def to_arrow_decimals(values: list[Decimal]) -> pyarrow.Array:
 
 def convert_bars_to_arrow_bytes(bars: list[Bar], bar_period: BarPeriod) -> bytes:
     """`ts_event` is the bar end: a strategy sees a bar only after its period is over."""
-    bar_end_ns = [convert_to_ns(bar.start_utc + bar_period.length) for bar in bars]
+    bar_end_ns = [convert_to_ns(find_bar_end(bar.start_utc, bar_period)) for bar in bars]
     table = pyarrow.table(
         {
             "open": to_arrow_decimals([bar.open for bar in bars]),

@@ -177,7 +177,10 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   whole hour from the UNIX epoch. The route widens hourly ranges the same as
   other ranges. The 9:30 ET bar is in the whole hour from 9:00 ET, so a
   range that includes 9:00 ET or 9:30 ET reads it. A range that starts at
-  10:00 ET does not read it. The saved ranges of `databento_bar` are whole
+  10:00 ET does not read it. This bar ends at 10:00 ET, not at 10:30 ET
+  (`find_bar_end`), so the backtest engine gets each bar before the next open
+  tick and the equity point of the bar is at the bar end of a forward test.
+  The saved ranges of `databento_bar` are whole
   days, so a widened hourly range of a bought day has no missing part.
 - Phase 3 (#188): the route reads through the global source order (section
   8.7.2). A part is missing only when no bar source in the source order saved

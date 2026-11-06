@@ -3,7 +3,7 @@
 The bars have an open that differs from the close of the bar before, so a test can tell the two prices apart.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -25,6 +25,7 @@ STRATEGIES_DIRECTORY = Path(__file__).parent / "strategies"
 BAR_COUNT_CODE = (STRATEGIES_DIRECTORY / "buy_and_sell_by_bar_count.py").read_text()
 BRACKET_CODE = (STRATEGIES_DIRECTORY / "bracket_with_all_cash.py").read_text()
 CLOSE_TWICE_CODE = (STRATEGIES_DIRECTORY / "close_position_twice.py").read_text()
+BUY_UNLESS_IN_FLIGHT_CODE = (STRATEGIES_DIRECTORY / "buy_unless_in_flight.py").read_text()
 FOLLOW_UNIVERSE_CODE = (STRATEGIES_DIRECTORY / "follow_universe.py").read_text()
 REBALANCE_CODE = (STRATEGIES_DIRECTORY / "rebalance_in_one_bar.py").read_text()
 START_UTC = datetime(2026, 3, 2, tzinfo=UTC)
@@ -216,6 +217,33 @@ def test_rule_code_does_not_buy_two_times_when_the_next_bar_has_no_volume(tmp_pa
     assert {trade.side for trade in trades} == {"BUY"}
     assert sum(trade.quantity_shares for trade in trades) == Decimal(10)
     assert {trade.time_utc for trade in trades} == {find_open_time(1)}
+
+
+def test_rule_code_does_not_buy_two_times_after_the_first_hourly_bar_of_a_day(tmp_path: Path) -> None:
+    code = make_rules_code(
+        StrategyRules.model_validate(make_rules(group("all_of", condition(price(), "above", number(70)))))
+    )
+    # The first hourly bar of the day starts at 9:30 ET (14:30 UTC) and ends at the start of the next bar.
+    regular_hours = [timedelta(hours=14, minutes=30), *(timedelta(hours=hour) for hour in range(15, 21))]
+    bars = [replace(make_bar(0, 100, 100), start_utc=START_UTC + start) for start in regular_hours]
+
+    request = BacktestRequest(
+        strategy_version_id=1,
+        instrument=WAVE,
+        bar_period=BarPeriod.ONE_HOUR,
+        time_range=TimeRange(start_utc=START_UTC, end_utc=START_UTC + timedelta(days=1)),
+        paper_capital_usd=Decimal(100000),
+    )
+
+    trades = run_strategy_on_bars(StrategyRun(code, request, Decimal(100000), bars, []), tmp_path)
+
+    assert read_fills(trades) == [(START_UTC + timedelta(hours=15) + OPEN_FILL_DELAY, "BUY", Decimal(100), Decimal(10))]
+
+
+def test_a_strategy_sees_a_held_order_as_in_flight(tmp_path: Path) -> None:
+    trades, _ = run_single(make_flat_bars(3), tmp_path, code=BUY_UNLESS_IN_FLIGHT_CODE)
+
+    assert read_fills(trades) == [(find_open_time(1), "BUY", Decimal(100), Decimal(10))]
 
 
 def test_a_position_closed_two_times_sells_one_time_at_the_next_open(tmp_path: Path) -> None:

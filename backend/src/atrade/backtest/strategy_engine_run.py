@@ -50,7 +50,7 @@ from nautilus_trader.trading import Strategy
 from atrade.backtest.arrow_bars import NANOSECONDS_PER_SECOND, convert_bars_to_arrow_bytes, convert_to_ns
 from atrade.backtest.backtest_metrics import BacktestTrade
 from atrade.backtest.backtest_store import BacktestRequest
-from atrade.foundation.bar import Bar, BarPeriod
+from atrade.foundation.bar import Bar, BarPeriod, find_bar_end
 from atrade.foundation.instrument import Instrument
 from atrade.strategy import StrategyFileError, load_strategy_classes
 
@@ -161,7 +161,7 @@ def make_last_close_tick(instrument: Equity, bars: list[Bar], bar_period: BarPer
     """1 trade tick at the close of the last bar, just before its end. An order without a next open fills at this
     close, so the last price of the instrument must be this close, not the last open."""
     bar = bars[-1]
-    time_ns = convert_to_ns(bar.start_utc + bar_period.length) - 1
+    time_ns = convert_to_ns(find_bar_end(bar.start_utc, bar_period)) - 1
     return TradeTick(
         instrument.id,
         instrument.make_price(float(bar.close)),
@@ -334,6 +334,29 @@ def run_engine(engine: BacktestEngine, inputs: EngineInputs, work_directory: Pat
         inputs.changed_orders.extend(reduced_orders + read_refused_orders(engine))
 
 
+@dataclass(frozen=True)
+class HeldOrder:
+    instrument_id: InstrumentId
+    send: Callable[[], None]
+
+
+class HeldOrderCache:
+    """The engine cache, with each held order in `orders_inflight_count`. The engine has no such order until its open
+    tick. A strategy that sees no order would send the order a second time."""
+
+    def __init__(self, engine_cache: Any, held_orders: dict[str, HeldOrder]) -> None:
+        self.engine_cache = engine_cache
+        self.held_orders = held_orders
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.engine_cache, name)
+
+    def orders_inflight_count(self, *args: Any, **kwargs: Any) -> int:
+        instrument_id = kwargs.get("instrument_id")
+        held_count = sum(instrument_id in {None, held.instrument_id} for held in self.held_orders.values())
+        return self.engine_cache.orders_inflight_count(*args, **kwargs) + held_count
+
+
 class NextOpenOrders(Strategy):
     """Sends each market order only after the next open tick of its instrument (section 10.10.3).
 
@@ -347,8 +370,12 @@ class NextOpenOrders(Strategy):
 
     _atrade_open_times_ns: dict[InstrumentId, list[int]]
     _atrade_reduced_orders: list[str]
-    _atrade_waiting_orders: dict[str, Callable[[], None]]
+    _atrade_waiting_orders: dict[str, HeldOrder]
     _atrade_closing_instruments: set[InstrumentId]
+
+    @property
+    def cache(self) -> Any:
+        return HeldOrderCache(super().cache, self._atrade_waiting_orders)
 
     def _atrade_send_at_next_open(self, instrument_id: InstrumentId, send: Callable[[], None]) -> None:
         times_ns = self._atrade_open_times_ns.get(instrument_id, [])
@@ -358,12 +385,12 @@ class NextOpenOrders(Strategy):
             return
         waiting_orders = self._atrade_waiting_orders
         name = f"next-open-{self.clock.timestamp_ns()}-{len(waiting_orders)}"
-        waiting_orders[name] = send
+        waiting_orders[name] = HeldOrder(instrument_id, send)
         # 1 nanosecond apart. The last close tick of the instrument comes after the last alert: each order sees the cash after the fill of the order before.
         self.clock.set_time_alert_ns(name, times_ns[index] + len(waiting_orders), self._atrade_send_waiting_order)
 
     def _atrade_send_waiting_order(self, event: TimeEvent) -> None:
-        self._atrade_waiting_orders.pop(event.name)()
+        self._atrade_waiting_orders.pop(event.name).send()
 
     def _atrade_fit_to_cash(self, order: Any) -> Any:
         """`order`, or a smaller order when the free cash pays for only a part of it at the last tick: the price of

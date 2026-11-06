@@ -204,8 +204,8 @@ New columns are null on existing rows, except where a default is given.
    instrument and bar period before the start (section 10.3.1), and for an
    instrument that is not in USD the saved exchange rates (section 10.8).
 4. The child converts the bars to Arrow bytes (`decimal128(38, 16)` prices
-   and volume, `uint64` times). `ts_event` is the bar end, so a strategy sees
-   a bar only after its period. `BarDataWrangler` makes NautilusTrader bars
+   and volume, `uint64` times). `ts_event` is the bar end
+   (`find_bar_end`), so a strategy sees a bar only after its period. `BarDataWrangler` makes NautilusTrader bars
    from the bytes.
 5. The child imports the strategy code from a file in a temporary directory
    under `/tmp`, so that tracebacks show the line numbers. It makes the
@@ -972,9 +972,11 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
   the end of its bar, with the close of that bar. The trade mark goes on the
   fill bar, because `Date.parse` keeps a millisecond and drops a
   microsecond. The trade tables show the bar start.
-- A held order is not in the engine cache. Until the open tick,
-  `orders_inflight_count` does not count it, and `close_position` of the
-  same instrument does nothing.
+- A held order is not in the engine cache. The strategy reads
+  `HeldOrderCache`: `orders_inflight_count` counts each held order, so
+  a strategy that checks for an order does not send it a second time. The
+  other cache reads do not show a held order. Until the open tick,
+  `close_position` of the same instrument does nothing.
 - The held orders go 1 nanosecond apart, in the order of the strategy calls.
   Each order sees the cash after the fill of the order before. So a buy
   sent after a sell can use the cash of that sell.

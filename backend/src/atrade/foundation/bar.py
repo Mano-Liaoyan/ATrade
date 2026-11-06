@@ -83,6 +83,12 @@ def floor_to_bar_start(time_utc: datetime, bar_period: BarPeriod) -> datetime:
     return datetime.fromtimestamp(unix_seconds - unix_seconds % period_seconds, tz=UTC)
 
 
+def find_bar_end(start_utc: datetime, bar_period: BarPeriod) -> datetime:
+    """Returns the end of the bar period that contains `start_utc`. The first hourly bar of a day that opens at 9:30
+    has only 30 minutes: it ends at 10:00, when the next bar starts."""
+    return floor_to_bar_start(start_utc, bar_period) + bar_period.length
+
+
 def ceil_to_bar_start(time_utc: datetime, bar_period: BarPeriod) -> datetime:
     floor_start = floor_to_bar_start(time_utc, bar_period)
     if floor_start == time_utc:
