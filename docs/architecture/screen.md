@@ -407,6 +407,31 @@ kinds:
   `quarter_universe` is the last quarter that starts at or before
   `as_of_utc`. The other start lists are the lists of today. The form source
   "Screen" and the screen page buttons are in `backtest.md` section 10.10.7.
+- Done in #413: the prefilter of a point-in-time run. Step 2 reads up to 252
+  daily bars of each instrument that step 1 keeps. Before this read,
+  `run_screen_at` checks each `compare` condition on
+  `average_trading_value(20)` with `average_trading_value_20` of the daily
+  bar summary. These 2 values are equal: the same indicator class calculates
+  them from the same last 20 daily bars (ADR 0001). An instrument that fails
+  the check is not in the read, so the read has fewer instruments and the
+  result rows stay the same. These rules apply:
+  - A definition with a `rank` condition gets no prefilter, because the
+    percentiles use all candidates.
+  - A condition with another period gets no prefilter.
+  - An instrument whose summary has no value stays in the read. Step 2 gives
+    its exclusion.
+  - The prefilter comes after step 1, so the daily bars date and the "Still
+    trading" filter do not change.
+  - The exclusion reason of an instrument can be different from a run without
+    the prefilter. The rows are the only output that a backtest uses.
+  - The run of the screen page has no prefilter, because it shows the
+    exclusion reasons.
+- The backtest child writes one log line for each period of a `screen`
+  universe to its standard output, for example `Screen period 2026-03-01:
+  2133 candidates, 31.2 seconds.` The count is the number of instruments in
+  the read of step 2. The parent keeps only the standard error, for the
+  failure text, so standard output is the path to the log of the `web`
+  container.
 - For a fixed list from the AI assistant, the tool result has the
   survivorship bias warning. The AI assistant must write the warning in its
   answer.

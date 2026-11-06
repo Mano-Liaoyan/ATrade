@@ -1,6 +1,8 @@
 """The universe of a multi-instrument backtest: the universe periods and their members, the saved-bar check, and the
 bars of each member (docs/architecture/backtest.md section 10.10)."""
 
+import logging
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Final
@@ -17,6 +19,8 @@ from atrade.market_data import (
     read_us_universe_quarter_starts,
 )
 from atrade.screen import run_screen_at
+
+logger = logging.getLogger("atrade.backtest")
 
 MAX_UNIVERSE_SIZE: Final = 500
 MONTHS_IN_PERIOD: Final[dict[UniverseRebalancePeriod, int]] = {"quarter": 3, "month": 1}
@@ -107,11 +111,18 @@ async def run_screen_periods(
     the members of the period (docs/architecture/screen.md section 24.9). A period can have no member."""
     periods: list[UniversePeriod] = []
     for start_utc in find_screen_period_starts(time_range, rebalance_period):
+        run_start = time.monotonic()
         outcome = await run_screen_at(
             database_url=database_url,
             market=screen.market,
             definition=screen.definition,
             as_of_utc=find_screen_run_time(start_utc),
+        )
+        logger.info(
+            "Screen period %s: %d candidates, %.1f seconds.",
+            f"{start_utc:%Y-%m-%d}",
+            outcome.after_prefilter_count,
+            time.monotonic() - run_start,
         )
         periods.append(UniversePeriod(start_utc=start_utc, members=[row.instrument for row in outcome.rows]))
     return periods
