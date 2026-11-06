@@ -6,6 +6,41 @@
 # SSH_ORIGINAL_COMMAND.
 set -euo pipefail
 
+# The bars and their saved ranges come back from the Databento import and from IBKR (docs/architecture.md section 14.2).
+# A saved range without its bars would hide that the bars are missing, so both stay out of the backup.
+backup_keep_count=7
+backup_excluded_tables=(ibkr_bar ibkr_bar_saved_range databento_bar databento_bar_saved_range)
+
+# The parentheses keep umask in this function. A backup can hold credentials, so only the deploy user can read it.
+# The Compose file of the running commit starts postgres, so a new image in the new commit does not replace it first.
+backup_database() (
+  umask 077
+  local backup_dir="$HOME/atrade-backups" backup_file table
+  local compose=(docker compose --file deploy/compose.yaml --env-file .env)
+  local dump=(pg_dump --username=atrade --dbname=atrade --format=custom)
+  for table in "${backup_excluded_tables[@]}"; do
+    dump+=("--exclude-table-data=$table")
+  done
+  mkdir -p "$backup_dir"
+  backup_file="$backup_dir/atrade-$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short=12 HEAD).dump"
+
+  # This also starts postgres when the stack is down. A running postgres stays as it is.
+  if ! "${compose[@]}" up --detach --wait postgres; then
+    printf 'ERROR: The postgres service did not start, so the database backup failed. Nothing was deployed.\n' >&2
+    exit 1
+  fi
+  if ! "${compose[@]}" exec --no-TTY postgres "${dump[@]}" > "$backup_file.partial"; then
+    rm -f "$backup_file.partial"
+    printf 'ERROR: The database backup failed. Nothing was deployed.\n' >&2
+    exit 1
+  fi
+  mv "$backup_file.partial" "$backup_file"
+  printf 'Database backup: %s\n' "$backup_file"
+  # The names start with the UTC time, so the name order is the time order.
+  find "$backup_dir" -maxdepth 1 -name 'atrade-*.dump' | sort -r | tail -n "+$((backup_keep_count + 1))" \
+    | xargs -r rm -f --
+)
+
 # Bash reads a script while it runs it, and git checkout below replaces this file.
 # The function makes Bash read all of the script before the checkout.
 main() {
@@ -33,6 +68,7 @@ main() {
     printf 'Skipping %s: it is older than the deployed commit %s.\n' "$commit" "$(git rev-parse HEAD)"
     exit 0
   fi
+  backup_database
   git checkout --quiet --detach "$commit"
   printf 'Deploying %s\n' "$(git log -1 --format='%h %s')"
   # --wait: Compose waits until the services are running and their health checks pass.

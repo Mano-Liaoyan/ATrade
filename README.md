@@ -523,6 +523,30 @@ the server, for example `/srv/atrade`.
 Each later push to `main` deploys after CI passes. To deploy by hand on the
 server: `<checkout>/scripts/deploy <full commit SHA>`.
 
+### Restore a database backup
+
+Before each deployment, `scripts/deploy` writes a PostgreSQL backup to
+`~/atrade-backups/` of the deploy user and keeps the last 7 files. A failed
+backup stops the deployment. The file name holds the time and the commit that
+was deployed at that time. The backup has no bars and no saved ranges of bars.
+
+To restore, stop the deployments in GitHub, then run these commands on the
+server. Replace `<commit>` and `<file>` with the values from the file name:
+
+```bash
+cd <checkout>
+git checkout --detach <commit>
+compose='docker compose --file deploy/compose.yaml --env-file .env'
+$compose stop web forward-test
+$compose exec --no-TTY postgres pg_restore --username=atrade --dbname=atrade \
+  --clean --if-exists --no-owner --exit-on-error < ~/atrade-backups/<file>
+./start run --detach --wait
+```
+
+The restore replaces all tables, so the bar tables are then empty. Import the
+Databento history again (see "Import the Databento history"). IBKR bars come
+back at the next read.
+
 ## Check the code
 
 One command runs the same checks as CI:

@@ -1444,12 +1444,23 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   stops when `.env` is not there. When the commit is an ancestor of `HEAD` and
   is not `HEAD`, it writes the reason and exits with 0 and changes nothing,
   because CI runs can end in a different order than their commits
-  ([#379](https://github.com/Mano-Liaoyan/ATrade/issues/379)). Else it checks
-  out the commit (detached HEAD),
+  ([#379](https://github.com/Mano-Liaoyan/ATrade/issues/379)). Else it makes a
+  database backup, checks out the commit (detached HEAD),
   then runs `./start run --detach --wait`. The server builds the images. The
   build is the production build: `vp build` for the SPA, `uv sync --no-dev`,
   and uvicorn with 1 worker. The test is
   `backend/tests/app/test_deploy_script.py`.
+- `web` runs the migrations at start, so `scripts/deploy` makes the backup
+  first. It runs `docker compose up --detach --wait postgres` with the Compose
+  file of the deployed commit, so the stack can be down. Then it runs `pg_dump
+  --format=custom` in the `postgres` service and writes
+  `~/atrade-backups/atrade-<UTC time>-<deployed commit>.dump` of the deploy
+  user, with only owner access. It keeps the last 7 files. A failed backup
+  stops the deployment before the checkout, with a message. The backup has no
+  rows of `ibkr_bar`, `databento_bar`, and their `_saved_range` tables. The
+  Databento import and IBKR give these rows again, and a saved range without
+  its bars would hide that the bars are missing. README.md tells how to
+  restore.
 - The deploy workflow runs one deployment at a time (concurrency group
   `deploy`). `queue: max` keeps up to 100 waiting runs. Without it, GitHub
   keeps 1 waiting run, and an older commit can cancel the run of a newer commit.

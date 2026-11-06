@@ -1,7 +1,7 @@
 """`scripts/deploy` deploys only commits of origin/main.
 
-The test makes a bare origin repository and a clone of it with `scripts/deploy` and a fake `start`. The fake
-writes its arguments to a file, so the test sees whether the start was called.
+The test makes a bare origin repository and a clone of it with `scripts/deploy`, a fake `start`, and a fake `docker`.
+The fakes write their arguments to files, so the test sees whether the start and the database backup were called.
 """
 
 import os
@@ -54,16 +54,43 @@ def make_server_checkout(tmp_path: Path, start_calls: Path) -> Path:
     return server
 
 
+def make_fake_docker(fake_bin: Path) -> None:
+    """Writes each call to docker_calls.txt. `exec` prints the dump. FAKE_DOCKER_FAIL makes a matching call fail."""
+    fake_bin.mkdir(exist_ok=True)
+    (fake_bin / "docker").write_text(f"""#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "{fake_bin.parent / "docker_calls.txt"}"
+if [[ -n "${{FAKE_DOCKER_FAIL:-}}" && "$*" == *"$FAKE_DOCKER_FAIL"* ]]; then
+  printf 'partial dump'
+  exit 1
+fi
+if [[ "$*" == *" exec "* ]]; then
+  printf 'dump of the database'
+fi
+""")
+    (fake_bin / "docker").chmod(0o755)
+
+
 def run_deploy(
     server: Path, args: list[str], extra_env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
+    make_fake_docker(server.parent / "bin")
     return subprocess.run(
         ["bash", str(server / "scripts" / "deploy"), *args],
         capture_output=True,
         text=True,
         check=False,
-        env={**os.environ, **GIT_ENV, **(extra_env or {})},
+        env={
+            **os.environ,
+            **GIT_ENV,
+            "HOME": str(server.parent),
+            "PATH": f"{server.parent / 'bin'}:{os.environ['PATH']}",
+            **(extra_env or {}),
+        },
     )
+
+
+def list_backups(server: Path) -> list[Path]:
+    return sorted((server.parent / "atrade-backups").glob("*"))
 
 
 def test_checks_out_a_new_commit_of_main_and_starts_in_the_background(tmp_path: Path) -> None:
@@ -160,3 +187,90 @@ def test_stops_with_a_clear_message_when_env_is_missing(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert ".env not found" in result.stderr
     assert not start_calls.exists()
+
+
+def test_dumps_the_database_without_the_bars_before_the_start(tmp_path: Path) -> None:
+    start_calls = tmp_path / "start_calls.txt"
+    server = make_server_checkout(tmp_path, start_calls)
+    deployed_commit = git(server, "rev-parse", "HEAD")
+    new_commit = commit_file(tmp_path / "author", "change.txt")
+    git(tmp_path / "author", "push", "--quiet", "origin", "main")
+
+    result = run_deploy(server, [new_commit])
+
+    assert result.returncode == 0, result.stderr
+    calls = (tmp_path / "docker_calls.txt").read_text().splitlines()
+    up_call, dump_call = calls
+    assert up_call == "compose --file deploy/compose.yaml --env-file .env up --detach --wait postgres"
+    assert " exec --no-TTY postgres pg_dump --username=atrade --dbname=atrade --format=custom " in dump_call
+    for table in ("ibkr_bar", "ibkr_bar_saved_range", "databento_bar", "databento_bar_saved_range"):
+        assert f"--exclude-table-data={table}" in dump_call.split()
+    [backup] = list_backups(server)
+    assert backup.read_text() == "dump of the database"
+    assert backup.name.endswith(f"-{deployed_commit[:12]}.dump")
+    assert backup.stat().st_mode & 0o077 == 0
+    assert (server / "change.txt").stat().st_mode & 0o077 != 0
+    assert start_calls.exists()
+
+
+def test_keeps_only_the_last_backups(tmp_path: Path) -> None:
+    server = make_server_checkout(tmp_path, tmp_path / "start_calls.txt")
+    backup_dir = tmp_path / "atrade-backups"
+    backup_dir.mkdir()
+    old_backups = [backup_dir / f"atrade-20260101T00000{number}Z-abc.dump" for number in range(8)]
+    for backup in old_backups:
+        backup.write_text("old")
+    (backup_dir / "notes.txt").write_text("not a backup")
+
+    result = run_deploy(server, [git(server, "rev-parse", "HEAD")])
+
+    assert result.returncode == 0, result.stderr
+    kept = list_backups(server)
+    assert len([backup for backup in kept if backup.suffix == ".dump"]) == 7
+    assert (backup_dir / "notes.txt") in kept
+    assert old_backups[0] not in kept
+    assert old_backups[1] not in kept
+    assert old_backups[2] in kept
+
+
+def test_a_failed_dump_stops_the_deployment_before_the_checkout(tmp_path: Path) -> None:
+    start_calls = tmp_path / "start_calls.txt"
+    server = make_server_checkout(tmp_path, start_calls)
+    deployed_commit = git(server, "rev-parse", "HEAD")
+    new_commit = commit_file(tmp_path / "author", "change.txt")
+    git(tmp_path / "author", "push", "--quiet", "origin", "main")
+
+    result = run_deploy(server, [new_commit], {"FAKE_DOCKER_FAIL": "pg_dump"})
+
+    assert result.returncode == 1
+    assert "database backup failed" in result.stderr
+    assert "Nothing was deployed" in result.stderr
+    assert list_backups(server) == []
+    assert git(server, "rev-parse", "HEAD") == deployed_commit
+    assert not start_calls.exists()
+
+
+def test_postgres_that_does_not_start_stops_the_deployment(tmp_path: Path) -> None:
+    start_calls = tmp_path / "start_calls.txt"
+    server = make_server_checkout(tmp_path, start_calls)
+
+    result = run_deploy(server, [git(server, "rev-parse", "HEAD")], {"FAKE_DOCKER_FAIL": "up --detach --wait postgres"})
+
+    assert result.returncode == 1
+    assert "postgres service did not start" in result.stderr
+    assert not start_calls.exists()
+
+
+def test_a_skipped_commit_makes_no_backup(tmp_path: Path) -> None:
+    server = make_server_checkout(tmp_path, tmp_path / "start_calls.txt")
+    author = tmp_path / "author"
+    older_commit = commit_file(author, "older.txt")
+    newer_commit = commit_file(author, "newer.txt")
+    git(author, "push", "--quiet", "origin", "main")
+    run_deploy(server, [newer_commit])
+    [backup] = list_backups(server)
+
+    result = run_deploy(server, [older_commit])
+
+    assert result.returncode == 0, result.stderr
+    assert list_backups(server) == [backup]
