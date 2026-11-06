@@ -1,5 +1,6 @@
 """The body of one forward test child process: the wait for IB Gateway, the paper account check, the cancel of old
-orders, the warm-up bars, the LiveNode run, and the stop steps (docs/architecture.md sections 12.5-12.7).
+orders with the save of their fills, the warm-up bars, the LiveNode run, and the stop steps (docs/architecture.md
+sections 12.5-12.7).
 
 The child writes start_balance_usd, error_message, the status "waiting_for_gateway" and "running", and the
 interruption rows of a wait for IB Gateway. The worker reads the exit code and writes the other states.
@@ -9,6 +10,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import timedelta
 from decimal import Decimal
 from typing import Literal
 
@@ -26,19 +28,32 @@ from atrade.forward_test.forward_test_worker import (
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
-from atrade.foundation.order_ref import format_forward_test_order_tag
+from atrade.foundation.order_ref import format_forward_test_order_tag, read_order_source
 from atrade.foundation.settings import Settings
-from atrade.ibkr import GatewayConnection, GatewayRequestError
+from atrade.ibkr import Execution, GatewayConnection, GatewayRequestError
 from atrade.market_data import BarRequest, save_received_bars
-from atrade.paper_trading import PaperAccountCheckError, PaperAccountMonitor, require_paper_account
+from atrade.paper_trading import (
+    BOUGHT_SIDE,
+    ForwardTestLedger,
+    OwnerFill,
+    PaperAccountCheckError,
+    PaperAccountMonitor,
+    require_paper_account,
+)
 from atrade.strategy import read_strategy_version
 
 SUCCESS_EXIT_CODE = 0
 FAILURE_EXIT_CODE = 1
 # When IB Gateway is not reachable, the child tries again after this time (section 12.5).
 GATEWAY_RETRY_SECONDS = 30.0
+# The end condition of a retry for a held fill: at this age, ATrade saves the fill with commission 0 (section 12.6).
+COMMISSION_REPORT_LIMIT = timedelta(minutes=5)
 
 logger = logging.getLogger("atrade.forward_test_child")
+
+
+class HeldFillError(GatewayRequestError):
+    """A fill of the forward test has no commission report yet. A later read on a new connection tries again."""
 
 
 @dataclass(frozen=True)
@@ -156,6 +171,73 @@ async def save_warm_up_bars(job: ChildJob, bar_request: BarRequest, bars: list[B
         logger.warning("Forward test %s: the warm-up bars were not saved: %s", job.row.id, error)
 
 
+async def read_forward_test_instruments(job: ChildJob) -> list[Instrument]:
+    """The instrument, or the members of all recorded quarters of a multi-instrument forward test."""
+    instrument = forward_test_store.read_single_instrument(job.row)
+    if instrument is not None:
+        return [instrument]
+    async with await psycopg.AsyncConnection.connect(job.settings.database_url) as connection:
+        members = await forward_test_store.select_universe_members(connection, job.row.id)
+    return [member for quarter_members in members.values() for member in quarter_members]
+
+
+def make_owner_fill(job: ChildJob, execution: Execution, instrument: Instrument) -> OwnerFill:
+    return OwnerFill(
+        forward_test_id=job.row.id,
+        instrument=instrument,
+        side="BUY" if execution.side == BOUGHT_SIDE else "SELL",
+        quantity=execution.quantity,
+        price=execution.price,
+        time_utc=execution.time_utc,
+        order_ref=execution.order_ref,
+        execution_id=execution.execution_id,
+        ibkr_order_id=execution.order_id,
+        commission=execution.commission,
+    )
+
+
+async def save_fills(job: ChildJob, gateway_connection: GatewayConnection) -> None:
+    """Saves the executions of all orders of this forward test, also of earlier children, after the cancel step.
+
+    A fill after a crash, a lost IB Gateway, or the last read of the LiveNode has no other way into the owner ledger.
+    The owner ledger stores each execId once. reqExecutions returns only the current day (section 12.6).
+
+    Raises HeldFillError for a held fill that is younger than COMMISSION_REPORT_LIMIT. An older one is saved with
+    commission 0, because a wrong commission costs less than a wrong owner position.
+    """
+    executions = [
+        execution
+        for execution in await gateway_connection.read_executions(include_held=True)
+        if read_order_source(execution.order_ref).forward_test_id == job.row.id
+    ]
+    if not executions:
+        return
+    held = [execution for execution in executions if not execution.is_commission_reported]
+    now_utc = job.ibkr_access.clock.read_now_utc()
+    for execution in held:
+        if now_utc - execution.time_utc < COMMISSION_REPORT_LIMIT:
+            message = f"Execution {execution.execution_id} has no commission report."
+            raise HeldFillError(message)
+        logger.warning("Forward test %s: execution %s has commission 0.", job.row.id, execution.execution_id)
+    # The exchange of an execution is the venue, not the primary exchange of the instrument.
+    instruments = {
+        (instrument.symbol, instrument.currency): instrument for instrument in await read_forward_test_instruments(job)
+    }
+    ledger = ForwardTestLedger(
+        database_url=job.settings.database_url,
+        account=executions[0].account,
+        forward_test_id=job.row.id,
+        gateway_connection=gateway_connection,
+        clock=job.ibkr_access.clock,
+    )
+    for execution in executions:
+        instrument = instruments.get((execution.symbol, execution.currency))
+        if instrument is None:
+            logger.warning("Forward test %s: execution %s has no instrument.", job.row.id, execution.execution_id)
+            continue
+        await ledger.save_fill(make_owner_fill(job, execution, instrument))
+
+
 async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
     """Steps 1-3 of section 12.5 and restart step 1 of section 12.7, on one connection.
 
@@ -180,8 +262,15 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         try:
             for order in await gateway_connection.read_own_open_orders():
                 await gateway_connection.cancel_order_and_wait(order.order_id)
+            await save_fills(job, gateway_connection)
+        except HeldFillError as error:
+            # Not a crash. The start steps run again after the retry time, until the fill is saved (section 12.7).
+            logger.warning("Forward test %s: %s", job.row.id, error)
+            return GATEWAY_UNREACHABLE_EXIT_CODE
         except GatewayRequestError as error:
-            await write_error_message(job, f"The open orders were not cancelled before the start: {error}")
+            await write_error_message(
+                job, f"The open orders were not cancelled or their fills were not saved before the start: {error}"
+            )
             return FAILURE_EXIT_CODE
         # A multi-instrument forward test reads its warm-up from the bar store, not from IBKR (section 12.17).
         warm_up_bars = await read_warm_up_bars(job, gateway_connection) if job.row.universe_kind == "single" else ()
@@ -228,14 +317,16 @@ async def wait_until_ready(job: ChildJob, stop_requested: asyncio.Event) -> Chec
 
 
 async def cancel_open_orders(job: ChildJob) -> int:
-    """Steps 2-4 of section 12.6: cancel each open order of the client ID and wait for each confirmation."""
+    """Steps 2-5 of section 12.6: cancel each open order of the client ID, wait for each confirmation, and save the
+    fills of the forward test."""
     gateway_connection = job.ibkr_access.open_gateway_connection(job.client_id)
     try:
         await gateway_connection.connect()
         for order in await gateway_connection.read_own_open_orders():
             await gateway_connection.cancel_order_and_wait(order.order_id)
+        await save_fills(job, gateway_connection)
     except GatewayRequestError as error:
-        await write_error_message(job, f"The open orders were not cancelled: {error}")
+        await write_error_message(job, f"The open orders were not cancelled or their fills were not saved: {error}")
         return FAILURE_EXIT_CODE
     finally:
         gateway_connection.disconnect()

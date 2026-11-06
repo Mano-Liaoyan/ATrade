@@ -6,7 +6,8 @@ and keeps its fills in the owner ledger (docs/architecture/forward_test.md secti
 - The owner ledger checks each order first. A failed rule gives `OrderDenied` with the reason, and no order.
 - The client reads the executions of its own client ID every `fill_check_interval_seconds` (reqExecutions) and
   sends a fill for each new execution (execId) of an order that it sent in this run. It reads them once more at the
-  stop. A failed save is tried again at the next read.
+  stop. A failed save is tried again at the next read. The child saves all other fills after each cancel step
+  (section 12.6).
 - Reconciliation reports the owner positions and the owner cash, not the account positions and the account cash.
 """
 

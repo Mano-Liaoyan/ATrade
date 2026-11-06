@@ -12,7 +12,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal, Protocol
 
-from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Forex, Order, RequestError, Trade
+from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Fill, Forex, Order, RequestError, Trade
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
@@ -38,6 +38,7 @@ from atrade.ibkr.orders import (
     build_order,
     convert_fill,
     convert_trade,
+    has_commission_report,
 )
 
 DEFAULT_RETRY_SECONDS = 10.0
@@ -57,6 +58,9 @@ UTC_FORMAT_DATE = 2
 # The forex market closes on the weekend. 1 week of hourly bars always has a last bar.
 EXCHANGE_RATE_DURATION = "1 W"
 EXCHANGE_RATE_BAR_SIZE = "1 hour"
+# A commission report comes after its execution, also after the end of a reqExecutions answer.
+COMMISSION_REPORT_WAIT_SECONDS = 2.0
+COMMISSION_REPORT_CHECK_SECONDS = 0.05
 # While no live bar update comes, the live bar stream checks the connection this often.
 LIVE_BAR_CONNECTION_CHECK_SECONDS = 1.0
 # IB Gateway sends these codes when its connection to the IBKR servers is lost (1100, 2110) or comes back (1101, 1102).
@@ -152,8 +156,10 @@ class GatewayConnection(Protocol):
         """
         ...
 
-    async def read_executions(self) -> list[Execution]:
-        """The executions that IBKR returns for reqExecutions, of all client IDs of the account that IBKR shows."""
+    async def read_executions(self, *, include_held: bool = False) -> list[Execution]:
+        """The executions that IBKR returns for reqExecutions, of all client IDs of the account that IBKR shows. A fill
+        without its commission report (a held fill) stays out of the list until a later read. With `include_held`, it
+        is in the list with `is_commission_reported` False."""
         ...
 
     async def read_historical_bars(
@@ -196,6 +202,8 @@ class IbAsyncGatewayConnection:
         # balance. ATrade reports "connected" only after that startup synchronization.
         self.synchronized = False
         self.ib = IB()
+        # The fills that were held after the wait of read_executions. No later read waits for them.
+        self.timed_out_execution_ids: set[str] = set()
         # ib_async keeps one result per request type. Two parallel reqAllOpenOrders calls would lose one answer.
         self.open_orders_lock = asyncio.Lock()
         # Without this, ib_async ends a failed request with an empty result, the same as "no bars in the range".
@@ -474,15 +482,35 @@ class IbAsyncGatewayConnection:
                 raise GatewayRequestError(message)
             await asyncio.sleep(CANCEL_CONFIRMATION_CHECK_SECONDS)
 
-    async def read_executions(self) -> list[Execution]:
-        """https://interactivebrokers.github.io/tws-api/executions_commissions.html"""
+    async def read_executions(self, *, include_held: bool = False) -> list[Execution]:
+        """https://interactivebrokers.github.io/tws-api/executions_commissions.html
+
+        For an execId that ib_async knows, the answer holds a new Fill with an empty commission report. Only the
+        stored Fill of the execId gets the report, so this function reads the stored Fill.
+        """
         self.require_connection()
         try:
             fills = await asyncio.wait_for(self.ib.reqExecutionsAsync(), OPEN_ORDERS_TIMEOUT_SECONDS)
         except (ConnectionError, RequestError, TimeoutError) as error:
             message = f"IB Gateway did not return the executions: {error}"
             raise GatewayRequestError(message) from error
-        return [convert_fill(fill) for fill in fills]
+        stored_fills = [self.ib.wrapper.fills.get(fill.execution.execId, fill) for fill in fills]
+        await self.wait_for_commission_reports(stored_fills)
+        return [convert_fill(fill) for fill in stored_fills if include_held or has_commission_report(fill)]
+
+    async def wait_for_commission_reports(self, fills: list[Fill]) -> None:
+        """Waits for each report one time only, so a fill without a report does not slow each later read."""
+        waiting = [fill for fill in fills if fill.execution.execId not in self.timed_out_execution_ids]
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + COMMISSION_REPORT_WAIT_SECONDS
+        while True:
+            waiting = [fill for fill in waiting if not has_commission_report(fill)]
+            if not waiting or loop.time() >= deadline:
+                break
+            await asyncio.sleep(COMMISSION_REPORT_CHECK_SECONDS)
+        for fill in waiting:
+            self.timed_out_execution_ids.add(fill.execution.execId)
+            logger.warning("Execution %s has no commission report.", fill.execution.execId)
 
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange

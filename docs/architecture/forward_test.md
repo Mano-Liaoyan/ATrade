@@ -201,7 +201,9 @@ This replaces the rules above:
 2. The child connects with `ib_async` and the same client ID.
 3. The child reads the open orders of this client ID with `reqOpenOrders`.
 4. The child cancels each order and waits for the confirmation.
-5. The child exits.
+5. The child reads the executions and saves the fills of this forward test in
+   the owner ledger.
+6. The child exits.
 
 - Positions stay open. The user handles them by hand.
 - Phase 3 (#146): the stop steps do not change. After the stop ends with the
@@ -212,8 +214,26 @@ This replaces the rules above:
   the positions with paper orders by hand.
 - Do not use `manage_stop`. It closes positions. `LiveNode.stop()` does not
   cancel orders.
-- When a cancellation fails, the status is "stop failed". The client ID stays
-  taken. The worker retries the cancellation.
+- When a cancellation or the save of a fill fails, the status is "stop
+  failed". The client ID stays taken. The worker retries the stop steps.
+- Step 5 and restart step 1 (section 12.7) find a fill after a crash, a lost
+  IB Gateway, or the last read of the `LiveNode`. The `orderRef` tells the
+  forward test. The symbol and the currency of the contract tell the
+  instrument, because the exchange of an execution is the execution venue,
+  not the primary exchange. An execution without an instrument of the forward
+  test gets a warning in the log and no ledger row. The owner ledger stores
+  each execId once, so a fill that the execution client saved adds no row.
+  `reqExecutions` returns only the current day, so a fill stays lost when no
+  child reads it on its day.
+- A held fill (`ibkr.md`, no commission report yet) of the forward test fails
+  step 5: the status is `stop_failed`, and the worker runs the stop steps
+  again on a new connection. No transfer to "By hand" happens before the fill
+  is in the ledger. End condition: the retries end when the report arrives,
+  or when the fill is 5 minutes old (`COMMISSION_REPORT_LIMIT`, measured from
+  the execution time). At that age, the child saves the fill with commission
+  0 and logs a warning with the execId. A wrong commission costs less than a
+  wrong owner position. A held fill that is already this old at the first
+  read gets only the 2 second wait of `read_executions()`.
 
 ## 12.7 Recovery after restart
 
@@ -231,7 +251,11 @@ This replaces the rules above:
   until it can write the result of that child.
 - Restart steps:
   1. Cancel all open orders of this client ID (section 12.6). This prevents
-     duplicate orders.
+     duplicate orders. Then save the fills of this forward test (step 5 of
+     section 12.6), so that the owner position is correct before the
+     `LiveNode` starts. A held fill is not a crash: the child runs the start
+     steps again every 30 seconds with the status `waiting_for_gateway`, with
+     the end condition of section 12.6.
   2. Start the `LiveNode`. Set `external_order_instrument_ids` and
      `reconciliation_instrument_ids` to the instrument. The account position
      on this instrument belongs to this strategy (section 12.2).
@@ -270,8 +294,8 @@ Implementation (#77):
   memory.
 - Each `run` child cancels the open orders of its client ID after the paper
   account check and before the `LiveNode` start (step 1), on the same
-  connection. A failed cancel there ends the child with exit code 1, which
-  is a crash.
+  connection. A failed cancel or a failed save of a fill there ends the child
+  with exit code 1, which is a crash.
 - IB Gateway lost: the child opens a TCP connection to the Gateway port every
   30 seconds while the `LiveNode` runs. After 5 minutes without a
   connection, it stops the `LiveNode` and exits with code 4
@@ -629,7 +653,7 @@ Phase 3 table changes (#146). The column names are choices of this document.
 | `waiting_for_gateway` | IB Gateway is not reachable. The child retries every 30 seconds, or the worker starts a new child after a lost Gateway. The client ID stays taken. |
 | `stopping` | The worker sent the stop request, or a `cancel_orders` child runs. |
 | `stopped` | The orders are cancelled and the child ended. The client ID is free. |
-| `stop_failed` | A cancel failed. The client ID stays taken. The next comparison starts a `cancel_orders` child again. |
+| `stop_failed` | A cancel or the save of a fill failed. The client ID stays taken. The next comparison starts a `cancel_orders` child again. |
 | `failed` | The paper account check failed (client ID free, no retry), or 3 crashes in a row (client ID taken until a stop cancels the orders). |
 
 - Writers: the Web process inserts the row (`desired_state = running`,
@@ -1113,8 +1137,9 @@ Execution client (`OwnerLedgerExecutionClient`,
 - An order on an instrument in the "Split check needed" state also gets
   `OrderDenied` ([`paper_trading.md`](paper_trading.md) section 11.11).
 - It reports only the orders and the fills of its own client ID.
-- It writes each fill into the owner ledger, with the forward test as the
-  owner.
+- It writes each fill of the orders of its run into the owner ledger, with
+  the forward test as the owner. The child saves all other fills of the
+  forward test (section 12.6).
 - For reconciliation, it reports the owner position of each instrument
   (`PositionStatusReport` with `quantity` and `avg_px_open`) and the owner
   cash (section 12.18). It does not report the account positions or the

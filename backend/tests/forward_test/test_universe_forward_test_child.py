@@ -36,9 +36,16 @@ from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarRequest, save_received_bars
 from atrade.paper_trading import ForwardTestLedger
 from tests.fakes.clock import FixedClock
-from tests.fakes.ibkr import FakeGatewayConnection
+from tests.fakes.ibkr import FakeGatewayConnection, make_execution
 from tests.fakes.owner_ledger import FakeOwnerLedger
-from tests.forward_test.test_forward_test_child import ACCOUNT_ID, make_forward_test_gateway, make_settings
+from tests.forward_test.test_forward_test_child import (
+    ACCOUNT_ID,
+    FakeLiveNode,
+    make_forward_test_gateway,
+    make_settings,
+    read_ledger_fills,
+    run_child,
+)
 from tests.forward_test.test_forward_test_routes import (
     FORWARD_TESTS_PATH,
     make_universe_request,
@@ -303,6 +310,28 @@ async def test_after_a_quarter_change_in_an_interruption_the_restarted_strategy_
 
     assert child.strategy.lists == [(bar_type_name(NVIDIA), bar_type_name(APPLE))]
     assert sorted(read_recorded_quarters(database_url, forward_test_id)) == [THIS_QUARTER_UTC, NEXT_QUARTER_UTC]
+
+
+@pytest.mark.anyio
+async def test_the_stop_finds_the_member_of_a_fill_by_its_symbol_and_currency(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test_id = await start_top_2_forward_test(web_client, database_url)
+    gateway_connection = make_forward_test_gateway()
+    gateway_connection.executions = [
+        make_execution(
+            ACCOUNT_ID, order_id=8, quantity="4", price="20", order_ref=f"O-FT{forward_test_id}-1", symbol="MSFT"
+        )
+    ]
+
+    await run_child(
+        make_settings(database_url, frontend_build_dir),
+        forward_test_id,
+        "cancel_orders",
+        FakeLiveNode(gateway_connection),
+    )
+
+    assert read_ledger_fills(database_url) == [("MSFT", "NASDAQ", Decimal(4), Decimal(0))]
 
 
 @pytest.mark.anyio
