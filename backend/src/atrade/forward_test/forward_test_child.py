@@ -132,7 +132,7 @@ async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection
     strategy_version = await read_strategy_version(
         database_url=job.settings.database_url, strategy_version_id=job.row.strategy_version_id
     )
-    look_back = find_look_back(bar_period, None if strategy_version is None else strategy_version.warm_up_bar_count)
+    look_back = find_look_back(bar_period, None if strategy_version is None else strategy_version.count_warm_up_bars())
     end_utc = floor_to_bar_start(job.ibkr_access.clock.read_now_utc(), bar_period)
     time_range = TimeRange(start_utc=end_utc - look_back.length, end_utc=end_utc)
     bar_request = BarRequest(

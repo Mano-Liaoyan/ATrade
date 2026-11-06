@@ -273,7 +273,10 @@ in a forward test, and it can trade on the first bar of the range.
   last N saved bars before the start. N is the largest look-back count of
   the indicators in its rules ([`indicator.md`](indicator.md) section 23.4,
   `find_warm_up_bar_count()` in `strategy/rules_code.py`).
-  `read_strategy_version()` gives N as `warm_up_bar_count`. The child reads
+  `StrategyVersion.count_warm_up_bars(parameters)` gives N. In a parameter
+  sweep run, N comes from the values of the run, and
+  `StrategyVersion.make_run_code(parameters)` puts N in the
+  `WARM_UP_BAR_COUNT` of the code. The child reads
   the saved bars of the range `start_utc` minus `N × bar period × factor`
   (factor 2 for 1-day bars, 6 for intraday bars, because a bar comes only
   in the trading hours), and at least the default length below, to

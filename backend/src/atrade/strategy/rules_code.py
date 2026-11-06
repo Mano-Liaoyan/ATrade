@@ -4,6 +4,8 @@
 it. It walks the rules in a fixed order (entry group, then exit items), so the same rules always give the same code.
 """
 
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from atrade.indicator import IndicatorDefinition, find_indicator_definition
@@ -27,7 +29,10 @@ INDENT = "    "
 COMPARISON_OPERATORS = {"above": ">", "below": "<", "at_or_above": ">=", "at_or_below": "<="}
 GROUP_OPERATORS = {"all_of": "and", "any_of": "or"}
 
+WARM_UP_BAR_COUNT_LINE = re.compile(r"^WARM_UP_BAR_COUNT = \d+$", re.MULTILINE)
+
 type Operand = PriceOperand | IndicatorOperand | NumberOperand
+type RunParameters = Mapping[str, int | float | bool]
 
 
 @dataclass(frozen=True)
@@ -216,15 +221,24 @@ def write_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
     ]
 
 
-def count_warm_up_bars(parts: CodeParts) -> int | None:
+def apply_run_parameters(indicator: IndicatorUse, run_parameters: RunParameters) -> dict[str, int | float]:
+    """The indicator parameters with the values of a parameter sweep run (ADR 0006: they are configuration fields)."""
+    return {name: run_parameters.get(f"{indicator.name}_{name}", value) for name, value in indicator.parameters.items()}
+
+
+def count_warm_up_bars(parts: CodeParts, run_parameters: RunParameters | None = None) -> int | None:
     """The bars that the longest indicator needs (section 23.4), or None without an indicator."""
     if not parts.indicators:
         return None
-    return max(indicator.definition.screen_look_back_bars(indicator.parameters) for indicator in parts.indicators)
+    return max(
+        indicator.definition.screen_look_back_bars(apply_run_parameters(indicator, run_parameters or {}))
+        for indicator in parts.indicators
+    )
 
 
-def find_warm_up_bar_count(rules: StrategyRules) -> int | None:
-    """The look-back bar count of a rule builder version: the bars of its longest indicator (#164).
+def find_warm_up_bar_count(rules: StrategyRules, run_parameters: RunParameters | None = None) -> int | None:
+    """The look-back bar count of a rule builder version: the bars of its longest indicator (#164), with the
+    parameter values of a parameter sweep run.
 
     The backtest and the forward test give the strategy the last bars of this count before the start.
     """
@@ -233,7 +247,12 @@ def find_warm_up_bar_count(rules: StrategyRules) -> int | None:
     write_exit_checks(parts, rules)
     if rules.settings.universe is not None:
         parts.value_names(rules.settings.universe.rank_indicator)
-    return count_warm_up_bars(parts)
+    return count_warm_up_bars(parts, run_parameters)
+
+
+def set_warm_up_bar_count(code: str, bar_count: int) -> str:
+    """The code of a rule builder version with another `WARM_UP_BAR_COUNT`. The saved code holds the default length."""
+    return WARM_UP_BAR_COUNT_LINE.sub(f"WARM_UP_BAR_COUNT = {bar_count}", code, count=1)
 
 
 def write_warm_up_constants(parts: CodeParts) -> list[str]:

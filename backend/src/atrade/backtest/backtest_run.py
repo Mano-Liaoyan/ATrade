@@ -187,7 +187,8 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
     # The source order of the backtest. Only a row from before the source order has none: then the global source
     # order (docs/architecture/backtest.md section 10.12).
     source_order = request.source_order or await read_source_order(database_url=database_url)
-    look_back = find_look_back(request.bar_period, strategy_version.warm_up_bar_count)
+    look_back = find_look_back(request.bar_period, strategy_version.count_warm_up_bars(request.parameters))
+    code = strategy_version.make_run_code(request.parameters)
     exchange_rates = (
         None if request.currency == USD else await read_daily_exchange_rates(database_url=database_url, request=request)
     )
@@ -201,7 +202,7 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
         )
         return BacktestInputs(
             request=request,
-            code=strategy_version.code,
+            code=code,
             bars=[],
             look_back_bars=[],
             bar_count_by_source=universe.bars.bar_count_by_source,
@@ -213,7 +214,7 @@ async def read_backtest_inputs(*, database_url: str, backtest_id: int) -> Backte
     )
     return BacktestInputs(
         request=request,
-        code=strategy_version.code,
+        code=code,
         bars=bars,
         look_back_bars=look_back_bars,
         bar_count_by_source=bar_count_by_source,

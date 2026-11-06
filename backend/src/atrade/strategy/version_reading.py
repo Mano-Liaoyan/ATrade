@@ -9,7 +9,7 @@ import psycopg
 from psycopg.rows import class_row, dict_row
 
 from atrade.strategy.chart_indicators import ChartIndicator, list_chart_indicators
-from atrade.strategy.rules_code import find_warm_up_bar_count
+from atrade.strategy.rules_code import RunParameters, find_warm_up_bar_count, set_warm_up_bar_count
 from atrade.strategy.strategy_rules import StrategyRules
 
 
@@ -22,9 +22,19 @@ class StrategyVersion:
     strategy_name: str
     version_number: int
     code: str
-    # The bars that the longest indicator of the rules needs (#164). None for a version without rules or without
-    # an indicator: the backtest and the forward test then use the default look-back length.
-    warm_up_bar_count: int | None = None
+    # None for a version that the rule builder did not save (ADR 0006).
+    rules: StrategyRules | None = None
+
+    def count_warm_up_bars(self, run_parameters: RunParameters | None = None) -> int | None:
+        """The bars that the longest indicator of the rules needs (#164), with the values of a parameter sweep run.
+        None for a version without rules or without an indicator: the backtest and the forward test then use the
+        default look-back length."""
+        return None if self.rules is None else find_warm_up_bar_count(self.rules, run_parameters)
+
+    def make_run_code(self, run_parameters: RunParameters | None = None) -> str:
+        """The code with the warm-up of `count_warm_up_bars`."""
+        bar_count = self.count_warm_up_bars(run_parameters)
+        return self.code if bar_count is None else set_warm_up_bar_count(self.code, bar_count)
 
 
 def list_version_chart_indicators(
@@ -43,7 +53,7 @@ def to_strategy_version(row: dict[str, Any]) -> StrategyVersion:
         strategy_name=row["strategy_name"],
         version_number=row["version_number"],
         code=row["code"],
-        warm_up_bar_count=None if rules is None else find_warm_up_bar_count(StrategyRules.model_validate(rules)),
+        rules=None if rules is None else StrategyRules.model_validate(rules),
     )
 
 
