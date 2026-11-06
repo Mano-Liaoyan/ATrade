@@ -166,8 +166,7 @@ Each class has:
 | Part | Behavior |
 |---|---|
 | Constructor | The parameters of the indicator, each with a default value. |
-| `handle_bar(bar)` | Takes one NautilusTrader `Bar`. `register_indicator_for_bars` calls it. |
-| `update(bar)` | The screen path: takes one `foundation` `Bar`. It gives the same update as `handle_bar` for the same open, high, low, close, and volume. A wrapped class makes a NautilusTrader bar from it and calls `handle_bar`. |
+| `handle_bar(bar)` | Takes one NautilusTrader `Bar`. `register_indicator_for_bars` calls it. The screen path makes the same bar from a `foundation` `Bar` with `make_nautilus_bar` and calls it, so both paths give the same update for the same open, high, low, close, and volume. |
 | `initialized` | `True` when the class has a value. NautilusTrader reads it for `indicators_initialized()`. |
 | Outputs (`value`, or the names of section 23.2) | The value (`float`), or "no value" (`None`) while `initialized` is `False`. |
 | `reset()` | Removes all received bars. |
@@ -581,7 +580,7 @@ section 6.2).
   rule builder version (backtest.md section 10.3.1). The read length is
   N × bar period × 2 for 1-day bars, and × 6 for intraday bars. It is at
   least 7 days. The route calculates
-  over all bars with `update(bar)` and returns only the values of the range.
+  over all bars with `handle_bar(bar)` and returns only the values of the range.
   So a chart value is equal to the screen value at the same daily bar. For
   a recursive average (EMA, RSI, ATR, MACD), a strategy value can be
   different by less than 0.005 (section 23.4).
@@ -960,7 +959,7 @@ A stored reference holds a copy of the expression (ADR 0009):
 - Strategy code has `FormulaIndicator(<expression>)`. `CHART_INDICATORS` has
   `formula` as a dict literal of string literals.
   A backtest child and a forward test child read no custom indicator row.
-- A screen with 1 name and 2 expressions is refused (`check_screen`), because
+- A screen with 1 name and 2 references is refused (`check_screen`), because
   a result names its columns by the indicator name. The problem tells the user
   to click "Use current expression" in each place or to select another
   indicator. A name has no parentheses, so it cannot be equal to the UI name of

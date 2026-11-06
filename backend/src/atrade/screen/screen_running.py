@@ -28,33 +28,43 @@ MARKET_CURRENCIES = {"US": "USD", "HK": "HKD"}
 UNIVERSE_SIZE = 500
 
 
-async def read_quarter_universe(database_url: str, now_utc: datetime) -> list[Instrument]:
-    """The universe of the current quarter (market_data.md section 8.9), by rank."""
-    quarter_start = find_first_trading_day_of_quarter(now_utc.date())
-    members = await read_us_universe_members(
-        database_url=database_url,
-        quarter_start_utc=datetime.combine(quarter_start, day_time(), tzinfo=UTC),
-        top_n=UNIVERSE_SIZE,
-    )
-    return [member.instrument for member in members]
+async def read_start_instruments(
+    database_url: str, *, market: str, start: str, quarter_start_utc: datetime | None
+) -> tuple[list[Instrument], list[DailyBarSummary] | None]:
+    """The start instruments of section 24.2. `quarter_start_utc` selects the US universe (market_data.md section 8.9).
+    With None, the universe is empty. `all_with_daily_bars` also gives the summary rows that its read returns, so a
+    run needs no second read. The other start instruments give None."""
+    currency = MARKET_CURRENCIES[market]
+    if start == "all_with_daily_bars":
+        summaries = await read_daily_bar_summaries_of_currency(database_url=database_url, currency=currency)
+        return [summary.instrument for summary in summaries], summaries
+    if start == "quarter_universe":
+        if quarter_start_utc is None:
+            return [], None
+        members = await read_us_universe_members(
+            database_url=database_url, quarter_start_utc=quarter_start_utc, top_n=UNIVERSE_SIZE
+        )
+        return [member.instrument for member in members], None
+    if start == "hk_instrument_list":
+        return await read_hk_instrument_list(database_url=database_url), None
+    watchlist = await read_watchlist_instruments(database_url=database_url)
+    return [instrument for instrument in watchlist if instrument.currency == currency], None
 
 
 async def read_start_summaries(
     database_url: str, *, market: str, start: str, now_utc: datetime
 ) -> tuple[list[Instrument], list[DailyBarSummary]]:
     """The start instruments of section 24.2 and their daily bar summary rows."""
-    currency = MARKET_CURRENCIES[market]
-    if start == "all_with_daily_bars":
-        summaries = await read_daily_bar_summaries_of_currency(database_url=database_url, currency=currency)
-        return [summary.instrument for summary in summaries], summaries
-    if start == "quarter_universe":
-        instruments = await read_quarter_universe(database_url, now_utc)
-    elif start == "hk_instrument_list":
-        instruments = await read_hk_instrument_list(database_url=database_url)
-    else:
-        watchlist = await read_watchlist_instruments(database_url=database_url)
-        instruments = [instrument for instrument in watchlist if instrument.currency == currency]
-    return instruments, await read_daily_bar_summaries(database_url=database_url, instruments=instruments)
+    quarter_start = find_first_trading_day_of_quarter(now_utc.date())
+    instruments, summaries = await read_start_instruments(
+        database_url,
+        market=market,
+        start=start,
+        quarter_start_utc=datetime.combine(quarter_start, day_time(), tzinfo=UTC),
+    )
+    if summaries is None:
+        summaries = await read_daily_bar_summaries(database_url=database_url, instruments=instruments)
+    return instruments, summaries
 
 
 def to_row_values(row: ScreenRow) -> tuple[str, str, str, dict[str, Any]]:

@@ -1,7 +1,7 @@
 """The common functions of the indicator classes that wrap a NautilusTrader 2.0 indicator (#161).
 
-The screen path `update` makes a NautilusTrader bar with `make_nautilus_bar` and gives it to the wrapped indicator,
-as the strategy path `handle_bar` does (docs/architecture/indicator.md section 23.5).
+The screen path makes a NautilusTrader bar with `make_nautilus_bar` and gives it to `handle_bar`, as the strategy path
+does (docs/architecture/indicator.md section 23.5).
 """
 
 from decimal import Decimal

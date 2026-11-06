@@ -21,7 +21,7 @@ from atrade.app.web import create_web_app
 from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
-from atrade.indicator import INDICATOR_CATALOG, create_indicator
+from atrade.indicator import INDICATOR_CATALOG, create_indicator, make_nautilus_bar
 from atrade.market_data import indicator_series
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection
@@ -145,13 +145,13 @@ async def read_series(
 
 
 def calculate_screen_values(key: str, bars: list[Bar], first_index: int) -> dict[str, list[float | None]]:
-    """The screen path: `update(bar)` with the look-back bars of the screen before `first_index`, then the bars."""
+    """The screen path: `handle_bar` with the look-back bars of the screen before `first_index`, then the bars."""
     definition = INDICATOR_CATALOG[key]
     indicator = create_indicator({"indicator": key}, has_output=False)
     look_back = definition.screen_look_back_bars({})
     values: dict[str, list[float | None]] = {output: [] for output in definition.outputs}
     for index, bar in enumerate(bars[first_index - look_back :]):
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
         if index >= look_back:
             for output, output_values in values.items():
                 value = getattr(indicator, output)

@@ -15,9 +15,11 @@ from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any, cast
 
+from nautilus_trader.model import Bar as NautilusBar
+
 from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
-from atrade.indicator import create_indicator, find_indicator_definition
+from atrade.indicator import create_indicator, find_indicator_definition, make_nautilus_bar
 from atrade.market_data import DailyBarSummary
 
 type DailyBarsReader = Callable[[list[Instrument], datetime, int], Awaitable[dict[Instrument, list[Bar]]]]
@@ -155,16 +157,17 @@ def find_filter_reason(
     return None
 
 
-def calculate_value(column: IndicatorColumn, bars: list[Bar]) -> float | None:
+def calculate_value(column: IndicatorColumn, bars: list[NautilusBar]) -> float | None:
     indicator = create_indicator(column.reference)
     for bar in bars[-column.look_back_bars :]:
-        indicator.update(bar)
+        indicator.handle_bar(bar)
     value = cast("float | None", getattr(indicator, column.output))
     return value if value is not None and math.isfinite(value) else None
 
 
 def calculate_values(columns: list[IndicatorColumn], bars: list[Bar]) -> dict[str, float | None]:
-    return {column.name: calculate_value(column, bars) for column in columns}
+    nautilus_bars = [make_nautilus_bar(bar) for bar in bars]
+    return {column.name: calculate_value(column, nautilus_bars) for column in columns}
 
 
 def calculate_percentiles(values: list[float]) -> tuple[list[float], list[float]]:
@@ -238,7 +241,7 @@ async def calculate_candidates(
         # In a thread, so the event loop serves other requests during a long calculation.
         values = await asyncio.to_thread(calculate_values, columns, bars)
         missing = next((name for name, value in values.items() if value is None), None)
-        if missing is not None or not bars:
+        if missing is not None:
             exclusions.append(ScreenExclusion(summary.instrument, f"No value: {missing}"))
             continue
         candidates.append(Candidate(summary, bars[-1].close, cast("dict[str, float]", values)))

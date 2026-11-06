@@ -17,7 +17,6 @@ from typing import Protocol, cast
 
 from nautilus_trader.model import Bar as NautilusBar
 
-from atrade.foundation.bar import Bar
 from atrade.indicator.indicator_catalog import (
     INDICATOR_CATALOG,
     MAXIMUM_PERIOD,
@@ -26,7 +25,6 @@ from atrade.indicator.indicator_catalog import (
     ParameterValue,
 )
 from atrade.indicator.indicator_problems import IndicatorProblem, check_output, check_parameters
-from atrade.indicator.wrapped_indicator import make_nautilus_bar
 
 MAX_EXPRESSION_LENGTH = 500
 MAX_DEPTH = 20
@@ -569,9 +567,6 @@ class FormulaIndicator:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self.value = self._root.update(bar)
-
-    def update(self, bar: Bar) -> None:
-        self.handle_bar(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self.value = None

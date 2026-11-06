@@ -18,6 +18,7 @@ from atrade.indicator import (
     DonchianChannel,
     Momentum12_1,
     RealizedVolatility,
+    make_nautilus_bar,
 )
 from tests.indicator.test_atrade_indicators import make_long_test_bars
 
@@ -114,7 +115,7 @@ def test_the_default_class_has_a_value_after_the_screen_look_back_bars(key: str)
     indicator = atrade.indicator.create_indicator({"indicator": key, "output": definition.outputs[0]})
 
     for bar in bars:
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
 
     outputs = read_outputs(indicator)
     assert len(bars) == look_back_bars

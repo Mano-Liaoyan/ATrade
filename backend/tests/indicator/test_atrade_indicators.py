@@ -11,7 +11,14 @@ from pathlib import Path
 import pytest
 
 from atrade.foundation.bar import Bar
-from atrade.indicator import ADRPercent, AverageTradingValue, DistanceTo52WeekHigh, Momentum12_1, RealizedVolatility
+from atrade.indicator import (
+    ADRPercent,
+    AverageTradingValue,
+    DistanceTo52WeekHigh,
+    Momentum12_1,
+    RealizedVolatility,
+    make_nautilus_bar,
+)
 from tests.indicator.test_wrapped_indicators import (
     IndicatorCase,
     IndicatorWithOutputs,
@@ -217,11 +224,11 @@ def test_the_adr_percent_is_not_initialized_while_it_has_no_value() -> None:
     # A strategy reads `value` after `initialized`, so `initialized` must not be true while `value` is None.
     indicator = ADRPercent(period=2)
     for bar in make_bars([(110, 101, 1), (2, 1, 1)]):
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
     assert not indicator.initialized
 
     for bar in make_bars([(110, 101, 1), (110, 101, 1)]):
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
     assert indicator.initialized
 
 

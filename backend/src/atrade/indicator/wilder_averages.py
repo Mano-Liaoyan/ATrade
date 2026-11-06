@@ -6,8 +6,7 @@ The NautilusTrader 2.0.0rc7 default of both is Wilder (section 21.1, #160), so t
 from nautilus_trader.indicators import AverageTrueRange, RelativeStrengthIndex
 from nautilus_trader.model import Bar as NautilusBar
 
-from atrade.foundation.bar import Bar
-from atrade.indicator.wrapped_indicator import make_nautilus_bar, read_output
+from atrade.indicator.wrapped_indicator import read_output
 
 
 class ATR:
@@ -27,9 +26,6 @@ class ATR:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._atr.handle_bar(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._atr.handle_bar(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._atr.reset()
@@ -54,9 +50,6 @@ class RSI:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._rsi.handle_bar(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._rsi.handle_bar(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._rsi.reset()
