@@ -51,7 +51,7 @@ async def test_a_silent_gateway_ends_the_exchange_rate_read_with_a_request_error
         await anyio.sleep_forever()
         return []
 
-    monkeypatch.setattr(gateway_connection_module, "OPEN_ORDERS_TIMEOUT_SECONDS", SHORT_TIMEOUT_SECONDS)
+    monkeypatch.setattr(gateway_connection_module, "CONTRACT_REQUEST_TIMEOUT_SECONDS", SHORT_TIMEOUT_SECONDS)
     connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=4004, client_id=1)
     monkeypatch.setattr(connection.ib, "isConnected", lambda: True)
     monkeypatch.setattr(connection.ib, "qualifyContractsAsync", never_answer)

@@ -56,6 +56,7 @@ from atrade.ibkr.orders import (
 DEFAULT_RETRY_SECONDS = 10.0
 CONNECT_TIMEOUT_SECONDS = 10.0
 OPEN_ORDERS_TIMEOUT_SECONDS = 10.0
+CONTRACT_REQUEST_TIMEOUT_SECONDS = 10.0
 CANCEL_CONFIRMATION_TIMEOUT_SECONDS = 10.0
 CANCEL_CONFIRMATION_CHECK_SECONDS = 0.1
 # The Web process holds its send lock during this wait, so the wait stays short.
@@ -408,7 +409,7 @@ class IbAsyncGatewayConnection:
         for pair, is_inverse in ((currency + quote_currency, False), (quote_currency + currency, True)):
             try:
                 contracts = await asyncio.wait_for(
-                    self.ib.qualifyContractsAsync(Forex(pair)), OPEN_ORDERS_TIMEOUT_SECONDS
+                    self.ib.qualifyContractsAsync(Forex(pair)), CONTRACT_REQUEST_TIMEOUT_SECONDS
                 )
             except ConnectionError, RequestError:
                 continue
