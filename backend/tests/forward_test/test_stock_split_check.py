@@ -5,14 +5,23 @@ import asyncio
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
+import httpx
+import psycopg
 import pytest
 
 from atrade.forward_test import MARKETS, StockSplitCheck, find_try_times
 from atrade.foundation.bar import Bar
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection
+from atrade.paper_trading import StockSplitLedger
+from atrade.paper_trading.stock_split_ledger import read_needed_split_checks
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection, make_stock_position
+from tests.forward_test.test_forward_test_routes import (
+    FORWARD_TESTS_PATH,
+    make_start_request,
+    save_test_strategy_version,
+)
 from tests.paper_trading.stock_split_setup import (
     ACCOUNT_ID,
     APPLE,
@@ -54,6 +63,38 @@ class CheckRun:
     def open_gateway_connection(self) -> GatewayConnection:
         self.connection_count += 1
         return self.gateway_connection
+
+
+async def start_flat_forward_test(web_client: httpx.AsyncClient, version_id: int, symbol: str = "AAPL") -> int:
+    response = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(version_id, symbol=symbol))
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+def make_universe_forward_test(database_url: str, forward_test_id: int) -> None:
+    """The forward test becomes a multi-instrument forward test with AAPL as a member."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            UPDATE forward_test SET symbol = NULL, exchange = NULL, currency = NULL, universe_kind = 'list',
+                universe_top_n = NULL
+            WHERE id = %(id)s
+            """,
+            {"id": forward_test_id},
+        )
+        connection.execute(
+            """
+            INSERT INTO forward_test_universe_member (forward_test_id, quarter_start_utc, symbol, exchange, currency)
+            VALUES (%(id)s, %(quarter_start_utc)s, %(symbol)s, %(exchange)s, %(currency)s)
+            """,
+            {
+                "id": forward_test_id,
+                "quarter_start_utc": utc(0, 0),
+                "symbol": APPLE.symbol,
+                "exchange": APPLE.exchange,
+                "currency": APPLE.currency,
+            },
+        )
 
 
 def test_the_tries_start_at_08_00_et_and_08_30_hkt_and_end_5_minutes_before_the_open() -> None:
@@ -121,6 +162,53 @@ async def test_a_confirmed_split_asks_the_worker_to_restart_the_forward_tests_th
     assert run.restarts == [[1]]
     assert run.connection_count == 1
     assert read_split_checks(database_url) == []
+
+
+@pytest.mark.anyio
+async def test_a_confirmed_split_restarts_the_flat_forward_tests_that_trade_the_instrument(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    """No owner holds the instrument, so only the evidence read of the running forward tests finds the stock split."""
+    version_id = await save_test_strategy_version(web_client)
+    single_id = await start_flat_forward_test(web_client, version_id)
+    universe_id = await start_flat_forward_test(web_client, version_id, symbol="MSFT")
+    make_universe_forward_test(database_url, universe_id)
+    await start_flat_forward_test(web_client, version_id, symbol="MSFT")
+    await save_close_before_ex_date(database_url, "100")
+    run = CheckRun(database_url, clock, apple_quantity="0")
+    run.gateway_connection.portfolio = []
+    # IBKR adjusted its bar of the stored day for a 1:4 reverse split.
+    new_close = Decimal(400)
+    run.gateway_connection.historical_bars[APPLE] = [
+        Bar(start_utc=DAY_BEFORE_UTC, open=new_close, high=new_close, low=new_close, close=new_close, volume=Decimal(1))
+    ]
+    clock.now_utc = utc(13, 0)
+
+    await run.check.run_due_tries()
+
+    assert run.restarts == [[single_id, universe_id]]
+
+
+@pytest.mark.anyio
+async def test_apply_split_restarts_the_flat_forward_tests_that_trade_the_instrument(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    write_ledger_start(database_url)
+    version_id = await save_test_strategy_version(web_client)
+    holder_id = await start_flat_forward_test(web_client, version_id)
+    flat_id = await start_flat_forward_test(web_client, version_id)
+    write_owner_fill(database_url, forward_test_id=holder_id, quantity=10, price="400")
+    await save_close_before_ex_date(database_url, "400")
+    run = CheckRun(database_url, clock, apple_quantity="40")
+    clock.now_utc = utc(13, 25)
+    await run.check.run_due_tries()
+    [split_check] = await read_needed_split_checks(database_url=database_url, account=ACCOUNT_ID)
+    ledger = StockSplitLedger(database_url=database_url, gateway_connection=run.gateway_connection, clock=clock)
+    await ledger.apply_split(split_check.id)
+
+    await run.check.restart_after_apply()
+
+    assert run.restarts == [[holder_id, flat_id]]
 
 
 @pytest.mark.anyio

@@ -63,6 +63,20 @@ async def read_running_member_lists(database_url: str) -> dict[int, list[Instrum
         return await forward_test_store.select_running_member_lists(connection)
 
 
+async def read_forward_tests_by_instrument(database_url: str) -> dict[Instrument, list[int]]:
+    """The running forward tests of each instrument that they trade, also without a position (section 12.22)."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        single_instruments = await forward_test_store.select_running_single_instruments(connection)
+        member_lists = await forward_test_store.select_running_member_lists(connection)
+    forward_test_ids: dict[Instrument, list[int]] = {}
+    for forward_test_id, instrument in single_instruments.items():
+        forward_test_ids.setdefault(instrument, []).append(forward_test_id)
+    for forward_test_id, members in member_lists.items():
+        for member in members:
+            forward_test_ids.setdefault(member, []).append(forward_test_id)
+    return forward_test_ids
+
+
 async def update_current_quarter(*, database_url: str, row: ForwardTestRow, now_utc: datetime) -> UniverseQuarter:
     """Returns the members of the current quarter, and records them when the quarter is new (section 12.17).
 

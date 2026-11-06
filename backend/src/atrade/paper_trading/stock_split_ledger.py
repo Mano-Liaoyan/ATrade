@@ -59,7 +59,8 @@ class InstrumentCheck:
 @dataclass(frozen=True)
 class InstrumentCheckOutcome:
     result: CheckResult
-    # The forward tests that held the instrument before a confirmed stock split. The worker restarts them.
+    # The forward tests that held the instrument before a confirmed stock split. The check adds the flat forward tests
+    # of the instrument, and the worker restarts them all.
     forward_test_ids: list[int]
 
 

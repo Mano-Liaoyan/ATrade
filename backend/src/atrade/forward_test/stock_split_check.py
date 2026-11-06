@@ -8,7 +8,8 @@
 - When IB Gateway is not reachable at the last try, the check logs it and runs on the next trading day.
 - It reads evidence A again for each checked instrument, then gives each instrument to the owner ledger
   (`StockSplitLedger` of `paper_trading`). After a confirmed stock split, or after "Apply split" on the paper trading
-  page, it asks the worker to restart the forward tests that held the instrument.
+  page, it asks the worker to restart the forward tests that hold or trade the instrument. A flat strategy also needs
+  the restart: its indicators hold prices from before the stock split.
 - The connection uses the bar fetcher client ID. The connection lock keeps one connection of the 2 jobs at a time.
 """
 
@@ -21,6 +22,7 @@ from decimal import Decimal
 from typing import Literal
 from zoneinfo import ZoneInfo
 
+from atrade.forward_test.forward_test_universe import read_forward_tests_by_instrument
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
@@ -182,7 +184,9 @@ class StockSplitCheck:
             for instrument in await read_owner_instruments(database_url=self.database_url, account=account)
             if instrument.currency == market.currency
         ]
-        instruments = list(dict.fromkeys([*account_quantities, *owner_instruments]))
+        running_forward_tests = await read_forward_tests_by_instrument(self.database_url)
+        running_instruments = [instrument for instrument in running_forward_tests if instrument.currency == market.currency]
+        instruments = list(dict.fromkeys([*account_quantities, *owner_instruments, *running_instruments]))
         await record_stock_split_evidence(
             database_url=self.database_url,
             gateway_connection=gateway_connection,
@@ -208,16 +212,22 @@ class StockSplitCheck:
             logger.info("Stock split check of %s: %s.", instrument.symbol, outcome.result)
             if outcome.result == "incomplete":
                 is_complete = False
-            if outcome.forward_test_ids:
-                self.request_restart(outcome.forward_test_ids)
+            if outcome.result == "confirmed":
+                self.restart_forward_tests(outcome.forward_test_ids, running_forward_tests.get(instrument, []))
         return is_complete
 
+    def restart_forward_tests(self, holding_ids: list[int], running_ids: list[int]) -> None:
+        forward_test_ids = sorted({*holding_ids, *running_ids})
+        if forward_test_ids:
+            self.request_restart(forward_test_ids)
+
     async def restart_after_apply(self) -> None:
-        """After "Apply split" on the Home page, restarts the forward tests that got a split adjustment."""
+        """After "Apply split" on the Home page, restarts the forward tests that got a split adjustment and the running
+        forward tests of the instrument."""
         try:
             for split_check, forward_test_ids in await read_unrestarted_split_checks(database_url=self.database_url):
-                if forward_test_ids:
-                    self.request_restart(forward_test_ids)
+                running_forward_tests = await read_forward_tests_by_instrument(self.database_url)
+                self.restart_forward_tests(forward_test_ids, running_forward_tests.get(split_check.instrument, []))
                 await write_split_check_restarted(
                     database_url=self.database_url,
                     split_check_id=split_check.id,

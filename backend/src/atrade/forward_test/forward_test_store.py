@@ -281,6 +281,21 @@ async def select_running_member_lists(connection: psycopg.AsyncConnection) -> di
     return member_lists
 
 
+async def select_running_single_instruments(connection: psycopg.AsyncConnection) -> dict[int, Instrument]:
+    """The instrument of each single-instrument forward test that holds a client ID."""
+    cursor = await connection.execute(
+        """
+        SELECT id, symbol, exchange, currency FROM forward_test
+        WHERE client_id IS NOT NULL AND symbol IS NOT NULL
+        ORDER BY id
+        """
+    )
+    return {
+        forward_test_id: Instrument(symbol=symbol, exchange=exchange, currency=currency)
+        for forward_test_id, symbol, exchange, currency in await cursor.fetchall()
+    }
+
+
 async def select_forward_tests(connection: psycopg.AsyncConnection) -> list[ForwardTestRow]:
     async with connection.cursor(row_factory=class_row(ForwardTestRow)) as cursor:
         await cursor.execute(f"SELECT {FORWARD_TEST_COLUMNS} FROM forward_test ORDER BY id DESC")

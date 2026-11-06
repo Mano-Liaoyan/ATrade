@@ -1338,7 +1338,9 @@ section 8.13 has the stock split table and the change of the stored bars.
 - The check runs before the market opens on each trading day: 08:00 ET for
   US instruments, 08:30 HKT for HK instruments.
 - It checks each instrument that has a paper account position or an owner
-  position.
+  position, or that a running forward test trades: the instrument of a
+  single-instrument forward test, or a member of the last recorded quarter of
+  a multi-instrument forward test.
 - Evidence A: the ratio between a stored daily close and the new IBKR
   `TRADES` close of the same day. IBKR adjusts `TRADES` bars for stock splits,
   not for dividends.
@@ -1355,8 +1357,10 @@ section 8.13 has the stock split table and the change of the stored bars.
   2. Change the owner ledger in one transaction
      ([`paper_trading.md`](paper_trading.md) section 11.11).
   3. Restart the child processes of the forward tests that trade the
-     instrument. The restart cancels their open orders (section 12.7) and
-     restores the strategy positions from the new ledger.
+     instrument, also when they hold no position: the indicators of a flat
+     strategy hold prices from before the stock split. The restart cancels
+     their open orders (section 12.7) and restores the strategy positions
+     from the new ledger.
 - The restart avoids a position report with a new quantity in a running
   LiveNode. Nobody checked what a running LiveNode does with it.
 - The restart time is not measured. The estimate is 1 minute or less for
@@ -1379,16 +1383,18 @@ Implemented (#220) with the IBKR fake only:
 - Each try connects with the bar fetcher client ID (one connection of the 2
   jobs at a time), runs the paper account check, reads the IBKR positions of
   the market, and reads evidence A again for each instrument with an IBKR
-  position or an owner position (`record_stock_split_evidence()` of
-  `market_data`). So a retry can find evidence A that the daily bar update
+  position or an owner position, and for each instrument of a running forward
+  test (`record_stock_split_evidence()` of `market_data`). So a retry can find evidence A that the daily bar update
   of the evening before did not have. Then it gives each instrument, and
   each candidate of the market, to `StockSplitLedger.check_instrument()` of
   `paper_trading`.
 - Evidence that is not complete (`position_only` or `bar_ratio_only`) waits
   for the next try. At the last try it gives the "Split check needed"
   state. The other 3 cases give the state at once.
-- After a confirmed stock split, the check asks the worker to restart the
-  forward tests that held the instrument (`ForwardTestWorker.request_restart`).
+- After a confirmed stock split, or after "Apply split", the check asks the
+  worker to restart the forward tests that held the instrument and the
+  running forward tests of the instrument
+  (`ForwardTestWorker.request_restart`).
   The worker asks the child to stop. When it ends with exit code 0 or 5, the
   worker writes `starting` and the next comparison starts a new child. The
   restart adds nothing to `crash_count`. The new child cancels the open
