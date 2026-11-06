@@ -186,3 +186,19 @@ def test_the_program_prints_the_cost_of_the_hourly_bars_of_each_universe_quarter
     assert total == Decimal("0.04")
     assert "XNAS.ITCH ohlcv-1h 2020-01-02 to 2020-04-01: 3 symbols, 0.03 USD: AAPL FB META" in caplog.text
     assert "The hourly bars of 2 quarters cost 0.04 USD." in caplog.text
+
+
+def test_a_symbol_link_that_waits_adds_no_old_symbol_to_the_hourly_purchase(database_url: str) -> None:
+    insert_member(database_url, date(2020, 1, 2), 1, nasdaq("META"))
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO databento_symbol_link (old_symbol, new_symbol, exchange, change_day, state)
+            VALUES ('FB', 'META', 'NASDAQ', '2020-03-02', 'waiting')
+            """
+        )
+    client = FakeDatabentoClient()
+
+    log_hourly_costs(database_url=database_url, client=client, end_day=date(2020, 5, 15))
+
+    assert client.hourly_cost_requests == [(["META"], date(2020, 1, 2), date(2020, 4, 1))]
