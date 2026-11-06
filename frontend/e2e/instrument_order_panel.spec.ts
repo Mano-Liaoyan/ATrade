@@ -44,6 +44,23 @@ test('the order panel is for the instrument of the page and starts with the last
   await expect(panel.getByRole('button', { name: 'Review sell order' })).toHaveClass(/cds--btn--danger/);
 });
 
+test('a long change value in a narrow tile ends with an ellipsis and stays inside the tile', async ({ page }) => {
+  await openWorkbench(page);
+  const value = keyNumber(orderPanel(page), 'Unrealized P&L');
+  const text = value.locator('.change__text');
+
+  await text.evaluate((element) => {
+    element.textContent = '+1,898,177.77';
+    element.closest<HTMLElement>('.metric-tile')?.style.setProperty('inline-size', '72px');
+  });
+
+  const isClipped = await text.evaluate((element) => element.scrollWidth > element.clientWidth);
+  expect(isClipped).toBe(true);
+  await expect(text).toHaveCSS('text-overflow', 'ellipsis');
+  const isInsideTile = await value.evaluate((element) => element.scrollWidth <= element.clientWidth);
+  expect(isInsideTile).toBe(true);
+});
+
 test('the order panel shows the position of the instrument', async ({ page }) => {
   await page.goto('/instruments/NASDAQ/TEST01?currency=USD');
   const panel = orderPanel(page, 'TEST01');

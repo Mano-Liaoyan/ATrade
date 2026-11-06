@@ -25,7 +25,7 @@
   {:else if direction === 'down'}
     <Icon icon={ArrowDown16} />
   {/if}
-  {text}
+  <span class="change__text">{text}</span>
 </span>
 
 <style>
@@ -36,9 +36,17 @@
     align-items: center;
     vertical-align: top;
     gap: var(--cds-spacing-02);
+    max-inline-size: 100%;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
     color: var(--cds-text-secondary);
+  }
+
+  /* An inline-flex box has no text-overflow, so its text has its own box. */
+  .change__text {
+    overflow: hidden;
+    min-inline-size: 0;
+    text-overflow: ellipsis;
   }
 
   .change--up {
