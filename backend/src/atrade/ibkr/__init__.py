@@ -12,9 +12,18 @@ from atrade.ibkr.gateway_connection import (
 )
 from atrade.ibkr.historical_bars import DailyExchangeRate
 from atrade.ibkr.http_routes import create_ibkr_router
-from atrade.ibkr.orders import Execution, OpenOrder, OrderRequest, OrderSide, OrderType, TimeInForce
+from atrade.ibkr.orders import (
+    SMART_ROUTING_EXCHANGE,
+    Execution,
+    OpenOrder,
+    OrderRequest,
+    OrderSide,
+    OrderType,
+    TimeInForce,
+)
 
 __all__ = [
+    "SMART_ROUTING_EXCHANGE",
     "AccountValue",
     "DailyExchangeRate",
     "Execution",

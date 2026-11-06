@@ -254,6 +254,77 @@ async def test_refuses_a_buy_order_larger_than_the_cash_minus_the_open_buy_order
     assert count_manual_orders(database_url) == 2
 
 
+def make_earlier_session_market_buy(symbol: str) -> OpenOrder:
+    """ib_async decodes no primary exchange for an open order of an earlier session."""
+    return OpenOrder(
+        order_id=900,
+        client_id=WEB_CLIENT_ID,
+        perm_id=9000,
+        account=ACCOUNT_ID,
+        instrument=Instrument(symbol=symbol, exchange="SMART", currency="USD"),
+        side="BUY",
+        quantity=Decimal(10),
+        order_type="MKT",
+        limit_price=None,
+        time_in_force="GTC",
+        status="Submitted",
+        filled_quantity=Decimal(0),
+        order_ref=MANUAL_ORDER_REF,
+    )
+
+
+@pytest.mark.anyio
+async def test_an_earlier_session_market_buy_reads_its_daily_bars_with_the_exchange_of_the_watchlist(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "INSERT INTO watchlist_instrument (symbol, exchange, currency, added_at_utc) "
+            "VALUES ('MSFT', 'NYSE', 'USD', now())"
+        )
+    gateway_connection = make_gateway()
+    gateway_connection.open_orders.append(make_earlier_session_market_buy("MSFT"))
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        response = await client.post(
+            ORDERS_PATH, json=make_order(symbol="AAPL", side="BUY", quantity=1, limit_price="100")
+        )
+
+    assert response.status_code == 201
+    assert [request.instrument.exchange for request in gateway_connection.historical_bar_requests] == ["NYSE"]
+
+
+@pytest.mark.anyio
+async def test_an_earlier_session_market_buy_of_an_unknown_instrument_refuses_with_a_clear_message(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = make_gateway()
+    gateway_connection.open_orders.append(make_earlier_session_market_buy("MSFT"))
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        response = await client.post(
+            ORDERS_PATH, json=make_order(symbol="AAPL", side="BUY", quantity=1, limit_price="100")
+        )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": (
+            "By hand has an open market buy order for MSFT from an earlier session, and ATrade does not know its"
+            " exchange. Add MSFT to the watchlist or cancel the order."
+        ),
+        "rule": "buy_more_than_cash",
+    }
+    assert gateway_connection.historical_bar_requests == []
+
+
 @pytest.mark.anyio
 async def test_a_market_buy_order_uses_the_last_daily_close_and_a_foreign_currency_the_ibkr_rate(
     database_url: str, clock: FixedClock, frontend_build_dir: Path

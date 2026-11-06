@@ -91,7 +91,7 @@ class StockSplitLedger:
     def __init__(self, *, database_url: str, gateway_connection: GatewayConnection, clock: Clock) -> None:
         self.database_url = database_url
         self.clock = clock
-        self.amounts = OrderAmounts(gateway_connection=gateway_connection, clock=clock)
+        self.amounts = OrderAmounts(database_url=database_url, gateway_connection=gateway_connection, clock=clock)
 
     async def check_instrument(self, check: InstrumentCheck) -> InstrumentCheckOutcome:
         """Section 11.11 for one instrument. Raises GatewayRequestError when IBKR does not answer."""

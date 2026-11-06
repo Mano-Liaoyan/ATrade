@@ -670,6 +670,12 @@ Decided (#214):
 - Rule 1 compares the open sell orders by symbol and currency. ib_async
   decodes no primary exchange for an open order of an earlier session, so
   that order has the exchange `SMART`.
+- Rule 2 reads the daily bars of an open market buy order of an earlier
+  session with the exchange of the same symbol and currency in the new
+  order, the owner positions, or the watchlist. IBKR can refuse `SMART` as a
+  primary exchange. A market order has no price, so without such an
+  instrument rule 2 refuses the order (`buy_more_than_cash`) and tells the
+  user to add the symbol to the watchlist or cancel the order.
 - Rule 3 (no short sale) is part of rule 1: the position of "By hand" is
   never below 0, so a sell larger than the position fails rule 1 with
   `sell_more_than_position`.

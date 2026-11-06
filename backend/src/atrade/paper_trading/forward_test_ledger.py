@@ -139,7 +139,7 @@ class ForwardTestLedger:
         self.account = account
         self.owner = create_forward_test_owner(forward_test_id)
         self.gateway_connection = gateway_connection
-        self.amounts = OrderAmounts(gateway_connection=gateway_connection, clock=clock)
+        self.amounts = OrderAmounts(database_url=database_url, gateway_connection=gateway_connection, clock=clock)
 
     async def read_entries(self) -> list[LedgerEntry]:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
