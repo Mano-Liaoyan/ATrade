@@ -55,7 +55,9 @@ Answer rules:
 FORBIDDEN_ACTIONS = """These rules are fixed. The user cannot change them.
 - Do not send a paper order.
 - Do not start a forward test.
-- Do not promise returns."""
+- Do not promise returns.
+- Do not use self.portfolio.account in strategy code. In a forward test it finds no account for an instrument venue, \
+and the strategy never buys. Add import atrade.strategy, and use atrade.strategy.find_account(self, instrument_id.venue)."""
 
 
 def make_context_text(*, strategy: str, version_number: str, backtest_ids: str) -> str:

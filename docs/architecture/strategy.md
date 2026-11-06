@@ -523,7 +523,10 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
 - Generated code and the code templates M1 to M4 find the account with
   `atrade.strategy.find_account`. A backtest has its account on the venue of
   the instruments (ADR 0003). A forward test has 1 account on the venue
-  `ATRADE` (ADR 0007).
+  `ATRADE` (ADR 0007). When no account exists, `find_account` writes 1
+  warning for each strategy instance and returns nothing.
+- The AI assistant must use `find_account`. The rule is in the fixed part of
+  the system prompt (section 25.9).
 - A saved strategy version keeps its code (ADR 0006). In a forward test, a
   version with `self.portfolio.account(` in its code finds no account and
   never buys. Such a version needs a new version. To make it, save the rules

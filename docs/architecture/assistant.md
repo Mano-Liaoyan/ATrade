@@ -738,7 +738,7 @@ editable part.
 | Part | Content | The user can edit it |
 |---|---|---|
 | Editable part | The role of the AI assistant, how to write a strategy (the file format and the template of strategy section 9.2), and the answer rules. One answer rule: an answer about a backtest result names the metrics. It also names the out-of-sample result. | Yes. Each save makes a prompt version. |
-| Fixed part | The forbidden actions: no paper order, no forward test start, no promise of returns. The context of the conversation start: the ID and name of the open strategy, the open version number, and the IDs of the last 3 backtests. | No. The page shows it read-only. |
+| Fixed part | The forbidden actions: no paper order, no forward test start, no promise of returns. Strategy code must not use `self.portfolio.account` (strategy section 9.8.2). This rule is in the fixed part because a saved prompt version does not change. The context of the conversation start: the ID and name of the open strategy, the open version number, and the IDs of the last 3 backtests. | No. The page shows it read-only. |
 
 - The default editable part is in English and is in the code.
 - The forbidden actions in the prompt only tell the model. They are not a
