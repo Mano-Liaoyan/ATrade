@@ -7,8 +7,9 @@ port 8000 (the browser) and port 8001 (the assistant service, docs/architecture/
 import asyncio
 import logging
 import sys
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager, suppress
+from collections.abc import AsyncGenerator, Coroutine
+from contextlib import asynccontextmanager
+from typing import Any
 
 import psycopg
 import uvicorn
@@ -83,6 +84,18 @@ START_CONTEXT_BACKTEST_COUNT = 3
 logger = logging.getLogger("atrade.web")
 
 
+def log_dead_task(task: asyncio.Task[None]) -> None:
+    """The background tasks run until the shutdown cancels them, so each other end is an error."""
+    if not task.cancelled():
+        logger.error("The background task %s ended.", task.get_name(), exc_info=task.exception())
+
+
+def start_background_task(coroutine: Coroutine[Any, Any, None]) -> asyncio.Task[None]:
+    task = asyncio.create_task(coroutine, name=coroutine.__qualname__)
+    task.add_done_callback(log_dead_task)
+    return task
+
+
 def create_start_context_reader(database_url: str) -> StartContextReader:
     """assistant imports only foundation (docs/architecture.md section 6.2), so app/ reads the strategy and the
     backtests for the start context of a conversation."""
@@ -135,17 +148,17 @@ def create_web_app(
     @asynccontextmanager
     async def keep_gateway_connected(_app: FastAPI) -> AsyncGenerator[None]:
         # The Web process starts without IB Gateway. The connection task connects again after each loss.
-        connection_task = asyncio.create_task(gateway_connection.keep_connected())
+        connection_task = start_background_task(gateway_connection.keep_connected())
         # The paper account check runs after each connection, also when no browser is open.
-        check_task = asyncio.create_task(paper_account_monitor.keep_checking())
-        backtest_task = asyncio.create_task(backtest_runner.keep_running())
-        daily_bar_task = asyncio.create_task(daily_bar_update.keep_updating())
-        table_change_task = asyncio.create_task(table_change_feed.keep_listening())
+        check_task = start_background_task(paper_account_monitor.keep_checking())
+        backtest_task = start_background_task(backtest_runner.keep_running())
+        daily_bar_task = start_background_task(daily_bar_update.keep_updating())
+        table_change_task = start_background_task(table_change_feed.keep_listening())
         yield
         for task in (table_change_task, daily_bar_task, backtest_task, check_task, connection_task):
             task.cancel()
-            with suppress(asyncio.CancelledError):
-                await task
+            # `wait` does not raise the error of a dead task, so the disconnect always runs.
+            await asyncio.wait([task])
         live_daily_bar_hub.stop()
         gateway_connection.disconnect()
 

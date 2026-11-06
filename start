@@ -66,6 +66,19 @@ check_env_file() {
   fi
 }
 
+# Live order placement is not part of ATrade. Without this check, `web` exits and Compose restarts it in a loop.
+refuse_live_trading_mode() {
+  local env_file="$1"
+  local trading_mode="${ATRADE_TRADING_MODE:-}"
+  if [[ -z "$trading_mode" ]]; then
+    trading_mode="$(read_env_value "$env_file" ATRADE_TRADING_MODE)"
+  fi
+  if [[ "$trading_mode" == "live" ]]; then
+    printf 'ERROR: ATRADE_TRADING_MODE=live is not allowed. Set ATRADE_TRADING_MODE=paper.\n' >&2
+    exit 1
+  fi
+}
+
 run_compose() {
   if ! command -v docker >/dev/null 2>&1; then
     printf 'ERROR: docker is not installed or not on PATH. ATrade runs with Docker Compose.\n' >&2
@@ -74,6 +87,7 @@ run_compose() {
   local env_file
   env_file="$(select_env_file)"
   check_env_file "$env_file"
+  refuse_live_trading_mode "$env_file"
   exec docker compose --file "$compose_file" --env-file "$env_file" up --build "$@"
 }
 

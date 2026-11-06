@@ -90,3 +90,19 @@ def test_password_in_the_process_environment_is_enough(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert "compose" in docker_calls.read_text()
+
+
+def test_stops_with_a_clear_message_in_live_trading_mode(tmp_path: Path) -> None:
+    result, docker_calls = run_start(tmp_path, "ATRADE_POSTGRES_PASSWORD=test-password\nATRADE_TRADING_MODE=live\n")
+
+    assert result.returncode == 1
+    assert "ATRADE_TRADING_MODE" in result.stderr
+    assert not docker_calls.exists()
+
+
+def test_live_trading_mode_in_the_process_environment_stops_the_start(tmp_path: Path) -> None:
+    result, docker_calls = run_start(tmp_path, VALID_ENV, extra_env={"ATRADE_TRADING_MODE": "live"})
+
+    assert result.returncode == 1
+    assert "ATRADE_TRADING_MODE" in result.stderr
+    assert not docker_calls.exists()

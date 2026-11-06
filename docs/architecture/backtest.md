@@ -217,6 +217,9 @@ Failures that the user sees in `error_message`:
   USD (section 10.8). The start route refuses such a request first.
 - A Web restart during a run: the runner sets the `running` backtests to
   `failed` at start, because their children ended with the old process.
+- A lost PostgreSQL connection: the runner writes a warning and tries again.
+  The running children continue. A backtest stays `running` until the
+  runner can write its end.
 
 Limits of this stage:
 

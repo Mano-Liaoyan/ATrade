@@ -5,6 +5,7 @@ The function that starts a child comes in as an argument, so that tests and the 
 """
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -28,6 +29,8 @@ GATEWAY_UNREACHABLE_EXIT_CODE = 4
 CRASH_LIMIT = 3
 # A run child that ran this long before its crash starts a new count: the crashes are not "in a row".
 CRASH_COUNT_RESET_AFTER = timedelta(minutes=10)
+
+logger = logging.getLogger(__name__)
 
 # "run": check the paper account, run the LiveNode until the stop request, then cancel the open orders.
 # "cancel_orders": only cancel the open orders of the client ID, for a stop without a running child.
@@ -97,9 +100,12 @@ class ForwardTestWorker:
             running_child.is_restart_requested = True
 
     async def keep_comparing(self) -> None:
-        """Runs until the caller cancels it."""
+        """Runs until the caller cancels it. A PostgreSQL restart must not interrupt the forward tests."""
         while True:
-            await self.compare_states()
+            try:
+                await self.compare_states()
+            except psycopg.OperationalError as error:
+                logger.warning("The forward-test worker lost the database connection. It tries again. %s", error)
             await asyncio.sleep(COMPARE_INTERVAL_SECONDS)
 
     async def compare_states(self) -> None:
@@ -114,8 +120,9 @@ class ForwardTestWorker:
             return
         exit_code = running_child.child.read_exit_code()
         if exit_code is not None:
-            del self.running_children[row.id]
+            # The next comparison records the end again when the write fails.
             await self.record_child_end(connection, row, running_child, exit_code)
+            del self.running_children[row.id]
             return
         is_stop_wanted = row.is_stop_wanted(self.clock.read_now_utc())
         if is_stop_wanted and running_child.mode == "run" and not running_child.is_stop_requested:
