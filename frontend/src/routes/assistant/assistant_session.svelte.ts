@@ -269,10 +269,11 @@ export class AssistantSession {
     writeStoredLayout(THINKING_LEVEL_STORAGE_KEY, level);
   }
 
-  /** Sends the message input. False when nothing was sent. */
+  /** Sends the message input. False when nothing was sent: web refuses a prompt during a run or without a credential,
+   * so the message stays in the input. */
   send(): boolean {
     const message = this.text.trim();
-    if (message === '' || this.#socket === null) {
+    if (message === '' || this.#socket === null || this.log.isRunning || this.selection.credentialId === '') {
       return false;
     }
     this.#socket.send({

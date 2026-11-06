@@ -1,4 +1,4 @@
-// The AI assistant session: the title read after a run.
+// The AI assistant session: the title read after a run, and send() with a run or without a credential.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { AssistantSession } from './assistant_session.svelte';
 
@@ -126,5 +126,46 @@ describe('the title read after a run', () => {
     await vi.advanceTimersByTimeAsync(5 * READ_DELAY_MILLISECONDS);
 
     expect(listReadCount).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('send', () => {
+  const SELECTION = { provider: 'fake', model: 'fake-model', credentialId: 'key-1' };
+
+  it('sends the input and clears it', async () => {
+    const session = await openSession();
+    session.selection = SELECTION;
+    session.text = 'Hello';
+
+    expect(session.send()).toBe(true);
+
+    expect(session.text).toBe('');
+    expect(session.log.items).toHaveLength(1);
+    expect(fakeSocket().sent).toHaveLength(1);
+  });
+
+  it('keeps the input during a run: web refuses the prompt', async () => {
+    const session = await openSession();
+    session.selection = SELECTION;
+    fakeSocket().receive({ type: 'run_state', state: 'running' });
+    session.text = 'Hello';
+
+    expect(session.send()).toBe(false);
+
+    expect(session.text).toBe('Hello');
+    expect(session.log.items).toHaveLength(0);
+    expect(fakeSocket().sent).toHaveLength(0);
+  });
+
+  it('keeps the input without a credential: web refuses the prompt', async () => {
+    const session = await openSession();
+    session.selection = { ...SELECTION, credentialId: '' };
+    session.text = 'Hello';
+
+    expect(session.send()).toBe(false);
+
+    expect(session.text).toBe('Hello');
+    expect(session.log.items).toHaveLength(0);
+    expect(fakeSocket().sent).toHaveLength(0);
   });
 });
