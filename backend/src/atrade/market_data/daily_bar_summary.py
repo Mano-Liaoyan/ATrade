@@ -6,7 +6,7 @@ SQL statement, so a read of many instruments is one database query.
 """
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, LiteralString
@@ -184,16 +184,51 @@ def calculate_daily_bar_summary(instrument: Instrument, bars: list[Bar]) -> Dail
     )
 
 
+# The confirmed stock splits with an ex-date after the last day of a summary. Each one changed the stored close of that
+# day (section 8.13.3). A stock split that waits for the user check, or that the user rejected, changed no stored bar.
+SELECT_LATER_SPLITS: LiteralString = """
+    SELECT split.symbol, split.exchange, split.currency, split.split_ratio
+    FROM stock_split AS split
+    JOIN unnest(
+            %(symbols)s::text[], %(exchanges)s::text[], %(currencies)s::text[], %(last_day_start_utc)s::timestamptz[]
+        ) AS summary (symbol, exchange, currency, last_day_start_utc)
+        ON split.symbol = summary.symbol AND split.exchange = summary.exchange
+            AND split.currency = summary.currency AND split.ex_date_utc > summary.last_day_start_utc
+    WHERE split.confirmation IN ('both_evidences', 'bar_evidence', 'user_apply', 'import_check')
+"""
+
+
+async def restore_last_closes(
+    connection: psycopg.AsyncConnection, summaries: list[DailyBarSummary]
+) -> list[DailyBarSummary]:
+    """The summaries with the real close of the last day: the stored close times the split ratios of the later stock
+    splits. The average trading value needs no change, because a stock split does not change close x volume."""
+    cursor = await connection.execute(
+        SELECT_LATER_SPLITS,
+        {
+            **create_instrument_parameters([summary.instrument for summary in summaries]),
+            "last_day_start_utc": [summary.last_day_start_utc for summary in summaries],
+        },
+    )
+    ratios: defaultdict[Instrument, Decimal] = defaultdict(lambda: Decimal(1))
+    for symbol, exchange, currency, split_ratio in await cursor.fetchall():
+        ratios[Instrument(symbol=symbol, exchange=exchange, currency=currency)] *= split_ratio
+    return [replace(summary, last_close=summary.last_close * ratios[summary.instrument]) for summary in summaries]
+
+
 async def read_daily_bar_summaries_before(
     *, database_url: str, instruments: list[Instrument], before_utc: datetime
 ) -> list[DailyBarSummary]:
     """The summary rows that `instruments` had with only the daily bars that start before `before_utc`, in the order
-    of `instruments`. The same calculation as the saved summary, so a point-in-time screen run gets the values that
-    the summary had at that time (docs/architecture/screen.md section 24.9). An instrument without such bars has no
-    row. One database query."""
+    of `instruments`. The same calculation as the saved summary, and the real close of that day, so a point-in-time
+    screen run gets the values that the summary had at that time, also after a later stock split
+    (docs/architecture/screen.md section 24.9). An instrument without such bars has no row. 2 database queries."""
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         bars_by_instrument = await select_last_daily_bars(connection, instruments, before_utc, SUMMARY_BAR_COUNT)
-    return [calculate_daily_bar_summary(instrument, bars) for instrument, bars in bars_by_instrument.items() if bars]
+        summaries = [
+            calculate_daily_bar_summary(instrument, bars) for instrument, bars in bars_by_instrument.items() if bars
+        ]
+        return await restore_last_closes(connection, summaries)
 
 
 UPSERT_SUMMARIES_QUERY = sql.SQL("""

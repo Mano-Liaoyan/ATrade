@@ -8,7 +8,13 @@ import pytest
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import BarRequest, read_daily_bar_summaries, save_received_bars
+from atrade.market_data import (
+    BarRequest,
+    StockSplitChange,
+    apply_stock_split,
+    read_daily_bar_summaries,
+    save_received_bars,
+)
 from atrade.screen import run_screen_at
 from tests.screen.test_screen_run_routes import add_to_watchlist, make_definition
 
@@ -80,3 +86,43 @@ async def test_the_filter_values_of_a_point_in_time_run_are_the_daily_bar_summar
     assert row.last_price == summary_at_day_40.last_close == Decimal(40)
     assert row.average_trading_value_20 == summary_at_day_40.average_trading_value_20
     assert row.average_trading_value_20 is not None
+
+
+@pytest.mark.anyio
+async def test_a_later_stock_split_does_not_change_the_last_price_filter_of_a_point_in_time_run(
+    database_url: str,
+) -> None:
+    """Close 100 on the last day before the date. A 10:1 stock split after the date divides the stored bars by 10, and
+    the filter must still see 100 (ADR 0008 changes the stored bars in place)."""
+    bars = [
+        Bar(
+            start_utc=at_day(index),
+            open=Decimal(100),
+            high=Decimal(100),
+            low=Decimal(100),
+            close=Decimal(100),
+            volume=Decimal(1000),
+        )
+        for index in range(30)
+    ]
+    bar_request = BarRequest(AAA, BarPeriod.ONE_DAY, TimeRange(at_day(0), at_day(30)))
+    await save_received_bars(database_url=database_url, bar_request=bar_request, bars=bars)
+    add_to_watchlist(database_url, AAA)
+    definition = make_definition(filters=[{"field": "last_price", "operator": ">=", "value": "50"}])
+    before_split = await run_screen_at(
+        database_url=database_url, market="US", definition=definition, as_of_utc=at_day(20)
+    )
+
+    await apply_stock_split(
+        database_url=database_url,
+        change=StockSplitChange(AAA, at_day(25), Decimal(10)),
+        confirmation="bar_evidence",
+        recorded_at_utc=at_day(30),
+    )
+    after_split = await run_screen_at(
+        database_url=database_url, market="US", definition=definition, as_of_utc=at_day(20)
+    )
+
+    assert [row.instrument for row in after_split.rows] == [AAA]
+    assert after_split.rows[0].last_price == before_split.rows[0].last_price == Decimal(100)
+    assert after_split.rows[0].average_trading_value_20 == before_split.rows[0].average_trading_value_20

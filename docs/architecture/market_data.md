@@ -983,6 +983,11 @@ Table `daily_bar_summary`: one row for each instrument.
   only the daily bars that start before `before_utc`, with the calculation of
   the saved summary. The point-in-time screen run of a backtest uses it
   (`screen.md` section 24.9). It saves nothing.
+- `read_daily_bar_summaries_before` gives the real close of the last day. It
+  multiplies the stored close by the split ratio of each confirmed stock
+  split (section 8.13.1) with an ex-date after that day. A later stock split
+  changed that stored close (section 8.13.3). The average trading value does
+  not change, because a stock split does not change close × volume.
 - Code (#195): `market_data/daily_bar_summary.py` (the bulk read and the
   summary), `market_data/daily_bar_update.py` (`DailyBarUpdate`, started by
   `app/web.py`). Tests: `tests/market_data/test_daily_bar_summary.py` and

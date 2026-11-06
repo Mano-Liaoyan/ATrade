@@ -26,6 +26,7 @@ from atrade.market_data import (
     StockSplitConfirmedError,
     apply_stock_split,
     read_daily_bar_summaries,
+    read_daily_bar_summaries_before,
     read_saved_bars,
     read_stock_split_candidates,
     read_unsaved_ranges,
@@ -447,3 +448,69 @@ async def test_a_failed_read_of_the_stored_day_does_not_stop_the_read_of_the_mis
 
     assert closes == [50.0, 50.0, 50.0]
     assert await read_stock_split_candidates(database_url=database_url) == []
+
+
+async def insert_stock_split(database_url: str, ex_date_utc: datetime, confirmation: str | None) -> None:
+    """A `stock_split` row that the bars do not follow: a waiting or rejected stock split changes no bar."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        await connection.execute(
+            """
+            INSERT INTO stock_split (
+                symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc
+            )
+            VALUES ('AAPL', 'NASDAQ', 'USD', %s, 2, 'databento_import', %s, %s)
+            """,
+            (ex_date_utc, confirmation, RECORDED_AT_UTC),
+        )
+
+
+async def read_close_before(database_url: str, before_utc: datetime) -> Decimal:
+    [summary] = await read_daily_bar_summaries_before(
+        database_url=database_url, instruments=[APPLE], before_utc=before_utc
+    )
+    return summary.last_close
+
+
+async def save_stored_week(database_url: str) -> None:
+    bars = [create_bar(start_utc, "120") for start_utc in BAR_DAYS_UTC]
+    await save_received_bars(
+        database_url=database_url,
+        bar_request=BarRequest(APPLE, BarPeriod.ONE_DAY, STORED_RANGE),
+        bars=bars,
+    )
+
+
+async def apply_week_split(database_url: str, ex_date_utc: datetime, split_ratio: str) -> None:
+    await apply_stock_split(
+        database_url=database_url,
+        change=StockSplitChange(APPLE, ex_date_utc, Decimal(split_ratio)),
+        confirmation="bar_evidence",
+        recorded_at_utc=RECORDED_AT_UTC,
+    )
+
+
+@pytest.mark.anyio
+async def test_a_summary_before_a_date_has_the_real_close_of_its_last_day(database_url: str) -> None:
+    """The stored closes after 2 stock splits: 120 / 4 / 0.5 = 60 before the first ex-date, 120 / 0.5 = 240 before the
+    second, and 120 on the last days."""
+    await save_stored_week(database_url)
+    await apply_week_split(database_url, EX_DATE_UTC, "4")
+    await apply_week_split(database_url, EX_DATE_UTC + ONE_DAY * 2, "0.5")
+
+    # The last day is before both ex-dates, before the second ex-date only, and on the second ex-date.
+    assert await read_close_before(database_url, BAR_DAYS_UTC[2]) == Decimal(120)
+    assert await read_close_before(database_url, BAR_DAYS_UTC[3]) == Decimal(120)
+    assert await read_close_before(database_url, BAR_DAYS_UTC[4] + ONE_DAY) == Decimal(120)
+    [saved_summary] = await read_daily_bar_summaries(database_url=database_url, instruments=[APPLE])
+    assert saved_summary.last_close == Decimal(120)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("confirmation", [None, "import_rejected"])
+async def test_a_stock_split_that_changed_no_bar_does_not_change_the_close_of_a_summary_before_a_date(
+    database_url: str, confirmation: str | None
+) -> None:
+    await save_stored_week(database_url)
+    await insert_stock_split(database_url, EX_DATE_UTC, confirmation)
+
+    assert await read_close_before(database_url, EX_DATE_UTC) == Decimal(120)
