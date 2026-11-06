@@ -185,8 +185,19 @@ class BarReader:
 async def read_saved_bars(*, database_url: str, bar_request: BarRequest, source_order: list[BarSource]) -> SavedBars:
     """Reads only the bars that PostgreSQL holds, through the source order. It never calls IBKR, so backtests do not
     depend on IB Gateway."""
-    async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        return await select_merged_bars(connection, source_order, bar_request)
+    [saved_bars] = await read_saved_bars_of_many(
+        database_url=database_url, bar_requests=[bar_request], source_order=source_order
+    )
+    return saved_bars
+
+
+async def read_saved_bars_of_many(
+    *, database_url: str, bar_requests: list[BarRequest], source_order: list[BarSource]
+) -> list[SavedBars]:
+    """`read_saved_bars` for each bar request, in the same order, on one connection. The merge of the source order
+    applies to each range, so each bar request keeps its own queries."""
+    async with await psycopg.AsyncConnection.connect(database_url, autocommit=True) as connection:
+        return [await select_merged_bars(connection, source_order, bar_request) for bar_request in bar_requests]
 
 
 async def read_unsaved_ranges(*, database_url: str, bar_request: BarRequest) -> list[TimeRange]:

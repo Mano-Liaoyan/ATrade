@@ -3,7 +3,9 @@ look-back bars before each range of periods (docs/architecture/backtest.md secti
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
+import psycopg
 import pytest
 
 from atrade.backtest.backtest_store import BacktestRequest, BacktestUniverse, UniversePeriod
@@ -99,3 +101,28 @@ async def test_reads_each_member_only_in_its_periods_plus_1_year_of_look_back_ba
     # The bar counts are the bars of the periods, without the look-back bars.
     # AAA 58 days (2026-02-02 to 2026-04-01), BBB 88 days, CCC 30 days.
     assert universe_bars.bar_count_by_source == {BarSource.IBKR: 58 + 88 + 30, BarSource.DATABENTO: 0}
+
+
+@pytest.mark.anyio
+async def test_reads_all_members_with_one_connection(database_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Regression: 2 connections for each range of each member made a universe of 500 members open 1000 connections.
+    connect = psycopg.AsyncConnection.connect
+    connect_count = 0
+
+    async def count_connect(*args: Any, **kwargs: Any) -> psycopg.AsyncConnection[Any]:
+        nonlocal connect_count
+        connect_count += 1
+        return await connect(*args, **kwargs)
+
+    monkeypatch.setattr(psycopg.AsyncConnection, "connect", count_connect)
+
+    universe_bars = await read_universe_bars(
+        database_url=database_url,
+        request=REQUEST,
+        periods=PERIODS,
+        source_order=[BarSource.IBKR, BarSource.DATABENTO],
+        look_back_length=ONE_DAY_UNIVERSE_LOOK_BACK,
+    )
+
+    assert [member.instrument for member in universe_bars.members] == [AAA, BBB, CCC]
+    assert connect_count == 1
