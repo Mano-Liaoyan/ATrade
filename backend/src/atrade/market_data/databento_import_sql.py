@@ -192,7 +192,7 @@ SELECT_IMPORT_PRICES: LiteralString = """
 # Evidence A gives the day after the last stored bar as the ex-date, so the import can find an applied stock split on a
 # later day. A second row would wait, and it would change the next IBKR bars before its ex-date. The window is the
 # `MATCH_DAYS` of the stock split report, and the tolerance is its `MATCH_RATIO_TOLERANCE`. A different split ratio is
-# a different stock split.
+# a different stock split. The window is in hours: an interval in days follows the DST changes of the session time zone.
 INSERT_STOCK_SPLIT: LiteralString = """
     INSERT INTO stock_split (symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc)
     SELECT %(symbol)s::text, %(exchange)s::text, %(currency)s::text, %(ex_date_utc)s::timestamptz,
@@ -202,7 +202,7 @@ INSERT_STOCK_SPLIT: LiteralString = """
         WHERE applied.symbol = %(symbol)s AND applied.exchange = %(exchange)s AND applied.currency = %(currency)s
             AND applied.confirmation IN ('both_evidences', 'bar_evidence', 'user_apply', 'import_check')
             AND applied.ex_date_utc < %(ex_date_utc)s
-            AND applied.ex_date_utc >= %(ex_date_utc)s::timestamptz - interval '5 days'
+            AND applied.ex_date_utc >= %(ex_date_utc)s::timestamptz - interval '120 hours'
             AND abs(%(split_ratio)s::numeric / applied.split_ratio - 1) <= %(ratio_tolerance)s
     )
     ON CONFLICT (symbol, exchange, currency, ex_date_utc) DO NOTHING

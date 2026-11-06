@@ -24,6 +24,7 @@ from atrade.market_data import (
     import_databento_files,
     read_saved_bars,
 )
+from atrade.market_data.databento_import_adjustment import DetectedSplit, record_stock_splits
 from tests.databento_import_runs import import_and_check_splits
 from tests.fakes.databento import (
     CLOSE_PRICE,
@@ -274,6 +275,22 @@ async def test_the_import_records_no_second_row_for_a_stock_split_that_is_applie
     new_rows = [row for row in read_table(database_url, STOCK_SPLIT_QUERY) if row[5] == "databento_import"]
     assert len(new_rows) == expected_new_rows
     assert len(report.stock_splits) == expected_new_rows
+
+
+@pytest.mark.anyio
+async def test_the_stock_split_window_has_5_utc_days_also_across_a_dst_change_of_the_session_time_zone(
+    database_url: str,
+) -> None:
+    # New York goes to daylight saving time on 2020-03-08, between the 2 ex-dates.
+    ex_date = date(2020, 3, 9)
+    insert_ibkr_evidence_split(database_url, utc_day(ex_date) - timedelta(days=5), "both_evidences")
+    split = DetectedSplit(Instrument("GONE", "NASDAQ", "USD"), ex_date, Decimal(2), None)
+
+    with psycopg.connect(database_url) as connection:
+        connection.execute("SET TIME ZONE 'America/New_York'")
+        inserted_splits = record_stock_splits(connection, [split])
+
+    assert inserted_splits == []
 
 
 @pytest.mark.anyio
