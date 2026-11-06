@@ -24,8 +24,8 @@ BARS_QUERY = {
     ],
 )
 @pytest.mark.anyio
-async def test_a_query_value_is_refused(web_client: httpx.AsyncClient, path: str, params: dict[str, object]) -> None:
-    response = await web_client.get(path, params=httpx.QueryParams(params))
+async def test_a_query_value_is_refused(web_client: httpx.AsyncClient, path: str, params: dict[str, str | int]) -> None:
+    response = await web_client.get(path, params=params)
 
     assert response.status_code == httpx.codes.UNPROCESSABLE_ENTITY, response.text
     assert "cannot store" in response.json()["detail"][0]["msg"]
