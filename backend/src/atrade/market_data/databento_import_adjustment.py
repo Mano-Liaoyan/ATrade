@@ -17,6 +17,7 @@ import psycopg
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import databento_import_sql
 from atrade.market_data.ibkr_split_check import record_split_checks
+from atrade.market_data.ibkr_split_report import MATCH_RATIO_TOLERANCE
 from atrade.market_data.stock_split_detection import DailyPrices, FoundSplit, find_splits_by_detection_rule
 
 IMPORT_PRICES_CURSOR = "databento_import_prices"
@@ -120,6 +121,7 @@ def record_stock_splits(connection: psycopg.Connection, splits: list[DetectedSpl
                 "currency": split.instrument.currency,
                 "ex_date_utc": to_utc_day(split.ex_date),
                 "split_ratio": split.split_ratio,
+                "ratio_tolerance": MATCH_RATIO_TOLERANCE,
                 "confirmation": split.confirmation,
             },
         )

@@ -214,16 +214,26 @@ async def test_the_detection_rule_finds_a_stock_split_of_an_instrument_that_stop
     assert [bar.close for bar in bars] == [Decimal(80), Decimal(80), Decimal(41), Decimal(42)]
 
 
-def insert_ibkr_evidence_split(database_url: str, ex_date_utc: datetime, confirmation: str) -> None:
+def insert_ibkr_evidence_split(
+    database_url: str, ex_date_utc: datetime, confirmation: str, split_ratio: Decimal = Decimal(2)
+) -> None:
     with psycopg.connect(database_url) as connection:
         connection.execute(
             """
             INSERT INTO stock_split (
                 symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc
             )
-            VALUES ('GONE', 'NASDAQ', 'USD', %(ex_date_utc)s, 2, 'ibkr_evidence', %(confirmation)s, %(recorded_at_utc)s)
+            VALUES (
+                'GONE', 'NASDAQ', 'USD', %(ex_date_utc)s, %(split_ratio)s, 'ibkr_evidence', %(confirmation)s,
+                %(recorded_at_utc)s
+            )
             """,
-            {"ex_date_utc": ex_date_utc, "confirmation": confirmation, "recorded_at_utc": CHECKED_AT_UTC},
+            {
+                "ex_date_utc": ex_date_utc,
+                "split_ratio": split_ratio,
+                "confirmation": confirmation,
+                "recorded_at_utc": CHECKED_AT_UTC,
+            },
         )
 
 
@@ -233,20 +243,23 @@ GONE_EX_DATE = TRADING_DAYS[5]
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    ("days_earlier", "confirmation", "expected_new_rows"),
+    ("days_earlier", "applied_split", "expected_new_rows"),
     [
-        (2, "both_evidences", 0),
-        (2, "user_apply", 0),
-        (5, "bar_evidence", 0),
-        (6, "both_evidences", 1),
-        (2, "import_rejected", 1),
+        (2, ("both_evidences", "2"), 0),
+        (2, ("user_apply", "2"), 0),
+        (5, ("bar_evidence", "2"), 0),
+        (2, ("both_evidences", "2.05"), 0),
+        (2, ("both_evidences", "0.1"), 1),
+        (6, ("both_evidences", "2"), 1),
+        (2, ("import_rejected", "2"), 1),
     ],
 )
 async def test_the_import_records_no_second_row_for_a_stock_split_that_is_applied_at_an_earlier_ex_date(
-    database_url: str, tmp_path: Path, days_earlier: int, confirmation: str, expected_new_rows: int
+    database_url: str, tmp_path: Path, days_earlier: int, applied_split: tuple[str, str], expected_new_rows: int
 ) -> None:
+    confirmation, applied_ratio = applied_split
     ex_date_utc = utc_day(GONE_EX_DATE) - timedelta(days=days_earlier)
-    insert_ibkr_evidence_split(database_url, ex_date_utc, confirmation)
+    insert_ibkr_evidence_split(database_url, ex_date_utc, confirmation, Decimal(applied_ratio))
     gone_bars = create_bars(
         "GONE",
         [TRADING_DAYS[4], GONE_EX_DATE],
