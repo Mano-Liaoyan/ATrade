@@ -5,6 +5,7 @@ route, no frontend files, and no OpenAPI document. Compose does not publish the 
 """
 
 import ipaddress
+import logging
 from typing import Final
 from urllib.parse import urlsplit
 
@@ -38,6 +39,8 @@ __all__ = [
     "RefuseOtherSite",
     "create_assistant_port_app",
 ]
+
+logger = logging.getLogger("atrade.web")
 
 
 def create_assistant_port_app(*, settings: Settings, clock: Clock, gateway_connection: GatewayConnection) -> FastAPI:
@@ -158,4 +161,8 @@ class RefuseOtherSite:
         if scope["type"] not in {"http", "websocket"} or not is_other_site_request(scope):
             await self.app(scope, receive, send)
             return
+        headers = dict(scope["headers"])
+        logger.warning(
+            "Refused a request from another site: Origin %r, Host %r", headers.get(b"origin"), headers.get(b"host")
+        )
         await refuse_request(scope, send, OTHER_SITE_REFUSED_TEXT)

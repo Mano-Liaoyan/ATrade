@@ -22,6 +22,8 @@ backup_database() (
     dump+=("--exclude-table-data=$table")
   done
   mkdir -p "$backup_dir"
+  # A killed earlier dump leaves a partial file.
+  find "$backup_dir" -maxdepth 1 -name '*.partial' -delete
   backup_file="$backup_dir/atrade-$(date -u +%Y%m%dT%H%M%SZ)-$(git rev-parse --short=12 HEAD).dump"
 
   # This also starts postgres when the stack is down. A running postgres stays as it is.

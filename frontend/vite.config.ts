@@ -23,8 +23,11 @@ export default defineConfig({
       },
     },
   },
-  // `vp dev` sends API and WebSocket requests to a local backend (python -m atrade.app.web).
-  server: { proxy: { '/api': 'http://127.0.0.1:8000', '/ws': { target: 'ws://127.0.0.1:8000', ws: true } } },
+  // `vp dev` sends API and WebSocket requests to a local backend (python -m atrade.app.web). The object form keeps
+  // the Host header of the browser, so that the backend sees a same-site request.
+  server: {
+    proxy: { '/api': { target: 'http://127.0.0.1:8000' }, '/ws': { target: 'ws://127.0.0.1:8000', ws: true } },
+  },
   // Vitest runs *.test.ts. Playwright runs e2e/*.spec.ts (#39). The tests that need $effect run on the client build.
   test: {
     projects: [
