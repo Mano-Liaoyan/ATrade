@@ -291,6 +291,12 @@ _Avoid_: demo trading, simulated trading
 
 ## Orders
 
+**Held fill**:
+An IBKR execution that ATrade has not saved because its commission report has
+not arrived. After 5 minutes ATrade saves it with commission 0. Not the same as
+a held order of a backtest, which waits for the next bar open.
+_Avoid_: pending fill
+
 **Paper account**:
 The broker account that holds no real money. Paper orders go to this account.
 _Avoid_: demo account, simulated account
