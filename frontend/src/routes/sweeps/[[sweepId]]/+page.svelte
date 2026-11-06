@@ -89,8 +89,7 @@
   let sortDirection = $state<SortDirection>('descending');
   let isDeleteDialogOpen = $state(false);
   let isDeleting = $state(false);
-  const runsColumnsId = $props.id();
-  let runsColumns = $state<HTMLDivElement>();
+  let runsRegion = $state<HTMLDivElement>();
   let runsTable = $state<HTMLTableElement>();
   let deleteMessage = $state('');
 
@@ -325,8 +324,8 @@
           {:else}
             <Panel {...state} label="Runs">
               <div class="table-region">
-                <ScrollRegion label="Runs" fill>
-                  <div class="cds--data-table-content runs-columns" id={runsColumnsId} bind:this={runsColumns}>
+                <ScrollRegion label="Runs" fill bind:viewport={runsRegion}>
+                  <div class="cds--data-table-container">
                     <table class="cds--data-table cds--data-table--sm cds--data-table--sort runs" bind:this={runsTable}>
                       <thead>
                         <tr>
@@ -388,7 +387,7 @@
                     </table>
                   </div>
                 </ScrollRegion>
-                <HorizontalScrollTrack label="Runs columns" viewport={runsColumns} content={runsTable} viewportId={runsColumnsId} wheelScrolls={false} />
+                <HorizontalScrollTrack label="Runs columns" viewport={runsRegion} content={runsTable} viewportId={runsRegion?.id ?? ''} wheelScrolls={false} />
               </div>
             </Panel>
           {/if}
@@ -449,18 +448,10 @@
     table-layout: fixed;
   }
 
-  /* All Runs columns stay readable: a narrow region scrolls them sideways with its own track. The sideways scroll makes
-     the header scroll away with the rows. */
+  /* All Runs columns stay readable: a narrow region scrolls them sideways with its own track. The scroll region is the
+     one scroll container for both axes, so the sticky header stays at its top. */
   .runs {
     min-inline-size: 54rem;
-  }
-
-  .runs-columns {
-    scrollbar-width: none;
-  }
-
-  .runs-columns::-webkit-scrollbar {
-    display: none;
   }
 
   /* The status icon and the number. */

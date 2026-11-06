@@ -106,11 +106,32 @@ async function checkRunsWidth(page: Page, width: number): Promise<void> {
   await track.press('Home');
 }
 
+/** The column names and the sort buttons stay at the top of the region while the rows scroll. */
+async function checkRunsHeaderStays(page: Page): Promise<void> {
+  // The panel and the scroll region in it have the same name.
+  const runs = page.getByRole('region', { name: 'Runs' }).getByRole('region', { name: 'Runs' });
+  const firstRow = runs.getByRole('row').nth(1);
+  await firstRow.evaluate((row) => {
+    row.style.height = '100rem';
+  });
+  const scrolled = await runs.evaluate((region) => {
+    region.scrollTop = region.scrollHeight;
+    const header = region.querySelector('th');
+    return { scrollTop: region.scrollTop, headerOffset: (header?.getBoundingClientRect().top ?? 0) - region.getBoundingClientRect().top };
+  });
+  expect(scrolled.scrollTop).toBeGreaterThan(0);
+  expect(scrolled.headerOffset).toBeCloseTo(0, 0);
+  await firstRow.evaluate((row) => {
+    row.style.height = '';
+  });
+}
+
 /** Sorts the Runs table, scrolls to its last row, opens the backtest of that run, and goes back to the sweep. */
 async function checkRuns(page: Page, sweepId: string): Promise<void> {
   for (const width of [1440, 1280]) {
     await checkRunsWidth(page, width);
   }
+  await checkRunsHeaderStays(page);
   const runs = page.getByRole('region', { name: 'Runs' });
   const periodHeader = runs.getByRole('columnheader', { name: 'average_period' });
   await periodHeader.getByRole('button').click();
