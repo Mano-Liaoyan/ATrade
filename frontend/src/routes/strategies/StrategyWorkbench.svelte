@@ -56,7 +56,6 @@
     BLANK_RULES,
     clearDraft,
     clearRulesDraft,
-    connectStrategyLanguageServer,
     deleteStrategy,
     describeRulesWarning,
     findRulesVersionNumber,
@@ -79,6 +78,7 @@
     type StrategyVersion,
     type StrategyVersionKey,
   } from '#lib/strategy';
+  import { connectStrategyLanguageServer } from '#lib/strategy_language_server';
   import NewStrategyDialog from './NewStrategyDialog.svelte';
   import StartBacktestDialog from '../backtests/StartBacktestDialog.svelte';
   import StartForwardTestDialog from '../forward-tests/StartForwardTestDialog.svelte';
