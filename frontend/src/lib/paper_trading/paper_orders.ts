@@ -2,7 +2,7 @@
 // The order list comes from the "orders" message of /ws/paper-trading (docs/architecture/paper_trading.md).
 import type { components } from '#lib/api';
 import type { StatusKind } from '#lib/foundation/carbon';
-import { describeErrorBody, readJsonBody, sendRequest } from '#lib/foundation/http_request';
+import { describeErrorBody, jsonRequest, readJsonBody, sendRequest } from '#lib/foundation/http_request';
 import { readSocketMessage } from '#lib/foundation/live_socket';
 
 export type SendOrderRequest = components['schemas']['SendOrderRequest'];
@@ -141,11 +141,7 @@ export function readOpenOrdersMessage(message: unknown): OpenOrder[] | null {
 }
 
 export async function sendPaperOrder(fetchFunction: typeof fetch, request: SendOrderRequest): Promise<SendOrderResult> {
-  const response = await sendRequest(fetchFunction, PAPER_ORDERS_PATH, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(request),
-  });
+  const response = await sendRequest(fetchFunction, PAPER_ORDERS_PATH, jsonRequest('POST', request));
   if (response === null) {
     return { kind: 'failed', message: 'Backend not reachable. ATrade did not send the order.' };
   }

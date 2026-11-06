@@ -2,7 +2,7 @@
 // (backend/src/atrade/assistant/prompt_routes.py). A prompt version does not change after it is saved, so the dialog
 // only reads versions and saves new ones. "Restore default" changes only the text area: it sends no request.
 import type { components } from '#lib/api';
-import { requestJson, type RequestResult } from '#lib/foundation/http_request';
+import { jsonRequest, requestJson, type RequestResult } from '#lib/foundation/http_request';
 
 export type PromptVersion = components['schemas']['PromptVersionResponse'];
 export type PromptVersionList = components['schemas']['PromptVersionListResponse'];
@@ -29,11 +29,7 @@ export function listPromptVersions(fetchFunction: typeof fetch): Promise<Request
 }
 
 export function savePromptVersion(fetchFunction: typeof fetch, text: string): Promise<RequestResult<PromptVersion>> {
-  return requestJson<PromptVersion>(fetchFunction, FAILED_ACTION, PROMPT_VERSIONS_PATH, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ text }),
-  });
+  return requestJson<PromptVersion>(fetchFunction, FAILED_ACTION, PROMPT_VERSIONS_PATH, jsonRequest('POST', { text }));
 }
 
 /** "Prompt v3" at the top of a conversation uses the same number. */

@@ -3,7 +3,7 @@
 // The Web process writes only the desired state. The forward-test worker writes the status (docs/architecture.md 12.3).
 import type { components } from '#lib/api';
 import type { StatusKind } from '#lib/foundation/carbon';
-import { describeErrorBody, readJsonBody, sendRequest } from '#lib/foundation/http_request';
+import { describeErrorBody, jsonRequest, readJsonBody, sendRequest } from '#lib/foundation/http_request';
 
 export type ForwardTest = components['schemas']['ForwardTestResponse'];
 export type ForwardTestRequest = components['schemas']['StartForwardTestRequest'];
@@ -182,7 +182,7 @@ export async function startForwardTest(fetchFunction: typeof fetch, request: For
   const outcome = await sendForwardTestRequest(
     fetchFunction,
     FORWARD_TESTS_PATH,
-    { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request) },
+    jsonRequest('POST', request),
     { notReachable: 'Backend not reachable. The forward test did not start.', failedAction: 'Starting the forward test' },
   );
   if (outcome.kind === 'failed') {

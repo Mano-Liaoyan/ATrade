@@ -1,7 +1,7 @@
 // The chart indicator set (docs/architecture/indicator.md section 23.9.7): the indicators of the instrument page
 // chart and the favorites of "Add indicator". Calls GET and PUT /api/market-data/chart-indicators. The last PUT wins.
 import type { components } from '#lib/api';
-import { BACKEND_NOT_REACHABLE, readErrorMessage, readJsonBody, requestJson, sendRequest, type RequestResult } from '#lib/foundation/http_request';
+import { BACKEND_NOT_REACHABLE, jsonRequest, readErrorMessage, readJsonBody, requestJson, sendRequest, type RequestResult } from '#lib/foundation/http_request';
 import type { ChartIndicatorDefinition, ChartPane } from './chart_indicators';
 
 /** The first pane is the price pane. `favorites` holds catalog keys. */
@@ -25,11 +25,7 @@ export function readChartIndicatorSet(fetchFunction: typeof fetch): Promise<Requ
 
 /** A refused set gives the message of its first problem. Another failure gives the `detail` text. */
 export async function saveChartIndicatorSet(fetchFunction: typeof fetch, chartSet: ChartIndicatorSet): Promise<RequestResult<ChartIndicatorSet>> {
-  const response = await sendRequest(fetchFunction, CHART_INDICATORS_PATH, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(chartSet),
-  });
+  const response = await sendRequest(fetchFunction, CHART_INDICATORS_PATH, jsonRequest('PUT', chartSet));
   if (response === null) {
     return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
   }

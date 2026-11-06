@@ -1,13 +1,7 @@
 // Calls the backtest HTTP routes (backend/src/atrade/backtest/http_routes.py).
 
 import type { components } from '#lib/api';
-import {
-  BACKEND_NOT_REACHABLE,
-  readErrorMessage,
-  requestJson as requestBackendJson,
-  sendRequest,
-  type RequestResult,
-} from '#lib/foundation/http_request';
+import { jsonRequest, requestJson, sendCommand, type RequestResult } from '#lib/foundation/http_request';
 
 // The generated type makes the fields with a default required. Without `out_of_sample_share`, the route uses 30.
 export type BacktestRequest = Omit<components['schemas']['StartBacktestRequest'], 'out_of_sample_share'> & {
@@ -64,20 +58,12 @@ const BACKTEST_LIMITS_PATH = '/api/backtest-limits';
 // A refused request has ErrorResponse {"detail": "<reason>"}. A request that does not validate has HTTPValidationError.
 const FAILED_ACTION = 'The backtest request';
 
-function requestJson<T>(fetchFunction: typeof fetch, path: string, init?: RequestInit): Promise<RequestResult<T>> {
-  return requestBackendJson<T>(fetchFunction, FAILED_ACTION, path, init);
-}
-
 export function startBacktest(fetchFunction: typeof fetch, request: BacktestRequest): Promise<RequestResult<Backtest>> {
-  return requestJson(fetchFunction, BACKTESTS_PATH, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(request),
-  });
+  return requestJson(fetchFunction, FAILED_ACTION, BACKTESTS_PATH, jsonRequest('POST', request));
 }
 
 export function listBacktests(fetchFunction: typeof fetch): Promise<RequestResult<Backtest[]>> {
-  return requestJson(fetchFunction, BACKTESTS_PATH);
+  return requestJson(fetchFunction, FAILED_ACTION, BACKTESTS_PATH);
 }
 
 export type DeleteBacktestResult = { kind: 'deleted' } | { kind: 'failed'; message: string };
@@ -85,33 +71,23 @@ export type DeleteBacktestResult = { kind: 'deleted' } | { kind: 'failed'; messa
 /** A true delete. The backend refuses a queued or running backtest, a sweep run, and the same-period backtest of a
  * forward test (409 with the reason). */
 export async function deleteBacktest(fetchFunction: typeof fetch, backtestId: number): Promise<DeleteBacktestResult> {
-  const response = await sendRequest(fetchFunction, `${BACKTESTS_PATH}/${String(backtestId)}`, { method: 'DELETE' });
-  if (response === null) {
-    return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
-  }
-  if (!response.ok) {
-    return { kind: 'failed', message: await readErrorMessage(response, FAILED_ACTION) };
-  }
-  return { kind: 'deleted' };
+  const result = await sendCommand(fetchFunction, FAILED_ACTION, `${BACKTESTS_PATH}/${String(backtestId)}`, { method: 'DELETE' });
+  return result.kind === 'failed' ? result : { kind: 'deleted' };
 }
 
 export function readBacktest(fetchFunction: typeof fetch, backtestId: number): Promise<RequestResult<BacktestDetail>> {
-  return requestJson(fetchFunction, `${BACKTESTS_PATH}/${String(backtestId)}`);
+  return requestJson(fetchFunction, FAILED_ACTION, `${BACKTESTS_PATH}/${String(backtestId)}`);
 }
 
 export function readBacktestLimits(fetchFunction: typeof fetch): Promise<RequestResult<BacktestLimits>> {
-  return requestJson(fetchFunction, BACKTEST_LIMITS_PATH);
+  return requestJson(fetchFunction, FAILED_ACTION, BACKTEST_LIMITS_PATH);
 }
 
 export function changeBacktestLimits(
   fetchFunction: typeof fetch,
   limits: BacktestLimits,
 ): Promise<RequestResult<BacktestLimits>> {
-  return requestJson(fetchFunction, BACKTEST_LIMITS_PATH, {
-    method: 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(limits),
-  });
+  return requestJson(fetchFunction, FAILED_ACTION, BACKTEST_LIMITS_PATH, jsonRequest('PUT', limits));
 }
 
 export function compareBacktests(
@@ -119,10 +95,10 @@ export function compareBacktests(
   firstBacktestId: number,
   secondBacktestId: number,
 ): Promise<RequestResult<BacktestComparison>> {
-  return requestJson(fetchFunction, `${BACKTESTS_PATH}/${String(firstBacktestId)}/comparison/${String(secondBacktestId)}`);
+  return requestJson(fetchFunction, FAILED_ACTION, `${BACKTESTS_PATH}/${String(firstBacktestId)}/comparison/${String(secondBacktestId)}`);
 }
 
 // The first and the last quarter start with US universe data (docs/architecture/backtest.md 10.10.6).
 export function readUsUniverseRange(fetchFunction: typeof fetch): Promise<RequestResult<UsUniverseRange>> {
-  return requestJson(fetchFunction, '/api/us-universe/range');
+  return requestJson(fetchFunction, FAILED_ACTION, '/api/us-universe/range');
 }
