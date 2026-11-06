@@ -401,6 +401,16 @@ function backtestStarts(): WebPortRequest[] {
 }
 
 describe('run_backtest with a universe (25.4.2)', () => {
+  test('the tool description has the rule for the code of a multi-instrument strategy', () => {
+    const tools = createAssistantTools({ client: new WebPortClient(web.baseUrl, CONVERSATION_ID), budget: { startedBacktests: 0 }, wait: QUICK_WAIT });
+
+    const description = tools.find((tool) => tool.name === 'run_backtest')?.description;
+
+    expect(description).toContain('no instrument_id and no bar_type');
+    expect(description).toContain('self.subscribe_data(DataType("UniverseUpdate"))');
+    expect(description).toContain('data.data.bar_types');
+  });
+
   test('starts a screen backtest with the conversation and each quarter when no period is given', async () => {
     const conversations = await openConversations([
       call('run_backtest', SCREEN_BACKTEST_ARGUMENTS),

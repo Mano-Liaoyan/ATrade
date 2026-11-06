@@ -738,10 +738,16 @@ editable part.
 
 | Part | Content | The user can edit it |
 |---|---|---|
-| Editable part | The role of the AI assistant, how to write a strategy (the file format and the template of strategy section 9.2), and the answer rules. One answer rule: an answer about a backtest result names the metrics. It also names the out-of-sample result. | Yes. Each save makes a prompt version. |
+| Editable part | The role of the AI assistant, how to write a strategy (the file format, the template of strategy section 9.2, and the multi-instrument rule with an example), and the answer rules. One answer rule: an answer about a backtest result names the metrics. It also names the out-of-sample result. | Yes. Each save makes a prompt version. |
 | Fixed part | The forbidden actions: no paper order, no forward test start, no promise of returns. Strategy code must not use `self.portfolio.account` (strategy section 9.8.2), and it must use only market and limit orders (forward test section 12.19). These rules are in the fixed part because a saved prompt version does not change. The context of the conversation start: the ID and name of the open strategy, the open version number, and the IDs of the last 3 backtests. | No. The page shows it read-only. |
 
 - The default editable part is in English and is in the code.
+- The multi-instrument rule: a strategy for a `screen` or `list` universe has
+  no `instrument_id` and no `bar_type` in its configuration. It calls
+  `subscribe_data(DataType("UniverseUpdate"))` and reads the members from
+  `data.data.bar_types` (backtest section 10.10.8). A real backtest in the
+  tests runs the example of the prompt. A saved prompt version keeps its old
+  text, so the `run_backtest` description also has this rule.
 - The forbidden actions in the prompt only tell the model. They are not a
   security control. The allow-list of port 8001 is the control (25.3).
 

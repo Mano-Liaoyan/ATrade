@@ -103,6 +103,10 @@ async def test_the_default_text_is_english_and_asks_for_the_metrics_and_the_out_
     assert "When you answer about a backtest result, name its metrics and its out-of-sample result." in default_text
     # The file format and the template of docs/architecture/strategy.md 9.2.
     assert "class MovingAverageConfig(StrategyConfig):" in default_text
+    # The multi-instrument rule (docs/architecture/backtest.md 10.10.8).
+    assert "has no instrument_id and no bar_type" in default_text
+    assert 'self.subscribe_data(DataType("UniverseUpdate"))' in default_text
+    assert "data.data.bar_types" in default_text
 
 
 @pytest.mark.anyio

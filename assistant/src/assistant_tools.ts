@@ -150,6 +150,11 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
         '"screen" needs screen_id: the screen runs again at each rebalance_period start (quarter, the default, or ' +
         'month). Use "screen" for a backtest from a screen. ' +
         '"list" needs screen_result_id, and optionally symbols (a part of that screen result): a fixed list. ' +
+        'A "screen" or "list" backtest is multi-instrument. Its strategy code has no instrument_id and no bar_type ' +
+        'in the StrategyConfig, and ATrade does not fill these fields. In on_start, the code calls ' +
+        'self.subscribe_data(DataType("UniverseUpdate")). In on_data(self, data), ' +
+        'str(data.data.bar_types).split(",") gives the bar type name of each member. A name can be empty. For each ' +
+        'new member, the code calls BarType.from_str(name), request_bars, and subscribe_bars. ' +
         'A multi-instrument backtest needs 1-DAY or 1-HOUR bars. Only instruments and a bar period with saved bars ' +
         'can run. One user message can start at most 5 backtests.',
       parameters: Type.Object({
