@@ -11,11 +11,14 @@ class PaperAccountFeed {
   openOrders = $state<OpenOrder[]>([]);
   filledOrders = $state<ManualOrder[]>([]);
   isConnected = $state(false);
+  #readNumber = 0;
 
   /** Reads the filled orders. A page that shows them calls this each time it opens. */
   async refreshFilledOrders(fetchFunction: typeof fetch): Promise<void> {
+    this.#readNumber += 1;
+    const thisRead = this.#readNumber;
     const orders = await readFilledManualOrders(fetchFunction);
-    if (orders !== null) {
+    if (thisRead === this.#readNumber && orders !== null) {
       this.filledOrders = orders;
     }
   }
