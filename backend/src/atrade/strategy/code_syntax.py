@@ -44,13 +44,10 @@ def is_order_factory(node: ast.expr) -> bool:
     )
 
 
-def is_backtest_only_order(node: ast.AST) -> bool:
+def is_backtest_only_order(function: ast.Attribute) -> bool:
     """A method of the user can have the same name as an `order_factory` call. Only the real API counts."""
-    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
-        return False
-    name = node.func.attr
-    return name == BACKTEST_ONLY_STRATEGY_CALL or (
-        name in BACKTEST_ONLY_FACTORY_CALLS and is_order_factory(node.func.value)
+    return function.attr == BACKTEST_ONLY_STRATEGY_CALL or (
+        function.attr in BACKTEST_ONLY_FACTORY_CALLS and is_order_factory(function.value)
     )
 
 
@@ -59,9 +56,9 @@ def find_backtest_only_orders(code: str) -> list[CodeProblem]:
     problems = [
         CodeProblem(
             line=node.lineno,
-            message=f"{node.func.attr} works only in a backtest. A forward test sends only market and limit orders.",  # pyright: ignore[reportAttributeAccessIssue]
+            message=f"{node.func.attr} works only in a backtest. A forward test sends only market and limit orders.",
         )
         for node in ast.walk(ast.parse(code))
-        if is_backtest_only_order(node)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and is_backtest_only_order(node.func)
     ]
     return sorted(problems, key=lambda problem: problem.line)

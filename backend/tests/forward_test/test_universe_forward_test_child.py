@@ -314,6 +314,7 @@ async def test_the_child_starts_the_saved_strategy_version_in_the_live_node(  # 
     frontend_build_dir: Path,
     clock: FixedClock,
     monkeypatch: pytest.MonkeyPatch,
+    *,
     version_body: dict[str, object],
 ) -> None:
     forward_test_id = await start_top_2_forward_test(web_client, database_url, version_body)

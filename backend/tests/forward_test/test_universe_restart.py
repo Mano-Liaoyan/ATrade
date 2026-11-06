@@ -87,6 +87,7 @@ async def start_restart(  # noqa: PLR0913 - the fixtures of the run
     frontend_build_dir: Path,
     clock: FixedClock,  # noqa: F811
     tmp_path: Path,
+    *,
     code: str,
 ) -> RestartChildRun:
     forward_test_id = await start_top_2_forward_test(web_client, database_url, {"code": code})
@@ -120,7 +121,7 @@ async def test_the_m1_template_sells_a_restored_position_outside_the_universe(
     clock: FixedClock,  # noqa: F811
     tmp_path: Path,
 ) -> None:
-    child = await start_restart(web_client, database_url, frontend_build_dir, clock, tmp_path, make_m1_code())
+    child = await start_restart(web_client, database_url, frontend_build_dir, clock, tmp_path, code=make_m1_code())
     strategy = child.strategy_of_version
     try:
         await wait_until(lambda: len(strategy.members) == 2 and all(strategy.closes.values()))
@@ -140,7 +141,7 @@ async def test_the_m1_template_rebalances_on_the_next_day_after_a_denied_sell(
     clock: FixedClock,  # noqa: F811
     tmp_path: Path,
 ) -> None:
-    child = await start_restart(web_client, database_url, frontend_build_dir, clock, tmp_path, make_m1_code())
+    child = await start_restart(web_client, database_url, frontend_build_dir, clock, tmp_path, code=make_m1_code())
     strategy = child.strategy_of_version
     child.ledger.split_check_needed.add(MICROSOFT)
     try:
@@ -166,7 +167,7 @@ async def test_a_rule_builder_rebalance_sells_a_restored_position_outside_the_un
     clock: FixedClock,  # noqa: F811
     tmp_path: Path,
 ) -> None:
-    child = await start_restart(web_client, database_url, frontend_build_dir, clock, tmp_path, make_rank_code())
+    child = await start_restart(web_client, database_url, frontend_build_dir, clock, tmp_path, code=make_rank_code())
     strategy = child.strategy_of_version
     try:
         await wait_until(lambda: len(strategy.members) == 2)

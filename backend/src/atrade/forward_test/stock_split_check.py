@@ -185,7 +185,9 @@ class StockSplitCheck:
             if instrument.currency == market.currency
         ]
         running_forward_tests = await read_forward_tests_by_instrument(self.database_url)
-        running_instruments = [instrument for instrument in running_forward_tests if instrument.currency == market.currency]
+        running_instruments = [
+            instrument for instrument in running_forward_tests if instrument.currency == market.currency
+        ]
         instruments = list(dict.fromkeys([*account_quantities, *owner_instruments, *running_instruments]))
         await record_stock_split_evidence(
             database_url=self.database_url,
