@@ -33,6 +33,23 @@ def find_closed_local_port() -> int:
 
 
 @pytest.mark.anyio
+async def test_a_silent_gateway_ends_the_exchange_rate_read_with_a_request_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def never_answer(*_contracts: object) -> list[object]:
+        await anyio.sleep_forever()
+        return []
+
+    monkeypatch.setattr(gateway_connection_module, "OPEN_ORDERS_TIMEOUT_SECONDS", SHORT_TIMEOUT_SECONDS)
+    connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=4004, client_id=1)
+    monkeypatch.setattr(connection.ib, "isConnected", lambda: True)
+    monkeypatch.setattr(connection.ib, "qualifyContractsAsync", never_answer)
+
+    with anyio.fail_after(STREAM_END_WAIT_SECONDS), pytest.raises(GatewayRequestError, match="HKDUSD"):
+        await connection.read_exchange_rate("HKD", "USD")
+
+
+@pytest.mark.anyio
 async def test_keeps_trying_to_connect_while_the_gateway_is_not_reachable(caplog: pytest.LogCaptureFixture) -> None:
     caplog.set_level(logging.WARNING, logger="atrade.ibkr")
     connection = IbAsyncGatewayConnection(

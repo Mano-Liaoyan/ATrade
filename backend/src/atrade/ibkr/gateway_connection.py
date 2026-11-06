@@ -387,9 +387,14 @@ class IbAsyncGatewayConnection:
         """
         for pair, is_inverse in ((currency + quote_currency, False), (quote_currency + currency, True)):
             try:
-                contracts = await self.ib.qualifyContractsAsync(Forex(pair))
+                contracts = await asyncio.wait_for(
+                    self.ib.qualifyContractsAsync(Forex(pair)), OPEN_ORDERS_TIMEOUT_SECONDS
+                )
             except ConnectionError, RequestError:
                 continue
+            except TimeoutError as error:
+                message = f"IB Gateway did not answer the contract request of {pair} in time."
+                raise GatewayRequestError(message) from error
             contract = contracts[0] if contracts else None
             # qualifyContractsAsync gives None or a list of candidates when the pair does not exist in one form.
             if isinstance(contract, Contract) and contract.conId:
