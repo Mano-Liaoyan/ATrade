@@ -4,6 +4,7 @@
 // backend/tests/e2e_server.py adds a failed HK backtest (700), a failed US backtest of 2026 (SBUS), and a failed US
 // backtest that used bars that waited for the IBKR stock split check (SCHK).
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { waitForStartedRunId } from './started_run';
 
 // A real child process runs each backtest. The browser projects share one queue with concurrency 1.
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
@@ -60,11 +61,10 @@ test('starts a backtest with a changed source order and sees the bar count of ea
   await page.getByRole('option', { name: 'AAPL / NASDAQ / USD', exact: true }).click();
   await dialog.getByLabel('Start date (UTC)').fill('2025-01-01');
   await dialog.getByLabel('End date (UTC)').fill('2025-01-11');
-  // The address has the newest backtest of the list until the page opens the started one, so the id comes from the answer.
-  const startResponse = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().endsWith('/api/backtests'));
+  const startedId = waitForStartedRunId(page, '/api/backtests');
   await dialog.getByRole('button', { name: 'Start backtest' }).click();
 
-  const backtestId = String(((await (await startResponse).json()) as { id: number }).id);
+  const backtestId = await startedId;
   await expect(page.getByRole('dialog', { name: 'New backtest' })).toHaveCount(0);
   await expect(page).toHaveURL(new RegExp(`/backtests/${backtestId}$`));
   const chartPanel = page.getByRole('region', { name: `Backtest #${backtestId}` });

@@ -3,6 +3,7 @@
 // "E2E stopped forward tests", so the list overflows. The client ID range 10-13 allows 4 forward tests at a time, and
 // the browser projects run at the same time, so each test starts only 1 forward test and stops it.
 import { expect, test, type Locator, type Page, type WebSocketRoute } from '@playwright/test';
+import { waitForStartedRunId } from './started_run';
 
 // A status change takes worker comparisons and socket reads, each every 2 seconds: "Running" takes 1 comparison and
 // 1 read (up to 4 seconds), "Stopped" takes 2 comparisons and 1 read. The worker and the socket run in the e2e server
@@ -102,12 +103,13 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   const startButton = dialog.getByRole('button', { name: 'Start forward test' });
   // A local time far after the fixed clock of the e2e server, so the worker does not stop the forward test.
   await dialog.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
+  const startedId = waitForStartedRunId(page, '/api/forward-tests');
   await startButton.click();
 
   // The page opens the new forward test.
+  const forwardTestId = await startedId;
   await expect(dialog).toHaveCount(0);
-  await expect(page).toHaveURL(/\/forward-tests\/\d+$/);
-  const forwardTestId = page.url().split('/').at(-1) ?? '';
+  await expect(page).toHaveURL(new RegExp(`/forward-tests/${forwardTestId}$`));
   const chartPanel = page.getByRole('region', { name: `Forward test #${forwardTestId}` });
   const heading = chartPanel.getByRole('heading', { level: 1 });
   await expect(heading).toContainText(`#${forwardTestId}`);
@@ -169,11 +171,12 @@ test('starts a top N forward test on daily bars with the universe name, the Inst
   await dialog.getByLabel('N', { exact: true }).fill('30');
   await fillCapitalBelowTheUnallocatedAmount(dialog, '1000');
   await dialog.getByLabel('End time (local, optional)').fill('2099-12-31T23:30');
+  const startedId = waitForStartedRunId(page, '/api/forward-tests');
   await dialog.getByRole('button', { name: 'Start forward test' }).click();
 
+  const forwardTestId = await startedId;
   await expect(dialog).toHaveCount(0);
-  await expect(page).toHaveURL(/\/forward-tests\/\d+$/);
-  const forwardTestId = page.url().split('/').at(-1) ?? '';
+  await expect(page).toHaveURL(new RegExp(`/forward-tests/${forwardTestId}$`));
   const chartPanel = page.getByRole('region', { name: `Forward test #${forwardTestId}` });
   const heading = chartPanel.getByRole('heading', { level: 1 });
   await expect(heading).toContainText('Top 30 by trading value');

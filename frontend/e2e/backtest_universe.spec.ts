@@ -2,6 +2,7 @@
 // watchlist backtest with its header label, the Instruments tab, and the Symbol column of the Trades table. The bar
 // chart saves the AAPL bars in ibkr_bar, and the watchlist has AAPL.
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { waitForStartedRunId } from './started_run';
 
 const BACKTEST_TIMEOUT_MILLISECONDS = 60_000;
 const WARNING_TEXT = 'Survivorship bias';
@@ -58,11 +59,12 @@ test('starts a watchlist backtest and sees each instrument and the symbol of eac
   await expect(dialog.getByText(WARNING_TEXT, { exact: true })).toBeVisible();
   await dialog.getByLabel('Start date (UTC)').fill('2025-01-01');
   await dialog.getByLabel('End date (UTC)').fill('2025-01-11');
+  const startedId = waitForStartedRunId(page, '/api/backtests');
   await dialog.getByRole('button', { name: 'Start backtest' }).click();
 
+  const backtestId = await startedId;
   await expect(page.getByRole('dialog', { name: 'New backtest' })).toHaveCount(0);
-  await expect(page).toHaveURL(/\/backtests\/\d+$/);
-  const backtestId = page.url().split('/').at(-1) ?? '';
+  await expect(page).toHaveURL(new RegExp(`/backtests/${backtestId}$`));
   const chartPanel = page.getByRole('region', { name: `Backtest #${backtestId}` });
   await expect(chartPanel.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,
