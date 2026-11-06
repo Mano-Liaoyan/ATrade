@@ -19,6 +19,10 @@ ISO_DATE_LENGTH = 10
 ISO_SECONDS_LENGTH = 19
 
 
+class DatabentoDownloadNotStartedError(Exception):
+    """A download stopped before Databento sent data, so it bought nothing."""
+
+
 class DatabentoClient(Protocol):
     def download_batch_job(self, job_id: str, output_dir: Path) -> list[Path]:
         """Downloads all files of a done batch job to `<output_dir>/<job_id>/` and returns their paths."""
@@ -36,7 +40,7 @@ class DatabentoClient(Protocol):
     def download_daily_summary(self, start: date, end: date, output_dir: Path) -> Path:
         """Downloads the EQUS.SUMMARY `ohlcv-1d` bars of all symbols from `start` to `end` (not included) to one DBN
         file in `output_dir` and returns its path. This costs money (about 1.3 USD for a quarter). After an error, no
-        file is at that path."""
+        file is at that path. Raises DatabentoDownloadNotStartedError when Databento sent no data."""
         ...
 
 
@@ -87,7 +91,19 @@ class DatabentoHistoricalClient:
         # `get_range` refuses a path that exists, and a failed stream leaves a partial file at its path.
         partial_path = path.with_name(f"partial-{path.name}")
         partial_path.unlink(missing_ok=True)
-        self.historical.timeseries.get_range(
-            dataset=SUMMARY_DATASET, schema=DAILY_SCHEMA, symbols="ALL_SYMBOLS", start=start, end=end, path=partial_path
-        )
+        try:
+            self.historical.timeseries.get_range(
+                dataset=SUMMARY_DATASET,
+                schema=DAILY_SCHEMA,
+                symbols="ALL_SYMBOLS",
+                start=start,
+                end=end,
+                path=partial_path,
+            )
+        except Exception as error:
+            # databento 0.87 creates the file after `check_http_error` passes. Without a file, the request failed at
+            # the connection or with an HTTP 4xx or 5xx, and no data came. With a file, data came and can bill.
+            if not partial_path.exists():
+                raise DatabentoDownloadNotStartedError from error
+            raise
         return partial_path.replace(path)

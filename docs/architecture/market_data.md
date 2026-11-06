@@ -858,9 +858,19 @@ Quarterly update in the `forward-test` worker:
   update keeps the path in memory, and only after a download without an
   error. `download_daily_summary()` writes to a `partial-` file and renames
   it at the end, so a partial file is never at the final path.
-- One process makes at most 3 paid downloads for one quarter. After the
-  limit, each try logs an error. A restart of the `forward-test` service
-  clears the limit.
+- When `databento_bar` already holds the 63 trading days to the last ranking
+  day without a gap, the update does not download. It calculates the members
+  from the saved bars. Thus a restart after the import does not pay again.
+- One process makes at most 3 downloads that can bill for one quarter. A
+  download that stops before Databento sends data does not count, so an
+  outage does not use the limit. The update tries again each 15 minutes.
+  At the limit, the update of the quarter stops and logs this 1 time. A
+  restart of the `forward-test` service clears the limit.
+- Limit: the count of downloads is in memory, and the file is on the `/tmp`
+  tmpfs. A process that stops between the start of a download and the commit
+  of its import leaves no record. Each restart in that state pays again
+  (about 1.3 USD), without a limit. A durable record needs a migration, so
+  ATrade does not have one.
 - The current quarter is the same for the daily bar update, screens, and
   forward tests: `read_current_us_universe_quarter()` gives the last saved
   quarter on or before now. Until the update saves a new quarter, the
@@ -960,6 +970,8 @@ Phase 3. Sources:
 - It saves the bars in `ibkr_bar` and updates the daily bar summary.
 - When IB Gateway is not reachable, the update does not run that day. The
   screen page shows the last daily bar date, so the user sees old data.
+  After a start of the `web` process, the update first waits for the first
+  connection, because the process starts without IB Gateway.
 - Each read of bars from IBKR also reads 1 stored daily bar again (stock
   split evidence, section 8.13).
 

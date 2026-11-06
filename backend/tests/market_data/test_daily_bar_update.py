@@ -181,6 +181,22 @@ async def test_does_not_run_that_day_when_ib_gateway_is_not_reachable(
 
 
 @pytest.mark.anyio
+async def test_the_update_after_a_start_waits_for_the_first_connection_and_logs_the_wait_1_time(
+    database_url: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    gateway_connection = FakeGatewayConnection(managed_accounts=["DU1234567"])
+    update = create_update(database_url, gateway_connection, AFTER_CLOSE_UTC)
+
+    assert await update.update_if_due() is False
+    assert await update.update_if_due() is False
+
+    assert len([record for record in caplog.records if "waits" in record.message]) == 1
+    gateway_connection.connected = True
+    assert await update.update_if_due() is True
+    assert await update.update_if_due() is False
+
+
+@pytest.mark.anyio
 async def test_a_failed_read_of_one_instrument_does_not_stop_the_update(
     database_url: str, gateway_connection: FakeGatewayConnection
 ) -> None:

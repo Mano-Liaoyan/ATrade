@@ -17,6 +17,7 @@ from atrade.market_data import (
     read_us_universe_members,
     us_universe_update,
 )
+from atrade.market_data.databento_client import DatabentoDownloadNotStartedError
 from tests.fakes.clock import FixedClock
 from tests.fakes.databento import DailyRecord, FakeDatabentoClient
 from tests.us_universe_bars import insert_daily_bars, nasdaq, nyse, weekdays
@@ -218,16 +219,54 @@ async def test_a_failed_download_is_not_used_again(
     assert len(await read_ranked_symbols(database_url)) == 2
 
 
-def test_a_process_makes_at_most_3_paid_downloads_of_a_quarter(
-    database_url: str, client: FakeDatabentoClient, tmp_path: Path
+def test_a_process_stops_after_3_downloads_that_can_bill_and_logs_the_stop_1_time(
+    database_url: str, client: FakeDatabentoClient, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     client.summary_download_failures = 10
-    update = create_update(database_url, FixedClock(at_new_york_time(date(2025, 1, 2), 6)), client, tmp_path)
+    clock = FixedClock(at_new_york_time(date(2025, 1, 2), 6))
+    update = create_update(database_url, clock, client, tmp_path)
     for _ in range(3):
         with pytest.raises(OSError):
             update.update_if_due()
 
-    with pytest.raises(UsUniverseCalculationError, match="3 paid downloads"):
-        update.update_if_due()
+    update.update_if_due()
+    update.update_if_due()
 
     assert len(client.summary_downloads) == 3
+    assert [record.message for record in caplog.records if "stops" in record.message] == [
+        "The US universe update of 2025-01-02 stops after 3 downloads that can bill. A restart clears the limit."
+    ]
+
+
+@pytest.mark.anyio
+async def test_a_databento_outage_does_not_use_the_download_limit(
+    database_url: str, client: FakeDatabentoClient, tmp_path: Path
+) -> None:
+    client.summary_download_outages = 5
+    update = create_update(database_url, FixedClock(at_new_york_time(date(2025, 1, 2), 6)), client, tmp_path)
+    for _ in range(5):
+        with pytest.raises(DatabentoDownloadNotStartedError):
+            update.update_if_due()
+
+    update.update_if_due()
+
+    assert len(await read_ranked_symbols(database_url)) == 2
+
+
+@pytest.mark.anyio
+async def test_a_restart_after_the_import_does_not_buy_the_window_again(
+    database_url: str, client: FakeDatabentoClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail_save(**_: object) -> None:
+        raise OSError
+
+    clock = FixedClock(at_new_york_time(date(2025, 1, 2), 6))
+    with monkeypatch.context() as patch:
+        patch.setattr(us_universe_update, "save_us_universe", fail_save)
+        with pytest.raises(OSError):
+            create_update(database_url, clock, client, tmp_path).update_if_due()
+
+    create_update(database_url, clock, client, tmp_path).update_if_due()
+
+    assert len(client.summary_downloads) == 1
+    assert len(await read_ranked_symbols(database_url)) == 2

@@ -4,6 +4,7 @@ At 21:00 ET of each US trading day, the update reads the daily bars of the curre
 instrument list, and the watchlist from IBKR into ibkr_bar, and updates the daily bar summary. 21:00 ET is after the
 US close and after the Hong Kong close of the same day. It is also after 00:00 UTC of the next day in all seasons, so
 the read range holds the daily bar of the day. When IB Gateway is not reachable, the update does not run that day.
+After a start, the update waits for the first connection of the process.
 """
 
 import asyncio
@@ -49,6 +50,7 @@ class DailyBarUpdate:
         self.gateway_connection = gateway_connection
         self.read_watchlist_instruments = read_watchlist_instruments
         self.last_update_day: date | None = None
+        self.waiting_day: date | None = None
 
     async def keep_updating(self) -> None:
         """Runs until the caller cancels it. An error is logged, and the update runs again on the next trading day."""
@@ -70,6 +72,12 @@ class DailyBarUpdate:
         """Returns True when the update ran."""
         due_day = self.find_due_day(self.clock.read_now_utc())
         if due_day is None:
+            return False
+        if self.gateway_connection.read_connection_number() == 0:
+            # The process just started. The check of each minute runs the update after the first connection.
+            if due_day != self.waiting_day:
+                self.waiting_day = due_day
+                logger.warning("The daily bar update of %s waits for the first connection to IB Gateway.", due_day)
             return False
         self.last_update_day = due_day
         if not self.gateway_connection.is_connected():

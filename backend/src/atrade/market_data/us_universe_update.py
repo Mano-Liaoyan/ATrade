@@ -4,7 +4,8 @@ From 06:00 ET on the first trading day of the quarter until the quarter has memb
 downloads the EQUS.SUMMARY daily bars of the 100 calendar days to the last ranking day (63 trading days and more),
 imports them into databento_bar, and saves the members. When the bar of the previous trading day is not available, it
 tries again each 15 minutes. At 09:00 ET it uses the window that ends 1 trading day earlier. A try after a failed
-import or save uses the downloaded file again, because a download costs money.
+import or save uses the downloaded file again, because a download costs money. When databento_bar already holds the
+window, the update does not download it.
 """
 
 import asyncio
@@ -17,12 +18,12 @@ from zoneinfo import ZoneInfo
 import psycopg
 
 from atrade.foundation.clock import Clock
-from atrade.market_data.databento_client import DatabentoClient
+from atrade.market_data.databento_client import DatabentoClient, DatabentoDownloadNotStartedError
 from atrade.market_data.databento_import import import_databento_files
 from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, find_previous_trading_day
 from atrade.market_data.us_universe import (
     WINDOW_CALENDAR_DAYS,
-    UsUniverseCalculationError,
+    has_ranking_window,
     has_us_universe,
     save_us_universe,
     to_utc_day,
@@ -45,6 +46,7 @@ class UsUniverseUpdate:
         self.download_dir = download_dir
         self.next_try_utc: datetime | None = None
         self.saved_quarter_start_utc: datetime | None = None
+        self.stopped_quarter_start_utc: datetime | None = None
         # By last ranking day. A path is here only after its download ended without an error.
         self.downloaded_paths: dict[date, Path] = {}
         self.paid_downloads: Counter[datetime] = Counter()
@@ -81,21 +83,29 @@ class UsUniverseUpdate:
         logger.info("The EQUS.SUMMARY bar of %s is not available. Next try in 15 minutes.", previous_trading_day)
         return None
 
-    def download(self, quarter_start_utc: datetime, last_ranking_day: date) -> Path:
-        """The file of the window to `last_ranking_day`. This process buys it at most 1 time."""
+    def download(self, quarter_start_utc: datetime, last_ranking_day: date) -> Path | None:
+        """The file of the window to `last_ranking_day`. This process buys it at most 1 time. None at the limit of
+        downloads that can bill: the update of the quarter then stops until a restart."""
         if last_ranking_day not in self.downloaded_paths:
             if self.paid_downloads[quarter_start_utc] >= MAX_PAID_DOWNLOADS_PER_QUARTER:
-                message = (
-                    f"The quarter of {quarter_start_utc:%Y-%m-%d} used {MAX_PAID_DOWNLOADS_PER_QUARTER} paid downloads."
+                self.stopped_quarter_start_utc = quarter_start_utc
+                logger.error(
+                    "The US universe update of %s stops after %d downloads that can bill. A restart clears the limit.",
+                    f"{quarter_start_utc:%Y-%m-%d}",
+                    MAX_PAID_DOWNLOADS_PER_QUARTER,
                 )
-                raise UsUniverseCalculationError(message)
+                return None
             self.paid_downloads[quarter_start_utc] += 1
-            # The full window, also when the previous quarter has less than 63 trading days.
-            self.downloaded_paths[last_ranking_day] = self.client.download_daily_summary(
-                last_ranking_day - timedelta(days=WINDOW_CALENDAR_DAYS),
-                last_ranking_day + timedelta(days=1),
-                self.download_dir,
-            )
+            try:
+                # The full window, also when the previous quarter has less than 63 trading days.
+                self.downloaded_paths[last_ranking_day] = self.client.download_daily_summary(
+                    last_ranking_day - timedelta(days=WINDOW_CALENDAR_DAYS),
+                    last_ranking_day + timedelta(days=1),
+                    self.download_dir,
+                )
+            except DatabentoDownloadNotStartedError:
+                self.paid_downloads[quarter_start_utc] -= 1
+                raise
         return self.downloaded_paths[last_ranking_day]
 
     def update_if_due(self) -> None:
@@ -104,7 +114,7 @@ class UsUniverseUpdate:
             return
         first_trading_day = find_first_trading_day_of_quarter(now_utc.astimezone(NEW_YORK).date())
         quarter_start_utc = to_utc_day(first_trading_day)
-        if quarter_start_utc == self.saved_quarter_start_utc:
+        if quarter_start_utc in (self.saved_quarter_start_utc, self.stopped_quarter_start_utc):
             return
         with psycopg.connect(self.database_url) as connection:
             if has_us_universe(connection, quarter_start_utc):
@@ -113,8 +123,11 @@ class UsUniverseUpdate:
         last_ranking_day = self.find_last_ranking_day(now_utc, find_previous_trading_day(first_trading_day))
         if last_ranking_day is None:
             return
-        path = self.download(quarter_start_utc, last_ranking_day)
-        import_databento_files(database_url=self.database_url, file_paths=[path])
+        if not has_ranking_window(database_url=self.database_url, last_ranking_day=last_ranking_day):
+            path = self.download(quarter_start_utc, last_ranking_day)
+            if path is None:
+                return
+            import_databento_files(database_url=self.database_url, file_paths=[path])
         save_us_universe(
             database_url=self.database_url, quarter_start_utc=quarter_start_utc, last_ranking_day=last_ranking_day
         )

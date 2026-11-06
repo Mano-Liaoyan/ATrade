@@ -6,10 +6,14 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from databento.common.error import BentoError
+from databento.common.error import BentoError, BentoServerError
 from databento.common.validation import validate_file_write_path
 
-from atrade.market_data.databento_client import DatabentoHistoricalClient, find_schema_end
+from atrade.market_data.databento_client import (
+    DatabentoDownloadNotStartedError,
+    DatabentoHistoricalClient,
+    find_schema_end,
+)
 
 DATASET_END = "2026-11-03T15:20:00.000000000Z"
 
@@ -38,11 +42,15 @@ class StreamedTimeseries:
     """`timeseries.get_range` of databento 0.87: it refuses a path that exists, and a failed stream leaves a partial
     file."""
 
-    def __init__(self, failures: int) -> None:
+    def __init__(self, failures: int, http_failures: int = 0) -> None:
         self.failures = failures
+        self.http_failures = http_failures
 
     def get_range(self, *, path: Path, **_: object) -> None:
         validate_file_write_path(path, "path")
+        if self.http_failures > 0:
+            self.http_failures -= 1
+            raise BentoServerError(http_status=503)
         with path.open("xb") as writer:
             writer.write(b"partial")
             if self.failures > 0:
@@ -51,9 +59,10 @@ class StreamedTimeseries:
             writer.write(b" and complete")
 
 
-def create_client(failures: int, monkeypatch: pytest.MonkeyPatch) -> DatabentoHistoricalClient:
+def create_client(failures: int, monkeypatch: pytest.MonkeyPatch, http_failures: int = 0) -> DatabentoHistoricalClient:
     client = DatabentoHistoricalClient("db-no-real-key")
-    monkeypatch.setattr(client, "historical", SimpleNamespace(timeseries=StreamedTimeseries(failures)))
+    timeseries = StreamedTimeseries(failures, http_failures)
+    monkeypatch.setattr(client, "historical", SimpleNamespace(timeseries=timeseries))
     return client
 
 
@@ -78,3 +87,21 @@ def test_a_second_download_of_the_same_range_replaces_the_file(tmp_path: Path, m
     path = client.download_daily_summary(date(2024, 9, 22), date(2025, 1, 1), tmp_path)
 
     assert path.read_bytes() == b"partial and complete"
+
+
+def test_an_http_error_before_the_data_is_a_download_that_did_not_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = create_client(0, monkeypatch, http_failures=1)
+
+    with pytest.raises(DatabentoDownloadNotStartedError):
+        client.download_daily_summary(date(2024, 9, 22), date(2025, 1, 1), tmp_path)
+
+
+def test_a_stream_that_stops_is_not_a_download_that_did_not_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = create_client(1, monkeypatch)
+
+    with pytest.raises(BentoError):
+        client.download_daily_summary(date(2024, 9, 22), date(2025, 1, 1), tmp_path)
