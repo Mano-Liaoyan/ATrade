@@ -9,7 +9,7 @@ import asyncio
 import logging
 import sys
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from atrade.foundation.bar import Bar
@@ -31,7 +31,7 @@ async def read_quarter_start_at(database_url: str, as_of_utc: datetime) -> datet
     quarter_starts = await read_us_universe_quarter_starts(
         database_url=database_url, end_utc=as_of_utc + QUARTER_START_WINDOW
     )
-    started = [start for start in quarter_starts if start.replace(day=1) <= as_of_utc]
+    started = [start for start in quarter_starts if start.astimezone(UTC).replace(day=1) <= as_of_utc]
     return started[-1] if started else None
 
 

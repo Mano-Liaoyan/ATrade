@@ -4,6 +4,7 @@ the daily bars that close at or before the date, and its filter values are the d
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import psycopg
 import pytest
@@ -18,7 +19,7 @@ from atrade.market_data import (
     read_last_daily_bars,
     save_received_bars,
 )
-from atrade.screen import run_screen_at
+from atrade.screen import run_screen_at, screen_point_in_time
 from atrade.screen.screen_point_in_time import read_quarter_start_at
 from atrade.screen.screen_run import ScreenOutcome, run_screen_steps
 from tests.screen.test_screen_run_routes import add_to_watchlist, make_definition
@@ -59,9 +60,15 @@ async def save_rising_bars(
     [
         (datetime(2024, 12, 31, tzinfo=UTC), datetime(2024, 10, 1, tzinfo=UTC)),
         (datetime(2025, 1, 1, tzinfo=UTC), datetime(2025, 1, 2, tzinfo=UTC)),
+        (datetime(2025, 3, 28, tzinfo=UTC), datetime(2025, 1, 2, tzinfo=UTC)),
         (datetime(2025, 4, 1, tzinfo=UTC), datetime(2025, 4, 1, tzinfo=UTC)),
     ],
-    ids=["last_day_of_a_quarter", "calendar_start_of_a_quarter_without_trading", "first_trading_day_of_a_quarter"],
+    ids=[
+        "last_day_of_a_quarter",
+        "calendar_start_of_a_quarter_without_trading",
+        "days_before_a_quarter_in_the_window",
+        "first_trading_day_of_a_quarter",
+    ],
 )
 async def test_a_point_in_time_run_reads_the_quarter_of_the_calendar_month_of_its_date(
     database_url: str, as_of_utc: datetime, quarter_start_utc: datetime
@@ -79,6 +86,19 @@ async def test_a_point_in_time_run_reads_the_quarter_of_the_calendar_month_of_it
         )
 
     assert await read_quarter_start_at(database_url, as_of_utc) == quarter_start_utc
+
+
+@pytest.mark.anyio
+async def test_the_month_of_a_quarter_start_is_the_utc_month(monkeypatch: pytest.MonkeyPatch) -> None:
+    """2025-04-01 00:00 UTC is in March in New York, so its local month would keep the quarter too early."""
+
+    async def read_starts(*, database_url: str, end_utc: datetime) -> list[datetime]:
+        assert (database_url, end_utc.tzinfo) == ("unused", UTC)
+        return [datetime(2025, 4, 1, tzinfo=UTC).astimezone(ZoneInfo("America/New_York"))]
+
+    monkeypatch.setattr(screen_point_in_time, "read_us_universe_quarter_starts", read_starts)
+
+    assert await read_quarter_start_at("unused", datetime(2025, 3, 28, tzinfo=UTC)) is None
 
 
 @pytest.mark.anyio
