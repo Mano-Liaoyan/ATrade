@@ -198,6 +198,7 @@ async def test_the_system_prompt_is_the_editable_part_and_then_the_fixed_part_wi
     assert "Do not send a paper order." in fixed_part
     # A saved prompt version does not change (25.9.1), so the fixed part has the account rule.
     assert "atrade.strategy.find_account" in fixed_part
+    assert "market and limit orders" in fixed_part
     assert f"The open strategy: ID {strategy_id}, name SMA cross." in fixed_part
     assert "The open version: 1." in fixed_part
     last_three = ", ".join(str(backtest_id) for backtest_id in reversed(backtest_ids[1:]))

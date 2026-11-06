@@ -419,7 +419,8 @@ runs in a backtest and in a forward test like all other strategy versions.
 - When any indicator of the rules has no value, no rule runs on that bar
   ([ADR 0001](../adr/0001-one-indicator-definition-for-screens-and-strategies.md)).
 - Bracket orders (`OrderFactory.bracket`) and trailing stops are not in
-  phase 1. They can come later.
+  phase 1. They can come later. In hand-written code they work only in a
+  backtest ([`forward_test.md`](forward_test.md) section 12.19).
 
 ### 9.8.2 Rules
 

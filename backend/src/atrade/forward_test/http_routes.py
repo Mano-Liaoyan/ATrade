@@ -42,7 +42,12 @@ from atrade.paper_trading import (
     PaperAccountMonitor,
     read_needed_split_checks_with_holders,
 )
-from atrade.strategy import StrategyVersion, read_strategy_version, read_strategy_versions
+from atrade.strategy import (
+    StrategyVersion,
+    find_backtest_only_orders,
+    read_strategy_version,
+    read_strategy_versions,
+)
 from atrade.watchlist import read_watchlist_instruments
 
 # The forward test list and the records of each forward test: /ws/ sends a change message after a change
@@ -360,6 +365,8 @@ class ForwardTestRoutes:
         if request.end_time_utc is not None and request.end_time_utc <= self.clock.read_now_utc():
             detail = "The end time must be later than now."
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
+        if order_problems := find_backtest_only_orders(strategy_version.code):
+            return refuse_start(" ".join(f"Line {problem.line}: {problem.message}" for problem in order_problems))
         forward_test_request = await self.make_forward_test_request(request)
         net_liquidation = await self.read_net_liquidation_usd()
         if isinstance(net_liquidation, str):

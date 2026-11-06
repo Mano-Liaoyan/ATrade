@@ -73,6 +73,26 @@ async def test_starts_a_forward_test_with_the_lowest_free_client_id(web_client: 
     assert forward_test["created_at_utc"] == "2026-01-02T03:04:05Z"
 
 
+@pytest.mark.parametrize("call", ["strategy.order_factory.stop_market(1)", "strategy.submit_order_list(1)"])
+@pytest.mark.anyio
+async def test_refuses_the_start_of_code_with_orders_that_a_forward_test_cannot_send(
+    web_client: httpx.AsyncClient, call: str
+) -> None:
+    strategy = (await web_client.post("/api/strategies", json={"name": "Stops"})).json()
+    code = TEST_STRATEGY_FILE.read_text() + f"\n\ndef send_order(strategy) -> None:\n    {call}\n"
+    version = (await web_client.post(f"/api/strategies/{strategy['id']}/versions", json={"code": code})).json()
+
+    response = await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(version["id"]))
+
+    line = len(code.splitlines())
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        f"Line {line}: {call.rsplit('.', maxsplit=1)[-1].split('(', maxsplit=1)[0]} works only in a backtest. "
+        "A forward test sends only market and limit orders."
+    )
+    assert (await web_client.get(FORWARD_TESTS_PATH)).json() == []
+
+
 @pytest.mark.anyio
 async def test_lists_forward_tests_newest_first(web_client: httpx.AsyncClient) -> None:
     strategy_version_id = await save_test_strategy_version(web_client)
