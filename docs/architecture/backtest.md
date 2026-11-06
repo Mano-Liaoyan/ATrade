@@ -1423,8 +1423,7 @@ Phase 2 ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)):
   10.8), like port 8000. The rule "cannot load bars" is about bars only. A
   backtest without saved bars gets `422` (section 10.1).
 - Decided (#182): only the tool `run_backtest` counts the 5 backtests of a
-  user message. Port 8001 does not count them. A steer message is a new
-  user message, so it starts a new count. Only a backtest that
+  user message. Port 8001 does not count them. Only a backtest that
   `POST /api/backtests` accepted counts. A `422` does not count. The tool
   counts a backtest before its POST, so parallel tool calls of one model
   turn also start at most 5.

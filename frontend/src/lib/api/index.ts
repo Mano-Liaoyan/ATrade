@@ -3804,20 +3804,6 @@ export interface components {
             account_quantity_after: string;
         };
         /**
-         * SteerMessage
-         * @description Browser to server: a user message while the AI assistant runs.
-         */
-        SteerMessage: {
-            /**
-             * Type
-             * @default steer
-             * @constant
-             */
-            type: "steer";
-            /** Text */
-            text: string;
-        };
-        /**
          * StrategyVersionSavedMessage
          * @description The AI assistant saved a strategy version, for the diff card (25.5.2).
          */

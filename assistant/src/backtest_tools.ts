@@ -38,7 +38,7 @@ export const SERVICE_BACKTEST_WAIT: BacktestWait = {
   now: () => Date.now(),
 };
 
-/** The backtests that the current user message started. A new user message (prompt or steer) resets the count. */
+/** The backtests that the current user message started. Each user message has a new count. */
 export interface UserMessageBudget {
   startedBacktests: number;
 }

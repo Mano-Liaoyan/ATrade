@@ -243,38 +243,6 @@ async def test_the_next_answer_after_a_model_change_names_the_new_model_and_the_
 
 
 @pytest.mark.anyio
-async def test_steer_adds_a_user_message_to_the_active_run(
-    connection: AssistantConnection, assistant_service: FakeAssistantService
-) -> None:
-    assistant_service.run_scripts = [[MessageDeltaMessage(text="Work"), HOLD, FIRST_ANSWER]]
-    await connection.prompt("Write a strategy.", FIRST_MODEL)
-    assert await connection.receive() == {"type": "run_state", "state": "running"}
-    assert await connection.receive() == {"type": "message_delta", "text": "Work"}
-
-    await connection.send({"type": "steer", "text": "Use SMA 50."})
-    with anyio.fail_after(MESSAGE_WAIT_SECONDS):
-        while not assistant_service.steers:
-            await anyio.sleep(0.01)
-    assistant_service.release()
-
-    assert (await connection.receive_until_settled())[-2]["type"] == "message_end"
-    assert assistant_service.steers == [(connection.conversation_id, "Use SMA 50.")]
-
-
-@pytest.mark.anyio
-async def test_steer_without_an_active_run_sends_an_error(
-    connection: AssistantConnection, assistant_service: FakeAssistantService
-) -> None:
-    await connection.send({"type": "steer", "text": "Use SMA 50."})
-
-    assert await connection.receive() == {
-        "type": "error",
-        "message": "The AI assistant does not run. Send the message as a new prompt.",
-    }
-    assert assistant_service.steers == []
-
-
-@pytest.mark.anyio
 async def test_abort_stops_the_run_and_sends_settled(
     connection: AssistantConnection, assistant_service: FakeAssistantService
 ) -> None:
@@ -302,7 +270,7 @@ async def test_a_second_prompt_during_a_run_sends_an_error(
 
     assert await connection.receive() == {
         "type": "error",
-        "message": "The AI assistant runs. Send a steer message, or stop the run.",
+        "message": "The AI assistant runs. Stop the run first.",
     }
     assistant_service.release()
     await connection.receive_until_settled()

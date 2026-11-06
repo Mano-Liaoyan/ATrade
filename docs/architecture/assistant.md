@@ -20,8 +20,8 @@ routes of an allow-list.
 
 This section is the target. Most of it is not implemented. #178 adds the
 service skeleton and the networks (25.2, 25.3.1). #179 adds the
-conversations, the titles, `/ws/assistant` with `prompt`, `steer`, and
-`abort`, and the first 5 browser routes (25.8, 25.10, 25.11). #184 adds the
+conversations, the titles, `/ws/assistant` with `prompt` and `abort`, and
+the first 5 browser routes (25.8, 25.10, 25.11). #184 adds the
 system prompt, the prompt versions, their 2 routes, and the "Prompt" dialog
 component (25.9). The tickets name facts
 that nobody ran. Section 25.15 lists them.
@@ -865,7 +865,6 @@ Browser to server:
 | `type` | Content |
 |---|---|
 | `prompt` | A new user message. |
-| `steer` | A user message while the AI assistant runs. |
 | `abort` | Stop the current run (the "Stop" button). |
 | `login_answer` | The answer to a `login_step` of kind `prompt`. |
 | `login_start` | Start a login (#183). |
@@ -892,7 +891,6 @@ Fields (#179). Each message is a JSON object with `type`.
 | `type` | Direction | Fields |
 |---|---|---|
 | `prompt` | Browser to server | `text`, `provider`, `model`, `credential_id`, `thinking_level` |
-| `steer` | Browser to server | `text` |
 | `abort` | Browser to server | — |
 | `message_delta` | Server to browser | `text` |
 | `message_end` | Server to browser | `text`, `provider`, `model`, `credential_name`, `thinking_level` |
@@ -905,8 +903,8 @@ Fields (#179). Each message is a JSON object with `type`.
   exist, the server sends `error` and closes the socket with code 1008.
 - `web` sends `run_state` `running` before the run and `settled` after the
   run, also after an `abort` or an error.
-- A `prompt` during a run, a `steer` without a run, and a message that is
-  not valid each get an `error` message. A `prompt` during a run does not
+- A `prompt` during a run and a message that is not valid each get an
+  `error` message. A `prompt` during a run does not
   start a second run.
 - When the browser leaves during a run, `web` stops the run (`abort`).
 - Decided (#182): the fields of the tool messages:
@@ -936,14 +934,14 @@ Login fields (#183):
 | `login_step` | Server to browser | `step` (`auth_url`, `device_code`, `progress`, `info`, `prompt`), `message`, `url`, `user_code`, `prompt_id`, `prompt_type` (`text`, `secret`, `select`, `manual_code`), `options` (`[{id, label}]`); a field that the step does not use is null |
 | `login_end` | Server to browser | `credential` (the fields of `GET /api/assistant/credentials`) |
 
-- A socket without `conversation_id` is for the login only. A `prompt`,
-  `steer`, or `abort` on it gets an `error`.
+- A socket without `conversation_id` is for the login only. A `prompt` or
+  `abort` on it gets an `error`.
 - One login runs at a time on one socket. A failed login sends `error`.
 - No message to the browser holds a secret. The error of a message that is
   not valid does not repeat its input, because a `login_answer` can hold an
   API key. `web` does not log the answers.
 - `ASSISTANT_SOCKET_MESSAGE_MODELS` (`atrade.assistant`) lists the messages
-  of both directions. Message model names: `PromptMessage`, `SteerMessage`,
+  of both directions. Message model names: `PromptMessage`,
   `AbortMessage`, `MessageDeltaMessage`, `MessageEndMessage`,
   `RunStateMessage`, `ToolStepMessage`, `StrategyVersionSavedMessage`,
   `BacktestFinishedMessage`, `ScreenSavedMessage`,
@@ -1362,7 +1360,6 @@ columns behave the same (section 13).
   | Request | Answer |
   |---|---|
   | `POST /conversations/{id}/runs` `{text, provider, model, credential_id, thinking_level, system_prompt}` (`system_prompt` since #184). A `thinking_level` that is not a level of pi gets `400`. | One JSON line (`application/x-ndjson`) for each pi event that `web` uses: `text_delta` `{delta}`, `message_end` `{text, provider, model, credential_name, thinking_level}`, `error` `{message}`, and (#182) `tool_step`, `strategy_version_saved`, and `backtest_finished` with the fields of 25.10. The answer ends when the run ends. |
-  | `POST /conversations/{id}/steer` `{text}` | `204`, or `409` without an active run. |
   | `POST /conversations/{id}/abort` | `204`. |
   | `POST /conversations/{id}/title` `{provider, model, credential_id}` | `{title}`, or `502` `{detail}`. |
   | `GET /conversations/{id}/messages` | `{messages}`. |
@@ -1372,6 +1369,11 @@ columns behave the same (section 13).
   `/data/conversations/`. A wrong body gets `400`. The run has no read
   timeout, because a tool can wait 15 minutes (25.4.2). `web` changes the
   events into the messages of 25.10.
+- `assistant/tests/event_lines.json` holds one JSON line for each event of
+  this protocol. It is the contract check of the event lines.
+  `assistant/tests/event_lines.test.ts` proves that the service emits these
+  lines. `backend/tests/assistant/test_event_lines.py` proves that `web`
+  reads each line as a known event. When an event changes, change the file.
 - Decided (#183): the credential and login part of the same protocol:
 
   | Request | Answer |

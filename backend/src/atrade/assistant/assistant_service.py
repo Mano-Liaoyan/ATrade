@@ -7,7 +7,7 @@ The assistant service listens on port 8002 in the network atrade-assistant-inter
   the credential name, and the thinking level),
   `error`, and the tool events `tool_step`, `strategy_version_saved`, `backtest_finished`, `screen_saved`, and
   `screen_run_finished` (25.10).
-- `POST /conversations/{id}/steer`, `POST /conversations/{id}/abort`.
+- `POST /conversations/{id}/abort`.
 - `POST /conversations/{id}/title`: one model call without tools. `502` with `detail` when it fails.
 - `GET /conversations/{id}/messages`: the messages of the JSONL file.
 - `DELETE /conversations/{id}`: stops the run and deletes the JSONL file.
@@ -245,10 +245,6 @@ class AssistantService(Protocol):
         """Runs one user message with the system prompt of the conversation. The iterator ends at the settled run."""
         ...
 
-    async def steer(self, conversation_id: int, text: str) -> bool:
-        """Adds a user message to the active run. False when the conversation has no active run."""
-        ...
-
     async def abort(self, conversation_id: int) -> None: ...
 
     async def generate_title(self, conversation_id: int, selection: ModelSelection) -> str: ...
@@ -370,10 +366,6 @@ class AssistantServiceClient:
             event = read_event_line(line)
             if event is not None:
                 yield event
-
-    async def steer(self, conversation_id: int, text: str) -> bool:
-        response = await self.request("POST", f"/conversations/{conversation_id}/steer", {"text": text})
-        return response.status_code == HTTP_NO_CONTENT
 
     async def abort(self, conversation_id: int) -> None:
         await self.request("POST", f"/conversations/{conversation_id}/abort", {})

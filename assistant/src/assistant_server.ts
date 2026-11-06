@@ -4,7 +4,6 @@
 //   GET    /health                          The Compose health check.
 //   POST   /conversations/{id}/runs         {text, provider, model, credential_id, thinking_level, system_prompt} → the
 //                                           run events as JSON lines.
-//   POST   /conversations/{id}/steer        {text} → 204, or 409 without an active run.
 //   POST   /conversations/{id}/abort        → 204.
 //   POST   /conversations/{id}/title        {provider, model, credential_id} → {title}, or 502 {detail}.
 //   GET    /conversations/{id}/messages     → {messages}.
@@ -26,10 +25,9 @@ const HTTP_OK = 200;
 const HTTP_NO_CONTENT = 204;
 const HTTP_BAD_REQUEST = 400;
 const HTTP_NOT_FOUND = 404;
-const HTTP_CONFLICT = 409;
 const HTTP_BAD_GATEWAY = 502;
 // Only digits, so a conversation ID can never name a path outside the conversation directory.
-const CONVERSATION_PATH = /^\/conversations\/(\d+)(?:\/(runs|steer|abort|title|messages))?$/u;
+const CONVERSATION_PATH = /^\/conversations\/(\d+)(?:\/(runs|abort|title|messages))?$/u;
 
 const CREDENTIAL_PATH = /^\/credentials\/([\w-]+)$/u;
 const LOGIN_METHODS: readonly string[] = ['oauth', 'api_key'];
@@ -115,14 +113,6 @@ function createRoutes(conversations: Conversations): Record<string, RouteAction>
         response.write(`${JSON.stringify(event)}\n`);
       });
       response.end();
-    },
-    'POST steer': async (conversationId, request, response) => {
-      const text = readText(await readJson(request), 'text');
-      if (await conversations.steer(conversationId, text)) {
-        sendNoContent(response);
-      } else {
-        sendJson(response, HTTP_CONFLICT, { detail: 'The conversation has no active run.' });
-      }
     },
     'POST abort': async (conversationId, _request, response) => {
       await conversations.abort(conversationId);

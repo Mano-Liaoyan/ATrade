@@ -148,14 +148,6 @@ describe('the conversation routes', () => {
     });
   });
 
-  test('POST steer without an active run answers 409', async () => {
-    const baseUrl = await startOnFreePort();
-
-    const response = await postJson(`${baseUrl}/conversations/3/steer`, { text: 'Use SMA 50.' });
-
-    expect(response.status).toBe(409);
-  });
-
   test('POST abort answers 204', async () => {
     const baseUrl = await startOnFreePort();
 
