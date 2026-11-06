@@ -90,6 +90,8 @@ class ForwardTestWorker:
         self.start_child = start_child
         self.is_ready_to_run = is_ready_to_run
         self.running_children: dict[int, RunningChild] = {}
+        # The last logged error of each row. A row that fails again with the same error writes no new log.
+        self.row_errors: dict[int, str] = {}
 
     def request_restart(self, forward_test_ids: list[int]) -> None:
         """Asks the run child of each forward test to stop. The next comparison starts it again, without a crash
@@ -103,18 +105,30 @@ class ForwardTestWorker:
             running_child.is_restart_requested = True
 
     async def keep_comparing(self) -> None:
-        """Runs until the caller cancels it. A PostgreSQL restart must not interrupt the forward tests."""
+        """Runs until the caller cancels it. A PostgreSQL restart must not interrupt the forward tests. Another error is
+        logged, and the next comparison tries again. An error that leaves this loop ends the worker process, and that
+        stops all children without their stop steps."""
         while True:
             try:
                 await self.compare_states()
             except psycopg.OperationalError as error:
                 logger.warning("The forward-test worker lost the database connection. It tries again. %s", error)
+            except Exception:
+                logger.exception("The forward-test comparison failed. The next comparison tries again.")
             await asyncio.sleep(COMPARE_INTERVAL_SECONDS)
 
     async def compare_states(self) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             for row in await forward_test_store.select_rows_to_compare(connection):
-                await self.compare_row(connection, row)
+                try:
+                    await self.compare_row(connection, row)
+                except Exception as error:
+                    # The other rows still get their comparison, so their stop requests go out.
+                    if self.row_errors.get(row.id) != repr(error):
+                        self.row_errors[row.id] = repr(error)
+                        logger.exception("The comparison of forward test %s failed. It tries again.", row.id)
+                else:
+                    self.row_errors.pop(row.id, None)
 
     async def compare_row(self, connection: psycopg.AsyncConnection, row: ForwardTestRow) -> None:
         running_child = self.running_children.get(row.id)

@@ -612,6 +612,9 @@ class IbAsyncGatewayConnection:
                     if not self.ib.isConnected():
                         message = "The connection to IB Gateway was lost."
                         raise GatewayRequestError(message) from None
+                    if self.ibkr_link_lost:
+                        message = f"IB Gateway at {self.host}:{self.port} has no connection to IBKR."
+                        raise GatewayRequestError(message) from None
                     continue
                 # Only the newest state counts. Updates that came at the same time are one update.
                 while not updates.empty():
@@ -624,9 +627,11 @@ class IbAsyncGatewayConnection:
 
     async def subscribe_to_live_bars(self, contract: Contract, bar_period: BarPeriod) -> BarDataList:
         self.require_ibkr_link()
+        loop = asyncio.get_running_loop()
+        started_at = loop.time()
         try:
             # keepUpToDate needs an empty end time: the bars go up to now.
-            return await self.ib.reqHistoricalDataAsync(
+            bars_data = await self.ib.reqHistoricalDataAsync(
                 contract,
                 endDateTime="",
                 durationStr=LIVE_BAR_DURATIONS[bar_period],
@@ -639,6 +644,14 @@ class IbAsyncGatewayConnection:
             )
         except (ConnectionError, RequestError) as error:
             raise GatewayRequestError(str(error)) from error
+        # After a timeout, ib_async cancels the request and returns an empty list, but it keeps the subscriber. No
+        # update comes for that list, so the stream must fail and the caller must subscribe again.
+        # One instrument can have no answer, so this does not mark the IBKR link as lost.
+        if not bars_data and loop.time() - started_at >= HISTORICAL_DATA_TIMEOUT_SECONDS:
+            self.ib.cancelHistoricalData(bars_data)
+            message = "IB Gateway did not answer the live bar subscription in time."
+            raise GatewayRequestError(message)
+        return bars_data
 
     def disconnect(self) -> None:
         self.synchronized = False
