@@ -5,13 +5,21 @@ The records of the forward test and the result of the backtest are rows in a rea
 """
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 
 import httpx
 import psycopg
 import pytest
 
-from atrade.backtest import backtest_store, read_backtest_outcome, read_backtest_summaries
+from atrade.backtest import (
+    BacktestTrade,
+    EquityPoint,
+    backtest_store,
+    read_backtest_outcome,
+    read_backtest_summaries,
+)
+from atrade.forward_test.backtest_comparison import compare_fills
 from atrade.foundation.instrument import Instrument
 from tests.fakes.clock import FixedClock
 from tests.forward_test.test_forward_test_routes import (
@@ -30,6 +38,36 @@ STOPPED_UTC = datetime(2026, 1, 2, 3, 10, 5, tzinfo=UTC)
 
 def make_minute(minute: int, second: int = 0) -> datetime:
     return datetime(2026, 1, 2, 3, minute, second, tzinfo=UTC)
+
+
+def make_fill(time_utc: datetime, price: int) -> BacktestTrade:
+    return BacktestTrade(
+        time_utc=time_utc,
+        side="BUY",
+        quantity_shares=Decimal(10),
+        price_usd=Decimal(price),
+        commission_usd=Decimal(0),
+        symbol="AAPL",
+        exchange="NASDAQ",
+    )
+
+
+def test_a_live_fill_after_the_bar_close_and_the_backtest_fill_at_the_next_open_are_in_one_row() -> None:
+    """The signal bar ends on Friday night. The next bar starts on Monday, and the backtest fills at its open."""
+    bar_ends_utc = [
+        datetime(2026, 1, 9, tzinfo=UTC),
+        datetime(2026, 1, 10, tzinfo=UTC),
+        datetime(2026, 1, 13, tzinfo=UTC),
+    ]
+    equity_curve = [EquityPoint(time_utc=time_utc, equity_usd=Decimal(10000)) for time_utc in bar_ends_utc]
+
+    rows = compare_fills(
+        forward_test_fills=[make_fill(datetime(2026, 1, 10, 0, 0, 5, tzinfo=UTC), 150)],
+        backtest_fills=[make_fill(datetime(2026, 1, 12, 0, 0, 0, 1, tzinfo=UTC), 151)],
+        equity_curves=[equity_curve],
+    )
+
+    assert [(row.bar_end_utc, row.price_difference_usd) for row in rows] == [(bar_ends_utc[1], Decimal(-1))]
 
 
 async def start_forward_test(web_client: httpx.AsyncClient, *, currency: str = "USD") -> JsonObject:

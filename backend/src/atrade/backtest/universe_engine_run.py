@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Final
 
 from nautilus_trader.model import Bar as NautilusBar
-from nautilus_trader.model import CustomData, Equity, Venue
+from nautilus_trader.model import CustomData, Equity, TradeTick, Venue
 from nautilus_trader.persistence import DataCatalogConfig, ParquetDataCatalog
 
 from atrade.backtest.arrow_bars import convert_bars_to_arrow_bytes
@@ -22,9 +22,11 @@ from atrade.backtest.strategy_engine_run import (
     CATALOG_FIRST_NS,
     CATALOG_LAST_NS,
     LOOK_BACK_CATALOG_DIRECTORY_NAME,
+    EngineInputs,
     create_engine,
     create_instrument,
     create_wrangler,
+    make_open_ticks,
     read_trades,
     run_engine,
 )
@@ -79,18 +81,23 @@ def create_universe_catalog(look_back_bars: list[list[NautilusBar]], work_direct
     return DataCatalogConfig(str(catalog_path))
 
 
-def run_universe_strategy(run: UniverseRun, work_directory: Path) -> list[BacktestTrade]:
+def run_universe_strategy(
+    run: UniverseRun, work_directory: Path, changed_orders: list[str] | None = None
+) -> list[BacktestTrade]:
     """Returns the trades of the strategy on the bars of all members, in `run.currency`, with the real exchange.
 
-    Raises StrategyFailedError with the strategy error.
+    `changed_orders` gets the lines of the fill warning. Raises StrategyFailedError with the strategy error.
     """
     instruments: list[Equity] = []
     member_data: list[MemberData] = []
+    open_ticks: list[list[TradeTick]] = []
     for member in run.members:
         all_bars = member.look_back_bars + member.bars
         if not all_bars:
             continue
-        nautilus_instrument = create_instrument(member.instrument, all_bars, SIMULATED_VENUE)
+        # The open bars of the whole range hold more bars than `all_bars`: their prices also need a precision.
+        nautilus_instrument = create_instrument(member.instrument, all_bars + member.open_bars, SIMULATED_VENUE)
+        open_ticks.append(make_open_ticks(nautilus_instrument, member.open_bars))
         wrangler = create_wrangler(nautilus_instrument, run.bar_period, all_bars)
         instruments.append(nautilus_instrument)
         member_data.append(
@@ -120,5 +127,5 @@ def run_universe_strategy(run: UniverseRun, work_directory: Path) -> list[Backte
     # Data with the same time comes in the order of the `add_data` calls. The bars come first, so the bar that closes
     # at a period start comes before the list of that period (section 10.10.3).
     engine.add_data(make_universe_updates(run))
-    run_engine(engine, run.code, work_directory, dict(run.parameters))
+    run_engine(engine, EngineInputs(run.code, dict(run.parameters), open_ticks, changed_orders), work_directory)
     return read_trades(engine, {member.instrument.symbol: member.instrument.exchange for member in run.members})

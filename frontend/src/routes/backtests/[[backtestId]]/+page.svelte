@@ -305,6 +305,9 @@
               {#if detail.has_split_check_pending}
                 <SplitCheckWarning />
               {/if}
+              {#if detail.fill_warning !== null}
+                <InlineNotification kind="warning" title="Orders changed at the open" subtitle={detail.fill_warning} lowContrast />
+              {/if}
               {#if detail.metrics !== null}
                 <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} />
               {/if}

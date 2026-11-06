@@ -33,6 +33,7 @@ function makeBacktest(id: number, strategyId: number, strategyName: string): Bac
     bar_count_by_source: null,
     survivorship_bias: false,
     has_split_check_pending: false,
+    fill_warning: null,
     sweep_id: null,
     parameters: null,
   };

@@ -169,11 +169,15 @@ def find_universe_look_back_length(bar_period: BarPeriod, single_look_back: time
 
 @dataclass(frozen=True)
 class MemberBars:
-    """The bars of one member in its universe periods, and its look-back bars before the start of each range."""
+    """The bars of one member in its universe periods, and its look-back bars before the start of each range.
+
+    `open_bars` holds the member's bars of the whole backtest range. Only their open prices go to the engine.
+    """
 
     instrument: Instrument
     bars: list[Bar]
     look_back_bars: list[Bar]
+    open_bars: list[Bar]
 
 
 @dataclass(frozen=True)
@@ -195,19 +199,18 @@ async def read_universe_bars(
     bar_count_by_source = dict.fromkeys(source_order, 0)
     members: list[MemberBars] = []
     member_ranges = find_member_ranges(periods, request.time_range.end_utc)
-    bar_requests = [
-        bar_request
-        for member, ranges in member_ranges.items()
-        for time_range in ranges
-        for bar_request in (
-            BarRequest(instrument=member, bar_period=request.bar_period, time_range=time_range),
-            BarRequest(
-                instrument=member,
-                bar_period=request.bar_period,
-                time_range=TimeRange(start_utc=time_range.start_utc - look_back_length, end_utc=time_range.start_utc),
-            ),
-        )
-    ]
+    bar_requests: list[BarRequest] = []
+    for member, ranges in member_ranges.items():
+        for time_range in ranges:
+            look_back_range = TimeRange(start_utc=time_range.start_utc - look_back_length, end_utc=time_range.start_utc)
+            bar_requests.append(BarRequest(instrument=member, bar_period=request.bar_period, time_range=time_range))
+            bar_requests.append(
+                BarRequest(instrument=member, bar_period=request.bar_period, time_range=look_back_range)
+            )
+        if ranges != [request.time_range]:
+            bar_requests.append(
+                BarRequest(instrument=member, bar_period=request.bar_period, time_range=request.time_range)
+            )
     saved_bars_of_requests = iter(
         await read_saved_bars_of_many(database_url=database_url, bar_requests=bar_requests, source_order=source_order)
     )
@@ -226,6 +229,8 @@ async def read_universe_bars(
                 instrument=member,
                 bars=bars,
                 look_back_bars=[look_back_by_start[start_utc] for start_utc in sorted(look_back_by_start)],
+                # A member that leaves still sells at its next open, also outside its periods.
+                open_bars=bars if ranges == [request.time_range] else next(saved_bars_of_requests).bars,
             )
         )
     return UniverseBars(members=members, bar_count_by_source=bar_count_by_source)

@@ -98,6 +98,8 @@ class BacktestResult:
     metrics: BacktestMetrics
     # The bar count of each bar source in the backtest range, without the look-back bars.
     bar_count_by_source: dict[BarSource, int]
+    # The run warning when the free cash did not pay for an order at the open (section 10.10.3).
+    fill_warning: str | None = None
 
 
 @dataclass(frozen=True)
@@ -144,6 +146,7 @@ class BacktestRow:
     universe_screen: dict[str, Any] | None
     universe_rebalance_period: UniverseRebalancePeriod | None
     has_split_check_pending: bool
+    fill_warning: str | None
 
 
 BACKTEST_COLUMNS: Final = """
@@ -153,7 +156,8 @@ BACKTEST_COLUMNS: Final = """
     cagr_percent, annual_volatility_percent, sharpe_ratio, sortino_ratio, calmar_ratio, profit_factor,
     average_win_usd, average_win_percent, average_loss_usd, exposure_percent, turnover_per_year, win_rate_percent,
     out_of_sample_share, split_time_utc, conversation_id, source_order, bar_count_by_source, universe_kind,
-    universe_top_n, sweep_id, parameters, universe_screen, universe_rebalance_period, has_split_check_pending
+    universe_top_n, sweep_id, parameters, universe_screen, universe_rebalance_period, has_split_check_pending,
+    fill_warning
 """
 
 
@@ -607,7 +611,7 @@ async def save_result(
                 average_win_usd = %(average_win_usd)s, average_win_percent = %(average_win_percent)s,
                 average_loss_usd = %(average_loss_usd)s, exposure_percent = %(exposure_percent)s,
                 turnover_per_year = %(turnover_per_year)s, win_rate_percent = %(win_rate_percent)s,
-                bar_count_by_source = %(bar_count_by_source)s
+                bar_count_by_source = %(bar_count_by_source)s, fill_warning = %(fill_warning)s
             WHERE id = %(backtest_id)s
             """,
             {
@@ -616,6 +620,7 @@ async def save_result(
                 "bar_count_by_source": Jsonb(
                     {bar_source.value: count for bar_source, count in result.bar_count_by_source.items()}
                 ),
+                "fill_warning": result.fill_warning,
                 "ended_at_utc": ended_at_utc,
             },
         )

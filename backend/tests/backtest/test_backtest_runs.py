@@ -35,11 +35,11 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
     assert backtest["error_message"] is None
     assert backtest["started_at_utc"] == "2026-01-02T03:04:05Z"
     assert backtest["ended_at_utc"] is not None
-    # Each market order fills at the close of the bar that sent it: bars 3, 8, and 13 close at 104, 106, and 96.
+    # Each market order fills at the next open. The saved opens are the closes: 104, 106, and 96.
     # The sell ends the round trip 10 * (106 - 104) = 20. The last buy opens a position that stays open.
     assert backtest["trades"] == [
         {
-            "time_utc": "2026-03-05T00:00:00Z",
+            "time_utc": "2026-03-05T00:00:00.000001Z",
             "side": "BUY",
             "quantity_shares": "10",
             "price_usd": "104.00",
@@ -49,7 +49,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "round_trip_net_profit_usd": None,
         },
         {
-            "time_utc": "2026-03-10T00:00:00Z",
+            "time_utc": "2026-03-10T00:00:00.000001Z",
             "side": "SELL",
             "quantity_shares": "10",
             "price_usd": "106.00",
@@ -59,7 +59,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "round_trip_net_profit_usd": "20.00",
         },
         {
-            "time_utc": "2026-03-15T00:00:00Z",
+            "time_utc": "2026-03-15T00:00:00.000001Z",
             "side": "BUY",
             "quantity_shares": "10",
             "price_usd": "96.00",
@@ -86,7 +86,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
         "average_win_percent": "1.92",
         "average_loss_usd": None,
         # 13 of the 20 bar ends have a position.
-        "exposure_percent": "65.00",
+        "exposure_percent": "60.00",
         # Fills of 1040 + 1060 + 960 = 3060, mean equity 10049, 31 / 365.25 years.
         "turnover_per_year": "3.59",
         "win_rate_percent": "100.00",
@@ -105,6 +105,27 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
     ]  # fmt: skip
     assert equity_curve[0]["time_utc"] == "2026-03-03T00:00:00Z"
     assert equity_curve[-1]["time_utc"] == "2026-03-22T00:00:00Z"
+
+
+@pytest.mark.anyio
+async def test_a_backtest_shows_the_fill_warning_when_the_cash_does_not_pay_for_an_order(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    save_test_bars(database_url)
+    # The strategy buys 1000 shares at bar 3. The paper capital of 10000 pays for fewer at the next open of 104.
+    code = TEST_STRATEGY_FILE.read_text().replace(
+        "trade_quantity_shares: int = 10", "trade_quantity_shares: int = 1000"
+    )
+    backtest_id = await start_backtest(web_client, code)
+
+    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=60):
+        backtest = await wait_for_final_status(web_client, backtest_id)
+
+    assert backtest["status"] == "finished", backtest["error_message"]
+    assert backtest["trades"][0]["quantity_shares"] == "96"
+    assert backtest["fill_warning"].startswith(
+        "Changed orders: 2. Earliest: 2026-03-05 00:00 UTC: BUY 1000 BTEST reduced"
+    )
 
 
 @pytest.mark.anyio
@@ -171,7 +192,7 @@ async def test_the_template_warms_up_on_saved_bars_before_the_start(
 
     assert backtest["status"] == "finished", backtest["error_message"]
     assert backtest["trades"][0] == {
-        "time_utc": "2026-03-03T00:00:00Z",
+        "time_utc": "2026-03-03T00:00:00.000001Z",
         "side": "BUY",
         "quantity_shares": "10",
         "price_usd": "100.00",

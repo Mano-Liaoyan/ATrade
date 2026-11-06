@@ -41,6 +41,7 @@ from atrade.backtest.backtest_universe import (
 from atrade.backtest.strategy_engine_run import (
     StrategyFailedError,
     StrategyRun,
+    make_fill_warning,
     read_currency_precision,
     run_strategy_on_bars,
 )
@@ -238,7 +239,7 @@ async def save_failure(job: BacktestJob, error_message: str) -> None:
 
 
 def run_single_instrument(
-    inputs: BacktestInputs, starting_cash: Decimal, work_directory: Path
+    inputs: BacktestInputs, starting_cash: Decimal, work_directory: Path, changed_orders: list[str]
 ) -> tuple[list[BacktestTrade], list[EquityPoint]]:
     """The trades and the equity curve in the instrument currency."""
     request = inputs.request
@@ -249,7 +250,7 @@ def run_single_instrument(
         bars=inputs.bars,
         look_back_bars=inputs.look_back_bars,
     )
-    trades = run_strategy_on_bars(run, work_directory)
+    trades = run_strategy_on_bars(run, work_directory, changed_orders)
     equity_curve = calculate_equity_curve(
         start_cash=starting_cash, bars=inputs.bars, bar_period=request.bar_period, trades=trades
     )
@@ -257,7 +258,11 @@ def run_single_instrument(
 
 
 def run_universe(
-    inputs: BacktestInputs, universe: UniverseInputs, starting_cash: Decimal, work_directory: Path
+    inputs: BacktestInputs,
+    universe: UniverseInputs,
+    starting_cash: Decimal,
+    work_directory: Path,
+    changed_orders: list[str],
 ) -> tuple[list[BacktestTrade], list[EquityPoint]]:
     """The trades and the equity curve in the universe currency: the cash plus all positions at the bar closes."""
     request = inputs.request
@@ -270,7 +275,7 @@ def run_universe(
         periods=universe.periods,
         parameters=request.parameters or {},
     )
-    trades = run_universe_strategy(run, work_directory)
+    trades = run_universe_strategy(run, work_directory, changed_orders)
     equity_curve = calculate_universe_equity_curve(
         start_cash=starting_cash,
         bars_by_instrument={
@@ -285,11 +290,12 @@ def run_universe(
 async def save_result(job: BacktestJob, inputs: BacktestInputs, starting_cash: Decimal, work_directory: Path) -> None:
     """Runs the strategy with `starting_cash` in the backtest currency and saves the result in USD."""
     request = inputs.request
+    changed_orders: list[str] = []
     try:
         if inputs.universe is None:
-            trades, equity_curve = run_single_instrument(inputs, starting_cash, work_directory)
+            trades, equity_curve = run_single_instrument(inputs, starting_cash, work_directory, changed_orders)
         else:
-            trades, equity_curve = run_universe(inputs, inputs.universe, starting_cash, work_directory)
+            trades, equity_curve = run_universe(inputs, inputs.universe, starting_cash, work_directory, changed_orders)
     except StrategyFailedError as error:
         # readability-exception: the engine reports a strategy error only as an exception (G1).
         await save_failure(job, str(error))
@@ -312,6 +318,7 @@ async def save_result(job: BacktestJob, inputs: BacktestInputs, starting_cash: D
                 trades=trades,
                 metrics=metrics,
                 bar_count_by_source=inputs.bar_count_by_source,
+                fill_warning=make_fill_warning(changed_orders),
             ),
             ended_at_utc=job.clock.read_now_utc(),
         )

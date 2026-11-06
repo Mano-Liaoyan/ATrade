@@ -25,8 +25,8 @@ from tests.backtest.universe_data import (
 from tests.fakes.clock import FixedClock
 
 FOLLOW_UNIVERSE_FILE = Path(__file__).parent / "strategies" / "follow_universe.py"
-# A buy fills at the close of the first bar after the period start: the bar that starts at the period start.
-FIRST_FILL_DELAY = timedelta(days=1)
+# The strategy buys at the close of the bar that starts at the period start. The order fills at the next open.
+FIRST_FILL_DELAY = timedelta(days=1, microseconds=1)
 
 
 async def run_universe_backtest(
@@ -66,8 +66,8 @@ async def test_a_rule_backtest_trades_the_members_of_each_quarter_only_in_that_q
     # AAA leaves at the second quarter start, CCC joins then. BBB stays. The look-back bars warm up each new member.
     assert find_trades(backtest, "AAA") == [
         ("BUY", RANGE_START_UTC + FIRST_FILL_DELAY),
-        # The sell fills at the last close of AAA: the bar that closes at the second quarter start.
-        ("SELL", SECOND_QUARTER_START_UTC),
+        # The strategy sells at the second quarter start. AAA is not a member then, but it fills at its next open.
+        ("SELL", SECOND_QUARTER_START_UTC + timedelta(microseconds=1)),
     ]
     assert find_trades(backtest, "BBB") == [("BUY", RANGE_START_UTC + FIRST_FILL_DELAY)]
     # The strategy cannot read the list of the second quarter in the first quarter.

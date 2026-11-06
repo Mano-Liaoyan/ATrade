@@ -82,9 +82,9 @@ def test_the_template_trades_on_the_first_bar_because_look_back_bars_warm_up_the
         tmp_path,
     )
 
-    # The order fills at the close of the first bar of the range, at its end. No trade is before the start.
+    # The order fills at the open of the second bar of the range. No trade is before the start.
     assert [(trade.time_utc, trade.side, trade.price_usd) for trade in trades] == [
-        (start_utc + timedelta(days=1), "BUY", Decimal("110.00"))
+        (start_utc + timedelta(days=1, microseconds=1), "BUY", Decimal("110.00"))
     ]
 
 

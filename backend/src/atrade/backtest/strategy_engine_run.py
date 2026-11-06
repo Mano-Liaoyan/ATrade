@@ -4,36 +4,49 @@ Only the backtest child process calls this module, because the engine blocks the
 code is user code (docs/architecture.md section 10).
 """
 
+# The NautilusTrader 2.0 stubs type some parameters as a bare dict (docs/architecture.md section 16 G).
+# pyright: reportUnknownMemberType=false
+
 import functools
 import inspect
+import math
 import traceback
+from bisect import bisect_right
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import cast
+from typing import Any, Literal, cast
 
 from nautilus_trader.backtest import BacktestEngine, BacktestEngineConfig
-from nautilus_trader.common import FileWriterConfig, LoggerConfig, LogLevel, logger_flush
+from nautilus_trader.common import CacheConfig, FileWriterConfig, LoggerConfig, LogLevel, TimeEvent, logger_flush
 from nautilus_trader.execution import FixedFeeModel
 from nautilus_trader.model import (
     AccountType,
+    AggressorSide,
     BarType,
     Currency,
     Equity,
     InstrumentId,
     Money,
     OmsType,
+    OrderDenied,
     OrderFilled,
     OrderSide,
+    OrderType,
+    Position,
     Price,
+    Quantity,
     Symbol,
+    TradeId,
+    TradeTick,
     Venue,
 )
 from nautilus_trader.persistence import BarDataWrangler, DataCatalogConfig, ParquetDataCatalog
+from nautilus_trader.trading import Strategy
 
-from atrade.backtest.arrow_bars import NANOSECONDS_PER_SECOND, convert_bars_to_arrow_bytes
+from atrade.backtest.arrow_bars import NANOSECONDS_PER_SECOND, convert_bars_to_arrow_bytes, convert_to_ns
 from atrade.backtest.backtest_metrics import BacktestTrade
 from atrade.backtest.backtest_store import BacktestRequest
 from atrade.foundation.bar import Bar, BarPeriod
@@ -50,6 +63,13 @@ LOOK_BACK_CATALOG_DIRECTORY_NAME = "look_back_catalog"
 # not hold goes to the venue data client. The backtest data client cannot answer, and the request never ends.
 CATALOG_FIRST_NS = 1
 CATALOG_LAST_NS = 2**63 - 1
+# The engine fills a market order on a bar at the bar close. So each bar also gets a trade tick at its open, 1
+# microsecond after the bar start: later than the end of the bar before, and kept by the fill time (a `datetime` has
+# no nanoseconds). These ticks are real engine data: the last price of an instrument is its last open, and a strategy
+# can read them (docs/architecture/backtest.md section 10.10.3).
+OPEN_TICK_DELAY_NS = 1_000
+# The engine splits a bar into 4 ticks. The open tick has the volume of 1 of them.
+BAR_VOLUME_PARTS = 4
 
 
 class StrategyFailedError(Exception):
@@ -116,6 +136,26 @@ def write_look_back_catalog(
     return create_look_back_catalog(look_back_bars, wrangler, bar_period, work_directory)
 
 
+def make_open_ticks(instrument: Equity, bars: list[Bar]) -> list[TradeTick]:
+    """1 trade tick at the open of each bar. A bar without volume also gets a tick: `on_bar` runs on such a bar, so a
+    held order must fill before it. The rules of a strategy that sees no order would send the order a second time."""
+    ticks: list[TradeTick] = []
+    for bar in bars:
+        time_ns = convert_to_ns(bar.start_utc) + OPEN_TICK_DELAY_NS
+        ticks.append(
+            TradeTick(
+                instrument.id,
+                instrument.make_price(float(bar.open)),
+                instrument.make_qty(max(int(bar.volume / BAR_VOLUME_PARTS), 1)),
+                AggressorSide.NO_AGGRESSOR,
+                TradeId(f"open-{time_ns}"),
+                time_ns,
+                time_ns,
+            )
+        )
+    return ticks
+
+
 def create_engine(
     *,
     starting_cash: Decimal,
@@ -134,7 +174,11 @@ def create_engine(
     )
     engine = BacktestEngine(
         BacktestEngineConfig(
-            shutdown_on_error=True, logging=logging, catalogs=[] if look_back_catalog is None else [look_back_catalog]
+            shutdown_on_error=True,
+            logging=logging,
+            # The orders need only the last open tick. More ticks in the cache cost about 0.8 GB for 500 instruments.
+            cache=CacheConfig(tick_capacity=1),
+            catalogs=[] if look_back_catalog is None else [look_back_catalog],
         )
     )
     # The account is in the instrument currency, so the engine needs no exchange rates (section 10.8).
@@ -157,6 +201,31 @@ def read_error_log(work_directory: Path) -> str:
     return "".join(log_texts).strip()
 
 
+def find_side_name(order_side: OrderSide) -> Literal["BUY", "SELL"]:
+    return "BUY" if order_side == OrderSide.BUY else "SELL"
+
+
+def read_refused_orders(engine: BacktestEngine) -> list[str]:
+    """One line for each order that the engine refused: the time, the order, and the reason."""
+    return [
+        f"{datetime.fromtimestamp(event.ts_event / NANOSECONDS_PER_SECOND, tz=UTC):%Y-%m-%d %H:%M} UTC:"
+        f" {find_side_name(order.side)} {order.quantity} {order.instrument_id.symbol} refused ({event.reason})"
+        for order in engine.cache.orders()
+        for event in order.events()
+        if isinstance(event, OrderDenied)
+    ]
+
+
+def make_fill_warning(changed_orders: list[str]) -> str | None:
+    """The run warning of section 10.10.3: the count of the changed orders and the oldest of them.
+
+    Each line starts with its time, so the smallest line is the oldest.
+    """
+    if not changed_orders:
+        return None
+    return f"Changed orders: {len(changed_orders)}. Earliest: {min(changed_orders)}."
+
+
 def read_trades(engine: BacktestEngine, exchanges: dict[str, str] | None = None) -> list[BacktestTrade]:
     """The fills of all orders, oldest first. `exchanges` gives the real exchange of each symbol when the instruments
     are on a simulated venue. Without it, the exchange is the venue."""
@@ -172,7 +241,7 @@ def read_trades(engine: BacktestEngine, exchanges: dict[str, str] | None = None)
             trades.append(
                 BacktestTrade(
                     time_utc=datetime.fromtimestamp(event.ts_event / NANOSECONDS_PER_SECOND, tz=UTC),
-                    side="BUY" if event.order_side == OrderSide.BUY else "SELL",
+                    side=find_side_name(event.order_side),
                     quantity_shares=event.last_qty.as_decimal(),
                     price_usd=event.last_px.as_decimal(),
                     commission_usd=Decimal(0) if commission is None else commission.as_decimal(),
@@ -200,18 +269,38 @@ class StrategyRun:
     look_back_bars: list[Bar]
 
 
-def run_engine(engine: BacktestEngine, code: str, work_directory: Path, config_fields: dict[str, object]) -> None:
-    """Loads the strategy classes from `code`, makes the configuration with `config_fields`, and runs the engine.
+@dataclass(frozen=True)
+class EngineInputs:
+    """The strategy code and the open ticks of one engine run. `changed_orders` gets the lines of the fill warning."""
+
+    code: str
+    config_fields: dict[str, object]
+    open_ticks: list[list[TradeTick]]
+    changed_orders: list[str] | None = None
+
+
+def run_engine(engine: BacktestEngine, inputs: EngineInputs, work_directory: Path) -> None:
+    """Loads the strategy classes, makes the configuration, adds the open ticks, and runs the engine.
 
     Raises StrategyFailedError with the strategy error.
     """
     handler_errors: list[str] = []
+    reduced_orders: list[str] = []
+    waiting_orders: dict[str, WaitingOrder] = {}
+    open_ticks = [tick for ticks in inputs.open_ticks for tick in ticks]
+    if open_ticks:
+        engine.add_data(open_ticks)
     try:
-        strategy_class, config_class = load_strategy_classes(code, work_directory)
+        strategy_class, config_class = load_strategy_classes(inputs.code, work_directory)
         # readability-exception: the StrategyConfig stub has no such fields. The user subclass must define
         # them (docs/architecture/strategy.md section 9.2).
-        config = config_class(**config_fields)  # pyright: ignore[reportArgumentType]
-        engine.add_strategy(record_handler_errors(strategy_class, handler_errors)(config))
+        config = config_class(**inputs.config_fields)  # pyright: ignore[reportArgumentType]
+        checked_class = record_handler_errors(strategy_class, handler_errors)
+        open_times_ns = {
+            ticks[0].instrument_id: [tick.ts_event for tick in ticks] for ticks in inputs.open_ticks if ticks
+        }
+        order_class = fill_at_next_open(checked_class, open_times_ns, reduced_orders, waiting_orders)
+        engine.add_strategy(order_class(config))
         engine.run()
     except StrategyFileError as error:
         raise StrategyFailedError(str(error)) from error
@@ -224,6 +313,128 @@ def run_engine(engine: BacktestEngine, code: str, work_directory: Path, config_f
     error_log = read_error_log(work_directory)
     if error_log:
         raise StrategyFailedError(error_log)
+    if inputs.changed_orders is not None:
+        lost_orders = [order.line for order in waiting_orders.values()]
+        inputs.changed_orders.extend(reduced_orders + read_refused_orders(engine) + lost_orders)
+
+
+@dataclass(frozen=True)
+class WaitingOrder:
+    """A held order. `line` is its line of the fill warning, if the run ends before the order goes to the engine."""
+
+    line: str
+    send: Callable[[], None]
+
+
+class NextOpenOrders(Strategy):
+    """Sends each market order only after the next open tick of its instrument (section 10.10.3).
+
+    The engine then fills the order at this open, for all instruments alike. Its pre-trade check uses this price and
+    the cash after the fills before, so it refuses a buy that the cash cannot pay. The engine would end the run on such
+    a fill. An instrument without a later tick has no next open: the order goes at once and fills at the last close.
+
+    All names have the prefix `_atrade_`, because this class comes before the user class in the method order.
+    """
+
+    _atrade_open_times_ns: dict[InstrumentId, list[int]]
+    _atrade_reduced_orders: list[str]
+    _atrade_waiting_orders: dict[str, WaitingOrder]
+    _atrade_closing_instruments: set[InstrumentId]
+
+    def _atrade_send_at_next_open(self, instrument_id: InstrumentId, order_name: str, send: Callable[[], None]) -> None:
+        times_ns = self._atrade_open_times_ns.get(instrument_id, [])
+        index = bisect_right(times_ns, self.clock.timestamp_ns())
+        if index == len(times_ns):
+            send()
+            return
+        waiting_orders = self._atrade_waiting_orders
+        name = f"next-open-{self.clock.timestamp_ns()}-{len(waiting_orders)}"
+        line = f"{self.clock.utc_now():%Y-%m-%d %H:%M} UTC: {order_name} not sent (the run ended at its next open)"
+        waiting_orders[name] = WaitingOrder(line, send)
+        # 1 nanosecond apart: each order sees the cash after the fill of the order before.
+        self.clock.set_time_alert_ns(name, times_ns[index] + len(waiting_orders), self._atrade_send_waiting_order)
+
+    def _atrade_send_waiting_order(self, event: TimeEvent) -> None:
+        self._atrade_waiting_orders.pop(event.name).send()
+
+    def _atrade_fit_to_cash(self, order: Any) -> Any:
+        """`order`, or a smaller order when the free cash pays for only a part of it at the open.
+
+        The open tick holds a part of the bar volume. The engine fills the rest of a larger order 1 price step higher,
+        so that part of the check adds the step. The engine ends the run on a fill above the cash.
+        """
+        open_tick = self.cache.trade(order.instrument_id)
+        account = self.portfolio.account(order.instrument_id.venue)
+        free_cash = None if account is None else account.balance_free()
+        if order.side != OrderSide.BUY or open_tick is None or free_cash is None:
+            return order
+        price = open_tick.price.as_decimal()
+        if order.quantity.as_decimal() > open_tick.size.as_decimal():
+            price += Decimal(1).scaleb(-open_tick.price.precision)
+        quantity = math.floor(free_cash.as_decimal() / price)
+        if quantity < 1 or quantity >= order.quantity.as_decimal():
+            return order
+        self._atrade_reduced_orders.append(
+            f"{self.clock.utc_now():%Y-%m-%d %H:%M} UTC: BUY {order.quantity} {order.instrument_id.symbol}"
+            f" reduced to {quantity} at {open_tick.price}"
+        )
+        return self.order_factory.market(order.instrument_id, order.side, Quantity.from_int(quantity))
+
+    def submit_order(self, order: Any, *args: Any, **kwargs: Any) -> None:
+        if order.order_type != OrderType.MARKET:
+            super().submit_order(order, *args, **kwargs)
+            return
+        parent = super()
+        self._atrade_send_at_next_open(
+            order.instrument_id,
+            f"{find_side_name(order.side)} {order.quantity} {order.instrument_id.symbol}",
+            lambda: parent.submit_order(self._atrade_fit_to_cash(order), *args, **kwargs),
+        )
+
+    def submit_order_list(self, order_list: Any, *args: Any, **kwargs: Any) -> None:
+        # An order list goes as one unit: it is held with each entry type, and the cash does not reduce it.
+        # `order_factory.bracket` gives a list of orders.
+        source = cast("list[Any]", order_list)[0] if isinstance(order_list, list) else order_list
+        instrument_id: InstrumentId = source.instrument_id
+        parent = super()
+        self._atrade_send_at_next_open(
+            instrument_id,
+            f"order list {instrument_id.symbol}",
+            lambda: parent.submit_order_list(order_list, *args, **kwargs),
+        )
+
+    def close_position(self, position: Position, *args: Any, **kwargs: Any) -> None:
+        # The position stays open until the next open. A second close would sell the position twice.
+        closing_instruments = self._atrade_closing_instruments
+        if position.instrument_id in closing_instruments:
+            return
+        parent = super()
+
+        def close() -> None:
+            closing_instruments.discard(position.instrument_id)
+            parent.close_position(position, *args, **kwargs)
+
+        closing_instruments.add(position.instrument_id)
+        self._atrade_send_at_next_open(position.instrument_id, f"close {position.instrument_id.symbol}", close)
+
+
+def fill_at_next_open[StrategyClass: type](
+    strategy_class: StrategyClass,
+    open_times_ns: dict[InstrumentId, list[int]],
+    reduced_orders: list[str],
+    waiting_orders: dict[str, WaitingOrder],
+) -> StrategyClass:
+    """A subclass of `strategy_class` with the order rule of `NextOpenOrders`."""
+    fields = {
+        "_atrade_open_times_ns": open_times_ns,
+        "_atrade_reduced_orders": reduced_orders,
+        "_atrade_waiting_orders": waiting_orders,
+        "_atrade_closing_instruments": set[InstrumentId](),
+    }
+    subclass = type(strategy_class.__name__, (NextOpenOrders, strategy_class), fields)
+    subclass.__module__ = strategy_class.__module__
+    subclass.__qualname__ = strategy_class.__qualname__
+    return cast("StrategyClass", subclass)
 
 
 def record_handler_errors[StrategyClass: type](strategy_class: StrategyClass, errors: list[str]) -> StrategyClass:
@@ -255,10 +466,12 @@ def record_handler_errors[StrategyClass: type](strategy_class: StrategyClass, er
     return cast("StrategyClass", subclass)
 
 
-def run_strategy_on_bars(run: StrategyRun, work_directory: Path) -> list[BacktestTrade]:
+def run_strategy_on_bars(
+    run: StrategyRun, work_directory: Path, changed_orders: list[str] | None = None
+) -> list[BacktestTrade]:
     """Returns the trades of the strategy on `run.bars`, in the instrument currency.
 
-    Raises StrategyFailedError with the strategy error.
+    `changed_orders` gets the lines of the fill warning. Raises StrategyFailedError with the strategy error.
     """
     request = run.request
     instrument = request.single_instrument
@@ -282,5 +495,6 @@ def run_strategy_on_bars(run: StrategyRun, work_directory: Path) -> list[Backtes
         "instrument_id": nautilus_instrument.id,
         "bar_type": bar_type,
     }
-    run_engine(engine, run.code, work_directory, config_fields)
+    open_ticks = [make_open_ticks(nautilus_instrument, run.bars)]
+    run_engine(engine, EngineInputs(run.code, config_fields, open_ticks, changed_orders), work_directory)
     return read_trades(engine)
