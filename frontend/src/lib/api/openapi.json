@@ -9173,18 +9173,21 @@
             "type": "string",
             "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Symbol"
           },
           "exchange": {
             "type": "string",
             "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Exchange"
           },
           "currency": {
             "type": "string",
             "maxLength": 32,
             "minLength": 1,
+            "pattern": "^[^\\x00]*$",
             "title": "Currency"
           },
           "side": {
@@ -9192,6 +9195,7 @@
           },
           "quantity": {
             "type": "integer",
+            "maximum": 2147483647.0,
             "exclusiveMinimum": 0.0,
             "title": "Quantity"
           },

@@ -261,6 +261,34 @@ async def test_refuses_an_order_that_is_not_a_market_or_limit_order_with_day_or_
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    "changed_fields",
+    [
+        {"quantity": 2**31, "limit_price": "0.0001"},
+        {"limit_price": "1e-20000"},
+        {"symbol": "A\x00B"},
+        {"exchange": "A\x00B"},
+        {"currency": "A\x00B"},
+    ],
+)
+async def test_refuses_a_value_that_the_order_table_cannot_store_before_the_send(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path, changed_fields: JsonObject
+) -> None:
+    """After the send, a value that PostgreSQL refuses leaves an order at IBKR without a row (section 11.3)."""
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        send_response = await client.post(ORDERS_PATH, json=LIMIT_ORDER | changed_fields)
+
+    assert send_response.status_code == 422, send_response.text
+    assert gateway_connection.open_orders == []
+
+
+@pytest.mark.anyio
 async def test_refuses_a_limit_price_that_is_too_large_for_a_float(
     database_url: str, clock: FixedClock, frontend_build_dir: Path
 ) -> None:

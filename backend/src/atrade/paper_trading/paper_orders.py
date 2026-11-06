@@ -26,9 +26,16 @@ from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
 MAX_INSTRUMENT_FIELD_LENGTH = 32
 # The largest order price of the IBKR API is a float. A larger JSON number gives no valid order.
 LIMIT_PRICE_END = Decimal(10**12)
+# The limits of the manual_order columns. A value that PostgreSQL refuses after the send leaves an order at IBKR without
+# a row, so the request must refuse it first (section 11.3).
+MAX_ORDER_QUANTITY = 2**31 - 1
+MAX_LIMIT_PRICE_DECIMAL_PLACES = 16383
 
 InstrumentField = Annotated[
-    str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH)
+    str,
+    StringConstraints(
+        strip_whitespace=True, min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH, pattern=r"^[^\x00]*$"
+    ),
 ]
 
 
@@ -37,9 +44,11 @@ class SendOrderRequest(BaseModel):
     exchange: InstrumentField
     currency: InstrumentField
     side: OrderSide
-    quantity: Annotated[int, Field(gt=0)]
+    quantity: Annotated[int, Field(gt=0, le=MAX_ORDER_QUANTITY)]
     order_type: OrderType
-    limit_price: Annotated[Decimal, Field(gt=0, lt=LIMIT_PRICE_END)] | None
+    limit_price: (
+        Annotated[Decimal, Field(gt=0, lt=LIMIT_PRICE_END, decimal_places=MAX_LIMIT_PRICE_DECIMAL_PLACES)] | None
+    )
     time_in_force: TimeInForce
 
     @model_validator(mode="after")
