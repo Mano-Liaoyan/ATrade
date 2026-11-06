@@ -891,8 +891,12 @@ Decided (#202):
   the universe, and a market order needs a price in the cache.
 - An order that IBKR or ATrade denied, rejected, or ended gives no fill. On
   the first bar of a day without an open or in-flight order, the strategy
-  clears its sell count and ranks again. So a lost order waits for less than
-  1 day, and an order that fails again repeats once a day.
+  sends only the lost orders again, with the same side and the quantity
+  without a fill. A refused buy thus does not rank all targets each day. The
+  first bar of a new month clears the lost orders and the sell count, so the
+  rebalance runs also when a sell stays lost. A sell that ended without an
+  event clears the sell count and ranks again. So a lost order waits for less
+  than 1 day, and an order that fails again repeats once a day.
 - A saved version keeps its code (ADR 0006), so a saved M1 to M4 version must
   be saved again to get these 2 rules.
 

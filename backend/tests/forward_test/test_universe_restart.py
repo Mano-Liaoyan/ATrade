@@ -417,6 +417,8 @@ async def test_the_m1_template_sends_only_the_lost_buy_on_the_next_day(
         strategy.send_order("NVDA.NASDAQ", OrderSide.BUY, 1)
         await wait_until(lambda: strategy.lost_orders)
         child.ledger.split_check_needed.clear()
+        await wait_until(lambda: all(strategy.closes.values()))
+        strategy.rank_again = False
         strategy.retry_lost_orders(False)
         await wait_until(lambda: child.has_side(NVIDIA, "BUY"))
         rank_again = strategy.rank_again
