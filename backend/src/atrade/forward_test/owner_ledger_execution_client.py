@@ -10,6 +10,7 @@ and keeps its fills in the owner ledger (docs/architecture/forward_test.md secti
   (section 12.6).
 - IBKR can end an order without a fill, for example a day order at the market close. The client compares its sent
   orders with the open orders every `open_order_check_interval_seconds` and sends a cancel for each ended order.
+  After a reconnect, 1 empty list is not proof: IBKR can send the list late after an IB Gateway restart.
 - ib_async does not connect again by itself. The fill check connects again after a socket loss, for example at the
   daily IB Gateway restart, and then reads the fills of the gap (section 12.7).
 - Reconciliation reports the owner positions and the owner cash, not the account positions and the account cash.
@@ -168,6 +169,8 @@ class OwnerLedgerExecutionClient(ExecutionClient):
         self.fill_check_task: asyncio.Task[None] | None = None
         self.next_reconnect_at = 0.0
         self.next_open_order_check_at = 0.0
+        # True after a reconnect until an open order list can be trusted.
+        self.is_open_order_list_unproved = False
 
     def add_instruments(self, instruments: tuple[Instrument, ...]) -> None:
         """The new members of a quarter of a multi-instrument forward test (section 12.17)."""
@@ -222,6 +225,8 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             await self.gateway.connect()
         except GatewayRequestError as error:
             logger.warning("Forward test %s has no IB Gateway connection: %s", self.ledger_input.forward_test_id, error)
+            return
+        self.is_open_order_list_unproved = True
 
     async def read_new_fills(self) -> None:
         """A failed read or save does not stop the fill check. The next check tries the execution again."""
@@ -250,8 +255,13 @@ class OwnerLedgerExecutionClient(ExecutionClient):
 
         The executions come after the open orders, so they hold each fill of an order that left the open orders, also
         a held fill. An order of the last interval can be missing from the answer, so it waits for the next check.
+        The first empty list after a reconnect waits for the next check: a wrong cancel makes the strategy order again.
         """
         open_order_ids = {order.order_id for order in await self.gateway.read_own_open_orders()}
+        is_first_empty_list = self.is_open_order_list_unproved and not open_order_ids
+        self.is_open_order_list_unproved = False
+        if is_first_empty_list:
+            return
         executions = await self.gateway.read_executions(include_held=True)
         unsaved_order_ids = {
             execution.order_id
@@ -296,19 +306,23 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             )
         )
         sent_order.saved_execution_ids.add(execution.execution_id)
-        self.generate_order_filled(
-            sent_order.order,
-            VenueOrderId(str(execution.order_id)),
-            None,
-            TradeId(execution.execution_id),
-            create_quantity(execution.quantity),
-            self.make_price(sent_order.instrument, execution.price),
-            Currency.from_str(sent_order.instrument.currency),
-            None,
-            LiquiditySide.NO_LIQUIDITY_SIDE,
-            int(execution.time_utc.timestamp() * NANOSECONDS_PER_SECOND),
-        )
-        await self.send_account_state()
+        # The account state goes first: `on_order_filled` of the strategy reads the new cash. A failed cash read must
+        # not lose the fill event, because the next read skips a saved execution.
+        try:
+            await self.send_account_state()
+        finally:
+            self.generate_order_filled(
+                sent_order.order,
+                VenueOrderId(str(execution.order_id)),
+                None,
+                TradeId(execution.execution_id),
+                create_quantity(execution.quantity),
+                self.make_price(sent_order.instrument, execution.price),
+                Currency.from_str(sent_order.instrument.currency),
+                None,
+                LiquiditySide.NO_LIQUIDITY_SIDE,
+                int(execution.time_utc.timestamp() * NANOSECONDS_PER_SECOND),
+            )
 
     @override
     async def _submit_order(self, command: SubmitOrder) -> None:

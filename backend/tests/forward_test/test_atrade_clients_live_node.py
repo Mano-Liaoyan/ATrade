@@ -122,6 +122,41 @@ async def test_the_account_balance_follows_the_owner_ledger_cash_after_each_fill
 
 
 @pytest.mark.anyio
+async def test_the_fill_event_of_the_strategy_sees_the_new_cash(database_url: str) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        fill_open_order(world, "100")
+        await wait_until(lambda: bool(strategy.cash_at_fills))
+
+    assert strategy.cash_at_fills == [Decimal(9000)]
+
+
+@pytest.mark.anyio
+async def test_a_failed_cash_read_at_a_fill_does_not_lose_the_fill_event(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+
+        async def fail_cash_read(forward_test_id: int) -> Decimal:
+            raise OSError(forward_test_id)
+
+        monkeypatch.setattr(world.ledger, "read_cash_usd", fail_cash_read)
+        fill_open_order(world, "100")
+        await wait_until(lambda: bool(strategy.own_positions()))
+
+    assert strategy.positions_at_stop == [(Decimal(BUY_QUANTITY), Decimal(100))]
+
+
+@pytest.mark.anyio
 async def test_a_fill_above_the_cash_gives_a_balance_of_0_also_at_a_restart(database_url: str) -> None:
     """A market order can fill above the price of the ledger check. The engine refuses a negative balance."""
     world = make_world(database_url)
@@ -252,6 +287,35 @@ async def test_an_order_that_ibkr_ends_without_a_fill_is_no_longer_open(database
         await wait_until(lambda: strategy.count_open_orders() == 0)
 
     assert world.ledger.fills == []
+
+
+@pytest.mark.anyio
+async def test_an_empty_order_list_after_a_reconnect_does_not_end_an_open_order(database_url: str) -> None:
+    """A wrong cancel makes the strategy send the order again, and the old order is still open at IBKR."""
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: strategy.count_open_orders() == 1)
+        world.gateway.empty_own_open_order_reads = 1
+        world.gateway.connected = False
+        await wait_until(lambda: world.gateway.empty_own_open_order_reads == 0)
+        await asyncio.sleep(POLL_SECONDS * 5)
+        assert strategy.count_open_orders() == 1
+
+
+@pytest.mark.anyio
+async def test_2_empty_order_lists_after_a_reconnect_end_an_order(database_url: str) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: strategy.count_open_orders() == 1)
+        world.gateway.open_orders.clear()
+        world.gateway.connected = False
+        await wait_until(lambda: strategy.count_open_orders() == 0)
 
 
 @pytest.mark.anyio

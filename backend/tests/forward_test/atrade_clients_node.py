@@ -15,7 +15,7 @@ from nautilus_trader.common import Environment
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.live import LiveExecutionEngineConfig, LiveNodeBuilder, LiveNodeConfig
 from nautilus_trader.model import Bar as NautilusBar
-from nautilus_trader.model import BarType, InstrumentId, OrderDenied, OrderSide, Quantity, TraderId
+from nautilus_trader.model import BarType, InstrumentId, OrderDenied, OrderFilled, OrderSide, Quantity, TraderId
 from nautilus_trader.trading import Strategy
 
 from atrade.forward_test import (
@@ -63,6 +63,7 @@ class BuyOnceStrategy(Strategy):
         self.positions_at_start: list[tuple[Decimal, Decimal]] = []
         self.positions_at_stop: list[tuple[Decimal, Decimal]] = []
         self.sell_quantity = 0
+        self.cash_at_fills: list[Decimal | None] = []
 
     def own_positions(self) -> list[tuple[Decimal, Decimal]]:
         return [
@@ -103,6 +104,9 @@ class BuyOnceStrategy(Strategy):
 
     def on_order_denied(self, event: OrderDenied) -> None:
         self.denied_reasons.append(str(event.reason))
+
+    def on_order_filled(self, event: OrderFilled) -> None:
+        self.cash_at_fills.append(self.read_cash())
 
 
 @dataclass

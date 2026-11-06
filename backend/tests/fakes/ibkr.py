@@ -115,6 +115,8 @@ class FakeGatewayConnection:
         self.client_id = client_id
         # All open orders of the account, like reqAllOpenOrders. Tests add orders of other client IDs here.
         self.open_orders: list[OpenOrder] = []
+        # The next reads of the own open orders that are empty, like the first read after an IB Gateway restart.
+        self.empty_own_open_order_reads = 0
         # When it is set, place_order fails with this message, like an API error of IBKR.
         self.order_error_message: str | None = None
         # When it is set, cancel_order_and_wait fails with this message, like a cancel without a confirmation.
@@ -260,6 +262,9 @@ class FakeGatewayConnection:
 
     async def read_own_open_orders(self) -> list[OpenOrder]:
         self.require_connection()
+        if self.empty_own_open_order_reads > 0:
+            self.empty_own_open_order_reads -= 1
+            return []
         return [order for order in self.open_orders if order.client_id == self.client_id]
 
     async def cancel_order_and_wait(self, order_id: int) -> None:

@@ -118,7 +118,7 @@ This replaces the rules above:
 - The LiveNode of a forward test uses the ATrade execution client
   (section 12.19), not the IB execution client. The execution client reports
   the owner position and the owner cash for reconciliation, not the account
-  values. After each fill it reports the owner cash again, so the account
+  values. Before each fill event it reports the owner cash again, so the account
   balance of the strategy is the ledger cash. The balance shows 0 when the
   owner cash is below 0, because NautilusTrader refuses a negative balance.
 - The migration drops the partial unique index
@@ -1197,10 +1197,15 @@ Execution client (`OwnerLedgerExecutionClient`,
   held fills. The strategy gets `OrderCanceled` for an open order that IBKR
   no longer has and that has no unsaved fill, so the strategy does not wait
   for an order that IBKR ended, for example a day order at the market close.
-  An order that is younger than 60 s waits for the next check.
+  An order that is younger than 60 s waits for the next check. After a
+  reconnect, the first empty list waits for the next check: IBKR can send the
+  list late after an IB Gateway restart, and a wrong cancel makes the strategy
+  send the order again.
 - It sends only market and limit orders. A stop order gets `OrderDenied`, and
   `submit_order_list` reaches no IBKR order. So `POST /api/forward-tests`
-  refuses code with such a call with an AST check. A backtest runs this code.
+  refuses code with such a call with an AST check: a call on `order_factory`,
+  or `submit_order_list`. A method of the user with the same name passes, for
+  example `self.bracket()`. A backtest runs this code.
 
 Data client (`BarStoreDataClient`,
 `backend/src/atrade/forward_test/bar_store_data_client.py`):
