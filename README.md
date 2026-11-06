@@ -497,7 +497,9 @@ the server, for example `/srv/atrade`.
    `ATRADE_WEB_PORT`. The tailnet policy must let the NPM host connect to
    this port, and must not let tagged devices other than the NPM host
    connect to it.
-   Turn on "Websockets Support". Use an SSL certificate that Cloudflare
+   Turn on "Websockets Support". Do not set another `Host` header in the
+   advanced settings: `web` refuses a WebSocket and a non-GET request when
+   `Host` differs from `Origin`. Use an SSL certificate that Cloudflare
    accepts in Full (strict) mode, for example a Cloudflare Origin
    Certificate.
 8. In the firewall of the NPM host, let only the

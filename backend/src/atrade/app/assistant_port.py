@@ -1,4 +1,4 @@
-"""Port 8001: the app that the assistant service calls, and the refusal of its subnet on port 8000.
+"""Port 8001: the app that the assistant service calls, and the refusals of port 8000 (assistant subnet, other sites).
 
 docs/architecture/assistant.md 25.3.2 and 25.3.3. The app has only the routes of the allow-list. It has no `/ws/`
 route, no frontend files, and no OpenAPI document. Compose does not publish the port.
@@ -6,6 +6,7 @@ route, no frontend files, and no OpenAPI document. Compose does not publish the 
 
 import ipaddress
 from typing import Final
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
@@ -25,6 +26,7 @@ ASSISTANT_PORT: Final = 8001
 # The fixed subnet of atrade-assistant-internal in deploy/compose.yaml (decided in #178).
 ASSISTANT_SUBNET: Final = ipaddress.ip_network("172.31.250.0/24")
 REFUSED_TEXT: Final = b'{"detail":"Port 8000 does not answer requests from the assistant network."}'
+OTHER_SITE_REFUSED_TEXT: Final = b'{"detail":"Port 8000 does not answer requests from another site."}'
 # The WebSocket close code "policy violation". uvicorn answers a close before accept with HTTP 403.
 POLICY_VIOLATION_CLOSE_CODE: Final = 1008
 
@@ -33,6 +35,7 @@ __all__ = [
     "ASSISTANT_SUBNET",
     "CONVERSATION_HEADER",
     "RefuseAssistantSubnet",
+    "RefuseOtherSite",
     "create_assistant_port_app",
 ]
 
@@ -92,6 +95,24 @@ def is_assistant_address(scope: Scope) -> bool:
     return server is None or server[0] != client[0]
 
 
+async def refuse_request(scope: Scope, send: Send, refused_text: bytes) -> None:
+    """A WebSocket is closed before accept, so uvicorn answers 403. Each other request gets 403 with `refused_text`."""
+    if scope["type"] == "websocket":
+        await send({"type": "websocket.close", "code": POLICY_VIOLATION_CLOSE_CODE})
+        return
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 403,
+            "headers": [
+                (b"content-type", b"application/json"),
+                (b"content-length", str(len(refused_text)).encode()),
+            ],
+        }
+    )
+    await send({"type": "http.response.body", "body": refused_text})
+
+
 class RefuseAssistantSubnet:
     """ASGI middleware of port 8000: 403 for each request from another address of the assistant subnet."""
 
@@ -102,17 +123,39 @@ class RefuseAssistantSubnet:
         if scope["type"] not in {"http", "websocket"} or not is_assistant_address(scope):
             await self.app(scope, receive, send)
             return
-        if scope["type"] == "websocket":
-            await send({"type": "websocket.close", "code": POLICY_VIOLATION_CLOSE_CODE})
+        await refuse_request(scope, send, REFUSED_TEXT)
+
+
+def read_origin_host(origin: bytes) -> str:
+    """The host and port of an Origin header. Empty for "null" (a sandboxed page) and for a value that is not a URL."""
+    try:
+        return urlsplit(origin.decode("latin-1")).netloc.lower()
+    except ValueError:
+        return ""
+
+
+def is_other_site_request(scope: Scope) -> bool:
+    """True when a page of another site sent a WebSocket or a non-GET request. The browser sets Origin and the page
+    cannot change it. A tool sends no Origin, so it is not refused. The Vite proxy, Cloudflare, and Nginx Proxy Manager
+    keep the Host header of the browser (docs/architecture.md section 14)."""
+    if scope["type"] == "http" and scope["method"] == "GET":
+        return False
+    headers = dict(scope["headers"])
+    origin = headers.get(b"origin")
+    if origin is None:
+        return False
+    origin_host = read_origin_host(origin)
+    return not origin_host or origin_host != headers.get(b"host", b"").decode("latin-1").lower()
+
+
+class RefuseOtherSite:
+    """ASGI middleware of port 8000: 403 for a WebSocket or a non-GET request from a page of another site."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] not in {"http", "websocket"} or not is_other_site_request(scope):
+            await self.app(scope, receive, send)
             return
-        await send(
-            {
-                "type": "http.response.start",
-                "status": 403,
-                "headers": [
-                    (b"content-type", b"application/json"),
-                    (b"content-length", str(len(REFUSED_TEXT)).encode()),
-                ],
-            }
-        )
-        await send({"type": "http.response.body", "body": REFUSED_TEXT})
+        await refuse_request(scope, send, OTHER_SITE_REFUSED_TEXT)

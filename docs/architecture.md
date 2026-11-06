@@ -338,6 +338,19 @@ Port 8000 refuses with `403` each request whose peer address (ASGI
 requests from the assistant network."}`. A WebSocket from this subnet is
 closed before accept, so uvicorn answers `403`.
 
+Port 8000 also refuses each WebSocket and each non-GET request from a page of
+another site. The WebSockets and the routes have no login of their own, so
+without this rule a page on another site can open `/ws/assistant` or send
+`POST /api/paper-trading/stock-splits/{id}/apply`. The middleware is
+`RefuseOtherSite` in `app/assistant_port.py`. It compares the host and port of
+the `Origin` header with the `Host` header. When they differ, or when `Origin`
+is `null` or is not a URL, a request gets `403` with `{"detail": "Port 8000
+does not answer requests from another site."}`, and a WebSocket is closed
+before accept. A request without `Origin` passes, so tools such as `curl` still
+work. Port 8001 does not have this rule. The rule needs the `Host` header of
+the browser at `web`. The Vite development proxy keeps it, and the proxy path
+of section 14 keeps it.
+
 ## 7. IBKR access
 
 Section 7 is in [`docs/architecture/ibkr.md`](architecture/ibkr.md). It holds
@@ -1312,7 +1325,10 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
 - Nginx Proxy Manager (NPM) runs on a different host in the user's tailnet.
   One proxy host sends the Web host name to
   `http://<server Tailscale IP>:<ATRADE_WEB_PORT>`
-  with WebSocket support on (market data, the language server).
+  with WebSocket support on (market data, the language server). NPM sends
+  the `Host` header of the browser by default (`proxy_set_header Host $host`).
+  Do not change this in the advanced settings of the proxy host: `web` compares
+  it with `Origin` (section 6).
 - Only Cloudflare can connect to NPM: the firewall of the NPM host lets only
   the Cloudflare IP ranges connect to port 443. Without this rule, a request to
   the IP address of the NPM host bypasses Cloudflare Access.

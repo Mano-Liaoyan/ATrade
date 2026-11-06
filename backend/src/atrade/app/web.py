@@ -17,7 +17,12 @@ from fastapi import FastAPI
 from pydantic import ValidationError
 
 from atrade.app.access_session_routes import create_access_session_router
-from atrade.app.assistant_port import ASSISTANT_PORT, RefuseAssistantSubnet, create_assistant_port_app
+from atrade.app.assistant_port import (
+    ASSISTANT_PORT,
+    RefuseAssistantSubnet,
+    RefuseOtherSite,
+    create_assistant_port_app,
+)
 from atrade.app.backtest_process import BACKTEST_PROCESS_COMMAND
 from atrade.app.database_migrations import upgrade_database
 from atrade.app.frontend_files import create_frontend_router
@@ -174,6 +179,8 @@ def create_web_app(
     add_validation_error_handler(app)
     # The assistant service can call only port 8001 (docs/architecture/assistant.md 25.3.2).
     app.add_middleware(RefuseAssistantSubnet)
+    # A page of another site must not reach the WebSockets and the changing routes (docs/architecture.md section 6).
+    app.add_middleware(RefuseOtherSite)
     app.include_router(create_health_router(database_url=settings.database_url, clock=clock))
     app.include_router(create_access_session_router())
     app.include_router(
