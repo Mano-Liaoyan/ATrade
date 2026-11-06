@@ -170,3 +170,53 @@ def test_a_move_changes_the_old_symbol_in_the_saved_quarters(database_url: str, 
         (1, "OLDX"),
         (2, "NEWX"),
     ]
+
+
+@pytest.mark.anyio
+async def test_a_new_symbol_with_older_saved_bars_is_a_reused_ticker_and_gets_no_link(
+    database_url: str, tmp_path: Path
+) -> None:
+    older_bar = create_bars("NEWX", TRADING_DAYS[:1], [("7", "7", 1000)])
+    import_files(database_url, tmp_path / "first", create_history_files(older_bar))
+
+    import_files(
+        database_url,
+        tmp_path / "second",
+        create_history_files(
+            [
+                *create_bars("OLDX", TRADING_DAYS[1:3], [("50", "50", 1000)] * 2),
+                *create_bars("NEWX", TRADING_DAYS[3:], [("50", "50", 1000)] * 3),
+                *create_bars("ANCH", TRADING_DAYS, [("30", "30", 500)] * 6),
+            ]
+        ),
+    )
+
+    assert read_table(database_url, LINK_STATES) == []
+    assert [bar.start_utc.date() for bar in await read_bars(database_url, "OLDX")] == TRADING_DAYS[1:3]
+    assert [bar.start_utc.date() for bar in await read_bars(database_url, "NEWX")] == [
+        TRADING_DAYS[0],
+        *TRADING_DAYS[3:],
+    ]
+
+
+def test_a_stock_split_of_the_new_symbol_on_the_same_day_stays_and_the_import_does_not_stop(
+    database_url: str, tmp_path: Path
+) -> None:
+    with psycopg.connect(database_url) as connection:
+        connection.cursor().executemany(
+            """
+            INSERT INTO stock_split (
+                symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc
+            )
+            VALUES (%s, 'NASDAQ', 'USD', '2020-01-07T00:00:00Z', %s, 'databento_import', 'import_rejected', now())
+            """,
+            [("OLDX", 2), ("NEWX", 3)],
+        )
+
+    import_files(database_url, tmp_path, create_change("50", "50.2"))
+
+    assert read_table(database_url, LINK_STATES) == [("OLDX", "NEWX", "moved")]
+    assert read_table(database_url, "SELECT symbol, split_ratio FROM stock_split ORDER BY symbol") == [
+        ("NEWX", 3),
+        ("OLDX", 2),
+    ]

@@ -815,11 +815,15 @@ daily close of each instrument and day. Primary key `symbol`, `exchange`,
     SPAC and a new IPO are both near 10 USD.
   - The first volume of the new symbol is within 3 times of the last volume
     of the old symbol.
+- A new symbol with a saved bar before its first bar of the import gets no
+  new link. It is a reused ticker or an old instrument, and a move would merge
+  2 histories. A second import of a recorded link still applies that link.
 - A link with proof has the state `moved`. The import saves all history of a
   linked old symbol under the new symbol, the same as IBKR does. This
   includes the bars, saved ranges, stock splits, and universe members that
   an earlier import or update saved. A quarter that has both symbols keeps
-  both rows. The old symbol loses its daily bar summary.
+  both rows. A stock split of the new symbol on the same day stays, and the
+  stock split of the old symbol keeps its symbol. The old symbol loses its daily bar summary.
 - A link without proof has the state `waiting`. It moves no bar. The 2 symbols
   stay 2 instruments until the user check. `--accept` of
   `app/databento_check.py` moves the saved rows of all waiting links.
@@ -1215,8 +1219,8 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   The import log and the check list show each link.
 - Decided (#191): symbol reuse (a different company uses the symbol later)
   is not detected. The bars of both companies are under the same
-  instrument. The link rule does not link them, because there is a gap of
-  trading days between the 2 companies. The detection rule can see the
+  instrument. The link rule does not link them, because the new symbol has
+  older saved bars (section 8.8.4). The detection rule can see the
   price gap as a stock split; the user rejects it in the check.
 - Decided (#190): the program `app/databento_import.py` runs the Databento
   import in the `web` image with `docker compose run`. The downloaded files

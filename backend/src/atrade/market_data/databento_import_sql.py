@@ -168,7 +168,9 @@ SAVE_IMPORT_BARS: LiteralString = (
 # with more than 1 candidate gets no link. A candidate has proof when both listing exchanges come from the statistics
 # (before 2024-07-01: an EQUS.SUMMARY exchange is a copy of the old symbol), the open is not near 10 USD (many SPACs and
 # IPOs open there), and the first volume is within 3 times of the last volume. Without proof, the link waits for the
-# user check. `state` is the state of a link that an earlier import recorded. A rejected link stays rejected.
+# user check. `state` is the state of a link that an earlier import recorded. A rejected link stays rejected. A new
+# symbol with a saved bar before its first bar of this import is a reused ticker or an old instrument: it gets no new
+# link, so 2 histories do not merge.
 SELECT_SYMBOL_LINKS: LiteralString = """
     WITH trading_day AS (
         SELECT start_utc, lead(start_utc) OVER (ORDER BY start_utc) AS next_start_utc
@@ -201,6 +203,11 @@ SELECT_SYMBOL_LINKS: LiteralString = """
     WHERE candidate.old_symbol NOT IN (SELECT old_symbol FROM candidate GROUP BY old_symbol HAVING count(*) > 1)
         AND candidate.new_symbol NOT IN (SELECT new_symbol FROM candidate GROUP BY new_symbol HAVING count(*) > 1)
         AND link.state IS DISTINCT FROM 'rejected'
+        AND (link.state IS NOT NULL OR NOT EXISTS (
+            SELECT FROM databento_bar AS older_bar
+            WHERE older_bar.symbol = candidate.new_symbol AND older_bar.exchange = candidate.exchange
+                AND older_bar.start_utc < candidate.change_start_utc
+        ))
     ORDER BY candidate.change_start_utc, candidate.old_symbol
 """
 
@@ -216,9 +223,10 @@ MOVE_TO_NEW_SYMBOL: LiteralString = """
     WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s AND start_utc < %(change_start_utc)s
 """
 
-# A link can follow an earlier import: the rows that this import did not read go to the new symbol too. A saved bar of
-# the new symbol on the same day stays. The daily bar summary of the new symbol comes from the save of the import. A
-# saved quarter gets the new symbol, so its member keeps its bars. A quarter that has both symbols keeps both rows.
+# A link can follow an earlier import: the rows that this import did not read go to the new symbol too. A saved bar or
+# a stock split of the new symbol on the same day stays. The daily bar summary of the new symbol comes from the save of
+# the import. A saved quarter gets the new symbol, so its member keeps its bars. A quarter that has both symbols keeps
+# both rows.
 MOVE_SAVED_ROWS_TO_NEW_SYMBOL: tuple[LiteralString, ...] = (
     """
     UPDATE databento_bar AS old_bar SET symbol = %(new_symbol)s
@@ -235,8 +243,13 @@ MOVE_SAVED_ROWS_TO_NEW_SYMBOL: tuple[LiteralString, ...] = (
     WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s
     """,
     """
-    UPDATE stock_split SET symbol = %(new_symbol)s
+    UPDATE stock_split AS old_split SET symbol = %(new_symbol)s
     WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s AND ex_date_utc < %(change_start_utc)s
+        AND NOT EXISTS (
+            SELECT FROM stock_split AS new_split
+            WHERE new_split.symbol = %(new_symbol)s AND new_split.exchange = old_split.exchange
+                AND new_split.currency = old_split.currency AND new_split.ex_date_utc = old_split.ex_date_utc
+        )
     """,
     "DELETE FROM daily_bar_summary WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s",
     """
