@@ -121,6 +121,16 @@ HK_INSTRUMENTS = [
 ]
 
 
+def cancel_leftover_backtests(database_url: str) -> None:
+    """A stopped run leaves its queued backtests, and the e2e database is not cleared between runs. One queue with
+    concurrency 1 would run them first, so the tests of this run would wait past their timeouts."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "UPDATE backtest SET status = 'cancelled', ended_at_utc = %(now)s WHERE status = 'queued'",
+            {"now": FIXED_NOW_UTC},
+        )
+
+
 def insert_strategy_version(connection: psycopg.Connection, *, name: str, code: str) -> int | None:
     """Returns None when the strategy is already there: the e2e database is not cleared between runs."""
     strategy_row = connection.execute(
@@ -692,6 +702,7 @@ def main() -> None:
     frontend_build_dir = Path(os.environ["ATRADE_E2E_FRONTEND_BUILD_DIR"])
     port = int(os.environ["ATRADE_E2E_PORT"])
     upgrade_database(database_url)
+    cancel_leftover_backtests(database_url)
     add_stopped_forward_tests(database_url)
     add_compared_forward_test(database_url)
     add_chart_indicator_forward_test(database_url)
