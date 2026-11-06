@@ -1,12 +1,14 @@
 """Public entry of the backtest capability: backtest runs, their results, the metric functions (with PSR and DSR),
-backtests for other capabilities (queue one, read its outcome, the last IDs of a strategy), and the look-back bars of
-`request_bars`."""
+backtests for other capabilities (queue one, read its outcome or summaries, the last IDs of a strategy), the metric and
+equity point responses, and the look-back bars of `request_bars`."""
 
 from atrade.backtest.backtest_access import (
     BacktestOutcome,
+    BacktestSummary,
     check_backtest_request,
     queue_backtest,
     read_backtest_outcome,
+    read_backtest_summaries,
     read_last_backtest_ids,
 )
 from atrade.backtest.backtest_metrics import (
@@ -27,7 +29,13 @@ from atrade.backtest.backtest_run import LookBack, find_look_back, run_backtest
 from atrade.backtest.backtest_runner import BacktestRunner
 from atrade.backtest.backtest_start import BacktestRefusal, start_backtest
 from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus, BacktestUniverse, UniversePeriod
-from atrade.backtest.http_routes import BACKTEST_CHANGE_SOCKET, create_backtest_assistant_router, create_backtest_router
+from atrade.backtest.http_routes import (
+    BACKTEST_CHANGE_SOCKET,
+    BacktestMetricsResponse,
+    EquityPointResponse,
+    create_backtest_assistant_router,
+    create_backtest_router,
+)
 from atrade.backtest.sharpe_probability import (
     calculate_deflated_sharpe,
     calculate_probabilistic_sharpe,
@@ -43,14 +51,17 @@ __all__ = [
     "SWEEP_CHANGE_SOCKET",
     "UNIVERSE_UPDATE",
     "BacktestMetrics",
+    "BacktestMetricsResponse",
     "BacktestOutcome",
     "BacktestRefusal",
     "BacktestRequest",
     "BacktestRunner",
     "BacktestStatus",
+    "BacktestSummary",
     "BacktestTrade",
     "BacktestUniverse",
     "EquityPoint",
+    "EquityPointResponse",
     "LookBack",
     "RoundTrip",
     "SplitMetrics",
@@ -76,6 +87,7 @@ __all__ = [
     "make_universe_update",
     "queue_backtest",
     "read_backtest_outcome",
+    "read_backtest_summaries",
     "read_last_backtest_ids",
     "run_backtest",
     "start_backtest",

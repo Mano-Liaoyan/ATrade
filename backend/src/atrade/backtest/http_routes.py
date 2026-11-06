@@ -4,7 +4,7 @@ and read or change the backtest limits (timeout and concurrency).
 A new backtest waits in the queue. The backtest runner of the Web process starts it (backtest_runner.py).
 """
 
-from dataclasses import asdict, replace
+from dataclasses import asdict, fields, replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Annotated, Any, Literal, NoReturn
@@ -277,22 +277,7 @@ def to_metrics_response(metrics: BacktestMetrics | None) -> BacktestMetricsRespo
 
 def to_present_metrics_response(metrics: BacktestMetrics) -> BacktestMetricsResponse:
     return BacktestMetricsResponse(
-        final_equity_usd=metrics.final_equity_usd,
-        total_return_percent=metrics.total_return_percent,
-        max_drawdown_percent=metrics.max_drawdown_percent,
-        trade_count=metrics.trade_count,
-        cagr_percent=metrics.cagr_percent,
-        annual_volatility_percent=metrics.annual_volatility_percent,
-        sharpe_ratio=metrics.sharpe_ratio,
-        sortino_ratio=metrics.sortino_ratio,
-        calmar_ratio=metrics.calmar_ratio,
-        profit_factor=metrics.profit_factor,
-        average_win_usd=metrics.average_win_usd,
-        average_win_percent=metrics.average_win_percent,
-        average_loss_usd=metrics.average_loss_usd,
-        exposure_percent=metrics.exposure_percent,
-        turnover_per_year=metrics.turnover_per_year,
-        win_rate_percent=metrics.win_rate_percent,
+        **{field.name: getattr(metrics, field.name) for field in fields(metrics)},
         missing_reasons=metrics.missing_reasons,
     )
 

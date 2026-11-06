@@ -5024,25 +5024,6 @@
         ],
         "title": "ComparedBacktestSummaryResponse"
       },
-      "ComparedEquityPointResponse": {
-        "properties": {
-          "time_utc": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Time Utc"
-          },
-          "equity_usd": {
-            "type": "string",
-            "title": "Equity Usd"
-          }
-        },
-        "type": "object",
-        "required": [
-          "time_utc",
-          "equity_usd"
-        ],
-        "title": "ComparedEquityPointResponse"
-      },
       "ComparedInterruptionResponse": {
         "properties": {
           "start_utc": {
@@ -5069,10 +5050,6 @@
           "final_equity_usd": {
             "type": "string",
             "title": "Final Equity Usd"
-          },
-          "net_profit_usd": {
-            "type": "string",
-            "title": "Net Profit Usd"
           },
           "total_return_percent": {
             "type": "string",
@@ -5224,12 +5201,15 @@
             },
             "type": "object",
             "title": "Missing Reasons"
+          },
+          "net_profit_usd": {
+            "type": "string",
+            "title": "Net Profit Usd"
           }
         },
         "type": "object",
         "required": [
           "final_equity_usd",
-          "net_profit_usd",
           "total_return_percent",
           "max_drawdown_percent",
           "trade_count",
@@ -5245,7 +5225,8 @@
           "exposure_percent",
           "turnover_per_year",
           "win_rate_percent",
-          "missing_reasons"
+          "missing_reasons",
+          "net_profit_usd"
         ],
         "title": "ComparedMetricsResponse",
         "description": "The metrics of `GET /api/backtests/{id}` (docs/architecture/backtest.md section 10.9.2) and the Net profit: the\nfinal equity minus the start capital. A forward test has no split metrics and no robustness (section 12.10)."
@@ -6026,14 +6007,14 @@
           },
           "forward_test_equity_curve": {
             "items": {
-              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+              "$ref": "#/components/schemas/EquityPointResponse"
             },
             "type": "array",
             "title": "Forward Test Equity Curve"
           },
           "backtest_equity_curve": {
             "items": {
-              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+              "$ref": "#/components/schemas/EquityPointResponse"
             },
             "type": "array",
             "title": "Backtest Equity Curve"
@@ -6082,7 +6063,7 @@
           },
           "equity_curve": {
             "items": {
-              "$ref": "#/components/schemas/ComparedEquityPointResponse"
+              "$ref": "#/components/schemas/EquityPointResponse"
             },
             "type": "array",
             "title": "Equity Curve"

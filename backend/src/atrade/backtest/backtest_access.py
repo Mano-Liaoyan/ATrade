@@ -10,20 +10,26 @@ import psycopg
 
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_metrics import BacktestMetrics, BacktestTrade, EquityPoint
-from atrade.backtest.backtest_store import BacktestRequest, BacktestStatus, UniversePeriod
+from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, BacktestStatus, UniversePeriod
 from atrade.backtest.backtest_universe import check_universe
 from atrade.market_data import BarRequest, check_source_order, has_saved_bars, read_source_order
 
 
 @dataclass(frozen=True)
-class BacktestOutcome:
-    """A backtest with its result. `metrics` is None and the lists are empty until the backtest finished."""
+class BacktestSummary:
+    """A backtest without its equity curve and trades. `metrics` is None until the backtest finished."""
 
     id: int
     request: BacktestRequest
     status: BacktestStatus
     error_message: str | None
     metrics: BacktestMetrics | None
+
+
+@dataclass(frozen=True)
+class BacktestOutcome(BacktestSummary):
+    """A backtest with its result. The lists are empty until the backtest finished."""
+
     equity_curve: list[EquityPoint]
     trades: list[BacktestTrade]
 
@@ -128,6 +134,16 @@ async def queue_backtest(
     return row.id
 
 
+def to_summary(row: BacktestRow) -> BacktestSummary:
+    return BacktestSummary(
+        id=row.id,
+        request=backtest_store.read_request(row),
+        status=row.status,
+        error_message=row.error_message,
+        metrics=backtest_store.read_metrics(row),
+    )
+
+
 async def read_backtest_outcome(*, database_url: str, backtest_id: int) -> BacktestOutcome | None:
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         row = await backtest_store.select_backtest(connection, backtest_id)
@@ -135,15 +151,14 @@ async def read_backtest_outcome(*, database_url: str, backtest_id: int) -> Backt
             return None
         equity_curve = await backtest_store.select_equity_curve(connection, backtest_id)
         trades = await backtest_store.select_trades(connection, backtest_id)
-    return BacktestOutcome(
-        id=row.id,
-        request=backtest_store.read_request(row),
-        status=row.status,
-        error_message=row.error_message,
-        metrics=backtest_store.read_metrics(row),
-        equity_curve=equity_curve,
-        trades=trades,
-    )
+    return BacktestOutcome(**vars(to_summary(row)), equity_curve=equity_curve, trades=trades)
+
+
+async def read_backtest_summaries(*, database_url: str, backtest_ids: list[int]) -> list[BacktestSummary]:
+    """The backtests with these IDs, the newest first. An unknown ID gives no summary."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        rows = await backtest_store.select_backtests_by_id(connection, backtest_ids)
+    return [to_summary(row) for row in rows]
 
 
 async def read_last_backtest_ids(*, database_url: str, strategy_version_ids: list[int], count: int) -> list[int]:
