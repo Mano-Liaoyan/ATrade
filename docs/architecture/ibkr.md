@@ -117,7 +117,8 @@ The public entry `atrade.ibkr` exports:
   not check the account. The caller (`paper_trading`) runs the paper account
   check first.
 - `place_order_and_wait(request)` is `place_order` for orders by hand. It
-  waits at most 2 seconds while the status is `PendingSubmit`, and raises
+  waits at most 2 seconds for a working or ended status (a warning of IBKR
+  sets `ValidationError`, and the wait continues), and raises
   `GatewayRequestError` with the IBKR message when the status is `Cancelled`
   or `Inactive`,
   for example after error 201. Without an answer in the time, it returns the

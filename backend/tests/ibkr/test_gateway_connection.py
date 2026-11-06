@@ -137,6 +137,34 @@ async def test_place_order_and_wait_raises_when_ibkr_makes_the_order_inactive(mo
         await connection.place_order_and_wait(AAPL_ORDER)
 
 
+IBKR_WARNING_CODE = 399
+
+
+@pytest.mark.anyio
+async def test_place_order_and_wait_reports_a_rejection_after_an_ibkr_warning(monkeypatch: pytest.MonkeyPatch) -> None:
+    connection = make_connected_order_connection(monkeypatch, 1047)
+    event_loop = asyncio.get_running_loop()
+    event_loop.call_soon(connection.ib.wrapper.error, 1047, IBKR_WARNING_CODE, "The order is outside hours", "")
+    event_loop.call_later(
+        SHORT_TIMEOUT_SECONDS / 2, connection.ib.wrapper.error, 1047, 201, "Order rejected - reason: margin", ""
+    )
+
+    with pytest.raises(GatewayRequestError, match="Order rejected - reason: margin"):
+        await connection.place_order_and_wait(AAPL_ORDER)
+
+
+@pytest.mark.anyio
+async def test_place_order_and_wait_returns_the_id_after_an_ibkr_warning_without_a_later_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = make_connected_order_connection(monkeypatch, 1048)
+    asyncio.get_running_loop().call_soon(
+        connection.ib.wrapper.error, 1048, IBKR_WARNING_CODE, "The order is outside hours", ""
+    )
+
+    assert await connection.place_order_and_wait(AAPL_ORDER) == 1048
+
+
 @pytest.mark.anyio
 async def test_place_order_and_wait_returns_the_id_when_ibkr_accepts_the_order(monkeypatch: pytest.MonkeyPatch) -> None:
     connection = make_connected_order_connection(monkeypatch, 1043)

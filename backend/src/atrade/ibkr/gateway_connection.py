@@ -62,6 +62,9 @@ CANCEL_CONFIRMATION_CHECK_SECONDS = 0.1
 # The Web process holds its send lock during this wait, so the wait stays short.
 ORDER_ANSWER_TIMEOUT_SECONDS = 2.0
 ORDER_ANSWER_CHECK_SECONDS = 0.05
+# The statuses that end the wait for the first answer: the order works or it ended. A warning of IBKR sets
+# ValidationError, and a rejection can come after it.
+ORDER_ANSWER_STATUSES = OrderStatus.DoneStates | {OrderStatus.PreSubmitted, OrderStatus.Submitted}
 # ATrade trades stocks only. reqMatchingSymbols also returns other security types, for example indexes.
 STOCK_SECURITY_TYPE = "STK"
 HISTORICAL_DATA_TIMEOUT_SECONDS = 60.0
@@ -468,8 +471,8 @@ class IbAsyncGatewayConnection:
         return self.send_order(request).order.orderId
 
     async def place_order_and_wait(self, request: OrderRequest) -> int:
-        """Sends the order and waits a short time for the first answer of IBKR. Without an answer in the time, the
-        order can still be good, so this function returns the ID.
+        """Sends the order and waits a short time for the first answer of IBKR: a working or an ended status. Without an
+        answer in the time, the order can still be good, so this function returns the ID.
 
         Raises GatewayRequestError when IBKR rejects the order: the status is then Cancelled or Inactive, and the trade
         log can have the IBKR message.
@@ -478,7 +481,7 @@ class IbAsyncGatewayConnection:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + ORDER_ANSWER_TIMEOUT_SECONDS
         while (
-            trade.orderStatus.status == OrderStatus.PendingSubmit and loop.time() < deadline and self.ib.isConnected()
+            trade.orderStatus.status not in ORDER_ANSWER_STATUSES and loop.time() < deadline and self.ib.isConnected()
         ):
             await asyncio.sleep(ORDER_ANSWER_CHECK_SECONDS)
         status = trade.orderStatus.status
