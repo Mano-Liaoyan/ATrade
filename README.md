@@ -26,7 +26,7 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   `/api/backtests` and `/api/backtest-limits`, the forward test routes under
   `/api/forward-tests`, `/ws/paper-trading`, and the change sockets
   `/ws/backtests`, `/ws/sweeps`, `/ws/strategies`, `/ws/screens`,
-  `/ws/watchlist`, and `/ws/forward-tests`, and the live daily bars of the
+  `/ws/custom-indicators`, `/ws/watchlist`, and `/ws/forward-tests`, and the live daily bars of the
   watchlist `/ws/watchlist-live-bars`. A change of a list shows in each
   open tab without a reload, also a change from the AI assistant or a
   backtest process.
@@ -99,7 +99,9 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   from a formula expression, for example `close / sma(50) - 1`. They are in
   "Add indicator", the screen conditions, and the rule builder. A saved screen,
   strategy version, or backtest keeps its expression after a change or a delete.
-  Routes are under `/api/custom-indicators`. See
+  Routes are under `/api/custom-indicators`. The AI assistant can write and
+  check them too, and the Keep button of the Settings page stops its changes.
+  See
   [`docs/architecture/indicator.md`](docs/architecture/indicator.md)
   section 23.10.
 - Bars of a backtest or forward test: the "Bars" switch of the backtest

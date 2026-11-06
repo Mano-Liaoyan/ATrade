@@ -171,6 +171,11 @@ The screen paths come from #150. Decided (#205): they are the final paths
 | `PUT /api/screens/{screen_id}` | `update_screen` | 3 | Only a screen that the same conversation created and that the user has not kept. Else `403`. |
 | `POST /api/screens/{screen_id}/runs` | `run_screen` | 3 | The screen result records the conversation ID. |
 | `GET /api/screen-results/{screen_result_id}` (with page parameters) | `read_screen_result` | 3 | None. |
+| `GET /api/custom-indicators` | `list_custom_indicators` | 3 | None. |
+| `GET /api/custom-indicators/{custom_indicator_id}` | `read_custom_indicator` | 3 | None. |
+| `POST /api/custom-indicators/check` | `check_custom_indicator` | 3 | Saves nothing. |
+| `POST /api/custom-indicators` | `create_custom_indicator` | 3 | The custom indicator records the conversation ID. `kept` is false (indicator.md section 23.10.6). |
+| `PUT /api/custom-indicators/{custom_indicator_id}` | `update_custom_indicator` | 3 | Only a custom indicator that the same conversation created and that the user has not kept. Else `403`. |
 
 Decided (#209): `screen/http_routes.py` has `create_screen_assistant_router`.
 `app/assistant_port.py` adds it to the port 8001 app. It has the 7 screen
@@ -178,6 +183,11 @@ routes (`GET /api/screen-indicators` came with #373) and no `DELETE`. `POST`, `P
 conversation from the header `X-ATrade-Conversation-Id` (25.3.2), as the
 strategy and backtest routes do. The `403` body is
 `{"detail": "The AI assistant cannot change screen <id>. ..."}`.
+
+Decided (#374): `market_data/custom_indicators.py` has
+`create_custom_indicator_assistant_router`. `app/assistant_port.py` adds it to
+the port 8001 app. `POST /api/custom-indicators` and `PUT` read the conversation
+from the header, as the screen routes do.
 
 These routes are not on port 8001:
 
@@ -189,6 +199,9 @@ These routes are not on port 8001:
   watchlist")
 - `DELETE /api/strategies/{strategy_id}`
 - `DELETE /api/screens/{screen_id}`
+- `DELETE /api/custom-indicators/{custom_indicator_id}`
+- `POST /api/screens/{screen_id}/keep` and
+  `POST /api/custom-indicators/{custom_indicator_id}/keep`
 - the HK instrument list changes
 - the daily bar update
 - the parameter sweep routes
@@ -360,6 +373,29 @@ Problem list of the screen tools (#150 B5):
   and the reason.
 - The AI assistant corrects the conditions and tries again, like the save
   loop of a strategy version.
+
+### 25.4.4 Custom indicator tools
+
+Source: [网页 AI：用户自定义指标的工具](https://github.com/Mano-Liaoyan/ATrade/issues/374).
+The code is `assistant/src/custom_indicator_tools.ts`.
+
+| Tool | Does | Result to the model |
+|---|---|---|
+| `list_custom_indicators` | Lists the custom indicators. | The body of `GET /api/custom-indicators`, with `kept` and `assistant_conversation_id`. |
+| `read_custom_indicator` | Reads one custom indicator. | The row. |
+| `check_custom_indicator` | Checks a formula and saves nothing. The optional `custom_indicator_id` names the row to change. | `{"problems": [{"location", "message"}], "look_back_bars"}`. A message of the expression gives the column. |
+| `create_custom_indicator` | Saves a new custom indicator (indicator.md section 23.10.6). | The row. On `422`, the problem list. |
+| `update_custom_indicator` | Changes a custom indicator that the same conversation created and that the user has not kept. | The row. `403` for each other custom indicator. On `422`, the problem list. |
+
+- There is no delete tool. `list_indicators` (25.4.3) shows the custom
+  indicators in the catalog, so the keys for screens and strategies have one
+  source.
+- `FORMULA_SYNTAX` in the tool file is the only text of the expression syntax
+  for the model. It is the description of the `expression` parameter of the
+  check, create, and update tools. It has the calculation limit of rolling
+  windows. `tests/indicator/test_formula_syntax_text.py` compares it with
+  the parser: each bar field, each function, each limit, and each example. A
+  change of the parser must change this text and indicator.md section 23.10.1.
 
 ## 25.5 Strategy versions saved by the AI assistant
 

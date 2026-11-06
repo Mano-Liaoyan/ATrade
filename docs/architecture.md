@@ -701,6 +701,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     | `/ws/sweeps` | `parameter_sweep`, `backtest` | `backtest` (`SWEEP_CHANGE_SOCKET`) |
     | `/ws/strategies` | `strategy`, `strategy_version` | `strategy` |
     | `/ws/screens` | `screen`, `screen_result` | `screen` |
+    | `/ws/custom-indicators` | `custom_indicator` | `market_data` (`CUSTOM_INDICATOR_CHANGE_SOCKET`) |
     | `/ws/watchlist` | `watchlist_instrument` | `watchlist` |
     | `/ws/forward-tests` | `forward_test`, `forward_test_interruption`, `forward_test_equity_point`, `forward_test_fill`, `forward_test_same_period_backtest` | `forward_test` |
 

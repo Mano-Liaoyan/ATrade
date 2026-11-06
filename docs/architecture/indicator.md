@@ -991,15 +991,16 @@ expression gets each bar. `initialized` is `True` while `value` is a number.
 
 Table `custom_indicator`: `custom_indicator_id`, `name` (unique, without case),
 `expression`, `chart_placement` (`price` or `own`), `value_description`,
-`created_at_utc`, `changed_at_utc`.
+`kept`, `assistant_conversation_id`, `created_at_utc`, `changed_at_utc`.
 
 | Route | Behavior |
 |---|---|
-| `GET /api/custom-indicators` | `200` with the list by name: `[{"custom_indicator_id", "key", "name", "expression", "chart_placement", "value_description"}]`. |
+| `GET /api/custom-indicators` | `200` with the list by name: `[{"custom_indicator_id", "key", "name", "expression", "chart_placement", "value_description", "kept", "assistant_conversation_id"}]`. |
 | `POST /api/custom-indicators` | Body `{"name", "expression", "chart_placement", "value_description"}`. `201` with the row. `422` with `{"problems": [{"location", "message"}]}`. |
-| `POST /api/custom-indicators/check` | The same body. `200` with `{"problems": [...], "look_back_bars"}`. `look_back_bars` is null when the expression has a problem. It saves nothing. |
+| `POST /api/custom-indicators/check` | The same body. `200` with `{"problems": [...], "look_back_bars"}`. `look_back_bars` is null when the expression has a problem. It saves nothing. The optional parameter `custom_indicator_id` names the row that the body changes, so the row does not conflict with its own name. |
 | `GET /api/custom-indicators/{id}` | `200` with the row. `404` for an unknown id. |
 | `PUT /api/custom-indicators/{id}` | The body of `POST`. `200` with the row. `404` or `422`. |
+| `POST /api/custom-indicators/{id}/keep` | `200` with the row, and `kept` true. `404` for an unknown id. |
 | `DELETE /api/custom-indicators/{id}` | `204`. `404` for an unknown id. A delete is always allowed. |
 
 The problems are: a name with less than 1 or more than 60 characters, a name
@@ -1015,7 +1016,8 @@ and the text of the user as `value_description`. A built-in indicator has no
 `formula`.
 
 The routes are methods of `CustomIndicatorRoutes` in
-`market_data/custom_indicators.py`. They are not on port 8001 yet (#374).
+`market_data/custom_indicators.py`. `/ws/custom-indicators` pushes each change
+of the table (docs/architecture.md section 13, "Live updates").
 
 ### 23.10.5 User interface
 
@@ -1030,3 +1032,39 @@ The routes are methods of `CustomIndicatorRoutes` in
 - A reference to a deleted custom indicator, or to a line that is no longer on
   the price scale, shows its name from `formula`, and stays selected.
 - A chart shows a custom indicator with the price number format.
+- A row with `kept` false has the button "Keep". After the click, the row of an
+  indicator of the AI assistant has the green "Kept" status icon before the
+  name. A row of the user has neither. The delete button is the Discard of a
+  screen.
+
+### 23.10.6 AI assistant access
+
+Source: [网页 AI：用户自定义指标的工具](https://github.com/Mano-Liaoyan/ATrade/issues/374).
+The rule is the rule of a screen (screen.md section 24.8). The tools are in
+assistant section 25.4.4.
+
+| Route on port 8001 | Rule |
+|---|---|
+| `GET /api/custom-indicators`, `GET /api/custom-indicators/{id}` | Reads only. |
+| `POST /api/custom-indicators/check` | Saves nothing. |
+| `POST /api/custom-indicators` | Records the conversation ID. `kept` is false. |
+| `PUT /api/custom-indicators/{id}` | Only for an indicator that the same conversation made and that the user has not kept. Else `403`, also when the body has a problem. |
+
+- Port 8001 has the same handlers as port 8000: `create_of` and `change_of` of
+  `CustomIndicatorRoutes` take the conversation.
+  `create_custom_indicator_assistant_router` has the 5 routes. Port 8001 has no
+  keep route and no `DELETE`.
+- An indicator of the user has `kept` true and no conversation. Each row before
+  #374 is an indicator of the user.
+- Port 8001 adds no " (AI)" to the name, because a name cannot have
+  parentheses (section 23.10.4). A name that is in use is a problem of the check,
+  so the AI assistant selects another name.
+- A new indicator of the AI assistant is in the catalog before the user keeps
+  it. So a screen or a strategy can use it at once. A stored reference holds a
+  copy of the expression, so a later change does not reach that reference.
+- A delete of the conversation keeps the indicator and sets
+  `assistant_conversation_id` to null (`ON DELETE SET NULL`). The AI assistant
+  cannot change it after that.
+- The AI assistant has no condition card for a custom indicator. The user clicks
+  Keep on the Settings page, and the tool description tells the AI assistant to
+  say this.

@@ -47,6 +47,7 @@ from atrade.foundation.settings import Settings
 from atrade.foundation.table_changes import TableChangeFeed, create_change_socket_router
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
 from atrade.market_data import (
+    CUSTOM_INDICATOR_CHANGE_SOCKET,
     DailyBarUpdate,
     ExchangeRateReader,
     InstrumentLookup,
@@ -228,6 +229,7 @@ def create_web_app(
                 SWEEP_CHANGE_SOCKET,
                 STRATEGY_CHANGE_SOCKET,
                 SCREEN_CHANGE_SOCKET,
+                CUSTOM_INDICATOR_CHANGE_SOCKET,
                 WATCHLIST_CHANGE_SOCKET,
                 FORWARD_TEST_CHANGE_SOCKET,
             ],

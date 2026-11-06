@@ -16,6 +16,7 @@ from httpx_ws.transport import ASGIWebSocketTransport
 from atrade.backtest import BACKTEST_CHANGE_SOCKET, SWEEP_CHANGE_SOCKET
 from atrade.forward_test import FORWARD_TEST_CHANGE_SOCKET
 from atrade.foundation.table_changes import ChangeSocket, TableChangeFeed, create_change_socket_router
+from atrade.market_data import CUSTOM_INDICATOR_CHANGE_SOCKET
 from atrade.screen import SCREEN_CHANGE_SOCKET
 from atrade.strategy import STRATEGY_CHANGE_SOCKET
 from atrade.watchlist import WATCHLIST_CHANGE_SOCKET
@@ -28,6 +29,7 @@ APP_CHANGE_SOCKETS = [
     SWEEP_CHANGE_SOCKET,
     STRATEGY_CHANGE_SOCKET,
     SCREEN_CHANGE_SOCKET,
+    CUSTOM_INDICATOR_CHANGE_SOCKET,
     WATCHLIST_CHANGE_SOCKET,
     FORWARD_TEST_CHANGE_SOCKET,
 ]
