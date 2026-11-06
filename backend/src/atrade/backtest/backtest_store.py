@@ -397,34 +397,44 @@ async def delete_backtest(connection: psycopg.AsyncConnection, backtest_id: int)
     return None
 
 
+# The same instrument or universe and bar period, with the parameters of `find_same_universe_parameters`. A universe is
+# the same when the kind, the currency, and `universe_top_n` are the same (docs/architecture/backtest.md 10.10.8).
+SAME_UNIVERSE_CONDITION = """
+    symbol IS NOT DISTINCT FROM %(symbol)s AND exchange IS NOT DISTINCT FROM %(exchange)s
+    AND currency IS NOT DISTINCT FROM %(currency)s AND bar_period = %(bar_period)s
+    AND universe_kind = %(universe_kind)s AND universe_top_n IS NOT DISTINCT FROM %(universe_top_n)s
+"""
+
+
+def find_same_universe_parameters(row: BacktestRow) -> dict[str, object]:
+    return {
+        "symbol": row.symbol,
+        "exchange": row.exchange,
+        "currency": row.currency,
+        "bar_period": row.bar_period,
+        "universe_kind": row.universe_kind,
+        "universe_top_n": row.universe_top_n,
+    }
+
+
 async def select_overlapping_out_of_sample_parts(
     connection: psycopg.AsyncConnection, row: BacktestRow
 ) -> list[OverlappingBacktest]:
     """The backtests of the same instrument or universe and bar period whose out-of-sample part overlaps the
-    out-of-sample part of `row`: the finished backtests and `row` itself. A universe is the same as in
-    `select_finished_backtests_of`. The caller filters them by strategy, because the strategy tables belong to the
-    strategy capability."""
+    out-of-sample part of `row`: the finished backtests and `row` itself. The caller filters them by strategy, because
+    the strategy tables belong to the strategy capability."""
     async with connection.cursor(row_factory=class_row(OverlappingBacktest)) as cursor:
         await cursor.execute(
-            """
+            f"""
             SELECT id, strategy_version_id FROM backtest
             WHERE id = %(id)s
-                OR (status = 'finished'
-                    AND symbol IS NOT DISTINCT FROM %(symbol)s AND exchange IS NOT DISTINCT FROM %(exchange)s
-                    AND currency IS NOT DISTINCT FROM %(currency)s AND bar_period = %(bar_period)s
-                    AND universe_kind = %(universe_kind)s
-                    AND universe_top_n IS NOT DISTINCT FROM %(universe_top_n)s
+                OR (status = 'finished' AND {SAME_UNIVERSE_CONDITION}
                     AND split_time_utc < %(end_utc)s AND %(split_time_utc)s < end_utc)
             ORDER BY id
             """,
             {
+                **find_same_universe_parameters(row),
                 "id": row.id,
-                "symbol": row.symbol,
-                "exchange": row.exchange,
-                "currency": row.currency,
-                "bar_period": row.bar_period,
-                "universe_kind": row.universe_kind,
-                "universe_top_n": row.universe_top_n,
                 "end_utc": row.end_utc,
                 "split_time_utc": row.split_time_utc,
             },
@@ -455,27 +465,15 @@ class TrialRow:
 
 
 async def select_finished_backtests_of(connection: psycopg.AsyncConnection, row: BacktestRow) -> list[TrialRow]:
-    """The finished backtests of the same instrument or universe and the bar period of `row`, for all time ranges.
-    A universe is the same when the kind, the currency, and `universe_top_n` are the same
-    (docs/architecture/backtest.md section 10.10.8)."""
+    """The finished backtests of the same instrument or universe and the bar period of `row`, for all time ranges."""
     async with connection.cursor(row_factory=class_row(TrialRow)) as cursor:
         await cursor.execute(
-            """
+            f"""
             SELECT id, strategy_version_id, paper_capital_usd FROM backtest
-            WHERE status = 'finished' AND symbol IS NOT DISTINCT FROM %(symbol)s
-                AND exchange IS NOT DISTINCT FROM %(exchange)s AND currency IS NOT DISTINCT FROM %(currency)s
-                AND bar_period = %(bar_period)s AND universe_kind = %(universe_kind)s
-                AND universe_top_n IS NOT DISTINCT FROM %(universe_top_n)s
+            WHERE status = 'finished' AND {SAME_UNIVERSE_CONDITION}
             ORDER BY id
             """,
-            {
-                "symbol": row.symbol,
-                "exchange": row.exchange,
-                "currency": row.currency,
-                "bar_period": row.bar_period,
-                "universe_kind": row.universe_kind,
-                "universe_top_n": row.universe_top_n,
-            },
+            find_same_universe_parameters(row),
         )
         return await cursor.fetchall()
 

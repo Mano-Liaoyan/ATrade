@@ -32,6 +32,10 @@ class BarPeriod(StrEnum):
         """The name in messages, for example "1 min". The frontend shows the same names."""
         return BAR_PERIOD_LABELS[self]
 
+    def external_bar_type(self, instrument_id: object) -> str:
+        """The NautilusTrader bar type name of an instrument ID, for example `AAPL.NASDAQ-1-DAY-LAST-EXTERNAL`."""
+        return f"{instrument_id}-{self.value}-LAST-EXTERNAL"
+
 
 BAR_PERIOD_SECONDS = {
     BarPeriod.ONE_MINUTE: SECONDS_PER_MINUTE,

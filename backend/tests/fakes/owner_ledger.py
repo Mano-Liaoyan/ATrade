@@ -6,7 +6,7 @@ The fake checks only the sell rules (rules 1 and 3) and the "Split check needed"
 
 from decimal import Decimal
 
-from atrade.forward_test import OwnerFill, OwnerOrder, OwnerPosition
+from atrade.forward_test import ForwardTestPosition, OwnerFill, OwnerOrder
 from atrade.foundation.instrument import Instrument
 
 SELL_TOO_LARGE_REASON = "The sell order is larger than the owner position."
@@ -17,7 +17,7 @@ class FakeOwnerLedger:
     def __init__(self, *, cash_usd: Decimal) -> None:
         self.cash_usd = cash_usd
         # (forward test ID, instrument) -> owner position.
-        self.positions: dict[tuple[int, Instrument], OwnerPosition] = {}
+        self.positions: dict[tuple[int, Instrument], ForwardTestPosition] = {}
         self.split_check_needed: set[Instrument] = set()
         self.checked_orders: list[OwnerOrder] = []
         self.fills: list[OwnerFill] = []
@@ -37,7 +37,7 @@ class FakeOwnerLedger:
     async def save_fill(self, fill: OwnerFill) -> None:
         self.fills.append(fill)
         key = (fill.forward_test_id, fill.instrument)
-        old = self.positions.get(key, OwnerPosition(fill.instrument, Decimal(0), Decimal(0)))
+        old = self.positions.get(key, ForwardTestPosition(fill.instrument, Decimal(0), Decimal(0)))
         if fill.side == "BUY":
             quantity = old.quantity + fill.quantity
             average_price = (old.quantity * old.average_price + fill.quantity * fill.price) / quantity
@@ -46,9 +46,9 @@ class FakeOwnerLedger:
             quantity = old.quantity - fill.quantity
             average_price = old.average_price
             self.cash_usd += fill.quantity * fill.price
-        self.positions[key] = OwnerPosition(fill.instrument, quantity, average_price)
+        self.positions[key] = ForwardTestPosition(fill.instrument, quantity, average_price)
 
-    async def read_positions(self, forward_test_id: int) -> list[OwnerPosition]:
+    async def read_positions(self, forward_test_id: int) -> list[ForwardTestPosition]:
         return [
             position
             for (owner_id, _), position in self.positions.items()

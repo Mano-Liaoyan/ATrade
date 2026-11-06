@@ -49,13 +49,6 @@ class LedgerEntry:
     def owner(self) -> Owner:
         return Owner(kind=self.owner_kind, forward_test_id=self.forward_test_id)
 
-    def is_for(self, instrument: Instrument) -> bool:
-        return (self.symbol, self.exchange, self.currency) == (
-            instrument.symbol,
-            instrument.exchange,
-            instrument.currency,
-        )
-
 
 @dataclass(frozen=True)
 class NewFill:

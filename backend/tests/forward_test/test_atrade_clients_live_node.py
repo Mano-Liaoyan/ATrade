@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 
-from atrade.forward_test import OwnerFill, OwnerPosition
+from atrade.forward_test import ForwardTestPosition, OwnerFill
 from atrade.foundation.order_ref import read_order_source
 from atrade.ibkr import OpenOrder
 from tests.fakes.ibkr import LIVE_BAR_NOW_UTC, make_execution, make_forward_test_order
@@ -81,7 +81,7 @@ async def test_the_restarted_strategy_gets_its_position_from_the_owner_ledger_an
     assert world.gateway.open_orders == []
 
     # Stock split 2-for-1: the ledger change doubles the owner position and halves the average price (section 11.11).
-    world.ledger.positions[FORWARD_TEST_ID, APPLE] = OwnerPosition(
+    world.ledger.positions[FORWARD_TEST_ID, APPLE] = ForwardTestPosition(
         APPLE, Decimal(2 * BUY_QUANTITY), Decimal(FILL_PRICE) / 2
     )
     strategy_after_split = make_strategy(claims_external_orders=True)

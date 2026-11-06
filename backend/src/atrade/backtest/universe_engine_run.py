@@ -12,7 +12,7 @@ from typing import Final
 
 from nautilus_trader.model import Bar as NautilusBar
 from nautilus_trader.model import CustomData, Equity, Venue
-from nautilus_trader.persistence import BarDataWrangler, DataCatalogConfig, ParquetDataCatalog
+from nautilus_trader.persistence import DataCatalogConfig, ParquetDataCatalog
 
 from atrade.backtest.arrow_bars import convert_bars_to_arrow_bytes
 from atrade.backtest.backtest_metrics import BacktestTrade
@@ -22,9 +22,9 @@ from atrade.backtest.strategy_engine_run import (
     CATALOG_FIRST_NS,
     CATALOG_LAST_NS,
     LOOK_BACK_CATALOG_DIRECTORY_NAME,
-    count_decimal_places,
     create_engine,
     create_instrument,
+    create_wrangler,
     read_trades,
     run_engine,
 )
@@ -50,7 +50,7 @@ class UniverseRun:
 
 
 def find_bar_type_name(instrument: Instrument, bar_period: BarPeriod) -> str:
-    return f"{instrument.symbol}.{SIMULATED_VENUE}-{bar_period.value}-LAST-EXTERNAL"
+    return bar_period.external_bar_type(f"{instrument.symbol}.{SIMULATED_VENUE}")
 
 
 @dataclass(frozen=True)
@@ -91,10 +91,7 @@ def run_universe_strategy(run: UniverseRun, work_directory: Path) -> list[Backte
         if not all_bars:
             continue
         nautilus_instrument = create_instrument(member.instrument, all_bars, SIMULATED_VENUE)
-        volume_precision = max(count_decimal_places(bar.volume) for bar in all_bars)
-        wrangler = BarDataWrangler(
-            find_bar_type_name(member.instrument, run.bar_period), nautilus_instrument.price_precision, volume_precision
-        )
+        wrangler = create_wrangler(nautilus_instrument, run.bar_period, all_bars)
         instruments.append(nautilus_instrument)
         member_data.append(
             MemberData(
