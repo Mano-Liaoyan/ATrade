@@ -447,7 +447,8 @@ Each `IndicatorDefinition` (section 23.3) gets 2 fields:
   its pane, in the line color. It is a price line with `lineVisible: false`
   and `axisLabelVisible: true`; its price follows the crosshair. A hidden
   indicator or a bar without a value shows no label.
-- When the pointer is on a row, or the focus is in it, the row shows 3 ghost
+- When the pointer is on the name or the values of a row, or the focus is in
+  it, the row shows 3 ghost
   icon buttons. Each has a Bits UI `Tooltip`:
   - "Hide <legend name>" (`View`) or "Show <legend name>" (`ViewOff`). A
     hidden indicator keeps its row. The name is `--cds-text-disabled`, the
