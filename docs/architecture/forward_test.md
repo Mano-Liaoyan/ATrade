@@ -1258,8 +1258,9 @@ Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-
   is not used, because 5000 candidate instruments need about 5000 IBKR
   requests (about 42 minutes), and IBKR filters the volume of historical
   bars.
-- The worker downloads the data and calculates the universe at 06:00 ET on
-  the first trading day of the quarter.
+- The worker downloads the data and calculates the universe from 06:00 ET on
+  the first trading day of the quarter, on any day while the quarter has no
+  members.
 - When the daily bar of the previous trading day is not available yet, the
   worker tries again every 15 minutes until 09:00 ET.
 - When the bar is still missing at 09:00 ET, the worker uses the 63 trading
@@ -1426,8 +1427,10 @@ simplest option and records it in this document.
   is stored.
   Decided (#217): `422` with `"The US universe has no saved members for the
   quarter from <calendar quarter start>."`. The current quarter is the last
-  stored `quarter_start_utc` on or after the start of the calendar quarter
-  that contains now (the stored start is the first trading day).
+  saved quarter of `read_current_us_universe_quarter()`
+  ([`market_data.md`](market_data.md) section 8.9), when it starts on or after
+  the start of the calendar quarter that contains now (the stored start is
+  the first trading day).
 - Decided (#192): without `DATABENTO_API_KEY`, the quarterly update does not
   run, and the `forward-test` log tells why.
 - How ATrade maps a Databento symbol to the IBKR primary exchange.

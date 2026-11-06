@@ -13,7 +13,7 @@ import psycopg
 from atrade.forward_test import forward_test_store
 from atrade.forward_test.forward_test_store import ForwardTestRow
 from atrade.foundation.instrument import Instrument
-from atrade.market_data import read_us_universe_members, read_us_universe_quarter_starts
+from atrade.market_data import read_current_us_universe_quarter, read_us_universe_members
 
 
 @dataclass(frozen=True)
@@ -39,12 +39,13 @@ def find_calendar_quarter_start_utc(now_utc: datetime) -> datetime:
 
 
 async def find_current_us_universe_quarter(*, database_url: str, now_utc: datetime) -> datetime | None:
-    """The last stored quarter start on or after the start of the calendar quarter of `now_utc`. The stored start is
-    the first trading day of the quarter (market_data.md section 8.9). None before the update of the quarter ran."""
-    calendar_quarter_start_utc = find_calendar_quarter_start_utc(now_utc)
-    quarter_starts = await read_us_universe_quarter_starts(database_url=database_url, end_utc=now_utc)
-    current = [start_utc for start_utc in quarter_starts if start_utc >= calendar_quarter_start_utc]
-    return current[-1] if current else None
+    """The last saved quarter, when it starts on or after the start of the calendar quarter of `now_utc`. The stored
+    start is the first trading day of the quarter (market_data.md section 8.9). None before the update of the quarter
+    ran, so a `rule` start does not use the members of an earlier quarter (section 12.24)."""
+    quarter_start_utc = await read_current_us_universe_quarter(database_url=database_url, now_utc=now_utc)
+    if quarter_start_utc is None or quarter_start_utc < find_calendar_quarter_start_utc(now_utc):
+        return None
+    return quarter_start_utc
 
 
 async def read_us_universe_instruments(

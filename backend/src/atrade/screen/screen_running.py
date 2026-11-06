@@ -2,8 +2,7 @@
 screen result in one transaction (docs/architecture/screen.md sections 24.2 and 24.5)."""
 
 import time
-from datetime import UTC, datetime
-from datetime import time as day_time
+from datetime import datetime
 from typing import Any
 
 import psycopg
@@ -13,7 +12,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import (
     DailyBarSummary,
-    find_first_trading_day_of_quarter,
+    read_current_us_universe_quarter,
     read_daily_bar_summaries,
     read_daily_bar_summaries_of_currency,
     read_hk_instrument_list,
@@ -55,12 +54,13 @@ async def read_start_summaries(
     database_url: str, *, market: str, start: str, now_utc: datetime
 ) -> tuple[list[Instrument], list[DailyBarSummary]]:
     """The start instruments of section 24.2 and their daily bar summary rows."""
-    quarter_start = find_first_trading_day_of_quarter(now_utc.date())
+    quarter_start_utc = (
+        await read_current_us_universe_quarter(database_url=database_url, now_utc=now_utc)
+        if start == "quarter_universe"
+        else None
+    )
     instruments, summaries = await read_start_instruments(
-        database_url,
-        market=market,
-        start=start,
-        quarter_start_utc=datetime.combine(quarter_start, day_time(), tzinfo=UTC),
+        database_url, market=market, start=start, quarter_start_utc=quarter_start_utc
     )
     if summaries is None:
         summaries = await read_daily_bar_summaries(database_url=database_url, instruments=instruments)

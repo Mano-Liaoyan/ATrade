@@ -850,8 +850,8 @@ Table `us_universe_member`:
 
 Quarterly update in the `forward-test` worker:
 
-1. At 06:00 ET on the first trading day of the quarter, download the
-   EQUS.SUMMARY `ohlcv-1d` bars of the 100 calendar days to the previous
+1. From 06:00 ET on the first trading day of the quarter, on any day while
+   the quarter has no members, download the EQUS.SUMMARY `ohlcv-1d` bars of the 100 calendar days to the previous
    trading day (`ALL_SYMBOLS`). 100 days always hold 63 trading days, also
    when the previous quarter has fewer.
 2. Calculate the members and save them in one transaction.
@@ -860,13 +860,36 @@ Quarterly update in the `forward-test` worker:
 4. When the bar is still not available at 09:00 ET, use the 63 trading days
    that end 1 trading day earlier. Record the actual last day in
    `last_ranking_day_utc`.
-5. The strategies get the new members before the market opens.
+5. The strategies get the new members before the market opens. After a
+   missed first trading day, they get the members when the update saves them.
 
 - The cost is about 1.3 USD each quarter (`get_cost`: 1.23 to 1.36 USD).
+- A try after a failed import or save uses the downloaded file again. The
+  update keeps the path in memory, and only after a download without an
+  error. `download_daily_summary()` writes to a `partial-` file and renames
+  it at the end, so a partial file is never at the final path.
+- When `databento_bar` already holds the 63 trading days to the last ranking
+  day without a gap, the update does not download. It calculates the members
+  from the saved bars. Thus a restart after the import does not pay again.
+- One process makes at most 3 downloads that can bill for one quarter. A
+  download that stops before Databento sends data does not count, so an
+  outage does not use the limit. The update tries again each 15 minutes.
+  At the limit, the update of the quarter stops and logs this 1 time. A
+  restart of the `forward-test` service clears the limit.
+- Limit: the count of downloads is in memory, and the file is on the `/tmp`
+  tmpfs. A process that stops between the start of a download and the commit
+  of its import leaves no record. Each restart in that state pays again
+  (about 1.3 USD), without a limit. A durable record needs a migration, so
+  ATrade does not have one.
+- The current quarter is the same for the daily bar update, screens, and
+  forward tests: `read_current_us_universe_quarter()` gives the last saved
+  quarter on or before now. Until the update saves a new quarter, the
+  readers keep the last saved quarter.
 - The update needs the setting `DATABENTO_API_KEY`. Without it, the update
   does not run, and the `forward-test` log tells why.
 - Code (#192): `market_data/us_universe.py` (`save_us_universe`,
-  `calculate_us_universe_history`, `read_us_universe_members`),
+  `calculate_us_universe_history`, `read_us_universe_members`,
+  `read_current_us_universe_quarter`),
   `market_data/us_universe_update.py` (`UsUniverseUpdate`),
   `market_data/us_trading_days.py`, and `market_data/us_etf_symbols.py`.
   The Databento client gets `read_daily_summary_end_utc()`
@@ -957,6 +980,8 @@ Phase 3. Sources:
 - It saves the bars in `ibkr_bar` and updates the daily bar summary.
 - When IB Gateway is not reachable, the update does not run that day. The
   screen page shows the last daily bar date, so the user sees old data.
+  After a start of the `web` process, the update first waits for the first
+  connection, because the process starts without IB Gateway.
 - Each read of bars from IBKR also reads 1 stored daily bar again (stock
   split evidence, section 8.13).
 
@@ -1221,19 +1246,21 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - Decided (#192): no table records each calculation. The `forward-test` log
   has the tries, the 09:00 ET fallback, and the errors. After an error, the
   update tries again after 15 minutes.
-- Decided (#195): the daily bar update runs 1 time at 18:00 ET
+- Decided (#195): the daily bar update runs 1 time at 21:00 ET
   (`America/New_York`) on each US trading day of `market_data/us_trading_days.py`
-  (weekdays without New Year's Day and Good Friday). 18:00 ET is after the
+  (weekdays without New Year's Day and Good Friday). 21:00 ET is after the
   US close and after the Hong Kong close of the same day, so 1 run reads
-  all instruments. On another holiday, IBKR returns no new bar. A Hong Kong
+  all instruments. It is also after 00:00 UTC of the next day in standard
+  time and in daylight saving time, so the read range holds the daily bar
+  of that day. On another holiday, IBKR returns no new bar. A Hong Kong
   trading day that is not a US trading day comes with the next run. The
-  `web` process runs the update after a start when 18:00 ET of the day has
+  `web` process runs the update after a start when 21:00 ET of the day has
   passed. After an IBKR error for one instrument, the update logs it and
   reads the next instrument.
 - Decided (#195): for each instrument, the update reads from the start of
   its last IBKR daily bar (read again, section 8.13) to the start of the
   current UTC day. An instrument without an IBKR daily bar gets 366 days.
-  When IB Gateway is not reachable at 18:00 ET, the update of that day does
+  When IB Gateway is not reachable at 21:00 ET, the update of that day does
   not run and the log names the day.
 - Decided (#195): `daily_bar_summary` has no status column. "Still trading"
   is a rule of `screen` on `last_day_start_utc`. After a change of the
