@@ -7,10 +7,9 @@ from atrade.strategy.http_routes import STRATEGY_CHANGE_SOCKET, create_strategy_
 from atrade.strategy.language_server import STRATEGY_LANGUAGE_SERVER_PATH, create_strategy_language_server_router
 from atrade.strategy.strategy_loading import StrategyFileError, load_strategy_classes
 from atrade.strategy.strategy_parameters import StrategyParameter, read_strategy_parameters
-from atrade.strategy.strategy_store import SavedVersion, StrategyVersionRecord
+from atrade.strategy.strategy_store import SavedVersion
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from atrade.strategy.version_reading import (
-    StrategyOutline,
     StrategyVersion,
     list_version_chart_indicators,
     read_strategy_outline,
@@ -27,10 +26,8 @@ __all__ = [
     "CodeProblem",
     "SavedVersion",
     "StrategyFileError",
-    "StrategyOutline",
     "StrategyParameter",
     "StrategyVersion",
-    "StrategyVersionRecord",
     "create_strategy_assistant_router",
     "create_strategy_language_server_router",
     "create_strategy_router",

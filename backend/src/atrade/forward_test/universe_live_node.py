@@ -32,6 +32,7 @@ from atrade.forward_test.forward_test_universe import UniverseNodeInput, Univers
 from atrade.forward_test.live_node_run import (
     TRADER_ID_PREFIX,
     GatewayWatch,
+    create_ledger_connection,
     run_live_node,
     wait_for_end_or_stop,
 )
@@ -44,9 +45,8 @@ from atrade.forward_test.owner_ledger_execution_client import (
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
-from atrade.ibkr import IbAsyncGatewayConnection
 from atrade.market_data import BarRequest, read_saved_bars_of_many, read_source_order, read_unsaved_ranges
-from atrade.paper_trading import ForwardTestLedger, read_forward_test_fills
+from atrade.paper_trading import read_forward_test_fills
 from atrade.strategy import load_strategy_classes
 
 DAILY = BarPeriod.ONE_DAY
@@ -68,7 +68,7 @@ class UniverseClients:
 
 def find_bar_type_names(members: tuple[Instrument, ...]) -> tuple[str, ...]:
     """`SYMBOL.<primary exchange>-1-DAY-LAST-EXTERNAL`: the strategy uses only these instrument IDs (ADR 0003)."""
-    return tuple(f"{create_instrument_id(member)}-{DAILY.value}-LAST-EXTERNAL" for member in members)
+    return tuple(DAILY.external_bar_type(create_instrument_id(member)) for member in members)
 
 
 def read_universe(live_node_input: LiveNodeInput) -> UniverseNodeInput:
@@ -109,18 +109,7 @@ def create_universe_clients(
 
 
 def create_production_clients(live_node_input: LiveNodeInput) -> UniverseClients:
-    """The owner ledger in PostgreSQL and one ib_async connection with the client ID of the forward test."""
-    gateway_connection = IbAsyncGatewayConnection(
-        host=live_node_input.gateway_host, port=live_node_input.gateway_port, client_id=live_node_input.client_id
-    )
-    ledger = ForwardTestLedger(
-        database_url=live_node_input.database_url,
-        account=live_node_input.account_id,
-        forward_test_id=live_node_input.forward_test_id,
-        gateway_connection=gateway_connection,
-        clock=SystemClock(),
-    )
-    return create_universe_clients(live_node_input, ledger, gateway_connection)
+    return create_universe_clients(live_node_input, *create_ledger_connection(live_node_input))
 
 
 def build_universe_node(live_node_input: LiveNodeInput, clients: UniverseClients) -> LiveNode:

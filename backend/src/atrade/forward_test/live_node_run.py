@@ -17,10 +17,11 @@ from nautilus_trader.adapters.interactive_brokers import (
 from nautilus_trader.common import Environment
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.live import LiveExecutionEngineConfig, LiveNode, LiveNodeBuilder, LiveNodeConfig
-from nautilus_trader.model import BarType, InstrumentId, Symbol, TraderId, Venue
+from nautilus_trader.model import BarType, InstrumentId, TraderId
 from nautilus_trader.persistence import DataCatalogConfig
 
 from atrade.backtest import write_look_back_catalog
+from atrade.forward_test.atrade_instruments import create_instrument_id
 from atrade.forward_test.atrade_live_node import add_atrade_clients
 from atrade.forward_test.forward_test_child import LiveNodeEnd, LiveNodeInput
 from atrade.forward_test.forward_test_recorder import ForwardTestRecorder, RecorderInput
@@ -85,12 +86,6 @@ def read_node_instrument(live_node_input: LiveNodeInput) -> Instrument:
     return live_node_input.instrument
 
 
-def create_instrument_id(live_node_input: LiveNodeInput) -> InstrumentId:
-    # The IB instrument provider uses the simplified symbology: SYMBOL.PRIMARY_EXCHANGE, for example AAPL.NASDAQ.
-    instrument = read_node_instrument(live_node_input)
-    return InstrumentId(Symbol(instrument.symbol), Venue(instrument.exchange))
-
-
 def create_live_node_builder(
     live_node_input: LiveNodeInput, instrument_id: InstrumentId, warm_up_catalog: DataCatalogConfig
 ) -> LiveNodeBuilder:
@@ -114,8 +109,8 @@ def create_live_node_builder(
     return LiveNodeBuilder.from_config(f"forward-test-{live_node_input.forward_test_id}", config)  # pyright: ignore[reportUnknownMemberType]
 
 
-def create_execution_client_factory(live_node_input: LiveNodeInput) -> OwnerLedgerExecutionClientFactory:
-    """The ATrade execution client with the client ID of the forward test and the owner ledger (section 12.19)."""
+def create_ledger_connection(live_node_input: LiveNodeInput) -> tuple[ForwardTestLedger, IbAsyncGatewayConnection]:
+    """The owner ledger in PostgreSQL and one ib_async connection with the client ID of the forward test."""
     gateway_connection = IbAsyncGatewayConnection(
         host=live_node_input.gateway_host, port=live_node_input.gateway_port, client_id=live_node_input.client_id
     )
@@ -126,6 +121,12 @@ def create_execution_client_factory(live_node_input: LiveNodeInput) -> OwnerLedg
         gateway_connection=gateway_connection,
         clock=SystemClock(),
     )
+    return ledger, gateway_connection
+
+
+def create_execution_client_factory(live_node_input: LiveNodeInput) -> OwnerLedgerExecutionClientFactory:
+    """The ATrade execution client with the client ID of the forward test and the owner ledger (section 12.19)."""
+    ledger, gateway_connection = create_ledger_connection(live_node_input)
     ledger_input = OwnerLedgerInput(
         forward_test_id=live_node_input.forward_test_id,
         client_id=live_node_input.client_id,
@@ -153,7 +154,7 @@ def build_live_node(
 
 
 def create_bar_type(live_node_input: LiveNodeInput, instrument_id: InstrumentId) -> BarType:
-    return BarType.from_str(f"{instrument_id}-{live_node_input.bar_period.value}-LAST-EXTERNAL")
+    return BarType.from_str(live_node_input.bar_period.external_bar_type(instrument_id))
 
 
 def create_recorder(live_node_input: LiveNodeInput, instrument_id: InstrumentId) -> ForwardTestRecorder:
@@ -207,7 +208,7 @@ async def run_live_node(
     live_node_input: LiveNodeInput, stop_requested: asyncio.Event, *, gateway_watch: GatewayWatch | None = None
 ) -> LiveNodeEnd:
     """Runs until `stop_requested` is set, until IB Gateway is lost, or until the LiveNode ends by itself."""
-    instrument_id = create_instrument_id(live_node_input)
+    instrument_id = create_instrument_id(read_node_instrument(live_node_input))
     with tempfile.TemporaryDirectory(prefix=f"atrade-forward-test-{live_node_input.forward_test_id}-") as directory:
         strategy_class, config_class = load_strategy_classes(live_node_input.strategy_code, Path(directory))
         warm_up_catalog = write_look_back_catalog(

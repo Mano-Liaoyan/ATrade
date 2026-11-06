@@ -78,6 +78,14 @@ def create_instrument(instrument: Instrument, bars: list[Bar], venue: Venue | No
     )
 
 
+def create_wrangler(nautilus_instrument: Equity, bar_period: BarPeriod, bars: list[Bar]) -> BarDataWrangler:
+    """The wrangler for `bars`. The volume precision comes from these bars."""
+    volume_precision = max((count_decimal_places(bar.volume) for bar in bars), default=0)
+    return BarDataWrangler(
+        bar_period.external_bar_type(nautilus_instrument.id), nautilus_instrument.price_precision, volume_precision
+    )
+
+
 def create_look_back_catalog(
     look_back_bars: list[Bar], wrangler: BarDataWrangler, bar_period: BarPeriod, work_directory: Path
 ) -> DataCatalogConfig:
@@ -104,9 +112,7 @@ def write_look_back_catalog(
     """The look-back catalog of `create_look_back_catalog` for a forward test LiveNode, with the bar type
     `SYMBOL.EXCHANGE-<bar period>-LAST-EXTERNAL` (docs/architecture/forward_test.md section 12.15)."""
     nautilus_instrument = create_instrument(instrument, look_back_bars)
-    bar_type = BarType.from_str(f"{nautilus_instrument.id}-{bar_period.value}-LAST-EXTERNAL")
-    volume_precision = max((count_decimal_places(bar.volume) for bar in look_back_bars), default=0)
-    wrangler = BarDataWrangler(str(bar_type), nautilus_instrument.price_precision, volume_precision)
+    wrangler = create_wrangler(nautilus_instrument, bar_period, look_back_bars)
     return create_look_back_catalog(look_back_bars, wrangler, bar_period, work_directory)
 
 
@@ -258,9 +264,8 @@ def run_strategy_on_bars(run: StrategyRun, work_directory: Path) -> list[Backtes
     instrument = request.single_instrument
     all_bars = run.look_back_bars + run.bars
     nautilus_instrument = create_instrument(instrument, all_bars)
-    bar_type = BarType.from_str(f"{nautilus_instrument.id}-{request.bar_period.value}-LAST-EXTERNAL")
-    volume_precision = max(count_decimal_places(bar.volume) for bar in all_bars)
-    wrangler = BarDataWrangler(str(bar_type), nautilus_instrument.price_precision, volume_precision)
+    bar_type = BarType.from_str(request.bar_period.external_bar_type(nautilus_instrument.id))
+    wrangler = create_wrangler(nautilus_instrument, request.bar_period, all_bars)
     nautilus_bars = wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(run.bars, request.bar_period))
     engine = create_engine(
         starting_cash=run.starting_cash,

@@ -62,7 +62,7 @@ class OwnerFill:
 
 
 @dataclass(frozen=True)
-class OwnerPosition:
+class ForwardTestPosition:
     instrument: Instrument
     quantity: Decimal
     average_price: Decimal
@@ -198,10 +198,10 @@ class ForwardTestLedger:
             )
             await connection.commit()
 
-    async def read_positions(self, forward_test_id: int) -> list[OwnerPosition]:
+    async def read_positions(self, forward_test_id: int) -> list[ForwardTestPosition]:
         owner = create_forward_test_owner(forward_test_id)
         return [
-            OwnerPosition(
+            ForwardTestPosition(
                 instrument=position.instrument,
                 quantity=position.quantity,
                 average_price=position.average_cost or Decimal(0),

@@ -551,7 +551,7 @@ this document. The implementation can change them.
 | Name | Purpose |
 |---|---|
 | `OwnerLedgerExecutionClient`, `OwnerLedgerExecutionClientFactory(ledger_input, ledger, gateway)`, `OwnerLedgerInput` | The ATrade NautilusTrader execution client of section 12.19 (#213). `OwnerLedgerInput` has `forward_test_id`, `client_id`, `account_id`, `instruments`, and `fill_check_interval_seconds` (default 1). `gateway` is an `OrderGateway`: the order functions of the `ibkr` GatewayConnection. |
-| `OwnerLedger`, `OwnerOrder`, `OwnerFill`, `OwnerPosition` | The owner ledger interface of the execution client (#213). |
+| `OwnerLedger`, `OwnerOrder`, `OwnerFill`, `ForwardTestPosition` | The owner ledger interface of the execution client (#213). |
 | `BarStoreDataClient`, `BarStoreDataClientFactory(bar_store_input)`, `BarStoreInput` | The ATrade NautilusTrader data client of section 12.19 (#213). `BarStoreInput` has `database_url` and `instruments`. The factory keeps the created client in `client`, for `send_new_bars()`. |
 | `add_atrade_clients(builder, data_client_factory, execution_client_factory)` | Adds both clients to a `LiveNodeBuilder` as the default route. Without a data client factory, it adds only the execution client (#213). |
 | `BarFetcher(*, database_url, clock, open_gateway_connection, read_member_lists, sleep)` | The bar fetcher of section 12.20. `keep_fetching()` runs it in the worker. `fill_warm_up()` reads the warm-up before a start. |
@@ -563,7 +563,7 @@ this document. The implementation can change them.
   the cash of "By hand" in the owner ledger
   ([`paper_trading.md`](paper_trading.md) section 11.13), so `paper_trading`
   does not need the allocated capital. `OwnerOrder`, `OwnerFill`, and
-  `OwnerPosition` come from `paper_trading`. `OwnerFill` also has
+  `ForwardTestPosition` come from `paper_trading`. `OwnerFill` also has
   `execution_id`, `ibkr_order_id`, and `commission`.
 
 ## 12.12 Table
