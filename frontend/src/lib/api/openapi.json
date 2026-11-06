@@ -9182,6 +9182,7 @@
             "anyOf": [
               {
                 "type": "number",
+                "exclusiveMaximum": 1000000000000.0,
                 "exclusiveMinimum": 0.0
               },
               {

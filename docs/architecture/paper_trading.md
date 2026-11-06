@@ -99,7 +99,7 @@ orders only when all 4 conditions are true:
   there, ATrade does not send the order. The HTTP response is `403` with the
   reason, the actual accounts, and the expected account.
 - The quantity is a whole number larger than 0. A limit order needs a limit
-  price larger than 0. A market order has no limit price.
+  price larger than 0 and smaller than 10^12. A market order has no limit price.
 - ATrade sends each order to `SMART` routing with the primary exchange of the
   instrument, to the checked account, with the `orderRef` `ATRADE-BY-HAND`
   (section 12.9).

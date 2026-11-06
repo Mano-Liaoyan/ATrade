@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
+import json
 import httpx
 import pytest
 
@@ -207,6 +208,7 @@ async def test_refuses_the_order_when_ib_gateway_is_not_connected(
         {"time_in_force": "IOC"},
         {"quantity": 0},
         {"limit_price": "-1"},
+        {"limit_price": "1e400"},
         {"side": "SHORT"},
         {"symbol": ""},
     ],
@@ -222,6 +224,24 @@ async def test_refuses_an_order_that_is_not_a_market_or_limit_order_with_day_or_
         gateway_connection=gateway_connection,
     ) as client:
         send_response = await client.post(ORDERS_PATH, json=LIMIT_ORDER | changed_fields)
+
+    assert send_response.status_code == 422
+    assert gateway_connection.open_orders == []
+
+
+@pytest.mark.anyio
+async def test_refuses_a_limit_price_that_is_too_large_for_a_float(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = make_connected_gateway([ACCOUNT_ID])
+    body = json.dumps(LIMIT_ORDER | {"limit_price": 0}).replace('"limit_price": 0', '"limit_price": 1e400')
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        send_response = await client.post(ORDERS_PATH, content=body, headers={"content-type": "application/json"})
 
     assert send_response.status_code == 422
     assert gateway_connection.open_orders == []

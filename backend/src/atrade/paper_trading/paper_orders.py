@@ -23,6 +23,8 @@ from atrade.paper_trading.paper_account_check import PaperAccountCheckError
 from atrade.paper_trading.paper_account_monitor import PaperAccountMonitor
 
 MAX_INSTRUMENT_FIELD_LENGTH = 32
+# The largest order price of the IBKR API is a float. A larger JSON number gives no valid order.
+LIMIT_PRICE_END = Decimal(10**12)
 
 InstrumentField = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_INSTRUMENT_FIELD_LENGTH)
@@ -36,7 +38,7 @@ class SendOrderRequest(BaseModel):
     side: OrderSide
     quantity: Annotated[int, Field(gt=0)]
     order_type: OrderType
-    limit_price: Annotated[Decimal, Field(gt=0)] | None
+    limit_price: Annotated[Decimal, Field(gt=0, lt=LIMIT_PRICE_END)] | None
     time_in_force: TimeInForce
 
     @model_validator(mode="after")
