@@ -330,7 +330,10 @@ them by ID. A missing ID is not in the result. The forward test list uses it
   section 13).
 - One draft exists for each strategy version. The `localStorage` key is
   `atrade.strategy-draft.<strategy id>.v<version number>`. A save removes the
-  draft of the version that the user edited.
+  draft of the version that the user edited. With blocked or full storage,
+  the editor keeps working and the page keeps no draft. A failed write also
+  removes the older draft, and the editor panel shows the warning "Draft not
+  saved".
 - Unsaved rules of the "Rules" tab (section 9.8.5) have their own draft. The
   key is `atrade.strategy-rules-draft.<strategy id>.v<version number>`, with
   the number of the version that the rules come from (0 for the blank
@@ -620,7 +623,9 @@ Source: [Rule builder prototype](https://github.com/Mano-Liaoyan/ATrade/issues/1
 - The left side of "Rules" is the builder with 3 blocks: Settings, Entry,
   and Exit.
 - The right side is the code from the rules, read-only (`CodeEditor`). It
-  changes after each rule change (`POST /api/strategy-rules/code`).
+  changes after each rule change (`POST /api/strategy-rules/code`). When
+  this request fails, an error notification shows above the last code until
+  the next answer.
 - The lines of the code that a rule change changed are highlighted.
 - After a rule change, the code region scrolls to the first highlighted
   line. Only the code region scrolls. The page does not scroll.

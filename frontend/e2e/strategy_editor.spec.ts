@@ -214,6 +214,24 @@ test('keeps unsaved edits in the browser after a reload', async ({ page }, curre
   await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
 });
 
+test('shows the code and keeps edits when the browser storage is not available', async ({ page }, currentTest) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      get() {
+        throw new DOMException('The storage is not available.', 'SecurityError');
+      },
+    });
+  });
+  await createStrategy(page, createUniqueName(currentTest, 'Blocked storage'));
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
+
+  await replaceCode(page, VALID_CODE);
+
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class EmptyStrategy(Strategy):');
+  await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: 'Draft not saved' })).toBeVisible();
+});
+
 test('opens an older version from the version list', async ({ page }, currentTest) => {
   const name = createUniqueName(currentTest, 'Open');
   await createStrategy(page, name);

@@ -325,9 +325,9 @@
       return;
     }
     if (rulesToSave === null) {
-      clearDraft(localStorage, { strategyId: id, versionNumber: baseVersionNumber });
+      clearDraft({ strategyId: id, versionNumber: baseVersionNumber });
     } else {
-      clearRulesDraft(localStorage, { strategyId: id, versionNumber: savedRulesVersionNumber });
+      clearRulesDraft({ strategyId: id, versionNumber: savedRulesVersionNumber });
     }
     const label = formatVersionLabel(name, result.version.version_number);
     await openStrategy.reload(fetch, id, result.version.version_number);
@@ -672,6 +672,9 @@
                 },
               }}
             >
+              {#if openStrategy.draftNotSaved}
+                <InlineNotification kind="warning" title="Draft not saved. A reload loses your edits." lowContrast />
+              {/if}
               {#if assistantDiff.diff !== null && assistantDiff.isSelected}
                 {@const diff = assistantDiff.diff}
                 <CodeDiff

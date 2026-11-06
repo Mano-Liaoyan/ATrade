@@ -34,6 +34,7 @@ export class OpenStrategy {
   #rulesVersionNumber = $state(0);
   #message = $state('');
   #savedRules = $state<StrategyRules | null>(null);
+  #draftNotSaved = $state(false);
   #openNumber = 0;
   readonly #events: OpenStrategyEvents;
 
@@ -45,6 +46,8 @@ export class OpenStrategy {
   readonly rulesVersionNumber = $derived(this.#rulesVersionNumber);
   /** The read error of the strategy. No panel shows it (the panels need the strategy), so the main area does. */
   readonly message = $derived(this.#message);
+  /** The last write of a draft failed: the change is only in this page. */
+  readonly draftNotSaved = $derived(this.#draftNotSaved);
   readonly hasUnsavedCode = $derived(this.#version !== null && this.#code !== this.#version.code);
   readonly hasUnsavedRules = $derived(this.#rules !== null && JSON.stringify(this.#rules) !== JSON.stringify(this.#savedRules));
   readonly rulesWarning = $derived(
@@ -62,6 +65,7 @@ export class OpenStrategy {
     this.#message = '';
     this.#version = null;
     this.#rules = null;
+    this.#draftNotSaved = false;
   }
 
   /** Reads the strategy and opens a version. */
@@ -117,13 +121,14 @@ export class OpenStrategy {
       this.#events.onError(`Version not read: ${result.message}`);
       return;
     }
-    const draft = readDraft(localStorage, { strategyId: id, versionNumber });
+    const draft = readDraft({ strategyId: id, versionNumber });
     await this.#loadRules(fetcher, id, result.value, thisOpen);
     if (thisOpen !== this.#openNumber) {
       return;
     }
     this.#version = result.value;
     this.#code = draft ?? result.value.code;
+    this.#draftNotSaved = false;
     await this.#events.onVersionOpen(id, versionNumber);
   }
 
@@ -134,9 +139,10 @@ export class OpenStrategy {
     }
     const draftKey = { strategyId: this.#strategy.id, versionNumber: this.#rulesVersionNumber };
     if (JSON.stringify(changed) === JSON.stringify(this.#savedRules)) {
-      clearRulesDraft(localStorage, draftKey);
+      clearRulesDraft(draftKey);
+      this.#draftNotSaved = false;
     } else {
-      writeRulesDraft(localStorage, draftKey, changed);
+      this.#draftNotSaved = !writeRulesDraft(draftKey, changed);
     }
   };
 
@@ -147,9 +153,10 @@ export class OpenStrategy {
     }
     const draftKey = { strategyId: this.#version.strategy_id, versionNumber: this.#version.version_number };
     if (code === this.#version.code) {
-      clearDraft(localStorage, draftKey);
+      clearDraft(draftKey);
+      this.#draftNotSaved = false;
     } else {
-      writeDraft(localStorage, draftKey, code);
+      this.#draftNotSaved = !writeDraft(draftKey, code);
     }
   };
 
@@ -174,7 +181,7 @@ export class OpenStrategy {
     }
     this.#rulesVersionNumber = versionNumber ?? 0;
     this.#savedRules = result.value;
-    this.#rules = readRulesDraft(localStorage, { strategyId: id, versionNumber: this.#rulesVersionNumber }) ?? result.value;
+    this.#rules = readRulesDraft({ strategyId: id, versionNumber: this.#rulesVersionNumber }) ?? result.value;
   }
 
   async #readRules(

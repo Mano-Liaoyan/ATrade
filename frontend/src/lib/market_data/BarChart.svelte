@@ -131,6 +131,8 @@
 
   let chartContainer: HTMLDivElement | undefined = $state();
   let chart: IChartApi | undefined = $state();
+  // Not reactive: only the cleanup of the indicator series reads it.
+  let removedChart: IChartApi | undefined;
   let candlestickSeries: ISeriesApi<'Candlestick'> | undefined = $state();
   // The palette of the lines follows the theme (section 23.9.3).
   let isDark = $state(false);
@@ -236,6 +238,7 @@
       endColorSchemeWatch();
       createdChart.unsubscribeCrosshairMove(followCrosshair);
       createdChart.remove();
+      removedChart = createdChart;
       chart = undefined;
       candlestickSeries = undefined;
       tradeMarks = undefined;
@@ -393,6 +396,10 @@
     showAxisLabels(untrack(() => legendIndex));
     return () => {
       axisLabels = [];
+      // Svelte runs the cleanups in creation order, so the chart can be removed already. It then has no series.
+      if (currentChart === removedChart) {
+        return;
+      }
       for (const series of drawn) {
         currentChart.removeSeries(series);
       }

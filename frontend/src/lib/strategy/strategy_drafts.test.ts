@@ -1,5 +1,5 @@
 // Unsaved edits stay in the browser storage, one draft for each strategy version, until the user saves.
-import { describe, expect, it } from 'vite-plus/test';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import {
   BLANK_RULES,
   clearDraft,
@@ -31,31 +31,81 @@ function createMemoryStorage(): Storage {
   };
 }
 
+function createBlockedStorage(): Storage {
+  const storage = createMemoryStorage();
+  const block = (): never => {
+    throw new DOMException('The storage is not available.', 'SecurityError');
+  };
+  storage.getItem = block;
+  storage.setItem = block;
+  storage.removeItem = block;
+  return storage;
+}
+
+beforeEach(() => {
+  vi.stubGlobal('localStorage', createMemoryStorage());
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('strategy drafts', () => {
   it('returns the code that was written for the same strategy version', () => {
-    const storage = createMemoryStorage();
+    writeDraft({ strategyId: 4, versionNumber: 2 }, 'x = 1\n');
 
-    writeDraft(storage, { strategyId: 4, versionNumber: 2 }, 'x = 1\n');
-
-    expect(readDraft(storage, { strategyId: 4, versionNumber: 2 })).toBe('x = 1\n');
+    expect(readDraft({ strategyId: 4, versionNumber: 2 })).toBe('x = 1\n');
   });
 
   it('keeps the drafts of different versions apart', () => {
-    const storage = createMemoryStorage();
+    writeDraft({ strategyId: 4, versionNumber: 2 }, 'x = 1\n');
 
-    writeDraft(storage, { strategyId: 4, versionNumber: 2 }, 'x = 1\n');
-
-    expect(readDraft(storage, { strategyId: 4, versionNumber: 3 })).toBeNull();
-    expect(readDraft(storage, { strategyId: 5, versionNumber: 2 })).toBeNull();
+    expect(readDraft({ strategyId: 4, versionNumber: 3 })).toBeNull();
+    expect(readDraft({ strategyId: 5, versionNumber: 2 })).toBeNull();
   });
 
   it('forgets the draft after it is cleared', () => {
-    const storage = createMemoryStorage();
-    writeDraft(storage, { strategyId: 4, versionNumber: 2 }, 'x = 1\n');
+    writeDraft({ strategyId: 4, versionNumber: 2 }, 'x = 1\n');
 
-    clearDraft(storage, { strategyId: 4, versionNumber: 2 });
+    clearDraft({ strategyId: 4, versionNumber: 2 });
 
-    expect(readDraft(storage, { strategyId: 4, versionNumber: 2 })).toBeNull();
+    expect(readDraft({ strategyId: 4, versionNumber: 2 })).toBeNull();
+  });
+});
+
+describe('strategy drafts without browser storage', () => {
+  const key = { strategyId: 4, versionNumber: 2 };
+
+  it('gives no draft and throws no error when the storage is blocked', () => {
+    vi.stubGlobal('localStorage', createBlockedStorage());
+
+    expect(readDraft(key)).toBeNull();
+    expect(readRulesDraft(key)).toBeNull();
+    expect(() => {
+      writeDraft(key, 'x = 1\n');
+      writeRulesDraft(key, BLANK_RULES);
+      clearDraft(key);
+      clearRulesDraft(key);
+    }).not.toThrow();
+  });
+
+  it('removes the older draft and reports the failed write when a write exceeds the quota', () => {
+    writeDraft(key, 'older code\n');
+    writeRulesDraft(key, BLANK_RULES);
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('The quota is exceeded.', 'QuotaExceededError');
+    });
+
+    expect(writeDraft(key, 'newer code\n')).toBe(false);
+    expect(writeRulesDraft(key, BLANK_RULES)).toBe(false);
+
+    expect(readDraft(key)).toBeNull();
+    expect(readRulesDraft(key)).toBeNull();
+  });
+
+  it('reports a write that the storage keeps', () => {
+    expect(writeDraft(key, 'x = 1\n')).toBe(true);
+    expect(writeRulesDraft(key, BLANK_RULES)).toBe(true);
   });
 });
 
@@ -67,14 +117,13 @@ describe('formatVersionLabel', () => {
 
 describe('rules drafts', () => {
   it('keeps unsaved rules for one strategy and rules version until they are cleared', () => {
-    const storage = createMemoryStorage();
     const key = { strategyId: 4, versionNumber: 2 };
 
-    writeRulesDraft(storage, key, BLANK_RULES);
+    writeRulesDraft(key, BLANK_RULES);
 
-    expect(readRulesDraft(storage, key)).toEqual(BLANK_RULES);
-    expect(readRulesDraft(storage, { strategyId: 4, versionNumber: 3 })).toBeNull();
-    clearRulesDraft(storage, key);
-    expect(readRulesDraft(storage, key)).toBeNull();
+    expect(readRulesDraft(key)).toEqual(BLANK_RULES);
+    expect(readRulesDraft({ strategyId: 4, versionNumber: 3 })).toBeNull();
+    clearRulesDraft(key);
+    expect(readRulesDraft(key)).toBeNull();
   });
 });
