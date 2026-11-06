@@ -21,11 +21,12 @@ from atrade.backtest.backtest_universe import MemberBars
 from atrade.backtest.strategy_engine_run import (
     CATALOG_FIRST_NS,
     CATALOG_LAST_NS,
+    ENGINE_VOLUME_PRECISION,
     LOOK_BACK_CATALOG_DIRECTORY_NAME,
-    count_decimal_places,
     create_engine,
     create_instrument,
     read_trades,
+    round_up_volumes,
     run_engine,
 )
 from atrade.backtest.universe_update import make_universe_update
@@ -91,14 +92,17 @@ def run_universe_strategy(run: UniverseRun, work_directory: Path) -> list[Backte
         if not all_bars:
             continue
         nautilus_instrument = create_instrument(member.instrument, all_bars, SIMULATED_VENUE)
-        volume_precision = max(count_decimal_places(bar.volume) for bar in all_bars)
         wrangler = BarDataWrangler(
-            find_bar_type_name(member.instrument, run.bar_period), nautilus_instrument.price_precision, volume_precision
+            find_bar_type_name(member.instrument, run.bar_period),
+            nautilus_instrument.price_precision,
+            ENGINE_VOLUME_PRECISION,
         )
         instruments.append(nautilus_instrument)
         member_data.append(
             MemberData(
-                bars=wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(member.bars, run.bar_period))
+                bars=wrangler.process_record_batch_bytes(
+                    convert_bars_to_arrow_bytes(round_up_volumes(member.bars), run.bar_period)
+                )
                 if member.bars
                 else [],
                 look_back_bars=wrangler.process_record_batch_bytes(

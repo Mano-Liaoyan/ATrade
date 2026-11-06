@@ -5,6 +5,7 @@ the status and the result through the HTTP routes.
 """
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import httpx
 import psycopg
@@ -13,6 +14,7 @@ import pytest
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from tests.backtest.real_runner import (
     TEST_STRATEGY_FILE,
+    add_decimal_places_to_saved_bars,
     run_backtest_runner,
     save_test_bars,
     start_backtest,
@@ -105,6 +107,37 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
     ]  # fmt: skip
     assert equity_curve[0]["time_utc"] == "2026-03-03T00:00:00Z"
     assert equity_curve[-1]["time_utc"] == "2026-03-22T00:00:00Z"
+
+
+@pytest.mark.anyio
+async def test_a_backtest_runs_on_bars_with_more_than_16_decimal_places(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    save_test_bars(database_url)
+    add_decimal_places_to_saved_bars(database_url)
+    backtest_id = await start_backtest(web_client, TEST_STRATEGY_FILE.read_text())
+
+    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=60):
+        backtest = await wait_for_final_status(web_client, backtest_id)
+
+    assert backtest["status"] == "finished", backtest["error_message"]
+    assert [Decimal(trade["price_usd"]) for trade in backtest["trades"]] == [104, 106, 96]
+
+
+@pytest.mark.anyio
+async def test_a_bar_with_a_volume_below_one_share_fills_orders(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    save_test_bars(database_url)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute("UPDATE ibkr_bar SET volume = 0.35")
+    backtest_id = await start_backtest(web_client, TEST_STRATEGY_FILE.read_text())
+
+    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=60):
+        backtest = await wait_for_final_status(web_client, backtest_id)
+
+    assert backtest["status"] == "finished", backtest["error_message"]
+    assert sum(int(trade["quantity_shares"]) for trade in backtest["trades"]) == 30
 
 
 @pytest.mark.anyio
