@@ -4,6 +4,9 @@
 // at the bar ends (1 USD commission each), and the stopped forward test of "E2E chart indicators" with 2 fills.
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
+// The key metric tiles wrap at this width, so the bar chart is short. At 720 pixels the legend lies over the marks.
+test.use({ viewport: { width: 1280, height: 900 } });
+
 // The marks read the place of each mark from the series primitive (the "Trade marks" list of TradeMarkLayer).
 function markItems(page: Page): Locator {
   return page.getByRole('list', { name: 'Trade marks' }).getByRole('listitem');
