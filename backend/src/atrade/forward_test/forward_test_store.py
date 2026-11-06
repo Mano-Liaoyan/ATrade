@@ -484,16 +484,3 @@ async def write_error_message(connection: psycopg.AsyncConnection, *, forward_te
         "UPDATE forward_test SET error_message = %(error_message)s WHERE id = %(id)s",
         {"error_message": error_message, "id": forward_test_id},
     )
-
-
-async def write_start_balance(
-    connection: psycopg.AsyncConnection, *, forward_test_id: int, start_balance_usd: Decimal
-) -> None:
-    """The balance at the first start. A restart keeps the first value (section 12.1)."""
-    await connection.execute(
-        """
-        UPDATE forward_test SET start_balance_usd = %(start_balance_usd)s
-        WHERE id = %(id)s AND start_balance_usd IS NULL
-        """,
-        {"start_balance_usd": start_balance_usd, "id": forward_test_id},
-    )

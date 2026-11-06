@@ -2023,7 +2023,7 @@ option and records it in this document.
   10.9.5).
 - Decided (#170): the exposure of a forward test counts its recorded equity
   points (one at each bar end) as its bars. The recorded fills go to
-  `find_round_trips` with no change, because `select_fills` already gives
+  `find_round_trips` with no change, because `list_trades` already gives
   `BacktestTrade` rows. The metrics of the forward test routes have
   `net_profit_usd` (forward test section 12.10).
 - Decided (#172): `strategy` imports `indicator` (section 6.2). The rules
@@ -2238,7 +2238,7 @@ option and records it in this document.
 - Decided (#215): the allocated capital is a ledger `transfer` from
   "By hand" at the start, and the stop transfers the positions and the cash
   back (`docs/architecture/paper_trading.md` section 11.13).
-  `forward_test_fill` keeps only the fills of the old forward tests
+  Migration `d7b2f4a9c613` dropped `forward_test_fill`
   (`forward_test.md` section 12.24).
 - Decided (#215): an execution that IBKR makes after the stop of a run does
   not go into the owner ledger. The next run sends fills only for its own

@@ -27,7 +27,6 @@ from atrade.forward_test import (
 )
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.settings import Settings
-from atrade.ibkr import AccountValue
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import (
     FakeGatewayConnection,
@@ -97,16 +96,6 @@ def make_forward_test_gateway() -> FakeGatewayConnection:
 async def start_forward_test(web_client: httpx.AsyncClient) -> JsonObject:
     strategy_version_id = await save_test_strategy_version(web_client)
     return (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))).json()
-
-
-async def start_old_forward_test(web_client: httpx.AsyncClient, database_url: str) -> JsonObject:
-    """A forward test from the time before the allocated capital: its equity starts at the start balance."""
-    forward_test = await start_forward_test(web_client)
-    with psycopg.connect(database_url, autocommit=True) as connection:
-        connection.execute(
-            "UPDATE forward_test SET allocated_capital_usd = NULL WHERE id = %(id)s", {"id": forward_test["id"]}
-        )
-    return forward_test
 
 
 @dataclass(frozen=True)
@@ -317,79 +306,6 @@ async def test_a_failed_paper_account_check_starts_no_live_node(
     listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
     assert listed["error_message"] == (
         "The paper account check failed: The account DU1234567 from IB Gateway is not the expected account DU7654321."
-    )
-
-
-@pytest.mark.anyio
-async def test_a_paper_account_without_a_usd_balance_starts_no_live_node(
-    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
-) -> None:
-    forward_test = await start_old_forward_test(web_client, database_url)
-    gateway_connection = make_forward_test_gateway()
-    gateway_connection.account_values = []
-    live_node = FakeLiveNode(gateway_connection)
-
-    exit_code, _ = await run_child(
-        make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node
-    )
-
-    # The equity of the records starts at the balance, so a forward test without it cannot record (section 12.8).
-    assert exit_code == PAPER_CHECK_FAILED_EXIT_CODE
-    assert live_node.inputs == []
-    listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
-    assert listed["error_message"] == (
-        "The paper account has no NetLiquidation value in USD. IBKR sent no NetLiquidation value for the paper account."
-    )
-
-
-def make_eur_account_values() -> list[AccountValue]:
-    return [
-        AccountValue(account=ACCOUNT_ID, tag="NetLiquidation", value="1000.00", currency="EUR"),
-        AccountValue(account=ACCOUNT_ID, tag="TotalCashValue", value="1000.00", currency="EUR"),
-    ]
-
-
-@pytest.mark.anyio
-async def test_a_eur_paper_account_starts_with_the_balance_converted_to_usd(
-    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
-) -> None:
-    forward_test = await start_old_forward_test(web_client, database_url)
-    gateway_connection = make_forward_test_gateway()
-    gateway_connection.account_values = make_eur_account_values()
-    gateway_connection.exchange_rates = {("EUR", "USD"): Decimal("1.1139")}
-    live_node = FakeLiveNode(gateway_connection)
-
-    exit_code, _ = await run_child(
-        make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node
-    )
-
-    assert exit_code == 0
-    [live_node_input] = live_node.inputs
-    assert live_node_input.start_balance_usd == Decimal("1113.90")
-    listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
-    assert listed["start_balance_usd"] == "1113.90"
-
-
-@pytest.mark.anyio
-async def test_a_eur_paper_account_without_an_exchange_rate_starts_no_live_node(
-    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
-) -> None:
-    forward_test = await start_old_forward_test(web_client, database_url)
-    gateway_connection = make_forward_test_gateway()
-    gateway_connection.account_values = make_eur_account_values()
-    gateway_connection.exchange_rate_error_message = "No market data permissions."
-    live_node = FakeLiveNode(gateway_connection)
-
-    exit_code, _ = await run_child(
-        make_settings(database_url, frontend_build_dir), forward_test["id"], "run", live_node
-    )
-
-    assert exit_code == PAPER_CHECK_FAILED_EXIT_CODE
-    assert live_node.inputs == []
-    listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
-    assert listed["error_message"] == (
-        "The paper account has no NetLiquidation value in USD. The paper account has the base currency EUR and IBKR "
-        "sent no EUR to USD exchange rate: No market data permissions."
     )
 
 

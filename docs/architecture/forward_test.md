@@ -331,11 +331,7 @@ Implementation (#77):
   - The equity starts at `start_balance_usd`, not at the paper account
     balance. Other positions of the paper account do not change it. The
     start balance is `NetLiquidation` converted to USD (section 11.9 of
-    `paper_trading.md`). A child that has no `NetLiquidation` value in USD at
-    the first start, for example a EUR account without an exchange rate,
-    writes "The paper account has no NetLiquidation value in USD." and the
-    reason of the balance, and ends with exit code 3 before the `LiveNode`
-    starts.
+    `paper_trading.md`).
 - Tables (migration `3e7a1c5d9b78_forward_test_create_record_tables.py`,
   `ON DELETE CASCADE` from `forward_test`). Each insert has
   `ON CONFLICT DO NOTHING`, so a restart that reads a fill or a bar again
@@ -343,7 +339,6 @@ Implementation (#77):
 
 | Table | Columns |
 |---|---|
-| `forward_test_fill` | `forward_test_id`, `trade_id` (NautilusTrader `TradeId`), `time_utc`, `side`, `quantity_shares`, `price_usd`, `commission_usd`. Primary key `(forward_test_id, trade_id)`. |
 | `forward_test_equity_point` | `forward_test_id`, `time_utc` (bar end), `equity_usd`. Primary key `(forward_test_id, time_utc)`. |
 
 Phase 3 changes (#146, #149):
@@ -367,8 +362,7 @@ Phase 3 changes (#146, #149):
 - A stock split adjustment is a ledger record, not a fill (section 12.22). The
   "Fills" table shows it as a row (section 12.16).
 - The forward test routes read the fills of the forward test from the owner
-  ledger. Whether `forward_test_fill` stays, and what happens to its old
-  rows, is left to the implementation (section 12.24).
+  ledger. Migration `d7b2f4a9c613` drops `forward_test_fill` (section 12.24).
 - Implemented (#215): at each bar, the recorder reads the fills of the
   forward test on its instrument with `read_forward_test_fills_blocking()` of
   `paper_trading` and calculates the equity point with
@@ -487,7 +481,7 @@ Phase 3 changes (#146, #149):
   - Decided (#170): the exposure counts the recorded equity points as the
     bars, because a forward test has no saved bars and the DataActor
     records one point at each bar end (section 12.8). The recorded fills
-    go to `find_round_trips` with no change: `select_fills` gives
+    go to `find_round_trips` with no change: `list_trades` gives
     `BacktestTrade` rows.
   - Decided (#170): the forward test metrics have the fields of the backtest
     `metrics` (backtest section 10.5, Phase 1 row) and `net_profit_usd`
@@ -633,9 +627,7 @@ Phase 3 table changes (#146). The column names are choices of this document.
   `status = starting`, the client ID, `end_time_utc`,
   `allocated_capital_usd`) and after that writes only `desired_state`. The worker writes `status`, `client_id`,
   `crash_count`, `stopped_at_utc`, and the `crash` and `worker_restart`
-  interruptions. The child writes `start_balance_usd` only for an old row
-  without `allocated_capital_usd` (the `NetLiquidation` converted to USD
-  after the paper account check, only the first value), `error_message`, the `gateway` interruptions, and two statuses:
+  interruptions. The child writes `error_message`, the `gateway` interruptions, and two statuses:
   `waiting_for_gateway` (only from `starting`, `running`, or
   `waiting_for_gateway`) and `running` at the `LiveNode` start (only from
   `starting`, `running`, or `waiting_for_gateway`; it also clears
@@ -758,7 +750,7 @@ than the worker clock.
 ## 12.15 Child process
 
 - `run`: connect with `ib_async` and the client ID of the row, call
-  `require_paper_account()`, read the balance, cancel the open orders of the
+  `require_paper_account()`, cancel the open orders of the
   client ID, disconnect, then `run_live_node()` with the same client ID until
   `SIGTERM`. Then the stop steps of section 12.6 and exit code 0. When IB
   Gateway is not reachable, it waits (section 12.5). `run_live_node()`
@@ -1422,11 +1414,17 @@ simplest option and records it in this document.
   the quarters.
 - Whether `forward_test_fill` stays as a copy of the ledger fills, and the
   migration of the old rows and of `start_balance_usd`.
-  Decided (#215): `forward_test_fill` is not a copy. It keeps only the fills
-  of the old rows (without `allocated_capital_usd`), and the routes read it
-  only for them. The old rows keep `start_balance_usd`, and no migration
-  changes them. A forward test that runs during the upgrade has no
-  allocated capital in the owner ledger: stop it before the upgrade.
+  Decided (#215): `forward_test_fill` is not a copy. A forward test that
+  runs during the upgrade has no allocated capital in the owner ledger: stop
+  it before the upgrade.
+  Changed: no program wrote `forward_test_fill`, and production had 0 rows.
+  Migration `d7b2f4a9c613` drops the table, so the routes read the fills of
+  all rows from the owner ledger. The same migration sets
+  `allocated_capital_usd` to `start_balance_usd` for each old row without a
+  client ID. The child no longer writes `start_balance_usd`. The column and
+  `ForwardTestRow.start_capital_usd` stay for an old row without an allocated
+  capital. A forward test that holds a client ID must have an allocated
+  capital, or its child crashes at the start.
 - Whether a stock split restart opens an interruption.
   Decided (#220): no. The restart is before the open and misses no bar.
 - What the stock split check does when IB Gateway is not reachable until

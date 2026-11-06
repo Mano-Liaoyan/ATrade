@@ -1,7 +1,7 @@
 """The body of one forward test child process: the wait for IB Gateway, the paper account check, the cancel of old
 orders, the warm-up bars, the LiveNode run, and the stop steps (docs/architecture.md sections 12.5-12.7).
 
-The child writes start_balance_usd, error_message, the status "waiting_for_gateway" and "running", and the
+The child writes error_message, the status "waiting_for_gateway" and "running", and the
 interruption rows of a wait for IB Gateway. The worker reads the exit code and writes the other states.
 """
 
@@ -30,7 +30,7 @@ from atrade.foundation.order_ref import format_forward_test_order_tag
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, GatewayRequestError
 from atrade.market_data import BarRequest, save_received_bars
-from atrade.paper_trading import PaperAccountCheckError, PaperAccountMonitor, require_paper_account
+from atrade.paper_trading import PaperAccountCheckError, require_paper_account
 from atrade.strategy import read_strategy_version
 
 SUCCESS_EXIT_CODE = 0
@@ -103,20 +103,9 @@ async def write_error_message(job: ChildJob, error_message: str) -> None:
 @dataclass(frozen=True)
 class CheckedAccount:
     account_id: str
-    # The start of the equity: the allocated capital, or the first start balance of an old forward test.
+    # The start of the equity: the allocated capital.
     start_balance_usd: Decimal
     warm_up_bars: tuple[Bar, ...]
-
-
-async def save_start_balance(job: ChildJob, net_liquidation_usd: Decimal | None) -> Decimal | None:
-    """Saves the balance at the first start and returns the saved value."""
-    async with await psycopg.AsyncConnection.connect(job.settings.database_url, autocommit=True) as connection:
-        if net_liquidation_usd is not None:
-            await forward_test_store.write_start_balance(
-                connection, forward_test_id=job.row.id, start_balance_usd=net_liquidation_usd
-            )
-        row = await forward_test_store.select_forward_test(connection, job.row.id)
-    return None if row is None else row.start_balance_usd
 
 
 async def read_warm_up_bars(job: ChildJob, gateway_connection: GatewayConnection) -> tuple[Bar, ...]:
@@ -167,8 +156,6 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         try:
             await gateway_connection.connect()
             account_id = require_paper_account(settings=job.settings, gateway_connection=gateway_connection)
-            monitor = PaperAccountMonitor(settings=job.settings, gateway_connection=gateway_connection)
-            balance = await monitor.read_balance()
         except GatewayRequestError as error:
             logger.warning("Forward test %s: IB Gateway is not reachable: %s", job.row.id, error)
             return GATEWAY_UNREACHABLE_EXIT_CODE
@@ -187,20 +174,11 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
         warm_up_bars = await read_warm_up_bars(job, gateway_connection) if job.row.universe_kind == "single" else ()
     finally:
         gateway_connection.disconnect()
-    if job.row.allocated_capital_usd is not None:
-        # The equity starts at the allocated capital (section 12.8). The child does not need NetLiquidation.
-        return CheckedAccount(
-            account_id=account_id, start_balance_usd=job.row.allocated_capital_usd, warm_up_bars=warm_up_bars
-        )
-    # A forward test from the time before the allocated capital keeps its first start balance (section 12.24).
-    start_balance_usd = await save_start_balance(job, None if balance is None else balance.net_liquidation_usd)
-    if start_balance_usd is None:
-        # The equity of the records starts at the balance (section 12.8). This child sent no order.
-        reason = None if balance is None else balance.message
-        message = "The paper account has no NetLiquidation value in USD."
-        await write_error_message(job, message if reason is None else f"{message} {reason}")
-        return PAPER_CHECK_FAILED_EXIT_CODE
-    return CheckedAccount(account_id=account_id, start_balance_usd=start_balance_usd, warm_up_bars=warm_up_bars)
+    # The equity starts at the allocated capital (section 12.8). Each row with a client ID has it (section 12.24).
+    assert job.row.allocated_capital_usd is not None
+    return CheckedAccount(
+        account_id=account_id, start_balance_usd=job.row.allocated_capital_usd, warm_up_bars=warm_up_bars
+    )
 
 
 async def write_waiting_for_gateway(job: ChildJob) -> None:

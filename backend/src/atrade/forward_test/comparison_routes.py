@@ -454,12 +454,7 @@ class ComparisonRoutes:
     async def read_forward_test_detail(self, forward_test_id: int) -> ForwardTestDetailResponse:
         row = await self.read_forward_test_row(forward_test_id)
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
-            forward_test_fills = await forward_test_records.select_forward_test_fills(
-                connection,
-                forward_test_id=forward_test_id,
-                instrument=forward_test_store.read_single_instrument(row),
-                uses_owner_ledger=row.allocated_capital_usd is not None,
-            )
+            forward_test_fills = await forward_test_records.select_forward_test_fills(connection, forward_test_id)
             fills = forward_test_records.list_trades(forward_test_fills)
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             backtest_ids = await forward_test_records.select_same_period_backtest_ids(connection, forward_test_id)
@@ -494,12 +489,7 @@ class ComparisonRoutes:
         if not is_same_setup(row, backtest):
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=describe_other_setup(row))
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
-            forward_test_fills = await forward_test_records.select_forward_test_fills(
-                connection,
-                forward_test_id=forward_test_id,
-                instrument=forward_test_store.read_single_instrument(row),
-                uses_owner_ledger=row.allocated_capital_usd is not None,
-            )
+            forward_test_fills = await forward_test_records.select_forward_test_fills(connection, forward_test_id)
             fills = forward_test_records.list_trades(forward_test_fills)
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             interruptions = await forward_test_store.select_interruptions(connection, forward_test_id)
