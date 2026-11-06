@@ -121,7 +121,7 @@ export function openLiveSocket(options: LiveSocketOptions): () => void {
 
   function connect(): void {
     // A new socket gets the full heartbeat timeout to open and to send its first message.
-    lastMessageAtMilliseconds = Date.now();
+    restartHeartbeatTimer();
     let newSocket: OpenSocket | null = null;
     newSocket = createSocket(options.url, {
       onOpen: () => {

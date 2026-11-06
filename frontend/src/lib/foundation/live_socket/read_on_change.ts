@@ -36,15 +36,18 @@ export function readOnChange<T>(options: ReadOnChangeOptions<T>): () => void {
     }
     isReading = true;
     let readRequestCount = 0;
-    while (readRequestCount !== requestCount) {
-      readRequestCount = requestCount;
-      const value = await options.read();
-      if (isStopped) {
-        return;
+    try {
+      while (readRequestCount !== requestCount) {
+        readRequestCount = requestCount;
+        const value = await options.read();
+        if (isStopped) {
+          return;
+        }
+        options.onResult(value);
       }
-      options.onResult(value);
+    } finally {
+      isReading = false;
     }
-    isReading = false;
   }
 
   void readNow();

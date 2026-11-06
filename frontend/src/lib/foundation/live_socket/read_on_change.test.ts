@@ -113,6 +113,36 @@ describe('readOnChange', () => {
     expect(reads.count()).toBe(2);
   });
 
+  it('reads again after a read that rejects', async () => {
+    const { socket, openSocket } = createFakeSocket();
+    const results: number[] = [];
+    let readCount = 0;
+    // readNow keeps the rejection for the browser console. The test runner must not count it as an error.
+    const runnerListeners = process.listeners('unhandledRejection');
+    const rejections: unknown[] = [];
+    process.removeAllListeners('unhandledRejection');
+    process.on('unhandledRejection', (reason) => rejections.push(reason));
+    readOnChange({
+      socketPath: '/ws/x',
+      read: () => {
+        readCount += 1;
+        return readCount === 1 ? Promise.reject(new Error('Body read failed.')) : Promise.resolve(readCount);
+      },
+      onResult: (value) => results.push(value),
+      location: LOCATION,
+      openSocket,
+    });
+    await settle();
+    socket.options?.onMessage({ type: 'changed' });
+    await settle();
+    await new Promise((resolve) => setTimeout(resolve));
+    process.removeAllListeners('unhandledRejection');
+    runnerListeners.forEach((listener) => process.on('unhandledRejection', listener));
+
+    expect(results).toEqual([2]);
+    expect(rejections).toHaveLength(1);
+  });
+
   it('closes the socket at stop and gives no result after it', async () => {
     const { socket, openSocket } = createFakeSocket();
     const reads = createDeferredReads();

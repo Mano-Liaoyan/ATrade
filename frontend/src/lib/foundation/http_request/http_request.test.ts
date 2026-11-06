@@ -79,4 +79,25 @@ describe('requestJson', () => {
     expect(result).toEqual({ kind: 'failed', message: BACKEND_NOT_REACHABLE });
     expect(BACKEND_NOT_REACHABLE).toBe('The backend is not reachable.');
   });
+
+  it('returns a message when a successful answer has no JSON body', async () => {
+    const answerWithHtml: typeof fetch = () => Promise.resolve(new Response('<html></html>', { status: 200 }));
+
+    const result = await requestJson(answerWithHtml, 'The item request', '/api/items');
+
+    expect(result).toEqual({ kind: 'failed', message: 'The item request failed with HTTP status 200.' });
+  });
+
+  it('returns a message when the connection stops during the body', async () => {
+    const stoppedBody = new ReadableStream({
+      start: (controller) => {
+        controller.error(new TypeError('network error'));
+      },
+    });
+    const answerWithStoppedBody: typeof fetch = () => Promise.resolve(new Response(stoppedBody, { status: 200 }));
+
+    const result = await requestJson(answerWithStoppedBody, 'The item request', '/api/items');
+
+    expect(result).toEqual({ kind: 'failed', message: 'The item request failed with HTTP status 200.' });
+  });
 });

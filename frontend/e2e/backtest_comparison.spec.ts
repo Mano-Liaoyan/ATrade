@@ -143,11 +143,14 @@ test('compares two versions of the same strategy and refuses different strategie
   const firstBacktestId = await startBacktest(request, compared.version.id);
   const secondBacktestId = await startBacktest(request, secondVersion.id);
   const otherBacktestId = await startBacktest(request, other.version.id);
+  const backtestIds = [firstBacktestId, secondBacktestId, otherBacktestId];
   for (let fillerIndex = 0; fillerIndex < FILLER_BACKTEST_COUNT; fillerIndex += 1) {
-    await startBacktest(request, other.version.id, FILLER_RANGE);
+    backtestIds.push(await startBacktest(request, other.version.id, FILLER_RANGE));
   }
-  await waitUntilFinished(request, firstBacktestId);
-  await waitUntilFinished(request, secondBacktestId);
+  // The list changes while a backtest runs, and a click on a changing list can miss the checkbox.
+  for (const backtestId of backtestIds) {
+    await waitUntilFinished(request, backtestId);
+  }
 
   await page.goto(`/backtests/${String(firstBacktestId)}`);
   const list = page.getByRole('complementary', { name: 'Backtests' });

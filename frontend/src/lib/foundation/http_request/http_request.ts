@@ -52,7 +52,7 @@ export async function readErrorMessage(response: Response, failedAction: string)
   return describeErrorBody(await readJsonBody(response), response.status, failedAction);
 }
 
-/** Sends the request and returns the JSON body, or a message when the backend is not reachable or refuses. */
+/** Sends the request and returns the JSON body, or a message when the backend is not reachable or refuses, or when the body cannot be read. */
 export async function requestJson<T>(
   fetchFunction: typeof fetch,
   failedAction: string,
@@ -66,5 +66,9 @@ export async function requestJson<T>(
   if (!response.ok) {
     return { kind: 'failed', message: await readErrorMessage(response, failedAction) };
   }
-  return { kind: 'ok', value: (await response.json()) as T };
+  try {
+    return { kind: 'ok', value: (await response.json()) as T };
+  } catch {
+    return { kind: 'failed', message: describeErrorBody(null, response.status, failedAction) };
+  }
 }
