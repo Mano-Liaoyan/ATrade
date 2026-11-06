@@ -233,7 +233,7 @@ async def test_look_back_bars_follow_the_source_order_of_the_backtest(
 
     assert backtest["status"] == "finished", backtest["error_message"]
     assert backtest["bar_count_by_source"] == {"databento": 0, "ibkr": 20}
-    assert backtest["trades"][0]["time_utc"] == "2026-03-03T00:00:00.000001Z"
+    assert backtest["trades"][0]["time_utc"] == "2026-03-03T00:00:00.001000Z"
     assert backtest["trades"][0]["price_usd"] == "100.00"
 
 

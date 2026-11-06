@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from atrade.backtest.backtest_metrics import BacktestTrade
-from atrade.backtest.backtest_store import BacktestRequest, UniversePeriod
+from atrade.backtest.backtest_store import BacktestRequest, ParameterValues, UniversePeriod
 from atrade.backtest.backtest_universe import MemberBars
 from atrade.backtest.strategy_engine_run import StrategyRun, make_fill_warning, run_strategy_on_bars
 from atrade.backtest.universe_engine_run import UniverseRun, run_universe_strategy
@@ -28,11 +28,12 @@ CLOSE_TWICE_CODE = (STRATEGIES_DIRECTORY / "close_position_twice.py").read_text(
 FOLLOW_UNIVERSE_CODE = (STRATEGIES_DIRECTORY / "follow_universe.py").read_text()
 REBALANCE_CODE = (STRATEGIES_DIRECTORY / "rebalance_in_one_bar.py").read_text()
 START_UTC = datetime(2026, 3, 2, tzinfo=UTC)
-OPEN_FILL_DELAY = timedelta(microseconds=1)
+OPEN_FILL_DELAY = timedelta(milliseconds=1)
 WAVE = Instrument(symbol="WAVE", exchange="ARCA", currency="USD")
 AAA = Instrument(symbol="AAA", exchange="NASDAQ", currency="USD")
 BBB = Instrument(symbol="BBB", exchange="NYSE", currency="USD")
 LOOK_BACK_BAR_COUNT = 30
+HUNDRED_SHARES: ParameterValues = {"trade_quantity_shares": 100}
 
 
 def make_bar(day: int, open_price: int, close: int, volume: int = 1000000) -> Bar:
@@ -55,7 +56,12 @@ def read_fills(trades: list[BacktestTrade]) -> list[tuple[datetime, str, Decimal
 
 
 def run_single(
-    bars: list[Bar], work_directory: Path, *, code: str = BAR_COUNT_CODE, cash: int = 100000, shares: int = 10
+    bars: list[Bar],
+    work_directory: Path,
+    *,
+    code: str = BAR_COUNT_CODE,
+    cash: int = 100000,
+    parameters: ParameterValues | None = None,
 ) -> tuple[list[BacktestTrade], list[str]]:
     """The strategy of `BAR_COUNT_CODE` buys at bar 3 and sells at bar 8. Returns the trades and the changed orders."""
     request = BacktestRequest(
@@ -64,7 +70,7 @@ def run_single(
         bar_period=BarPeriod.ONE_DAY,
         time_range=TimeRange(start_utc=START_UTC, end_utc=START_UTC + timedelta(days=len(bars))),
         paper_capital_usd=Decimal(cash),
-        parameters={"trade_quantity_shares": shares} if code == BAR_COUNT_CODE else None,
+        parameters=parameters,
     )
     changed_orders: list[str] = []
     run = StrategyRun(code=code, request=request, starting_cash=Decimal(cash), bars=bars, look_back_bars=[])
@@ -96,7 +102,7 @@ def test_an_order_on_the_last_bar_has_no_next_open_and_fills_at_the_last_close(t
 def test_a_buy_that_gaps_over_the_cash_is_reduced_and_the_run_has_a_warning(tmp_path: Path) -> None:
     bars = [*make_flat_bars(3), make_bar(3, 130, 130), make_bar(4, 130, 130)]
 
-    trades, changed_orders = run_single(bars, tmp_path, cash=10000, shares=100)
+    trades, changed_orders = run_single(bars, tmp_path, cash=10000, parameters=HUNDRED_SHARES)
 
     # 100 shares cost 10000 at the close of 100, but 13000 at the open of 130. The cash pays for 76 shares.
     assert read_fills(trades) == [(find_open_time(3), "BUY", Decimal("130.00"), Decimal(76))]
@@ -119,7 +125,7 @@ def test_a_reduced_order_above_the_open_tick_volume_does_not_end_the_run(tmp_pat
     # The open tick holds 1000 shares. The engine fills the rest 1 cent higher, so the check adds 1 cent.
     bars = [*make_flat_bars(3), make_bar(3, 2, 2, volume=4000), make_bar(4, 2, 2, volume=4000)]
 
-    trades, changed_orders = run_single(bars, tmp_path, cash=10000, shares=9000)
+    trades, changed_orders = run_single(bars, tmp_path, cash=10000, parameters={"trade_quantity_shares": 9000})
 
     assert sum(trade.quantity_shares for trade in trades) == Decimal(4975)
     assert sum(trade.price_usd * trade.quantity_shares for trade in trades) <= Decimal(10000)
@@ -129,7 +135,7 @@ def test_a_reduced_order_above_the_open_tick_volume_does_not_end_the_run(tmp_pat
 def test_a_buy_refused_because_the_cash_pays_for_no_share_does_not_fail_the_run(tmp_path: Path) -> None:
     bars = [*make_flat_bars(3), make_bar(3, 20000, 20000), make_bar(4, 20000, 20000)]
 
-    trades, changed_orders = run_single(bars, tmp_path, cash=10000, shares=100)
+    trades, changed_orders = run_single(bars, tmp_path, cash=10000, parameters=HUNDRED_SHARES)
 
     assert trades == []
     assert len(changed_orders) == 1
@@ -140,21 +146,62 @@ def test_a_full_position_buy_on_a_day_that_closes_below_its_open_is_not_refused(
     # The cash check uses the next open of 95, not the open of 130 of the signal bar.
     bars = [*make_flat_bars(2), make_bar(2, 130, 100), make_bar(3, 95, 90), make_bar(4, 90, 90)]
 
-    trades, changed_orders = run_single(bars, tmp_path, cash=10000, shares=100)
+    trades, changed_orders = run_single(bars, tmp_path, cash=10000, parameters=HUNDRED_SHARES)
 
     assert read_fills(trades) == [(find_open_time(3), "BUY", Decimal("95.00"), Decimal(100))]
     assert changed_orders == []
 
 
-def test_a_full_cash_bracket_order_fills_at_the_next_open_after_a_day_that_closes_below_its_open(
-    tmp_path: Path,
-) -> None:
-    bars = [make_bar(0, 130, 100), make_bar(1, 95, 96), make_bar(2, 96, 96)]
+def test_a_buy_on_the_last_bar_fits_the_cash_at_the_close_that_fills_it(tmp_path: Path) -> None:
+    # 100 shares cost 9500 at the open of 95, but 10500 at the close of 105. The order has no next open.
+    bars = [*make_flat_bars(2), make_bar(2, 95, 105)]
 
-    trades, changed_orders = run_single(bars, tmp_path, code=BRACKET_CODE, cash=10000)
+    trades, changed_orders = run_single(bars, tmp_path, cash=10000, parameters=HUNDRED_SHARES)
 
-    assert read_fills(trades) == [(find_open_time(1), "BUY", Decimal("95.00"), Decimal(100))]
+    assert read_fills(trades) == [(START_UTC + timedelta(days=3), "BUY", Decimal("105.00"), Decimal(95))]
+    assert changed_orders == ["2026-03-05 00:00 UTC: BUY 100 WAVE reduced to 95 at 105.00"]
+
+
+def test_a_full_cash_buy_on_a_last_bar_that_closes_below_its_open_is_not_refused(tmp_path: Path) -> None:
+    bars = [*make_flat_bars(2), make_bar(2, 130, 100)]
+
+    trades, changed_orders = run_single(bars, tmp_path, cash=10000, parameters=HUNDRED_SHARES)
+
+    assert read_fills(trades) == [(START_UTC + timedelta(days=3), "BUY", Decimal("100.00"), Decimal(100))]
     assert changed_orders == []
+
+
+def test_a_bracket_order_keeps_the_fill_at_the_close_and_stops_out_at_a_gap_through_its_stop(tmp_path: Path) -> None:
+    bars = [make_bar(0, 100, 100), make_bar(1, 90, 90), make_bar(2, 90, 90)]
+
+    trades, changed_orders = run_single(bars, tmp_path, code=BRACKET_CODE, cash=10000, parameters={"stop_price": 95.0})
+
+    # An order list is not held: the entry fills at the close of 100. The stop is in the market before the gap.
+    assert read_fills(trades) == [
+        (START_UTC + timedelta(days=1), "BUY", Decimal("100.00"), Decimal(100)),
+        (find_open_time(1), "SELL", Decimal("90.00"), Decimal(100)),
+    ]
+    assert changed_orders == []
+
+
+def test_a_post_only_limit_bracket_rests_and_fills_at_its_limit_at_a_gap_down(tmp_path: Path) -> None:
+    bars = [make_bar(0, 102, 102), make_bar(1, 95, 96), make_bar(2, 96, 96)]
+
+    trades, changed_orders = run_single(
+        bars, tmp_path, code=BRACKET_CODE, cash=20000, parameters={"limit_price": 100.0}
+    )
+
+    assert [(trade.side, trade.price_usd) for trade in trades] == [("BUY", Decimal("100.00"))]
+    assert changed_orders == []
+
+
+def test_a_stop_that_the_venue_rejects_is_in_the_fill_warning(tmp_path: Path) -> None:
+    # The sell stop of 110 is above the close of 100. The position has no exit, so the run must say it.
+    bars = [make_bar(0, 100, 100), make_bar(1, 100, 100), make_bar(2, 100, 100)]
+
+    _, changed_orders = run_single(bars, tmp_path, code=BRACKET_CODE, cash=20000, parameters={"stop_price": 110.0})
+
+    assert any("SELL 100 WAVE refused" in line for line in changed_orders)
 
 
 def test_rule_code_does_not_buy_two_times_when_the_next_bar_has_no_volume(tmp_path: Path) -> None:
@@ -243,8 +290,8 @@ def test_all_members_of_one_rebalance_fill_at_their_next_open_in_each_member_ord
     }
 
 
-def test_an_order_held_at_the_end_of_the_data_gives_a_warning(tmp_path: Path) -> None:
-    # The open tick of day 1 is the last data of the run. The bars of day 1 are outside the member periods.
+def test_an_order_held_for_the_last_open_of_the_data_fills_at_that_open(tmp_path: Path) -> None:
+    # The bar of day 1 is outside the member periods. Only its open tick and its last close tick go to the engine.
     held = Member(AAA, [(100, 120), (150, 200)], 1)
     other = Member(BBB, [(50, 60)], 1)
     changed_orders: list[str] = []
@@ -252,8 +299,8 @@ def test_an_order_held_at_the_end_of_the_data_gives_a_warning(tmp_path: Path) ->
 
     trades = run_universe([make_member(held), make_member(other)], periods, tmp_path, REBALANCE_CODE, changed_orders)
 
-    assert [trade.symbol for trade in trades] == ["BBB"]
-    assert changed_orders == ["2026-03-03 00:00 UTC: BUY 10 AAA not sent (the run ended at its next open)"]
+    assert ("AAA", "BUY", Decimal("150.00"), find_open_time(1)) in read_symbol_fills(trades)
+    assert changed_orders == []
 
 
 def make_exit_periods() -> list[UniversePeriod]:

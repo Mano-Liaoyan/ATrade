@@ -39,7 +39,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
     # The sell ends the round trip 10 * (106 - 104) = 20. The last buy opens a position that stays open.
     assert backtest["trades"] == [
         {
-            "time_utc": "2026-03-05T00:00:00.000001Z",
+            "time_utc": "2026-03-05T00:00:00.001000Z",
             "side": "BUY",
             "quantity_shares": "10",
             "price_usd": "104.00",
@@ -49,7 +49,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "round_trip_net_profit_usd": None,
         },
         {
-            "time_utc": "2026-03-10T00:00:00.000001Z",
+            "time_utc": "2026-03-10T00:00:00.001000Z",
             "side": "SELL",
             "quantity_shares": "10",
             "price_usd": "106.00",
@@ -59,7 +59,7 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
             "round_trip_net_profit_usd": "20.00",
         },
         {
-            "time_utc": "2026-03-15T00:00:00.000001Z",
+            "time_utc": "2026-03-15T00:00:00.001000Z",
             "side": "BUY",
             "quantity_shares": "10",
             "price_usd": "96.00",
@@ -112,7 +112,8 @@ async def test_a_backtest_shows_the_fill_warning_when_the_cash_does_not_pay_for_
     web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
 ) -> None:
     save_test_bars(database_url)
-    # The strategy buys 1000 shares at bar 3. The paper capital of 10000 pays for fewer at the next open of 104.
+    # The strategy buys 1000 shares at bars 3 and 13. The paper capital of 10000 pays for fewer at the next open of 104.
+    # The sell of 1000 shares at bar 8 is above the position, so the third changed order is a rejected order.
     code = TEST_STRATEGY_FILE.read_text().replace(
         "trade_quantity_shares: int = 10", "trade_quantity_shares: int = 1000"
     )
@@ -124,7 +125,7 @@ async def test_a_backtest_shows_the_fill_warning_when_the_cash_does_not_pay_for_
     assert backtest["status"] == "finished", backtest["error_message"]
     assert backtest["trades"][0]["quantity_shares"] == "96"
     assert backtest["fill_warning"].startswith(
-        "Changed orders: 2. Earliest: 2026-03-05 00:00 UTC: BUY 1000 BTEST reduced"
+        "Changed orders: 3. Earliest: 2026-03-05 00:00 UTC: BUY 1000 BTEST reduced"
     )
 
 
@@ -192,7 +193,7 @@ async def test_the_template_warms_up_on_saved_bars_before_the_start(
 
     assert backtest["status"] == "finished", backtest["error_message"]
     assert backtest["trades"][0] == {
-        "time_utc": "2026-03-03T00:00:00.000001Z",
+        "time_utc": "2026-03-03T00:00:00.001000Z",
         "side": "BUY",
         "quantity_shares": "10",
         "price_usd": "100.00",

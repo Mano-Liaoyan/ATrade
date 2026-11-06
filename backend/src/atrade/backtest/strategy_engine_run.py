@@ -33,6 +33,7 @@ from nautilus_trader.model import (
     OmsType,
     OrderDenied,
     OrderFilled,
+    OrderRejected,
     OrderSide,
     OrderType,
     Position,
@@ -64,10 +65,10 @@ LOOK_BACK_CATALOG_DIRECTORY_NAME = "look_back_catalog"
 CATALOG_FIRST_NS = 1
 CATALOG_LAST_NS = 2**63 - 1
 # The engine fills a market order on a bar at the bar close. So each bar also gets a trade tick at its open, 1
-# microsecond after the bar start: later than the end of the bar before, and kept by the fill time (a `datetime` has
-# no nanoseconds). These ticks are real engine data: the last price of an instrument is its last open, and a strategy
+# millisecond after the bar start: later than the end of the bar before. A `datetime` and `Date.parse` in the browser
+# keep a millisecond, so the fill time stays inside its bar for the equity curve and the trade marks. These ticks are real engine data: the last price of an instrument is its last open, and a strategy
 # can read them (docs/architecture/backtest.md section 10.10.3).
-OPEN_TICK_DELAY_NS = 1_000
+OPEN_TICK_DELAY_NS = 1_000_000
 # The engine splits a bar into 4 ticks. The open tick has the volume of 1 of them.
 BAR_VOLUME_PARTS = 4
 
@@ -150,6 +151,22 @@ def make_open_ticks(instrument: Equity, bars: list[Bar]) -> list[TradeTick]:
     return ticks
 
 
+def make_last_close_tick(instrument: Equity, bars: list[Bar], bar_period: BarPeriod) -> TradeTick:
+    """1 trade tick at the close of the last bar, just before its end. An order without a next open fills at this
+    close, so the last price of the instrument must be this close, not the last open."""
+    bar = bars[-1]
+    time_ns = convert_to_ns(bar.start_utc + bar_period.length) - 1
+    return TradeTick(
+        instrument.id,
+        instrument.make_price(float(bar.close)),
+        instrument.make_qty(max(int(bar.volume / BAR_VOLUME_PARTS), 1)),
+        AggressorSide.NO_AGGRESSOR,
+        TradeId(f"close-{time_ns}"),
+        time_ns,
+        time_ns,
+    )
+
+
 def create_engine(
     *,
     starting_cash: Decimal,
@@ -200,13 +217,13 @@ def find_side_name(order_side: OrderSide) -> Literal["BUY", "SELL"]:
 
 
 def read_refused_orders(engine: BacktestEngine) -> list[str]:
-    """One line for each order that the engine refused: the time, the order, and the reason."""
+    """One line for each order that the risk engine or the venue refused: the time, the order, and the reason."""
     return [
         f"{datetime.fromtimestamp(event.ts_event / NANOSECONDS_PER_SECOND, tz=UTC):%Y-%m-%d %H:%M} UTC:"
         f" {find_side_name(order.side)} {order.quantity} {order.instrument_id.symbol} refused ({event.reason})"
         for order in engine.cache.orders()
         for event in order.events()
-        if isinstance(event, OrderDenied)
+        if isinstance(event, OrderDenied | OrderRejected)
     ]
 
 
@@ -265,11 +282,12 @@ class StrategyRun:
 
 @dataclass(frozen=True)
 class EngineInputs:
-    """The strategy code and the open ticks of one engine run. `changed_orders` gets the lines of the fill warning."""
+    """The strategy code and the ticks of one engine run. `changed_orders` gets the lines of the fill warning."""
 
     code: str
     config_fields: dict[str, object]
     open_ticks: list[list[TradeTick]]
+    last_close_ticks: list[TradeTick]
     changed_orders: list[str] | None = None
 
 
@@ -280,10 +298,9 @@ def run_engine(engine: BacktestEngine, inputs: EngineInputs, work_directory: Pat
     """
     handler_errors: list[str] = []
     reduced_orders: list[str] = []
-    waiting_orders: dict[str, WaitingOrder] = {}
-    open_ticks = [tick for ticks in inputs.open_ticks for tick in ticks]
-    if open_ticks:
-        engine.add_data(open_ticks)
+    ticks = [tick for ticks in inputs.open_ticks for tick in ticks] + inputs.last_close_ticks
+    if ticks:
+        engine.add_data(ticks)
     try:
         strategy_class, config_class = load_strategy_classes(inputs.code, work_directory)
         # readability-exception: the StrategyConfig stub has no such fields. The user subclass must define
@@ -293,7 +310,7 @@ def run_engine(engine: BacktestEngine, inputs: EngineInputs, work_directory: Pat
         open_times_ns = {
             ticks[0].instrument_id: [tick.ts_event for tick in ticks] for ticks in inputs.open_ticks if ticks
         }
-        order_class = fill_at_next_open(checked_class, open_times_ns, reduced_orders, waiting_orders)
+        order_class = fill_at_next_open(checked_class, open_times_ns, reduced_orders)
         engine.add_strategy(order_class(config))
         engine.run()
     except StrategyFileError as error:
@@ -308,16 +325,7 @@ def run_engine(engine: BacktestEngine, inputs: EngineInputs, work_directory: Pat
     if error_log:
         raise StrategyFailedError(error_log)
     if inputs.changed_orders is not None:
-        lost_orders = [order.line for order in waiting_orders.values()]
-        inputs.changed_orders.extend(reduced_orders + read_refused_orders(engine) + lost_orders)
-
-
-@dataclass(frozen=True)
-class WaitingOrder:
-    """A held order. `line` is its line of the fill warning, if the run ends before the order goes to the engine."""
-
-    line: str
-    send: Callable[[], None]
+        inputs.changed_orders.extend(reduced_orders + read_refused_orders(engine))
 
 
 class NextOpenOrders(Strategy):
@@ -325,17 +333,18 @@ class NextOpenOrders(Strategy):
 
     The engine then fills the order at this open, for all instruments alike. Its pre-trade check uses this price and
     the cash after the fills before, so it refuses a buy that the cash cannot pay. The engine would end the run on such
-    a fill. An instrument without a later tick has no next open: the order goes at once and fills at the last close.
+    a fill. An instrument without a later open tick goes at once: the order fills at the last close, and the last price
+    is this close (`make_last_close_tick`).
 
     All names have the prefix `_atrade_`, because this class comes before the user class in the method order.
     """
 
     _atrade_open_times_ns: dict[InstrumentId, list[int]]
     _atrade_reduced_orders: list[str]
-    _atrade_waiting_orders: dict[str, WaitingOrder]
+    _atrade_waiting_orders: dict[str, Callable[[], None]]
     _atrade_closing_instruments: set[InstrumentId]
 
-    def _atrade_send_at_next_open(self, instrument_id: InstrumentId, order_name: str, send: Callable[[], None]) -> None:
+    def _atrade_send_at_next_open(self, instrument_id: InstrumentId, send: Callable[[], None]) -> None:
         times_ns = self._atrade_open_times_ns.get(instrument_id, [])
         index = bisect_right(times_ns, self.clock.timestamp_ns())
         if index == len(times_ns):
@@ -343,18 +352,18 @@ class NextOpenOrders(Strategy):
             return
         waiting_orders = self._atrade_waiting_orders
         name = f"next-open-{self.clock.timestamp_ns()}-{len(waiting_orders)}"
-        line = f"{self.clock.utc_now():%Y-%m-%d %H:%M} UTC: {order_name} not sent (the run ended at its next open)"
-        waiting_orders[name] = WaitingOrder(line, send)
-        # 1 nanosecond apart: each order sees the cash after the fill of the order before.
+        waiting_orders[name] = send
+        # 1 nanosecond apart. The last close tick of the instrument comes after the last alert: each order sees the cash after the fill of the order before.
         self.clock.set_time_alert_ns(name, times_ns[index] + len(waiting_orders), self._atrade_send_waiting_order)
 
     def _atrade_send_waiting_order(self, event: TimeEvent) -> None:
-        self._atrade_waiting_orders.pop(event.name).send()
+        self._atrade_waiting_orders.pop(event.name)()
 
     def _atrade_fit_to_cash(self, order: Any) -> Any:
-        """`order`, or a smaller order when the free cash pays for only a part of it at the open.
+        """`order`, or a smaller order when the free cash pays for only a part of it at the last tick: the price of
+        the fill.
 
-        The open tick holds a part of the bar volume. The engine fills the rest of a larger order 1 price step higher,
+        The tick holds a part of the bar volume. The engine fills the rest of a larger order 1 price step higher,
         so that part of the check adds the step. The engine ends the run on a fill above the cash.
         """
         open_tick = self.cache.trade(order.instrument_id)
@@ -380,21 +389,7 @@ class NextOpenOrders(Strategy):
             return
         parent = super()
         self._atrade_send_at_next_open(
-            order.instrument_id,
-            f"{find_side_name(order.side)} {order.quantity} {order.instrument_id.symbol}",
-            lambda: parent.submit_order(self._atrade_fit_to_cash(order), *args, **kwargs),
-        )
-
-    def submit_order_list(self, order_list: Any, *args: Any, **kwargs: Any) -> None:
-        # An order list goes as one unit: it is held with each entry type, and the cash does not reduce it.
-        # `order_factory.bracket` gives a list of orders.
-        source = cast("list[Any]", order_list)[0] if isinstance(order_list, list) else order_list
-        instrument_id: InstrumentId = source.instrument_id
-        parent = super()
-        self._atrade_send_at_next_open(
-            instrument_id,
-            f"order list {instrument_id.symbol}",
-            lambda: parent.submit_order_list(order_list, *args, **kwargs),
+            order.instrument_id, lambda: parent.submit_order(self._atrade_fit_to_cash(order), *args, **kwargs)
         )
 
     def close_position(self, position: Position, *args: Any, **kwargs: Any) -> None:
@@ -409,20 +404,19 @@ class NextOpenOrders(Strategy):
             parent.close_position(position, *args, **kwargs)
 
         closing_instruments.add(position.instrument_id)
-        self._atrade_send_at_next_open(position.instrument_id, f"close {position.instrument_id.symbol}", close)
+        self._atrade_send_at_next_open(position.instrument_id, close)
 
 
 def fill_at_next_open[StrategyClass: type](
     strategy_class: StrategyClass,
     open_times_ns: dict[InstrumentId, list[int]],
     reduced_orders: list[str],
-    waiting_orders: dict[str, WaitingOrder],
 ) -> StrategyClass:
     """A subclass of `strategy_class` with the order rule of `NextOpenOrders`."""
     fields = {
         "_atrade_open_times_ns": open_times_ns,
         "_atrade_reduced_orders": reduced_orders,
-        "_atrade_waiting_orders": waiting_orders,
+        "_atrade_waiting_orders": {},
         "_atrade_closing_instruments": set[InstrumentId](),
     }
     subclass = type(strategy_class.__name__, (NextOpenOrders, strategy_class), fields)
@@ -491,5 +485,7 @@ def run_strategy_on_bars(
         "bar_type": bar_type,
     }
     open_ticks = [make_open_ticks(nautilus_instrument, run.bars)]
-    run_engine(engine, EngineInputs(run.code, config_fields, open_ticks, changed_orders), work_directory)
+    last_close_ticks = [make_last_close_tick(nautilus_instrument, run.bars, request.bar_period)] if run.bars else []
+    inputs = EngineInputs(run.code, config_fields, open_ticks, last_close_ticks, changed_orders)
+    run_engine(engine, inputs, work_directory)
     return read_trades(engine)

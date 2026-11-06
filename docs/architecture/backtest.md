@@ -910,60 +910,73 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
   close 120, next open 150, next close 200, fill 200. So ATrade adds these
   2 parts to the engine run, in `backtest/strategy_engine_run.py`:
   - `make_open_ticks` adds 1 trade tick at the open of each bar, 1
-    microsecond after the bar start. A bar without volume also gets a tick,
+    millisecond after the bar start. A bar without volume also gets a tick,
     with a size of 1 share, because `on_bar` runs on such a bar.
-  - `NextOpenOrders` holds each market order of `submit_order`, each
-    `close_position`, and each `submit_order_list` until the next open tick
-    of the instrument. All instruments of one rebalance thus fill on one
-    price basis, and the `add_data` order has no effect.
+    `make_last_close_tick` adds 1 trade tick at the close of the last bar
+    of each instrument, 1 nanosecond before the bar end.
+  - `NextOpenOrders` holds each market order of `submit_order` and each
+    `close_position` until the next open tick of the instrument. All
+    instruments of one rebalance thus fill on one price basis, and the
+    `add_data` order has no effect.
+- Book updates in place of trade ticks do not work. The engine ignores them
+  on the `L1_MBP` book that bar execution needs (checked on 2.0.0rc7).
 - Limit: a strategy can see the open ticks. At `on_bar`, the last price of an
-  instrument is the open of that bar, not its close. This changes the
-  values that use the last price: `portfolio.net_exposure`,
+  instrument is the open of that bar, not its close. Only the last bar of an
+  instrument has its close as the last price. This changes the values that
+  use the last price: `portfolio.net_exposure`,
   `portfolio.unrealized_pnl`, and `cache.price` with `PriceType.LAST`. For
   example, at a bar with open 120 and close 130, 10 shares give a net
   exposure of 1200, not 1300. A strategy that subscribes to trades also
   gets the ticks in `on_trade`. A strategy reads the close from the bar.
   The first-party templates and the rule builder code read cash, position
   quantity, and `bar.close`, so this limit does not change them.
-- The time of such a fill is the bar start plus 1 microsecond. It is later
+- The time of such a fill is the bar start plus 1 millisecond. It is later
   than the end of the bar before. So the fill counts in the equity point at
-  the end of its bar, with the close of that bar. The trade tables show the
-  bar start.
+  the end of its bar, with the close of that bar. The trade mark goes on the
+  fill bar, because `Date.parse` keeps a millisecond and drops a
+  microsecond. The trade tables show the bar start.
 - A held order is not in the engine cache. Until the open tick,
   `orders_inflight_count` does not count it, and `close_position` of the
   same instrument does nothing.
 - The held orders go 1 nanosecond apart, in the order of the strategy calls.
   Each order sees the cash after the fill of the order before. So a buy
   sent after a sell can use the cash of that sell.
-- Cash: the engine ends a run with `RuntimeError` when a fill makes the cash
-  negative. The check before each held order uses the open price. A buy
-  that the free cash pays only in part becomes a smaller order of the whole
-  shares that the cash pays. An open tick holds 1/4 of the bar volume, and
-  the engine fills the rest of an order 1 price step higher. So the check
-  adds this step for an order above the tick size. A buy without the cash
-  for 1 share goes to the engine, and the engine refuses it with
-  `OrderDenied`. These held market orders do not end the run.
-  `backtest.fill_warning` gives the count of the changed orders and the
-  oldest of them. The count also has each other order that the engine
-  refused, and each order that was still held when the run ended. IBKR
-  refuses such an order and does not reduce it. The backtest reduces it,
-  because a strategy that buys with all its cash would else lose each entry
-  on a gap up.
 - An order without a next open fills at once at the last close. This
   applies to an order on the last bar of the run, and to a sell of a member
-  without later saved bars.
-- A held order can stay unsent when its open tick is the last data of the
-  run. The time alert after that tick does not run. The order then counts
-  in `fill_warning`.
-- `submit_order_list` holds the list with each entry type, and the cash
-  check does not reduce it. The engine refuses a list that the cash cannot
-  pay at the open.
+  without later saved bars. The last close tick makes this close the last
+  price, so the cash check and the pre-trade check use the price of the
+  fill.
+- Cash: the engine ends a run with `RuntimeError` when a fill makes the cash
+  negative. The check before each market order of `submit_order` uses the
+  price of the fill: the open, or the last close. A buy that the free cash
+  pays only in part becomes a smaller order of the whole shares that the
+  cash pays. A tick holds 1/4 of the bar volume, and the engine fills the
+  rest of an order 1 price step higher. So the check adds this step for an
+  order above the tick size. A buy without the cash for 1 share goes to the
+  engine, and the engine refuses it with `OrderDenied`. IBKR refuses such an
+  order and does not reduce it. The backtest reduces it, because a strategy
+  that buys with all its cash would else lose each entry on a gap up.
+- `backtest.fill_warning` gives the count of the changed orders and the
+  oldest of them. A changed order is an order that the cash check reduced,
+  or an order with `OrderDenied` or `OrderRejected`. A rejected stop of a
+  bracket order counts, because the position then has no exit.
+- `submit_order_list` is not held, and the cash check does not change it.
+  The orders go to the engine at once, so the entry of a bracket order
+  keeps the fill at the close of the current bar. The stop rests from that
+  close, and a gap through the stop fills at the open. A hold makes a list
+  wrong: the venue rejects a stop that a gap passed, and the position then
+  has no exit. The venue also rejects a post-only limit entry at a gap. The
+  first-party templates and the rule builder code use no order lists.
 - Not held: `close_all_positions`, and limit and stop orders of
   `submit_order`. A market order of `close_all_positions` fills at the close
   of the current bar.
+- The pre-trade check of an order that is not held uses the open of the
+  current bar, because the last price is this open. On a bar that closes
+  below its open, the engine can thus refuse a market entry of a list with
+  almost all the cash. The refusal is in `fill_warning`.
 - 2 cases can still end the run with the `RuntimeError`. One is a buy stop
-  order over a gap. The other is an order list above the tick size whose
-  rest goes over the cash.
+  order over a gap. The other is a market entry of a list with almost all
+  the cash on a bar that closes above its open.
 - Backtest results from before this rule are not directly comparable with
   new results.
 - One fill uses at most 1/4 of the bar volume. The engine fills the rest of

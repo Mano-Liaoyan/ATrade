@@ -508,7 +508,7 @@ Phase 3 changes (#146, #149):
   - Fill table: a fill belongs to the last bar end (of both equity curves) at
     or before its time, so a live fill just after a bar close and the
     backtest fill at the next open are in one row: the backtest fill time is
-    the start of the next bar plus 1 microsecond (`backtest.md` section
+    the start of the next bar plus 1 millisecond (`backtest.md` section
     10.10.3). One row for each bar end
     and side. More fills in one row give the total quantity and the average
     price weighted by quantity (4 decimal places). The difference is the
