@@ -8,7 +8,8 @@ never get the fallback page.
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path as PathParameter, status
+from fastapi import APIRouter, HTTPException, status
+from fastapi import Path as PathParameter
 from fastapi.responses import FileResponse
 
 SPA_FALLBACK_PAGE = "200.html"
