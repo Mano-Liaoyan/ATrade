@@ -4,7 +4,9 @@
 from typing import Any
 
 import httpx
+import psycopg
 import pytest
+from psycopg.types.json import Jsonb
 
 from tests.backtest.test_backtest_routes import save_test_strategy_version
 from tests.backtest.test_universe_backtest_routes import count_backtests, read_universe_members
@@ -137,3 +139,35 @@ async def test_a_list_universe_does_not_take_the_screen_fields(
 
     assert response.status_code == 422
     assert next(iter(fields)) in str(response.json()["detail"])
+
+
+@pytest.mark.anyio
+async def test_rejects_a_saved_screen_that_today_fails_the_screen_check(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    """Only an old row can have 2 references with one column name: the save routes refuse it."""
+    save_universe_test_data(database_url)
+    screen_id = await create_screen(web_client, make_definition(start="quarter_universe"))
+    saved = await save_test_strategy_version(web_client)
+    conditions = [
+        {
+            "kind": "compare",
+            "indicator": {
+                "indicator": "realized_volatility",
+                "parameters": {"period": 20, "bars_per_year": bars_per_year},
+                "output": "value",
+            },
+            "operator": ">",
+            "value": "0",
+        }
+        for bars_per_year in (252, 52)
+    ]
+    definition = make_definition(start="quarter_universe", indicator_conditions=conditions)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute("UPDATE screen SET definition = %s WHERE id = %s", (Jsonb(definition), screen_id))
+
+    response = await start_screen_backtest(web_client, saved["strategy_version_id"], screen_id=screen_id)
+
+    assert response.status_code == 422
+    assert "has 2 different references" in str(response.json()["detail"])
+    assert await count_backtests(web_client) == 0

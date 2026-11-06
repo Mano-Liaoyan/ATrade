@@ -1,8 +1,8 @@
 """The public entry of the indicator capability (docs/architecture/indicator.md section 23.3).
 
 Strategy code imports the classes from here and registers them with `register_indicator_for_bars`. A screen makes a
-NautilusTrader bar of each saved `foundation` bar with `make_nautilus_bar` and gives it to `handle_bar`. Screens and the rule builder read `INDICATOR_CATALOG` and check stored
-indicator references with `check_indicator_reference`.
+NautilusTrader bar of each saved `foundation` bar with `make_nautilus_bar` and gives it to `handle_bar`. Screens and
+the rule builder read `INDICATOR_CATALOG` and check stored indicator references with `check_indicator_reference`.
 """
 
 from atrade.indicator.atrade_indicators import (

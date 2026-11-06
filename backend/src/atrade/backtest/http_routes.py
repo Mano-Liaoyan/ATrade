@@ -61,7 +61,7 @@ from atrade.foundation.error_response import ERROR_RESPONSE, REFUSED_OR_NOT_VALI
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.table_changes import ChangeSocket
 from atrade.market_data import BarSource, ExchangeRateReader, read_us_universe_quarter_starts
-from atrade.screen import MARKET_CURRENCIES, read_saved_screen, read_screen_result_members
+from atrade.screen import MARKET_CURRENCIES, check_screen, read_saved_screen, read_screen_result_members
 from atrade.strategy import (
     ChartIndicator,
     StrategyVersion,
@@ -498,6 +498,10 @@ class BacktestRoutes:
         screen = await read_saved_screen(database_url=self.database_url, screen_id=request.screen_id)
         if screen is None:
             refuse(f"Screen {request.screen_id} does not exist.")
+        # An old screen can fail a newer check. A saved copy is not checked again, so it stays repeatable.
+        problems = check_screen(name=screen.name, market=screen.market, definition=screen.definition)
+        if problems:
+            refuse(problems[0].message)
         return BacktestUniverse(
             kind="screen",
             currency=MARKET_CURRENCIES[screen.market],
