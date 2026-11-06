@@ -78,6 +78,8 @@
     openId: () => screenId,
     // /screens opens the screen that the user opened last, or the first screen of the list.
     defaultId: (items) => (items.find((item) => item.id === readLastScreenId()) ?? items[0])?.id,
+    // A list push during "New screen" must not change the screen: the run of the new screen would become stale.
+    holdsDefaultOpen: () => isCreating,
     readsDetailOnChange: true,
   });
   let screenResult = $state<ScreenResult | null>(null);
@@ -275,7 +277,7 @@
   // Runs a screen that the page just made, and opens it. A failed run keeps its reason for the opened screen.
   async function runAndOpen(id: number, body: { market: string; definition: unknown }, thisRun: number): Promise<void> {
     const run = await runScreenDraft(fetch, id, body);
-    // Stale, unless the list push already moved /screens to this new screen.
+    // Stale, unless the user already opened this new screen in the list.
     if (thisRun !== runNumber && screenId !== id) {
       return;
     }

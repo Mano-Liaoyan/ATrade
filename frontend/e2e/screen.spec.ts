@@ -3,7 +3,7 @@
 // bias warning, the backtest buttons that open the New backtest form (#208), and the edits of the condition bar
 // (#212). The tests make the screens and their screen results with the API. The bar chart saves the daily bars of AAPL
 // first: the IBKR fake of backend/tests/e2e_server.py has one daily bar for each day.
-import { expect, test, type APIRequestContext, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type APIRequestContext, type Page, type TestInfo, type WebSocketRoute } from '@playwright/test';
 
 interface ScreenResultSummary {
   start_count: number;
@@ -458,6 +458,50 @@ test('"New screen" shows the reason of a failed create, then creates a screen an
 
 const WATCHLIST_DEFINITION = { start: 'watchlist', filters: [], indicator_conditions: [], order: { indicator: SMA_3, direction: 'descending' } };
 const RUNS_ROUTE = '**/api/screens/*/runs';
+
+// A list push must not open the first screen of the list while the run of "New screen" waits for its answer.
+test('a list push during "New screen" does not take the page from the new screen', async ({ page, request }, currentTest) => {
+  const sockets: WebSocketRoute[] = [];
+  await page.routeWebSocket(/\/ws\/screens$/, (socket) => {
+    sockets.push(socket);
+  });
+  let isListEmpty = true;
+  await page.route('**/api/screens', async (route) => {
+    await (route.request().method() === 'GET' && isListEmpty ? route.fulfill({ json: [] }) : route.fallback());
+  });
+  const name = uniqueName(currentTest, 'New screen');
+  await nameCreatedScreens(page, name);
+  let finishRun = (): void => undefined;
+  const runCanFinish = new Promise<void>((resolve) => {
+    finishRun = resolve;
+  });
+  await page.route(RUNS_ROUTE, async (route) => {
+    await runCanFinish;
+    await route.fallback();
+  });
+  await page.goto('/screens');
+
+  const created = page.waitForResponse(
+    (response) => response.url().endsWith('/api/screens') && response.request().method() === 'POST',
+  );
+  const runStarted = page.waitForRequest((runRequest) => runRequest.url().endsWith('/runs'));
+  await page.getByRole('button', { name: 'New screen', exact: true }).click();
+  const screen = (await (await created).json()) as { id: number };
+  await runStarted;
+
+  const otherName = uniqueName(currentTest, 'Other screen');
+  await createScreen(request, otherName, 'US', WATCHLIST_DEFINITION);
+  isListEmpty = false;
+  await expect.poll(() => sockets.length).toBeGreaterThan(0);
+  for (const socket of sockets) {
+    socket.send(JSON.stringify({ type: 'changed' }));
+  }
+  await expect(page.getByRole('region', { name: 'Screen list' }).getByRole('link', { name: otherName })).toBeVisible();
+
+  finishRun();
+  await expect(page).toHaveURL(new RegExp(`/screens/${String(screen.id)}\\?result=\\d+$`));
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
+});
 
 test('"Delete screen" on the open screen leaves the page on another screen', async ({ page, request }, currentTest) => {
   await saveAaplDailyBars(page, request);

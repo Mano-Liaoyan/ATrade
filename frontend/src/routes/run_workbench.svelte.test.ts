@@ -162,6 +162,17 @@ describe('RunWorkbench open newest', () => {
     flushSync();
     expect(goto).toHaveBeenCalledOnce();
   });
+
+  it('waits while holdsDefaultOpen is true', async () => {
+    let isHeld = $state(true);
+    items = ok([{ id: 9, status: 'running' }]);
+    start({ holdsDefaultOpen: () => isHeld });
+    await settle();
+    expect(goto).not.toHaveBeenCalled();
+    isHeld = false;
+    flushSync();
+    expect(goto).toHaveBeenCalledOnce();
+  });
 });
 
 describe('RunWorkbench detail, read on a list row change', () => {

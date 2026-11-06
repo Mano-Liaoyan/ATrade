@@ -17,6 +17,8 @@ export interface RunWorkbenchOptions<Item, Detail> {
   openId: () => number | null;
   /** The id that the address without an id opens. Undefined: the newest run. */
   defaultId?: (items: Item[]) => number | undefined;
+  /** True: the page opens a run by itself, so the address without an id waits. */
+  holdsDefaultOpen?: () => boolean;
   /** True: the shown detail of this id does not change any more, so a list row change does not read it again. */
   isFinal?: (detail: Detail, id: number) => boolean;
   /**
@@ -63,9 +65,9 @@ export class RunWorkbench<Item extends { id: number }, Detail> {
     );
 
     // The address without an id opens defaultId or the newest run. `reset: false` keeps the page state, so an open dialog stays
-    // open. A navigation that runs (for example a click on a header link) wins.
+    // open. A navigation that runs (for example a click on a header link) wins, and also holdsDefaultOpen.
     $effect(() => {
-      if (navigating.to !== null) {
+      if (navigating.to !== null || options.holdsDefaultOpen?.() === true) {
         return;
       }
       const newest = this.items.reduce<Item | undefined>(
