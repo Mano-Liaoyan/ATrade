@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 import pytest
 
-from tests.backtest.real_runner import run_backtest_runner, wait_for_final_status
+from tests.backtest.real_runner import add_decimal_places_to_saved_bars, run_backtest_runner, wait_for_final_status
 from tests.backtest.test_universe_backtest_routes import read_universe_members
 from tests.backtest.universe_data import (
     AAA,
@@ -108,4 +108,19 @@ async def test_a_list_backtest_has_one_period_from_the_start_and_trades_the_list
     # 2 positions of 10 shares, valued at the bar close prices: the equity changes with the prices.
     equity_values = {point["equity_usd"] for point in backtest["equity_curve"]}
     assert len(equity_values) > 2
+    assert backtest["metrics"]["trade_count"] == 2
+
+
+@pytest.mark.anyio
+async def test_a_list_backtest_runs_on_bars_with_more_than_16_decimal_places(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    save_universe_test_data(database_url)
+    add_decimal_places_to_saved_bars(database_url)
+    instruments = [to_instrument_body(AAA), to_instrument_body(CCC)]
+
+    backtest = await run_universe_backtest(
+        web_client, database_url, clock, universe_kind="list", instruments=instruments
+    )
+
     assert backtest["metrics"]["trade_count"] == 2

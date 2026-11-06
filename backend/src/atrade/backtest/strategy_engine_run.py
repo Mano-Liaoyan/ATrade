@@ -8,9 +8,9 @@ import functools
 import inspect
 import traceback
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 from pathlib import Path
 from typing import cast
 
@@ -43,6 +43,9 @@ from atrade.strategy import StrategyFileError, load_strategy_classes
 MIN_PRICE_PRECISION = 2
 # NautilusTrader refuses a precision above 9 in its standard-precision build. IBKR prices have fewer places.
 MAX_PRECISION = 9
+# The matching engine drops each bar whose volume precision is not the size precision of the instrument, and `Equity`
+# has size precision 0.
+ENGINE_VOLUME_PRECISION = 0
 ERROR_LOG_FILE_NAME = "strategy_errors"
 LOOK_BACK_CATALOG_DIRECTORY_NAME = "look_back_catalog"
 # The catalog says that it holds all bars from the first to the last UNIX nanosecond (1, not 0: 0 means "no time").
@@ -61,6 +64,12 @@ def count_decimal_places(value: Decimal) -> int:
     if not isinstance(exponent, int) or exponent >= 0:
         return 0
     return min(-exponent, MAX_PRECISION)
+
+
+def round_up_volumes(bars: list[Bar]) -> list[Bar]:
+    """Rounds each volume up to whole shares (ENGINE_VOLUME_PRECISION). The stock split adjustment gives fractional
+    volumes. Rounding up keeps each volume above zero: the matching engine fills no order on a bar with volume 0."""
+    return [replace(bar, volume=bar.volume.to_integral_value(rounding=ROUND_CEILING)) for bar in bars]
 
 
 def create_instrument(instrument: Instrument, bars: list[Bar], venue: Venue | None = None) -> Equity:
@@ -259,9 +268,10 @@ def run_strategy_on_bars(run: StrategyRun, work_directory: Path) -> list[Backtes
     all_bars = run.look_back_bars + run.bars
     nautilus_instrument = create_instrument(instrument, all_bars)
     bar_type = BarType.from_str(f"{nautilus_instrument.id}-{request.bar_period.value}-LAST-EXTERNAL")
-    volume_precision = max(count_decimal_places(bar.volume) for bar in all_bars)
-    wrangler = BarDataWrangler(str(bar_type), nautilus_instrument.price_precision, volume_precision)
-    nautilus_bars = wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(run.bars, request.bar_period))
+    wrangler = BarDataWrangler(str(bar_type), nautilus_instrument.price_precision, ENGINE_VOLUME_PRECISION)
+    nautilus_bars = wrangler.process_record_batch_bytes(
+        convert_bars_to_arrow_bytes(round_up_volumes(run.bars), request.bar_period)
+    )
     engine = create_engine(
         starting_cash=run.starting_cash,
         currency=instrument.currency,

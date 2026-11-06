@@ -180,9 +180,13 @@ New columns are null on existing rows, except where a default is given.
    instrument and bar period before the start (section 10.3.1), and for an
    instrument that is not in USD the saved exchange rates (section 10.8).
 4. The child converts the bars to Arrow bytes (`decimal128(38, 16)` prices
-   and volume, `uint64` times). `ts_event` is the bar end, so a strategy sees
-   a bar only after its period. `BarDataWrangler` makes NautilusTrader bars
-   from the bytes.
+   and volume, `uint64` times). The stock split adjustment of Databento bars
+   gives more than 16 decimal places, so the conversion rounds half-even to
+   16 places. `ts_event` is the bar end, so a strategy sees a bar only after
+   its period. `BarDataWrangler` makes NautilusTrader bars from the bytes.
+   The engine drops a bar with a fractional volume and fills no order on a
+   bar with volume 0, so the child rounds the volumes of the bars of the
+   range up to whole shares. The saved bars do not change.
 5. The child imports the strategy code from a file in a temporary directory
    under `/tmp`, so that tracebacks show the line numbers. It makes the
    strategy configuration with `instrument_id` and `bar_type`

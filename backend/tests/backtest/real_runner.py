@@ -6,6 +6,7 @@ import asyncio
 import csv
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,20 @@ def save_test_bars(database_url: str, *, exchange: str = "ARCA", currency: str =
             bar_rows,
         )
         save_ibkr_saved_range(connection, Instrument(symbol="BTEST", exchange=exchange, currency=currency), "1-DAY")
+
+
+def add_decimal_places_to_saved_bars(database_url: str) -> None:
+    """Gives each saved bar more than 16 decimal places, like a Databento bar after stock splits. The values stay equal
+    after the rounding to 16 decimal places."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            UPDATE ibkr_bar
+            SET open = open * %(factor)s, high = high * %(factor)s, low = low * %(factor)s, close = close * %(factor)s,
+                volume = volume * %(factor)s
+            """,
+            {"factor": Decimal("1.00000000000000000001")},
+        )
 
 
 async def start_backtest(web_client: httpx.AsyncClient, code: str, *, strategy_name: str = "Bar count") -> int:
