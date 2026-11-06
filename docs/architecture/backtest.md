@@ -217,6 +217,9 @@ Failures that the user sees in `error_message`:
   USD (section 10.8). The start route refuses such a request first.
 - A Web restart during a run: the runner sets the `running` backtests to
   `failed` at start, because their children ended with the old process.
+- A lost PostgreSQL connection: the runner writes a warning and tries again.
+  The running children continue. A backtest stays `running` until the
+  runner can write its end.
 
 Limits of this stage:
 
@@ -224,6 +227,9 @@ Limits of this stage:
 - `request_bars` gets only the look-back bars of the backtest bar type
   (section 10.3.1).
 - Cash dividends are not in the backtest (section 10.1).
+- If the database commits the start of a queued backtest and the connection
+  stops before the answer, the row stays `running` without a child until the
+  next `web` start.
 
 Phase 3 changes steps 1, 3, and 5 for a backtest with a universe (section
 10.10.4) and for the source order (section 10.12).

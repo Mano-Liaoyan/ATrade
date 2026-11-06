@@ -6,7 +6,9 @@ applies to the next backtest that starts.
 """
 
 import asyncio
+import logging
 import os
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 
 import psycopg
@@ -21,6 +23,8 @@ CHILD_ENVIRONMENT_ALLOW_LIST = ("PATH", "HOME", "TZ")
 # A failed child shows the end of its error output. The start of a long traceback is less useful.
 MAX_ERROR_OUTPUT_CHARACTERS = 4000
 RESTART_ERROR_MESSAGE = "The Web process stopped during the backtest. Start the backtest again."
+
+logger = logging.getLogger(__name__)
 
 
 def create_child_environment(database_url: str) -> dict[str, str]:
@@ -53,15 +57,29 @@ class BacktestRunner:
 
     async def keep_running(self) -> None:
         """Runs until it is cancelled. Cancellation stops the running children."""
+        await self.retry_until_database_answers(self.fail_running_backtests)
+        async with asyncio.TaskGroup() as task_group:
+            while True:
+                await self.retry_until_database_answers(lambda: self.start_queued_backtests(task_group))
+                await asyncio.sleep(QUEUE_CHECK_INTERVAL_SECONDS)
+
+    async def retry_until_database_answers(self, database_step: Callable[[], Awaitable[None]]) -> None:
+        """A PostgreSQL restart must not cancel the running children."""
+        while True:
+            try:
+                await database_step()
+            except psycopg.OperationalError as error:
+                logger.warning("The backtest runner lost the database connection. It tries again. %s", error)
+                await asyncio.sleep(QUEUE_CHECK_INTERVAL_SECONDS)
+            else:
+                return
+
+    async def fail_running_backtests(self) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             # No child of an earlier Web process is still running: the children end with their parent.
             await backtest_store.fail_running_backtests(
                 connection, ended_at_utc=self.clock.read_now_utc(), error_message=RESTART_ERROR_MESSAGE
             )
-        async with asyncio.TaskGroup() as task_group:
-            while True:
-                await self.start_queued_backtests(task_group)
-                await asyncio.sleep(QUEUE_CHECK_INTERVAL_SECONDS)
 
     async def start_queued_backtests(self, task_group: asyncio.TaskGroup) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
@@ -111,11 +129,14 @@ class BacktestRunner:
     async def end_backtest(
         self, backtest_id: int, *, status_if_running: backtest_store.BacktestStatus, error_message: str | None
     ) -> None:
-        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            await backtest_store.end_backtest(
-                connection,
-                backtest_id=backtest_id,
-                ended_at_utc=self.clock.read_now_utc(),
-                status_if_running=status_if_running,
-                error_message=error_message,
-            )
+        async def write_end() -> None:
+            async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
+                await backtest_store.end_backtest(
+                    connection,
+                    backtest_id=backtest_id,
+                    ended_at_utc=self.clock.read_now_utc(),
+                    status_if_running=status_if_running,
+                    error_message=error_message,
+                )
+
+        await self.retry_until_database_answers(write_end)

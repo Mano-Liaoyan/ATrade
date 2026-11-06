@@ -226,6 +226,9 @@ This replaces the rules above:
   It uses the same client ID and the same strategy version.
 - After 3 crashes in a row, the status is "failed". The worker stops the
   restarts.
+- A PostgreSQL restart does not stop the worker. The worker writes a warning
+  and compares again. The children continue. The worker keeps an ended child
+  until it can write the result of that child.
 - Restart steps:
   1. Cancel all open orders of this client ID (section 12.6). This prevents
      duplicate orders.

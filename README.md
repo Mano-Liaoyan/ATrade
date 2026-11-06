@@ -272,7 +272,8 @@ With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
 | `assistant` | The AI assistant: a Node.js process with the pi SDK (`assistant/`, image from `deploy/assistant.Dockerfile`). Memory limit `ATRADE_ASSISTANT_MEMORY_LIMIT` (default `1g`), read-only root file system, writable `/tmp`, volume `atrade-assistant-pi` on `/data`. No published port, no database URL, no IBKR setting. Networks `atrade-assistant-internal` (with `web` only) and `atrade-assistant-egress` (to the model providers). Health check on `GET /health` (port 8002, inside the network only). |
 
 At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
-`live`, `web` does not start and writes the reason.
+`live`, `./start run` stops with the reason and does not call Compose. `web`
+also refuses this value.
 
 Rootless Podman without the memory cgroup controller cannot set a memory
 limit. On such a host, set `ATRADE_WEB_MEMORY_LIMIT=0` and
