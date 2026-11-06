@@ -760,8 +760,9 @@ longer bars first.
 - The out-of-sample part is the last `out_of_sample_share` percent of the
   backtest range. The split time is the start of the out-of-sample part.
 - The start route calculates `split_time_utc` from the part of the request
-  range between the first and the last saved bar. Thus the split time is
-  always inside the bars. A screen universe has no members before its run,
+  range between the first and the last saved bar in that range. Thus the
+  split time is always inside the bars, also with a gap in the bars. A saved
+  row keeps its split time and its metrics. A screen universe has no members before its run,
   so all instruments of its currency count. After the start, nobody can
   change it. To use a different share, the user starts a new backtest.
   Reason: the user must not move the split time after the user sees the

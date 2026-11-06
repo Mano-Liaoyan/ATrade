@@ -142,6 +142,33 @@ async def test_a_range_beyond_the_saved_bars_has_the_split_time_and_the_metrics_
 
 
 @pytest.mark.anyio
+async def test_a_bar_before_the_range_does_not_put_the_split_time_before_the_first_bar_of_the_range(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO ibkr_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
+            VALUES ('BTEST', 'ARCA', 'USD', '1-DAY', '2020-01-02T00:00:00Z', 1, 1, 1, 1, 1)
+            """
+        )
+    saved = await save_test_strategy_version(web_client)
+
+    backtest = (
+        await post_backtest(
+            web_client,
+            saved["strategy_version_id"],
+            start_utc="2026-02-01T00:00:00Z",
+            end_utc=LAST_BAR_END,
+            out_of_sample_share=50,
+        )
+    ).json()
+
+    assert backtest["split_time_utc"] == "2026-03-12T00:00:00Z"
+
+
+@pytest.mark.anyio
 async def test_finished_backtest_has_the_metrics_of_both_parts(
     web_client: httpx.AsyncClient, database_url: str
 ) -> None:

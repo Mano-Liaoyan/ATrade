@@ -251,9 +251,12 @@ async def has_saved_bars(*, database_url: str, bar_request: BarRequest, source_o
     return False
 
 
-async def read_saved_bar_coverage(*, database_url: str, instruments: list[Instrument]) -> list[list[SavedBarCoverage]]:
+async def read_saved_bar_coverage(
+    *, database_url: str, instruments: list[Instrument], time_range: TimeRange | None = None
+) -> list[list[SavedBarCoverage]]:
     """For each instrument, the bar sources and bar periods with saved bars, and the first and the last saved bar: in
-    the order of the bar periods, then in the global source order. No IBKR call."""
+    the order of the bar periods, then in the global source order. With `time_range`, only the bars that start in the
+    range count. No IBKR call."""
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         source_order = await select_source_order(connection)
-        return await bar_store.select_saved_bar_coverage(connection, source_order, instruments)
+        return await bar_store.select_saved_bar_coverage(connection, source_order, instruments, time_range)

@@ -123,8 +123,8 @@ async def add_global_source_order(*, database_url: str, request: BacktestRequest
 async def find_bar_range(
     *, database_url: str, request: BacktestRequest, universe_periods: list[UniversePeriod] | None
 ) -> TimeRange:
-    """The request range clipped to the first and the last saved bar, for the split time (section 10.9.4). A screen
-    universe has no members before its run, so all instruments of its currency count."""
+    """The request range clipped to the first and the last saved bar in the range, for the split time (section 10.9.4).
+    A screen universe has no members before its run, so all instruments of its currency count."""
     if request.universe is None:
         instruments = [request.single_instrument]
     elif request.universe.screen is not None:
@@ -136,7 +136,9 @@ async def find_bar_range(
         instruments = list(dict.fromkeys(member for period in universe_periods or [] for member in period.members))
     coverage = [
         item
-        for instrument_coverage in await read_saved_bar_coverage(database_url=database_url, instruments=instruments)
+        for instrument_coverage in await read_saved_bar_coverage(
+            database_url=database_url, instruments=instruments, time_range=request.time_range
+        )
         for item in instrument_coverage
         if item.bar_period == request.bar_period
     ]

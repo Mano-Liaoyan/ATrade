@@ -100,16 +100,19 @@ async def has_bars(
 
 
 async def select_saved_bar_coverage(
-    connection: psycopg.AsyncConnection, source_order: list[BarSource], instruments: list[Instrument]
+    connection: psycopg.AsyncConnection,
+    source_order: list[BarSource],
+    instruments: list[Instrument],
+    time_range: TimeRange | None = None,
 ) -> list[list[SavedBarCoverage]]:
     """Returns, for each instrument, the bar sources and bar periods that have saved bars: in the order of BarPeriod,
-    then in the source order.
+    then in the source order. With `time_range`, only the bars that start in the range count.
 
     One query for each bar source. min() and max() of each instrument and bar period use the primary key.
     """
     coverage: list[list[SavedBarCoverage]] = [[] for _ in instruments]
     for bar_source in source_order:
-        rows = await select_saved_bar_coverage_rows(connection, bar_source, instruments)
+        rows = await select_saved_bar_coverage_rows(connection, bar_source, instruments, time_range)
         for row in rows:
             # WITH ORDINALITY counts from 1.
             coverage[row.instrument_position - 1].append(
@@ -128,7 +131,10 @@ async def select_saved_bar_coverage(
 
 
 async def select_saved_bar_coverage_rows(
-    connection: psycopg.AsyncConnection, bar_source: BarSource, instruments: list[Instrument]
+    connection: psycopg.AsyncConnection,
+    bar_source: BarSource,
+    instruments: list[Instrument],
+    time_range: TimeRange | None,
 ) -> list[SavedBarCoverageRow]:
     async with connection.cursor(row_factory=class_row(SavedBarCoverageRow)) as cursor:
         await cursor.execute(
@@ -143,6 +149,8 @@ async def select_saved_bar_coverage_rows(
                     FROM {bar_table} AS bar
                     WHERE bar.symbol = instrument.symbol AND bar.exchange = instrument.exchange
                         AND bar.currency = instrument.currency AND bar.bar_period = period.bar_period
+                        AND bar.start_utc >= COALESCE(%(start_utc)s::timestamptz, '-infinity')
+                        AND bar.start_utc < COALESCE(%(end_utc)s::timestamptz, 'infinity')
                 ) AS coverage
             WHERE coverage.first_start_utc IS NOT NULL
             ORDER BY instrument.position, period.position
@@ -152,6 +160,8 @@ async def select_saved_bar_coverage_rows(
                 "exchanges": [instrument.exchange for instrument in instruments],
                 "currencies": [instrument.currency for instrument in instruments],
                 "bar_periods": [bar_period.value for bar_period in BarPeriod],
+                "start_utc": None if time_range is None else time_range.start_utc,
+                "end_utc": None if time_range is None else time_range.end_utc,
             },
         )
         return await cursor.fetchall()
