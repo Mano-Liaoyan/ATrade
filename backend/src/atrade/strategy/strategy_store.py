@@ -13,12 +13,13 @@ from psycopg.types.json import Jsonb
 # The version source (docs/architecture/strategy.md section 9.1.1). A CHECK constraint holds the same values.
 VersionSource = Literal["user", "rule_builder", "ai_assistant"]
 # A version is discarded when strategy_version_discard has a row for it (docs/architecture/assistant.md 25.5.1).
-VERSION_COLUMNS: Final = """
-    id, strategy_id, version_number, code, code_sha256, created_at_utc, source, rules, conversation_id,
+VERSION_SUMMARY_COLUMNS: Final = """
+    id, version_number, code_sha256, created_at_utc, source, conversation_id,
     EXISTS (
         SELECT 1 FROM strategy_version_discard WHERE strategy_version_discard.strategy_version_id = strategy_version.id
     ) AS discarded
 """
+VERSION_COLUMNS: Final = f"strategy_id, code, rules, {VERSION_SUMMARY_COLUMNS}"
 
 
 @dataclass(frozen=True)
@@ -36,17 +37,21 @@ class StrategyListRow:
 
 
 @dataclass(frozen=True)
-class StrategyVersionRecord:
+class StrategyVersionSummaryRecord:
     id: int
-    strategy_id: int
     version_number: int
-    code: str
     code_sha256: str
     created_at_utc: datetime
     source: VersionSource
-    rules: dict[str, Any] | None
     conversation_id: int | None
     discarded: bool
+
+
+@dataclass(frozen=True)
+class StrategyVersionRecord(StrategyVersionSummaryRecord):
+    strategy_id: int
+    code: str
+    rules: dict[str, Any] | None
 
 
 @dataclass(frozen=True)
@@ -121,11 +126,11 @@ async def select_strategy(connection: psycopg.AsyncConnection, strategy_id: int)
         return await cursor.fetchone()
 
 
-async def select_versions(connection: psycopg.AsyncConnection, strategy_id: int) -> list[StrategyVersionRecord]:
-    async with connection.cursor(row_factory=class_row(StrategyVersionRecord)) as cursor:
+async def select_versions(connection: psycopg.AsyncConnection, strategy_id: int) -> list[StrategyVersionSummaryRecord]:
+    async with connection.cursor(row_factory=class_row(StrategyVersionSummaryRecord)) as cursor:
         await cursor.execute(
             f"""
-            SELECT {VERSION_COLUMNS}
+            SELECT {VERSION_SUMMARY_COLUMNS}
             FROM strategy_version
             WHERE strategy_id = %(strategy_id)s
             ORDER BY version_number

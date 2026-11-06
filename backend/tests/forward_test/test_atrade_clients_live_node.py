@@ -184,7 +184,8 @@ async def test_two_equal_partial_fills_of_one_order_both_go_into_the_owner_ledge
             )
             for number in range(2)
         )
-        await wait_until(lambda: len(world.ledger.fills) == 2)
+        # The fill events come to the strategy after the ledger save, so the wait reads the position of the strategy.
+        await wait_until(lambda: strategy.own_positions() == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))])
 
     assert world.ledger.read_quantity(FORWARD_TEST_ID, APPLE) == BUY_QUANTITY
     assert strategy.positions_at_stop == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))]
