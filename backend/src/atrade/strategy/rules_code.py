@@ -175,7 +175,7 @@ def write_buy(rules: StrategyRules, parts: CodeParts) -> list[str]:
     if isinstance(size, PercentOfEquity):
         percent = parts.add_field("equity_percent", size.percent)
         quantity_lines = [
-            "        account = self.portfolio.account(self.settings.instrument_id.venue)",
+            "        account = atrade.strategy.find_account(self, self.settings.instrument_id.venue)",
             "        equity = None if account is None else account.balance_total()",
             "        if equity is None:",
             "            return",
@@ -193,6 +193,14 @@ def write_buy(rules: StrategyRules, parts: CodeParts) -> list[str]:
     ]
 
 
+def write_atrade_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
+    imports = [
+        *(["import atrade.indicator"] if parts.indicators else []),
+        *(["import atrade.strategy"] if isinstance(rules.settings.position_size, PercentOfEquity) else []),
+    ]
+    return ["", *imports] if imports else []
+
+
 def write_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
     standard = [
         *(["import math"] if isinstance(rules.settings.position_size, PercentOfEquity) else []),
@@ -204,7 +212,7 @@ def write_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
         "from nautilus_trader.config import StrategyConfig",
         "from nautilus_trader.model import Bar, BarType, InstrumentId, OrderSide, Position, Quantity",
         "from nautilus_trader.trading import Strategy",
-        *(["", "import atrade.indicator"] if parts.indicators else []),
+        *write_atrade_imports(rules, parts),
     ]
 
 
@@ -549,7 +557,7 @@ def write_universe_strategy(
         "        self.buys = []",
         "        if not buys:",
         "            return",
-        "        account = self.portfolio.account(self.members[buys[0]].instrument_id.venue)",
+        "        account = atrade.strategy.find_account(self, self.members[buys[0]].instrument_id.venue)",
         "        cash = None if account is None else account.balance_total()",
         "        if cash is None:",
         "            return",
@@ -611,6 +619,7 @@ def make_universe_code(rules: StrategyRules, universe: UniverseSettings) -> str:
         "from nautilus_trader.trading import Strategy",
         "",
         "import atrade.indicator",
+        "import atrade.strategy",
         "",
         "# Each member gets this share of equity / hold_count. The rest stays as cash for the commissions and the gap",
         "# from the close of the rank to the fill.",

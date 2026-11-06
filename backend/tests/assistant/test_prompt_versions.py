@@ -112,6 +112,7 @@ async def test_the_fixed_part_has_the_forbidden_actions(client: httpx.AsyncClien
     assert "Do not send a paper order." in fixed_part
     assert "Do not start a forward test." in fixed_part
     assert "Do not promise returns." in fixed_part
+    assert "atrade.strategy.find_account(self, instrument_id.venue)" in fixed_part
 
 
 @pytest.mark.anyio
@@ -195,6 +196,8 @@ async def test_the_system_prompt_is_the_editable_part_and_then_the_fixed_part_wi
     editable_part, fixed_part = system_prompt.split("\n\n", 1)
     assert editable_part == "Answer in short sentences."
     assert "Do not send a paper order." in fixed_part
+    # A saved prompt version does not change (25.9.1), so the fixed part has the account rule.
+    assert "atrade.strategy.find_account" in fixed_part
     assert f"The open strategy: ID {strategy_id}, name SMA cross." in fixed_part
     assert "The open version: 1." in fixed_part
     last_three = ", ".join(str(backtest_id) for backtest_id in reversed(backtest_ids[1:]))

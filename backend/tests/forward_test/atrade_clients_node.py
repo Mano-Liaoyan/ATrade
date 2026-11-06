@@ -167,7 +167,7 @@ async def wait_until(condition: Callable[[], bool]) -> None:
 
 @asynccontextmanager
 async def run_node[LedgerT: OwnerLedger](
-    world: ClientsWorld[LedgerT], strategy: BuyOnceStrategy, run_number: int
+    world: ClientsWorld[LedgerT], strategy: Strategy, run_number: int
 ) -> AsyncGenerator[BarStoreDataClientFactory]:
     builder, data_factory = build_node(world, run_number)
     live_node = builder.build()
