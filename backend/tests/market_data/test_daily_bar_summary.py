@@ -3,6 +3,8 @@
 Real PostgreSQL, the IBKR fake, and hand-made DBN files (docs/architecture/market_data.md section 8.11).
 """
 
+import asyncio
+import threading
 from collections.abc import AsyncIterator
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -22,6 +24,7 @@ from atrade.indicator import AverageTradingValue, make_nautilus_bar
 from atrade.market_data import (
     BarRequest,
     DailyBarSummary,
+    daily_bar_summary,
     import_databento_files,
     read_daily_bar_summaries,
     read_last_daily_bars,
@@ -110,15 +113,21 @@ def closes_by_day(bars: list[Bar]) -> list[tuple[int, Decimal]]:
 
 @pytest.fixture
 def query_count(monkeypatch: pytest.MonkeyPatch) -> list[int]:
-    """Counts the SQL statements that async cursors send."""
+    """Counts the SQL statements that async and blocking cursors send."""
     count = [0]
     original_execute = psycopg.AsyncCursor.execute
+    original_blocking_execute = psycopg.Cursor.execute
 
     async def count_execute(self: psycopg.AsyncCursor[Any], *args: Any, **kwargs: Any) -> psycopg.AsyncCursor[Any]:
         count[0] += 1
         return await original_execute(self, *args, **kwargs)
 
+    def count_blocking_execute(self: psycopg.Cursor[Any], *args: Any, **kwargs: Any) -> psycopg.Cursor[Any]:
+        count[0] += 1
+        return original_blocking_execute(self, *args, **kwargs)
+
     monkeypatch.setattr(psycopg.AsyncCursor, "execute", count_execute)
+    monkeypatch.setattr(psycopg.Cursor, "execute", count_blocking_execute)
     return count
 
 
@@ -127,6 +136,7 @@ async def test_reads_the_last_daily_bars_of_many_instruments_in_one_query_throug
     database_url: str, query_count: list[int]
 ) -> None:
     save_apple_and_microsoft_bars(database_url)
+    query_count[0] = 0
 
     bars = await read_last_daily_bars(
         database_url=database_url, instruments=[APPLE, MICROSOFT, TENCENT], before_utc=day(9), bar_count=3
@@ -162,6 +172,25 @@ def test_the_read_stops_at_the_bar_count_in_each_bar_source(database_url: str) -
 
     assert row is not None
     assert find_table_scan_rows(row[0][0]["Plan"]) <= 3 + 3
+
+
+def test_the_read_runs_in_a_thread(database_url: str) -> None:
+    save_apple_and_microsoft_bars(database_url)
+    threads: list[threading.Thread] = []
+    original_read = daily_bar_summary.select_last_daily_bars_blocking
+
+    def record_thread(*args: Any) -> dict[Instrument, list[Bar]]:
+        threads.append(threading.current_thread())
+        return original_read(*args)
+
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(daily_bar_summary, "select_last_daily_bars_blocking", record_thread)
+        asyncio.run(
+            read_last_daily_bars(database_url=database_url, instruments=[APPLE], before_utc=day(9), bar_count=3)
+        )
+
+    assert len(threads) == 1
+    assert threads[0] is not threading.current_thread()
 
 
 @pytest.mark.anyio

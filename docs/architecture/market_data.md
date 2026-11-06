@@ -1017,7 +1017,9 @@ Table `daily_bar_summary`: one row for each instrument.
 - `read_last_daily_bars` of the `market_data` public entry reads the last n
   daily bars before a date for a list of instruments in one SQL statement.
   The statement reads the global source order too and applies the merge
-  rule of section 8.7.2. Screens (section 24.5) and the summary use it.
+  rule of section 8.7.2. It runs in a thread, because the rows of many
+  instruments stop the event loop for seconds. Screens (section 24.5) and the
+  summary use it.
 - Screens read the summary rows with `read_daily_bar_summaries` (a list of
   instruments) and `read_daily_bar_summaries_of_currency` (all instruments
   with saved daily bars in one currency, #206), and the HK instrument list

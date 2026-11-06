@@ -5,6 +5,7 @@ Both read through the global source order with the merge rule of section 8.7.2. 
 SQL statement, so a read of many instruments is one database query.
 """
 
+import asyncio
 from collections import defaultdict
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -178,9 +179,14 @@ async def read_last_daily_bars(
     *, database_url: str, instruments: list[Instrument], before_utc: datetime, bar_count: int
 ) -> dict[Instrument, list[Bar]]:
     """For each instrument, the last `bar_count` daily bars that start before `before_utc`, oldest first, merged in
-    the global source order. One database query for all instruments. No IBKR call."""
-    async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        return await select_last_daily_bars(connection, instruments, before_utc, bar_count)
+    the global source order. One database query for all instruments. No IBKR call. The read of many instruments stops
+    the event loop for seconds, so it runs in a thread."""
+
+    def read_blocking() -> dict[Instrument, list[Bar]]:
+        with psycopg.connect(database_url) as connection:
+            return select_last_daily_bars_blocking(connection, instruments, before_utc, bar_count)
+
+    return await asyncio.to_thread(read_blocking)
 
 
 def calculate_daily_bar_summary(instrument: Instrument, bars: list[Bar]) -> DailyBarSummary:
