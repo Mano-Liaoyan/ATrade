@@ -49,7 +49,8 @@ def add_validation_error_handler(app: FastAPI) -> None:
         return send_field_errors([{key: value for key, value in item.items() if key != "input"} for item in errors])
 
     async def send_unstorable_value_error(_request: Request, error: Exception) -> Response:
-        logger.warning("PostgreSQL refused a value of a request: %s", error)
+        # The DataError can also come from a value of the server, so the log keeps the traceback.
+        logger.warning("PostgreSQL refused a value of a request: %s", error, exc_info=error)
         return send_field_errors([{"type": "value_error", "loc": ["request"], "msg": UNSTORABLE_VALUE_MESSAGE}])
 
     app.add_exception_handler(RequestValidationError, send_validation_error)

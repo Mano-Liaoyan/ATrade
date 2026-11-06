@@ -1,6 +1,8 @@
 """A value that PostgreSQL or the file system cannot take gets a 422 from the shared layer, not a 500. The requests
 come from generated requests on the OpenAPI document."""
 
+import logging
+
 import httpx
 import pytest
 
@@ -36,6 +38,19 @@ async def test_a_body_value_is_refused(web_client: httpx.AsyncClient) -> None:
     response = await web_client.post("/api/strategies", json={"name": NUL_TEXT})
 
     assert response.status_code == httpx.codes.UNPROCESSABLE_ENTITY, response.text
+
+
+@pytest.mark.anyio
+async def test_a_refused_value_logs_its_traceback(
+    web_client: httpx.AsyncClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.WARNING, logger="atrade.foundation.error_response")
+
+    await web_client.post("/api/strategies", json={"name": NUL_TEXT})
+
+    records = [record for record in caplog.records if "PostgreSQL refused" in record.getMessage()]
+    assert records
+    assert records[0].exc_info is not None
 
 
 @pytest.mark.parametrize("path", ["/a%00b", "/_app/a%00b"])
