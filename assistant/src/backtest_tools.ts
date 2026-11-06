@@ -5,7 +5,8 @@
 // - One user message starts at most 5 backtests. The sixth call starts no backtest and returns an error.
 // - A `screen` universe without a rebalance period rebalances each quarter. Each result of a fixed `list` universe
 //   has the survivorship bias warning.
-// - read_backtest returns the backtest with a summary of the equity curve and of the trades.
+// - read_backtest and compare_backtests return each backtest with a summary of the equity curve, the trades, and the
+//   instruments. list_backtests returns the newest 50 backtests. A cut result says what it left out.
 // - read_backtest and list_backtests add `error_summary`, the last line of the error message, to a failed backtest.
 import type { AgentToolUpdateCallback } from '@earendil-works/pi-coding-agent';
 import { answerResult, errorResult, isSuccess, textResult, type ToolDetails, type ToolResult } from './tool_results.ts';
@@ -14,6 +15,8 @@ import type { WebPortAnswer, WebPortClient } from './web_port_client.ts';
 export const MAX_BACKTESTS_PER_USER_MESSAGE = 5;
 export const MAX_EQUITY_POINTS = 50;
 export const MAX_TRADES = 50;
+export const MAX_INSTRUMENTS = 50;
+export const MAX_LISTED_BACKTESTS = 50;
 const FINAL_STATUSES = new Set(['finished', 'failed', 'timed_out']);
 const MILLISECONDS_PER_MINUTE = 60_000;
 const WAIT_MINUTES = 15;
@@ -48,7 +51,7 @@ interface BacktestState {
   status: string;
 }
 
-type DetailBody = Record<string, unknown> & { equity_curve?: unknown[]; trades?: unknown[] };
+type DetailBody = Record<string, unknown> & { equity_curve?: unknown[]; trades?: unknown[]; instruments?: unknown[] };
 
 /** At most `count` items, evenly spread, with the first and the last item. */
 export function spreadSample<T>(items: readonly T[], count: number): T[] {
@@ -73,26 +76,61 @@ export function addErrorSummary<T extends Record<string, unknown>>(backtest: T):
   return summary === null ? backtest : { ...backtest, error_summary: summary };
 }
 
-/** The list_backtests content: the list of GET /api/backtests, each failed backtest with `error_summary`. */
+/** The list_backtests content: the newest 50 backtests of GET /api/backtests (the newest is first), each failed
+ * backtest with `error_summary`. A longer list also has its count and a note. */
 export function summarizeBacktestList(body: unknown): unknown {
   if (!Array.isArray(body)) {
     return body;
   }
-  return body.map((item: unknown) =>
-    typeof item === 'object' && item !== null ? addErrorSummary(item as Record<string, unknown>) : item,
-  );
+  const backtests = body
+    .slice(0, MAX_LISTED_BACKTESTS)
+    .map((item: unknown) => (typeof item === 'object' && item !== null ? addErrorSummary(item as Record<string, unknown>) : item));
+  if (body.length <= MAX_LISTED_BACKTESTS) {
+    return backtests;
+  }
+  return {
+    backtest_count_total: body.length,
+    left_out:
+      `backtests has the newest ${String(MAX_LISTED_BACKTESTS)} of ${String(body.length)} backtests. ` +
+      'An older backtest has a lower ID. To read an older backtest, call read_backtest with its ID.',
+    backtests,
+  };
 }
 
-/** The read_backtest content: all fields, the equity curve as at most 50 points, the first 50 trades, and
- * `error_summary` of a failed backtest. */
+/** The note of a backtest summary that left out items, or no field. */
+function describeLeftOut(pointCount: number, tradeCount: number, instrumentCount: number): { left_out?: string } {
+  const cuts = [
+    pointCount > MAX_EQUITY_POINTS ? `equity_curve has ${String(MAX_EQUITY_POINTS)} of ${String(pointCount)} points, evenly spread.` : '',
+    tradeCount > MAX_TRADES ? `trades has the first ${String(MAX_TRADES)} of ${String(tradeCount)} trades.` : '',
+    instrumentCount > MAX_INSTRUMENTS
+      ? `instruments has the first ${String(MAX_INSTRUMENTS)} of ${String(instrumentCount)} instruments, sorted by symbol.`
+      : '',
+  ].filter((cut) => cut !== '');
+  return cuts.length === 0 ? {} : { left_out: `${cuts.join(' ')} No tool reads the other items. The backtest page shows them to the user.` };
+}
+
+/** The read_backtest content: all fields, the equity curve as at most 50 points, the first 50 trades, the first 50
+ * instruments, `error_summary` of a failed backtest, and a note when it left out items. */
 export function summarizeBacktest(body: DetailBody): Record<string, unknown> {
-  const { equity_curve: equityCurve = [], trades = [], ...backtest } = body;
+  const { equity_curve: equityCurve = [], trades = [], instruments = [], ...backtest } = body;
   return {
     ...addErrorSummary(backtest),
     equity_curve_point_count: equityCurve.length,
     equity_curve: spreadSample(equityCurve, MAX_EQUITY_POINTS),
     trade_count_total: trades.length,
     trades: trades.slice(0, MAX_TRADES),
+    instrument_count_total: instruments.length,
+    instruments: instruments.slice(0, MAX_INSTRUMENTS),
+    ...describeLeftOut(equityCurve.length, trades.length, instruments.length),
+  };
+}
+
+/** The compare_backtests content: the comparison with the read_backtest content of both backtests. */
+export function summarizeComparison(body: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...body,
+    first: summarizeBacktest(body.first as DetailBody),
+    second: summarizeBacktest(body.second as DetailBody),
   };
 }
 

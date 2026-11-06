@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vite-plus/test';
 import { ASSISTANT_TOOL_NAMES, createAssistantTools } from '../src/assistant_tools.ts';
-import { runBacktest, summarizeBacktest, SURVIVORSHIP_BIAS_WARNING, type BacktestWait } from '../src/backtest_tools.ts';
+import { runBacktest, summarizeBacktest, summarizeComparison, SURVIVORSHIP_BIAS_WARNING, type BacktestWait } from '../src/backtest_tools.ts';
 import { Conversations, type RunEvent } from '../src/conversations.ts';
+import { errorResult, MAX_TOOL_RESULT_CHARACTERS, textResult } from '../src/tool_results.ts';
 import { WebPortClient, type WebPortAnswer } from '../src/web_port_client.ts';
 import { createFakeOpenModel } from './fake_model.ts';
 import { startFakeModelServer, type ChatMessage, type FakeModelServer, type ModelStep } from './fake_model_server.ts';
@@ -145,7 +146,7 @@ describe('the strategy and backtest tools', () => {
       readBacktestContent,
       [backtestBody(11, 'finished')],
       readBacktestContent,
-      COMPARISON,
+      summarizeComparison(COMPARISON),
     ]);
   });
 
@@ -159,6 +160,80 @@ describe('the strategy and backtest tools', () => {
     expect(summary.trade_count_total).toBe(60);
     expect(summary.trades).toHaveLength(50);
     expect(summary.metrics).toEqual({ final_equity_usd: '10500', trade_count: 60 });
+  });
+
+  test('a backtest result gives at most 50 instruments and says what it left out', () => {
+    const instruments = Array.from({ length: 60 }, (_unused, index) => ({ symbol: `S${String(index)}` }));
+
+    const summary = summarizeBacktest({ ...backtestBody(11, 'finished'), instruments });
+
+    expect(summary.instrument_count_total).toBe(60);
+    expect(summary.instruments).toHaveLength(50);
+    expect(summary.left_out).toContain('equity_curve has 50 of 120 points');
+    expect(summary.left_out).toContain('trades has the first 50 of 60 trades');
+    expect(summary.left_out).toContain('instruments has the first 50 of 60 instruments');
+    expect(summary.left_out).toContain('backtest page');
+  });
+
+  test('a backtest result without a cut has no left_out note', () => {
+    expect(summarizeBacktest({ id: 11, equity_curve: [], trades: [], instruments: [] })).not.toHaveProperty('left_out');
+  });
+
+  test('compare_backtests uses the read_backtest summary for both backtests and keeps the code', () => {
+    const backtest = { ...backtestBody(11, 'finished'), code: '# code\n' };
+
+    const comparison = summarizeComparison({ strategy_id: 3, strategy_name: 'SMA crossover', first: backtest, second: backtest });
+
+    expect(comparison).toEqual({
+      strategy_id: 3,
+      strategy_name: 'SMA crossover',
+      first: summarizeBacktest(backtest),
+      second: summarizeBacktest(backtest),
+    });
+    expect((comparison.first as { code: string }).code).toBe('# code\n');
+    expect((comparison.first as { equity_curve: unknown[] }).equity_curve).toHaveLength(50);
+  });
+
+  test('list_backtests returns the newest 50 backtests and says how to read an older backtest', async () => {
+    web.backtestList = Array.from({ length: 60 }, (_unused, index) => ({ id: 60 - index, status: 'finished' }));
+    const conversations = await openConversations([call('list_backtests'), { text: 'Done.' }]);
+
+    await runOnce(conversations);
+
+    const [result] = readToolResults() as { backtest_count_total: number; left_out: string; backtests: { id: number }[] }[];
+    expect(result?.backtest_count_total).toBe(60);
+    expect(result?.backtests).toHaveLength(50);
+    expect(result?.backtests.at(0)?.id).toBe(60);
+    expect(result?.backtests.at(-1)?.id).toBe(11);
+    expect(result?.left_out).toContain('read_backtest');
+  });
+
+  test('a tool result above the limit is cut with a note, and each tool result goes through the limit', async () => {
+    web.backtestList = [{ ...backtestBody(11, 'failed'), error_message: 'x'.repeat(2 * MAX_TOOL_RESULT_CHARACTERS) }];
+    const conversations = await openConversations([call('list_backtests'), { text: 'Done.' }]);
+
+    await runOnce(conversations);
+
+    const [result] = readToolResults() as string[];
+    expect(result).toHaveLength(MAX_TOOL_RESULT_CHARACTERS);
+    expect(result).toContain('ATrade cut this tool result');
+  });
+
+  test('the limit keeps a text of the limit length, and it cuts an error result', () => {
+    const atLimit = 'x'.repeat(MAX_TOOL_RESULT_CHARACTERS);
+
+    expect(textResult(atLimit).content).toEqual([{ type: 'text', text: atLimit }]);
+
+    const result = errorResult(`${atLimit}x`);
+    expect(result.isError).toBe(true);
+    const [content] = result.content;
+    expect(content?.type === 'text' ? content.text : '').toContain(`It has ${String(MAX_TOOL_RESULT_CHARACTERS + 1)} characters`);
+  });
+
+  test('the limit does not leave half of a character at the cut', () => {
+    const [content] = textResult('😀'.repeat(MAX_TOOL_RESULT_CHARACTERS)).content;
+
+    expect(content?.type === 'text' && content.text.isWellFormed()).toBe(true);
   });
 
   test('read_backtest and list_backtests give the last error line of a failed backtest as error_summary', async () => {

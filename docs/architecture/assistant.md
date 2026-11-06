@@ -228,9 +228,9 @@ prompt does not list the tools.
 | `create_strategy` | Creates a strategy with version 1 from the template. | The new strategy. |
 | `save_strategy_version` | Saves code as a new strategy version (25.5). | The new version. On `422`, the problem list `{"problems": [{"line", "message"}]}` of the checks before save (strategy section 9.3). |
 | `run_backtest` | Queues a backtest of a saved strategy version and waits for its end (25.4.2). | The backtest ID and its status. When it finished, the same content as `read_backtest`. |
-| `list_backtests` | Lists the backtests. | The answer of `GET /api/backtests`. Each backtest with an error message also has `error_summary`. |
-| `read_backtest` | Reads one backtest. | The metrics, a summary of the equity curve, a summary of the trades, and `error_summary` of a backtest with an error message. |
-| `compare_backtests` | Compares 2 backtests. | The answer of the comparison route. |
+| `list_backtests` | Lists the newest 50 backtests. | The newest 50 backtests of `GET /api/backtests`. Each backtest with an error message also has `error_summary`. A longer list also has `backtest_count_total` and `left_out`. |
+| `read_backtest` | Reads one backtest. | The metrics, a summary of the equity curve, of the trades, and of the instruments, and `error_summary` of a backtest with an error message. |
+| `compare_backtests` | Compares 2 backtests. | The answer of the comparison route, with the content of `read_backtest` and `code` for each backtest. |
 
 - The AI assistant does not change the rules of the rule builder. It changes
   only code. ATrade treats a code change of the AI assistant like a code
@@ -251,6 +251,21 @@ prompt does not list the tools.
   `equity_curve_point_count` gives the full count. `trades` has the first 50
   trades with all their fields (`time_utc`, `side`, `quantity_shares`,
   `price_usd`, `commission_usd`). `trade_count_total` gives the full count.
+  `instruments` has the first 50 instruments, sorted by symbol.
+  `instrument_count_total` gives the full count. When the summaries leave out
+  items, `left_out` says which items. No tool reads these items, so the note
+  names the backtest page.
+- Decided: `compare_backtests` uses the summaries of `read_backtest` for both
+  backtests. The full comparison of a 6-month 1-minute backtest had 6,030,133
+  bytes.
+- Decided: `list_backtests` returns the newest 50 backtests. `left_out` tells
+  the AI assistant to read an older backtest with `read_backtest`.
+- Decided: `textResult` in `assistant/src/tool_results.ts` limits the text of
+  each tool result to 100,000 characters
+  (`MAX_TOOL_RESULT_CHARACTERS`). It cuts a longer text and adds a note with
+  the full length. Compaction is off, so each later user message sends all
+  earlier tool results to the model again. A result that is too large stops
+  each later message of the conversation with "prompt is too long".
 - Decided: a backtest with an error message (for example a failed
   backtest with a Python traceback) also has `error_summary`, the last line
   of `error_message` that is not empty, in `read_backtest`, in the
