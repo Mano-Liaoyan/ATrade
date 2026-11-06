@@ -112,7 +112,8 @@ def find_split_evidence(
     `quantity_before` must be above 0. An instrument that no owner holds has no evidence B.
     """
     if bar_ratio is None:
-        if quantity_after == quantity_before:
+        # A stock split leaves a position above 0. Other differences stay "Unattributed".
+        if quantity_after == quantity_before or quantity_after <= 0:
             return None
         position_ratio = Fraction(quantity_after) / Fraction(quantity_before)
         return SplitEvidence(

@@ -553,7 +553,9 @@ The "Split check needed" state:
 
 - An instrument goes to this state when:
   - only evidence A shows a ratio, and the IBKR position did not change
-  - the IBKR position changed, and evidence A shows no ratio
+  - the IBKR position changed to a value above 0, and evidence A shows no
+    ratio. An IBKR position of 0 or less is not a stock split: the difference
+    stays as "Unattributed"
   - the 2 ratios are not the same
   - the IBKR share count is not the share count of the ledger change above
   - the ratio is not a usual split ratio (a whole number, 1 divided by a
