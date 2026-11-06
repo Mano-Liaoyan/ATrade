@@ -15,7 +15,7 @@ import psycopg
 import pytest
 from httpx_ws import aconnect_ws
 
-from atrade.assistant import MessageEnd
+from atrade.assistant import MessageEndMessage
 from tests.assistant.assistant_app import create_conversation, create_strategy, open_assistant_client
 from tests.backtest.real_runner import save_test_bars
 from tests.fakes.assistant import FakeAssistantService
@@ -23,7 +23,9 @@ from tests.fakes.clock import FixedClock
 
 MESSAGE_WAIT_SECONDS = 5
 MODEL = {"provider": "fake", "model": "fake-model", "credential_id": "fake-key-1", "thinking_level": "off"}
-ANSWER = MessageEnd(text="Hello.", provider="fake", model="fake-model", credential_name="Fake key")
+ANSWER = MessageEndMessage(
+    text="Hello.", provider="fake", model="fake-model", credential_name="Fake key", thinking_level=None
+)
 
 
 @pytest.fixture

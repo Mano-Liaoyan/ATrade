@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from atrade.assistant.assistant_service import (
     AssistantService,
     AssistantServiceError,
-    CredentialSummary,
+    CredentialResponse,
     ThinkingLevel,
 )
 from atrade.foundation.error_response import ERROR_RESPONSE
@@ -42,32 +42,8 @@ class ProviderListResponse(BaseModel):
     providers: list[ProviderResponse]
 
 
-class CredentialResponse(BaseModel):
-    id: str
-    name: str
-    provider: str
-    type: Literal["oauth", "api_key"]
-    # The last 4 characters of an API key. None for a subscription login.
-    key_last4: str | None
-    # "failed": the last OAuth refresh failed. The user deletes the credential and logs in again.
-    state: Literal["ready", "failed"]
-    state_message: str | None
-
-
 class CredentialListResponse(BaseModel):
     credentials: list[CredentialResponse]
-
-
-def to_credential_response(credential: CredentialSummary) -> CredentialResponse:
-    return CredentialResponse(
-        id=credential.id,
-        name=credential.name,
-        provider=credential.provider,
-        type=credential.type,
-        key_last4=credential.key_last4,
-        state=credential.state,
-        state_message=credential.state_message,
-    )
 
 
 def assistant_not_reachable(error: AssistantServiceError) -> HTTPException:
@@ -103,7 +79,7 @@ class CredentialRoutes:
             credentials = await self.assistant_service.list_credentials()
         except AssistantServiceError as error:
             raise assistant_not_reachable(error) from error
-        return CredentialListResponse(credentials=[to_credential_response(credential) for credential in credentials])
+        return CredentialListResponse(credentials=credentials)
 
     async def delete_credential(self, credential_id: Annotated[str, Path(pattern=CREDENTIAL_ID_PATTERN)]) -> None:
         try:

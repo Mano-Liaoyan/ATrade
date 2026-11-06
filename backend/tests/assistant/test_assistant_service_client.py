@@ -3,30 +3,29 @@
 The real service is tested in assistant/tests/assistant_server.test.ts with the same paths and fields.
 """
 
-import dataclasses
 import json
 
 import httpx
 import pytest
 
 from atrade.assistant import (
+    AssistantErrorMessage,
     AssistantServiceClient,
     AssistantServiceError,
-    BacktestFinished,
+    BacktestFinishedMessage,
     ConversationMessage,
-    CredentialSummary,
-    LoginEnd,
-    LoginStep,
-    MessageEnd,
+    CredentialResponse,
+    LoginEndMessage,
+    LoginStepMessage,
+    MessageDeltaMessage,
+    MessageEndMessage,
     ModelSelection,
     ProviderModel,
     ProviderSummary,
-    RunError,
-    ScreenRunFinished,
-    ScreenSaved,
-    StrategyVersionSaved,
-    TextDelta,
-    ToolStep,
+    ScreenRunFinishedMessage,
+    ScreenSavedMessage,
+    StrategyVersionSavedMessage,
+    ToolStepMessage,
 )
 
 SELECTION = ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1", thinking_level="high")
@@ -64,11 +63,11 @@ async def test_run_reads_the_json_lines_and_skips_unknown_events() -> None:
     events = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
 
     assert events == [
-        TextDelta(text="Hel"),
-        MessageEnd(
+        MessageDeltaMessage(text="Hel"),
+        MessageEndMessage(
             text="Hello.", provider="fake", model="fake-model", credential_name="Fake key", thinking_level="high"
         ),
-        RunError(message="Bad key"),
+        AssistantErrorMessage(message="Bad key"),
     ]
     assert str(requests[0].url) == "http://assistant:8002/conversations/7/runs"
     assert json.loads(requests[0].content) == {
@@ -111,18 +110,18 @@ async def test_run_reads_the_tool_events() -> None:
     events = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
 
     assert events == [
-        ToolStep(
+        ToolStepMessage(
             tool_call_id="call_1", tool_name="run_backtest", status="running", backtest_id=None, backtest_status=None
         ),
-        ToolStep(
+        ToolStepMessage(
             tool_call_id="call_1", tool_name="run_backtest", status="running", backtest_id=11, backtest_status="queued"
         ),
-        StrategyVersionSaved(strategy_id=3, strategy_version_id=103, version_number=3),
-        BacktestFinished(backtest_id=11),
-        ScreenSaved(
+        StrategyVersionSavedMessage(strategy_id=3, strategy_version_id=103, version_number=3),
+        BacktestFinishedMessage(backtest_id=11),
+        ScreenSavedMessage(
             screen_id=5, name="Momentum (AI)", market="US", definition={"start": "watchlist"}, previous_definition=None
         ),
-        ScreenRunFinished(
+        ScreenRunFinishedMessage(
             screen_id=5,
             screen_result_id=9,
             start_count=500,
@@ -186,10 +185,10 @@ async def test_read_messages_and_steer_and_delete_use_the_conversation_paths() -
     ]
 
 
-CREDENTIAL = CredentialSummary(
+CREDENTIAL = CredentialResponse(
     id="c1", name="Work", provider="anthropic", type="api_key", key_last4="7a9f", state="ready", state_message=None
 )
-CREDENTIAL_BODY = dataclasses.asdict(CREDENTIAL)
+CREDENTIAL_BODY = CREDENTIAL.model_dump()
 
 
 @pytest.mark.anyio
@@ -214,8 +213,16 @@ async def test_login_reads_the_login_steps_and_the_end() -> None:
     events = [event async for event in client.login("anthropic", "api_key", "Work")]
 
     assert events == [
-        LoginStep(step="prompt", message="Enter API key", prompt_id="p1", prompt_type="secret"),
-        LoginEnd(credential=CREDENTIAL),
+        LoginStepMessage(
+            step="prompt",
+            message="Enter API key",
+            url=None,
+            user_code=None,
+            prompt_id="p1",
+            prompt_type="secret",
+            options=None,
+        ),
+        LoginEndMessage(credential=CREDENTIAL),
     ]
     assert str(requests[0].url) == "http://assistant:8002/logins"
     assert json.loads(requests[0].content) == {"provider": "anthropic", "method": "api_key", "name": "Work"}
