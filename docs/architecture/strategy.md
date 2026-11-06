@@ -162,8 +162,11 @@ New columns of `strategy_version`:
     `distance_to_52_week_high` (252) for M3.
 - The "Blank code" start point is the code in
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
-  cross strategy: buy 10 shares when the close goes above SMA(20), sell when
-  it goes below. It shows only the file format. It cites no research, so it
+  cross strategy: buy 10 shares when the close goes above SMA(20), sell the
+  whole position when it goes below. A saved version keeps its code (ADR
+  0006), so a version from before this exit sells 10 shares, also when a stock
+  split or a partial fill changed the position. It shows only the file format.
+  It cites no research, so it
   is not a strategy template and is not in the template library
   ([#139](https://github.com/Mano-Liaoyan/ATrade/issues/139), T8).
 - The "Blank rules" start point and the rule templates make version 1 with
@@ -579,8 +582,11 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
 - Decided (#172): at each bar close, the code reads the prices and the
   indicator outputs of the rules. When an output has no value, or an order
   of the strategy is open or in flight, no rule runs on that bar. A cross
-  compares with the values of the previous bar. A cross is false when the
-  previous bar had no value. The code warms up the indicators with
+  compares with the values of the previous bar. The previous bar of the first
+  bar is the last look-back bar (`on_historical_bars`). A cross is false when
+  the previous bar had no value. A saved version keeps its code (ADR 0006), so
+  it must be saved again to get `on_historical_bars`. The code warms up the
+  indicators with
   `request_bars` in `on_start`: the bar count is the largest look-back count
   of the indicators ([`indicator.md`](indicator.md) section 23.4). The
   request goes `bar period × count × 6` back, and 7 days at least. The
@@ -702,9 +708,16 @@ Decided (#201):
   ranks at the next bar time, on the complete bars of all members, so it does
   not see a later bar. It waits for the first bar of a new member, at most 5
   bar times.
-- The strategy sells the positions that are not in the new targets. It buys
-  only when no order of the strategy is open and no position outside the
-  targets is open.
+- The strategy sells each of its positions that is not in the new targets,
+  also a position outside the members: a buy that filled after the list
+  removed its member, a sell that IBKR ended, or a position that a forward
+  test restart restored in a new quarter. A position with an open order
+  waits for the next rebalance. It buys only when no order of the strategy is
+  open and no position outside the targets is open.
+- `on_start` subscribes to the 1-day bars of each restored position, because
+  a market order needs a price in the cache.
+- A member that leaves loses its values and its last close. When it comes
+  back, the rebalance waits for its new values.
 - Equal weight: each buy gets equity × 0.95 / `hold_count` at the last close.
   The equity is the cash plus the open positions at the last close. The 5%
   stays as cash, as in the rule templates (section 9.9.3).
@@ -715,6 +728,9 @@ Decided (#201):
   indicator and "Highest first" or "Lowest first"). The entry block is
   "Entry filter". The tab has no control that turns the mode on or off: the
   rules of the version hold it.
+- A saved version keeps its code (ADR 0006). A version from before these
+  rules of the sell, of `on_start`, and of the values has the old code. To
+  get the new code, save the rules again.
 
 ### 9.8.7 Left to the implementation
 
@@ -847,8 +863,15 @@ Decided (#202):
 - The buys keep 2% of the equity as cash, because a market order fills at
   the open of the next bar.
 - `on_start` sets `shares` from `cache.positions_open`, because a forward
-  test restart restores the positions in a new strategy object. A saved
-  version keeps its code, so it must be saved again to get this.
+  test restart restores the positions in a new strategy object. It also
+  subscribes to the bars of each position, because a position can be outside
+  the universe, and a market order needs a price in the cache.
+- A sell that IBKR or ATrade denied, rejected, or ended gives no fill. On the
+  first bar of a day without an open or in-flight order, the strategy clears
+  its sell count and ranks again. So a lost sell stops the rebalance for less
+  than 1 day, and a sell that fails again repeats once a day.
+- A saved version keeps its code (ADR 0006), so a saved M1 to M4 version must
+  be saved again to get these 2 rules.
 
 Decided (#175):
 
