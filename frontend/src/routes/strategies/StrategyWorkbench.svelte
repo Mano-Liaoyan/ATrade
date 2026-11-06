@@ -308,10 +308,11 @@
     const baseVersionNumber = openVersion.version_number;
     const savedRulesVersionNumber = openStrategy.rulesVersionNumber;
     const rulesToSave = fileTab === 'rules' ? openStrategy.rules : null;
+    const sentCode = openStrategy.code;
     isSaving = true;
     const result =
       rulesToSave === null
-        ? await saveStrategyVersion(fetch, id, openStrategy.code)
+        ? await saveStrategyVersion(fetch, id, sentCode)
         : await saveStrategyRules(fetch, id, rulesToSave);
     isSaving = false;
     showSaveProblems(id, []);
@@ -324,14 +325,23 @@
       writeOutputError(`Version not saved: ${result.message}`);
       return;
     }
+    const label = formatVersionLabel(name, result.version.version_number);
     if (rulesToSave === null) {
-      clearDraft({ strategyId: id, versionNumber: baseVersionNumber });
+      await openSavedCode(id, result.version.version_number, baseVersionNumber, sentCode);
     } else {
       clearRulesDraft({ strategyId: id, versionNumber: savedRulesVersionNumber });
+      await openStrategy.reload(fetch, id, result.version.version_number);
     }
-    const label = formatVersionLabel(name, result.version.version_number);
-    await openStrategy.reload(fetch, id, result.version.version_number);
     writeOutput(result.isNewVersion ? `Saved as ${label}.` : `Saved. The code is the same as ${label}.`);
+  }
+
+  // The draft clears after the reload: text typed during the save goes to the draft of the saved version. A save of
+  // unchanged code keeps the version, so its draft stays.
+  async function openSavedCode(id: number, versionNumber: number, baseVersionNumber: number, sentCode: string): Promise<void> {
+    await openStrategy.reload(fetch, id, versionNumber, sentCode);
+    if (versionNumber !== baseVersionNumber) {
+      clearDraft({ strategyId: id, versionNumber: baseVersionNumber });
+    }
   }
 
   // A save can end after a strategy change: its problems do not belong to the strategy that is open then.

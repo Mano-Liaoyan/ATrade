@@ -68,8 +68,8 @@ export class OpenStrategy {
     this.#draftNotSaved = false;
   }
 
-  /** Reads the strategy and opens a version. */
-  async load(fetcher: typeof fetch, id: number, versionNumberToOpen: number | null): Promise<void> {
+  /** Reads the strategy and opens a version. `sentCode`: see openVersion. */
+  async load(fetcher: typeof fetch, id: number, versionNumberToOpen: number | null, sentCode?: string): Promise<void> {
     this.#openNumber += 1;
     const thisOpen = this.#openNumber;
     const result = await readStrategy(fetcher, id);
@@ -86,14 +86,14 @@ export class OpenStrategy {
     this.#strategy = result.value;
     const versionNumber = versionNumberToOpen ?? findDefaultVersionNumber(result.value.versions);
     if (versionNumber !== undefined) {
-      await this.openVersion(fetcher, versionNumber);
+      await this.openVersion(fetcher, versionNumber, sentCode);
     }
   }
 
   /** Loads the strategy again after a save. The save can end after a strategy change: then nothing happens. */
-  async reload(fetcher: typeof fetch, id: number, versionNumber: number): Promise<void> {
+  async reload(fetcher: typeof fetch, id: number, versionNumber: number, sentCode?: string): Promise<void> {
     if (this.#strategy?.id === id) {
-      await this.load(fetcher, id, versionNumber);
+      await this.load(fetcher, id, versionNumber, sentCode);
     }
   }
 
@@ -105,8 +105,11 @@ export class OpenStrategy {
     }
   }
 
-  /** Reads a version of the open strategy and opens it. */
-  async openVersion(fetcher: typeof fetch, versionNumber: number): Promise<void> {
+  /**
+   * Reads a version of the open strategy and opens it. `sentCode`: the code of the save that made the version. Text
+   * that the user typed after the save stays, as a draft of the opened version.
+   */
+  async openVersion(fetcher: typeof fetch, versionNumber: number, sentCode?: string): Promise<void> {
     const id = this.#strategy?.id;
     if (id === undefined) {
       return;
@@ -126,9 +129,13 @@ export class OpenStrategy {
     if (thisOpen !== this.#openNumber) {
       return;
     }
+    const typedCode = sentCode !== undefined && this.#code !== sentCode ? this.#code : null;
     this.#version = result.value;
     this.#code = draft ?? result.value.code;
     this.#draftNotSaved = false;
+    if (typedCode !== null) {
+      this.changeCode(typedCode);
+    }
     await this.#events.onVersionOpen(id, versionNumber);
   }
 

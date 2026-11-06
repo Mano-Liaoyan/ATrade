@@ -1,6 +1,6 @@
 // The open strategy: delayed reads of a strategy or version that is not open any more change nothing.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
-import type { StrategyRules } from '#lib/strategy';
+import { readDraft, type StrategyRules } from '#lib/strategy';
 import { OpenStrategy } from './open_strategy.svelte';
 
 const RULES = { entry: 'rules of the fake backend' } as unknown as StrategyRules;
@@ -251,6 +251,40 @@ describe('OpenStrategy', () => {
     expect(openStrategy.code).toBe('code 1.2');
     expect(errors).toEqual(['Rules not read: Read failed.']);
     expect(openedVersions).toEqual(['1.2']);
+  });
+
+  it('keeps the text that the user typed during a save as a draft of the new version', async () => {
+    const backend = createBackend();
+    const { openStrategy } = await createLoadedOpenStrategy(backend);
+    openStrategy.changeCode('sent code');
+    // The save takes time. The POST has the sent code, and the user types more.
+    openStrategy.changeCode('sent code and more');
+
+    const reload = openStrategy.reload(backend.fetchFunction, 1, 2, 'sent code');
+    await backend.answer('1');
+    await backend.answer('1/versions/2', 200, { id: 102, strategy_id: 1, version_number: 2, code: 'sent code', rules: null });
+    await backend.answer('1/versions/1');
+    await reload;
+
+    expect(openStrategy.version?.version_number).toBe(2);
+    expect(openStrategy.code).toBe('sent code and more');
+    expect(readDraft({ strategyId: 1, versionNumber: 2 })).toBe('sent code and more');
+  });
+
+  it('opens the saved code when the user typed nothing during the save', async () => {
+    const backend = createBackend();
+    const { openStrategy } = await createLoadedOpenStrategy(backend);
+    openStrategy.changeCode('sent code');
+
+    const reload = openStrategy.reload(backend.fetchFunction, 1, 2, 'sent code');
+    await backend.answer('1');
+    await backend.answer('1/versions/2', 200, { id: 102, strategy_id: 1, version_number: 2, code: 'sent code', rules: null });
+    await backend.answer('1/versions/1');
+    await reload;
+
+    expect(openStrategy.code).toBe('sent code');
+    expect(openStrategy.hasUnsavedCode).toBe(false);
+    expect(readDraft({ strategyId: 1, versionNumber: 2 })).toBeNull();
   });
 
   it('keeps a code draft for the open version and opens it again', async () => {
