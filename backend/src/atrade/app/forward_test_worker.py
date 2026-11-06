@@ -35,8 +35,14 @@ logger = logging.getLogger("atrade.forward_test_worker")
 # The service is read-only with a tmpfs on /tmp (deploy/compose.yaml). The import reads the file, so it can go.
 UNIVERSE_DOWNLOAD_DIR = Path("/tmp/databento")
 # The strategy code runs in the child, so the child gets only the settings that it reads. The child keeps the
-# refusal of the live trading mode.
-FORWARD_TEST_CHILD_VARIABLES = ("DATABASE_URL", "ATRADE_TRADING_MODE", "ATRADE_IBKR_HOST", "ATRADE_IBKR_PAPER_PORT")
+# refusal of the live trading mode, and the paper account check reads the account ID.
+FORWARD_TEST_CHILD_VARIABLES = (
+    "DATABASE_URL",
+    "ATRADE_TRADING_MODE",
+    "ATRADE_IBKR_HOST",
+    "ATRADE_IBKR_PAPER_PORT",
+    "ATRADE_IBKR_ACCOUNT_ID",
+)
 
 
 class ForwardTestProcess:

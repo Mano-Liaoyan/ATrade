@@ -90,7 +90,8 @@ services:
     pids_limit: 2048
     # The forward-test service waits for this check: web runs the database migrations before it serves HTTP.
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      # env -i: strategy code in a child can read the environment of this process (docs/architecture/backtest.md 10.1.1).
+      test: ["CMD", "/usr/bin/env", "-i", "/app/.venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
       interval: 5s
       timeout: 5s
       retries: 60

@@ -135,11 +135,10 @@ Strategy code can do these things. The results come from a real backtest in the
   IB Gateway was not connected.
 - Database: a child has the full `DATABASE_URL`. The role `atrade` is the
   PostgreSQL superuser, so the child can read and change all tables.
-- Health check: the prctl block ends at exec. By reading, the Compose health check
-  of `web` runs `python -c` with the full environment of the container, every 5
-  seconds. In a run with a test value, a child read the key from a process that
-  `podman exec` started in the same way. So a child that reads `/proc` in a loop
-  can possibly read the key while the health check runs.
+- Exec into the container: the prctl block ends at exec, and `docker exec` starts
+  a process with the full environment. In a run with a test value, a child read
+  the key from such a process. The Compose health check of `web` starts with
+  `env -i`, so the key is in that check only until the exec of `env`.
 - Other hosts, by reading: a child can connect to `ib-gateway:4004` and to the
   internet.
 

@@ -92,7 +92,7 @@ async def test_forward_test_child_gets_its_settings_and_no_secrets(
     assert facts["ibkr_paper_port"] == 4010
     assert "DATABENTO_API_KEY" not in facts["variable_names"]
     assert "ATRADE_IBKR_PASSWORD" not in facts["variable_names"]
-    assert "ATRADE_IBKR_ACCOUNT_ID" not in facts["variable_names"]
+    assert "ATRADE_IBKR_ACCOUNT_ID" in facts["variable_names"]
 
 
 def test_the_quarterly_update_does_not_run_without_a_databento_api_key_and_the_log_tells_why(

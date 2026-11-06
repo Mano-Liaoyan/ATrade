@@ -539,8 +539,9 @@ The public entry `atrade.forward_test` exports:
   `forward-test`) runs the worker with a start function that runs
   `python -m atrade.app.forward_test_process <ID> <run|cancel_orders>`. The
   stop request is `SIGTERM`. The child gets `PATH`, `HOME`, `TZ`,
-  `DATABASE_URL`, `ATRADE_TRADING_MODE`, `ATRADE_IBKR_HOST`, and
-  `ATRADE_IBKR_PAPER_PORT`. It does not get `DATABENTO_API_KEY`
+  `DATABASE_URL`, `ATRADE_TRADING_MODE`, `ATRADE_IBKR_HOST`,
+  `ATRADE_IBKR_PAPER_PORT`, and `ATRADE_IBKR_ACCOUNT_ID` (the paper account
+  check reads it). It does not get `DATABENTO_API_KEY`
   (`docs/architecture/backtest.md` section 10.1).
   The `forward-test` service has no IBKR user name or password.
 - The child loads the strategy code with `load_strategy_classes()` of
