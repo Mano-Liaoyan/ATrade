@@ -995,7 +995,7 @@ does not exist, when a symbol of `symbols` is not in the screen result, when
 `survivorship_bias` true (section 10.12): its members are chosen at the end
 of the range. Done in #208 for `screen`: `screen_id` and `rebalance_period`
 (default `quarter`). The route saves a copy of the screen and writes no
-members (section 10.10.8). `422` (no row) when the screen does not exist,
+members (section 10.10.8). `422` (no row) when the screen does not exist or fails `check_screen`,
 when `screen_id` is missing, or when `screen_id` or `rebalance_period` comes
 with another kind. Each backtest of `GET /api/backtests` and
 `GET /api/backtests/{backtest_id}` has `universe_screen` (the copy, null for
