@@ -5,6 +5,7 @@ The real service is tested in assistant/tests/assistant_server.test.ts with the 
 
 import dataclasses
 import json
+from collections.abc import AsyncIterator
 
 import httpx
 import pytest
@@ -131,6 +132,26 @@ async def test_run_reads_the_tool_events() -> None:
             result_count=20,
         ),
     ]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("character", ["\u2028", "\u2029", "\u0085"])
+async def test_run_splits_lines_only_at_the_newline(character: str) -> None:
+    deltas = [f"a{character}b", "c"]
+    lines = [json.dumps({"type": "text_delta", "delta": delta}, ensure_ascii=False) + "\n" for delta in deltas]
+    body = "".join(lines).encode()
+    # The chunk boundary is in the bytes of the character.
+    boundary = body.index(character.encode()) + 1
+
+    async def read_chunks() -> AsyncIterator[bytes]:
+        yield body[:boundary]
+        yield body[boundary:]
+
+    client = client_for(httpx.Response(200, content=read_chunks()), [])
+
+    events = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
+
+    assert events == [TextDelta(text=delta) for delta in deltas]
 
 
 @pytest.mark.anyio
