@@ -345,8 +345,14 @@ class AssistantServiceClient:
                 if response.status_code != HTTP_OK:
                     await response.aread()
                     raise AssistantServiceError(read_detail(response))
-                async for line in response.aiter_lines():
-                    yield line
+                # Split only at the newline. aiter_lines also splits at U+2028, U+2029, and U+0085. JSON.stringify
+                # does not escape these characters, so they can occur in a JSON line.
+                last_line = ""
+                async for text in response.aiter_text():
+                    *lines, last_line = (last_line + text).split("\n")
+                    for line in lines:
+                        yield line
+                yield last_line
         except httpx.HTTPError as error:
             raise not_reachable(error) from error
 
