@@ -681,9 +681,9 @@ class IbAsyncGatewayConnection:
         self.require_ibkr_link()
         loop = asyncio.get_running_loop()
         started_at = loop.time()
-        try:
-            # keepUpToDate needs an empty end time: the bars go up to now.
-            bars_data = await self.ib.reqHistoricalDataAsync(
+        # keepUpToDate needs an empty end time: the bars go up to now.
+        request = asyncio.ensure_future(
+            self.ib.reqHistoricalDataAsync(
                 contract,
                 endDateTime="",
                 durationStr=LIVE_BAR_DURATIONS[bar_period],
@@ -694,6 +694,13 @@ class IbAsyncGatewayConnection:
                 keepUpToDate=True,
                 timeout=HISTORICAL_DATA_TIMEOUT_SECONDS,
             )
+        )
+        try:
+            bars_data = await asyncio.shield(request)
+        except asyncio.CancelledError:
+            # The list to cancel exists only after the first answer, and IBKR limits the open subscriptions.
+            request.add_done_callback(self.cancel_abandoned_subscription)
+            raise
         except (ConnectionError, RequestError) as error:
             raise GatewayRequestError(str(error)) from error
         # After a timeout, ib_async cancels the request and returns an empty list, but it keeps the subscriber. No
@@ -704,6 +711,10 @@ class IbAsyncGatewayConnection:
             message = "IB Gateway did not answer the live bar subscription in time."
             raise GatewayRequestError(message)
         return bars_data
+
+    def cancel_abandoned_subscription(self, request: asyncio.Future[BarDataList]) -> None:
+        if not request.cancelled() and request.exception() is None and self.ib.isConnected():
+            self.ib.cancelHistoricalData(request.result())
 
     def disconnect(self) -> None:
         self.synchronized = False

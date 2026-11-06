@@ -306,7 +306,9 @@ Source: [Live bars on the chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   timeout (60 seconds) also fails, because ib_async then cancels the request
   and no update comes. That failure does not mark the IBKR link as lost. When
   the generator closes, it cancels the IBKR subscription
-  (`cancelHistoricalData`). Use `contextlib.aclosing`.
+  (`cancelHistoricalData`). Use `contextlib.aclosing`. A cancel before the
+  first answer leaves the request running, and the subscription ends at that
+  answer, because the list to cancel does not exist before it.
 - The live bars of `/ws/market-data` are not saved in PostgreSQL. The bars
   route saves only complete bars (section 8.4). A forward test saves each
   complete bar that its LiveNode receives (`docs/architecture/forward_test.md`

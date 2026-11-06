@@ -34,6 +34,7 @@ ONE_DAY_RANGE = TimeRange(datetime(2026, 3, 2, tzinfo=UTC), datetime(2026, 3, 3,
 SHORT_TIMEOUT_SECONDS = 0.05
 SHORT_CHECK_SECONDS = 0.01
 STREAM_END_WAIT_SECONDS = 2
+LIVE_REQUEST_ID = 7
 
 
 def find_closed_local_port() -> int:
@@ -361,6 +362,33 @@ async def test_a_timed_out_live_bar_subscription_raises_and_keeps_the_ibkr_link(
 
     assert connection.read_status() == "connected"
     assert live_bar_gateway.cancel_count == 1
+
+
+@pytest.mark.anyio
+async def test_a_live_bar_stream_cancelled_before_the_first_answer_cancels_its_subscription_at_the_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The real reqHistoricalDataAsync and wrapper: only the socket of the client is replaced."""
+    connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=4004, client_id=1)
+    connection.synchronized = True
+    cancelled_request_ids: list[int] = []
+    monkeypatch.setattr(connection.ib, "isConnected", lambda: True)
+    monkeypatch.setattr(connection.ib.client, "getReqId", lambda: LIVE_REQUEST_ID)
+    monkeypatch.setattr(connection.ib.client, "reqHistoricalData", ignore_message)
+    monkeypatch.setattr(connection.ib.client, "cancelHistoricalData", cancelled_request_ids.append)
+
+    stream = asyncio.create_task(anext(connection.stream_live_bars(AAPL, BarPeriod.ONE_DAY)))
+    await anyio.sleep(SHORT_CHECK_SECONDS)
+    stream.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await stream
+    assert LIVE_REQUEST_ID in connection.ib.wrapper.reqId2Subscriber
+
+    connection.ib.wrapper.historicalDataEnd(LIVE_REQUEST_ID, "", "")  # pyright: ignore[reportUnknownMemberType] readability-exception: ib_async gives reqId no type.
+    await anyio.sleep(SHORT_CHECK_SECONDS)
+
+    assert cancelled_request_ids == [LIVE_REQUEST_ID]
+    assert LIVE_REQUEST_ID not in connection.ib.wrapper.reqId2Subscriber
 
 
 @pytest.mark.anyio
