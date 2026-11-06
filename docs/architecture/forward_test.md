@@ -1385,7 +1385,11 @@ Implemented (#220) with the IBKR fake only:
   the market, and reads evidence A again for each instrument with an IBKR
   position or an owner position, and for each instrument of a running forward
   test (`record_stock_split_evidence()` of `market_data`). So a retry can find evidence A that the daily bar update
-  of the evening before did not have. Then it gives each instrument, and
+  of the evening before did not have. `read_portfolio` is 1 read for all
+  positions. A flat instrument of a running forward test is read only in the
+  first try of a day, because evidence A is 1 IBKR read for each instrument.
+  Limit: a universe of 500 flat members thus makes 500 reads in the first try
+  of a day, under the connection lock. Then it gives each instrument, and
   each candidate of the market, to `StockSplitLedger.check_instrument()` of
   `paper_trading`.
 - Evidence that is not complete (`position_only` or `bar_ratio_only`) waits

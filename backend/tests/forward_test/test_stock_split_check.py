@@ -11,6 +11,7 @@ import pytest
 
 from atrade.forward_test import MARKETS, StockSplitCheck, find_try_times
 from atrade.foundation.bar import Bar
+from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection
 from atrade.paper_trading import StockSplitLedger
@@ -35,6 +36,7 @@ from tests.paper_trading.stock_split_setup import (
 [US_MARKET, HK_MARKET] = MARKETS
 # Friday 2 January 2026, the ex-date of the tests. 08:00 ET is 13:00 UTC, 08:30 HKT is 00:30 UTC.
 EX_DAY = date(2026, 1, 2)
+MICROSOFT = Instrument(symbol="MSFT", exchange="NASDAQ", currency="USD")
 
 
 def utc(hour: int, minute: int, day: int = 2) -> datetime:
@@ -187,6 +189,27 @@ async def test_a_confirmed_split_restarts_the_flat_forward_tests_that_trade_the_
     await run.check.run_due_tries()
 
     assert run.restarts == [[single_id, universe_id]]
+
+
+@pytest.mark.anyio
+async def test_a_retry_reads_each_position_again_and_a_flat_instrument_only_in_the_first_try_of_a_day(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    write_ledger_start(database_url)
+    write_owner_fill(database_url, forward_test_id=1, quantity=10, price="400")
+    version_id = await save_test_strategy_version(web_client)
+    await start_flat_forward_test(web_client, version_id, symbol="MSFT")
+    await save_close_before_ex_date(database_url, "100")
+    await save_close_before_ex_date(database_url, "100", MICROSOFT)
+    run = CheckRun(database_url, clock, apple_quantity="40")
+
+    clock.now_utc = utc(13, 0)
+    for _ in range(2):
+        await run.check.try_market(MARKETS[0], EX_DAY, is_last_try=False)
+
+    symbols = [request.instrument.symbol for request in run.gateway_connection.historical_bar_requests]
+    assert symbols.count("AAPL") == 2
+    assert symbols.count("MSFT") == 1
 
 
 @pytest.mark.anyio

@@ -98,6 +98,8 @@ class MarketState:
     # The local day of the last finished check.
     done_day: date | None = None
     next_try_utc: datetime | None = None
+    # The local day on which the check read the flat instruments of the running forward tests.
+    flat_read_day: date | None = None
 
 
 class StockSplitCheck:
@@ -188,13 +190,18 @@ class StockSplitCheck:
         running_instruments = [
             instrument for instrument in running_forward_tests if instrument.currency == market.currency
         ]
-        instruments = list(dict.fromkeys([*account_quantities, *owner_instruments, *running_instruments]))
+        held_instruments = [*account_quantities, *owner_instruments]
+        instruments = list(dict.fromkeys([*held_instruments, *running_instruments]))
+        # IBKR has 1 historical read for each instrument, and a universe has 500 members. A flat member goes only in
+        # the first try of a day, so that the tries do not keep the bar fetcher waiting.
+        state = self.market_states[market.name]
         await record_stock_split_evidence(
             database_url=self.database_url,
             gateway_connection=gateway_connection,
-            instruments=instruments,
+            instruments=list(dict.fromkeys(held_instruments)) if state.flat_read_day == day else instruments,
             recorded_at_utc=self.clock.read_now_utc(),
         )
+        state.flat_read_day = day
         candidates = find_candidates(await read_stock_split_candidates(database_url=self.database_url), market)
         ledger = StockSplitLedger(
             database_url=self.database_url, gateway_connection=gateway_connection, clock=self.clock
