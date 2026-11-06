@@ -53,30 +53,19 @@
   } from '#lib/foundation/workbench';
   import { ForwardTestsOnInstrumentsFeed, stopForwardTest, type ForwardTest } from '#lib/forward_test';
   import {
-    BLANK_RULES,
     clearDraft,
     clearRulesDraft,
     connectStrategyLanguageServer,
     deleteStrategy,
-    describeRulesWarning,
-    findRulesVersionNumber,
     formatVersionLabel,
     generateRulesCode,
     listStrategies,
     STRATEGIES_SOCKET_PATH,
-    readDraft,
-    readStrategy,
-    readRulesDraft,
-    readStrategyVersion,
     saveStrategyRules,
     saveStrategyVersion,
-    writeDraft,
-    writeRulesDraft,
     type CodeProblem,
     type StrategyDetail,
     type StrategyListItem,
-    type StrategyRules,
-    type StrategyVersion,
     type StrategyVersionKey,
   } from '#lib/strategy';
   import NewStrategyDialog from './NewStrategyDialog.svelte';
@@ -92,6 +81,7 @@
   import BacktestTabLabel from './BacktestTabLabel.svelte';
   import ClosedBacktestMenu from './ClosedBacktestMenu.svelte';
   import { ClosedBacktestTabsState } from './closed_backtest_tabs.svelte';
+  import { OpenStrategy } from './open_strategy.svelte';
   import {
     createOutputLine,
     describeBacktestEvent,
@@ -100,7 +90,6 @@
     describeProblemCounts,
     describeShortcut,
     describeSwapButton,
-    findDefaultVersionNumber,
     findFinishedBacktest,
     findRunningForwardTest,
     isMacPlatform,
@@ -136,18 +125,9 @@
 
   let strategies: StrategyListItem[] = $state([]);
   let listMessage = $state('');
-  // The read error of the open strategy. No panel shows it (the panels need the strategy), so the main area does.
-  let strategyMessage = $state('');
-  let strategy = $state<StrategyDetail | null>(null);
-  let openVersion = $state<StrategyVersion | null>(null);
   // "Show discarded versions": the version Select hides the discarded versions until the user turns it on.
   let showDiscarded = $state(false);
-  let editorCode = $state('');
   let fileTab = $state<'rules' | 'strategy'>('strategy');
-  // The rules of the "Rules" tab, and the version that they come from (0: the blank rules, no version has rules).
-  let rules = $state<StrategyRules | null>(null);
-  let savedRules = $state<StrategyRules | null>(null);
-  let rulesVersionNumber = $state(0);
   let problems: CodeProblem[] = $state([]);
   let outputLines: string[] = $state([]);
   let outputTab = $state<OutputTab>('problems');
@@ -172,6 +152,9 @@
   let replacingCode = $state<string | null>(null);
   // The diff tab of a diff card. fileTab keeps the file tab to go back to.
   const assistantDiff = new AssistantDiff();
+  const openStrategy = new OpenStrategy({ onError: writeOutputError, onVersionOpen: showOpenVersion });
+  const strategy = $derived(openStrategy.strategy);
+  const openVersion = $derived(openStrategy.version);
 
   const forwardTestFeed = new ForwardTestsOnInstrumentsFeed();
   $effect(() => forwardTestFeed.start(fetch, window.location));
@@ -192,12 +175,7 @@
     selectStrategyBacktests(backtests, activeStrategyId).find((backtest) => !isFinalStatus(backtest.status)) ?? null,
   );
   const runningForwardTest = $derived(findRunningForwardTest(forwardTestFeed.forwardTests, activeStrategyId));
-  const hasUnsavedCode = $derived(openVersion !== null && editorCode !== openVersion.code);
-  const rulesWarning = $derived(
-    openVersion === null ? null : describeRulesWarning(openVersion.version_number, rulesVersionNumber),
-  );
-  const hasUnsavedRules = $derived(rules !== null && JSON.stringify(rules) !== JSON.stringify(savedRules));
-  const hasUnsavedChanges = $derived(fileTab === 'rules' ? hasUnsavedRules : hasUnsavedCode);
+  const hasUnsavedChanges = $derived(fileTab === 'rules' ? openStrategy.hasUnsavedRules : openStrategy.hasUnsavedCode);
   const saveLabel = $derived(fileTab === 'rules' ? 'Save rules as new version' : 'Save version');
   const versionItems = $derived(
     listVersionItems(strategy?.versions ?? [], {
@@ -267,21 +245,16 @@
 
   $effect(() => {
     const id = activeStrategyId;
-    strategy = null;
-    strategyMessage = '';
-    openVersion = null;
-    rules = null;
+    openStrategy.reset();
     problems = [];
     selection = { tab: null, backtestId: null };
     assistantDiff.close();
     if (id !== null) {
-      // The address gives the first version only. A later version change writes the address (openStrategyVersion).
-      void loadStrategy(
-        id,
-        untrack(() => addressVersionNumber),
-      ).then(() => {
+      // The address gives the first version only. A later version change writes the address (showOpenVersion).
+      const versionNumber = untrack(() => addressVersionNumber);
+      void openStrategy.load(fetch, id, versionNumber).then((isCurrent) => {
         // A diff card on another page opened this strategy for its diff.
-        const diffVersionNumber = assistantSession.takeRequestedDiff(id);
+        const diffVersionNumber = isCurrent ? assistantSession.takeRequestedDiff(id) : null;
         if (diffVersionNumber !== null) {
           void openDiff(diffVersionNumber);
         }
@@ -289,31 +262,7 @@
     }
   });
 
-  async function loadStrategy(id: number, versionNumberToOpen: number | null): Promise<void> {
-    const result = await readStrategy(fetch, id);
-    if (result.kind === 'failed') {
-      strategyMessage = result.message;
-      writeOutputError(`Strategy not read: ${result.message}`);
-      return;
-    }
-    strategyMessage = '';
-    strategy = result.value;
-    const versionNumber = versionNumberToOpen ?? findDefaultVersionNumber(result.value.versions);
-    if (versionNumber !== undefined) {
-      await openStrategyVersion(id, versionNumber);
-    }
-  }
-
-  async function openStrategyVersion(id: number, versionNumber: number): Promise<void> {
-    const result = await readStrategyVersion(fetch, id, versionNumber);
-    if (result.kind === 'failed') {
-      writeOutputError(`Version not read: ${result.message}`);
-      return;
-    }
-    const draft = readDraft(localStorage, { strategyId: id, versionNumber });
-    await loadRules(id, result.value);
-    openVersion = result.value;
-    editorCode = draft ?? result.value.code;
+  async function showOpenVersion(id: number, versionNumber: number): Promise<void> {
     problems = [];
     // On a version address, the address names the open version, so that a reload opens it again. The shallow route
     // change keeps the workbench state.
@@ -328,61 +277,15 @@
     }
   }
 
-  // Decided (#173): the "Rules" tab opens the rules of the open version when it has rules, or else of the latest
-  // version with rules (vM), or else the blank rules. A rules draft of that version replaces them.
-  async function loadRules(id: number, version: StrategyVersion): Promise<void> {
-    const versionNumber = findRulesVersionNumber(strategy?.versions ?? [], version.version_number);
-    let versionRules: StrategyRules = BLANK_RULES;
-    if (versionNumber === version.version_number && version.rules !== null) {
-      versionRules = version.rules as StrategyRules;
-    } else if (versionNumber !== null) {
-      const result = await readStrategyVersion(fetch, id, versionNumber);
-      if (result.kind === 'failed') {
-        writeOutputError(`Rules not read: ${result.message}`);
-        return;
-      }
-      versionRules = (result.value.rules ?? BLANK_RULES) as StrategyRules;
-    }
-    rulesVersionNumber = versionNumber ?? 0;
-    savedRules = versionRules;
-    rules = readRulesDraft(localStorage, { strategyId: id, versionNumber: rulesVersionNumber }) ?? versionRules;
-  }
-
-  function changeRules(changed: StrategyRules): void {
-    rules = changed;
-    if (strategy === null) {
-      return;
-    }
-    const draftKey = { strategyId: strategy.id, versionNumber: rulesVersionNumber };
-    if (JSON.stringify(changed) === JSON.stringify(savedRules)) {
-      clearRulesDraft(localStorage, draftKey);
-    } else {
-      writeRulesDraft(localStorage, draftKey, changed);
-    }
-  }
-
-  function changeCode(code: string): void {
-    editorCode = code;
-    if (openVersion === null) {
-      return;
-    }
-    const draftKey = { strategyId: openVersion.strategy_id, versionNumber: openVersion.version_number };
-    if (code === openVersion.code) {
-      clearDraft(localStorage, draftKey);
-    } else {
-      writeDraft(localStorage, draftKey, code);
-    }
-  }
-
   // In the warning case (section 9.8.4), a rules save first shows the diff of the open version code and the new code.
   // When the code request fails, the save runs at once and shows the problems.
   async function saveVersion(): Promise<void> {
     if (openVersion === null || strategy === null || isSaving) {
       return;
     }
-    if (fileTab === 'rules' && rules !== null && rulesWarning !== null) {
+    if (fileTab === 'rules' && openStrategy.rules !== null && openStrategy.rulesWarning !== null) {
       isSaving = true;
-      const result = await generateRulesCode(fetch, rules);
+      const result = await generateRulesCode(fetch, openStrategy.rules);
       isSaving = false;
       if (result.kind === 'ok') {
         replacingCode = result.value;
@@ -399,12 +302,12 @@
     const id = strategy.id;
     const name = strategy.name;
     const baseVersionNumber = openVersion.version_number;
-    const savedRulesVersionNumber = rulesVersionNumber;
-    const rulesToSave = fileTab === 'rules' ? rules : null;
+    const savedRulesVersionNumber = openStrategy.rulesVersionNumber;
+    const rulesToSave = fileTab === 'rules' ? openStrategy.rules : null;
     isSaving = true;
     const result =
       rulesToSave === null
-        ? await saveStrategyVersion(fetch, id, editorCode)
+        ? await saveStrategyVersion(fetch, id, openStrategy.code)
         : await saveStrategyRules(fetch, id, rulesToSave);
     isSaving = false;
     problems = [];
@@ -424,7 +327,7 @@
       clearRulesDraft(localStorage, { strategyId: id, versionNumber: savedRulesVersionNumber });
     }
     const label = formatVersionLabel(name, result.version.version_number);
-    await loadStrategy(id, result.version.version_number);
+    await openStrategy.reload(fetch, id, result.version.version_number);
     writeOutput(result.isNewVersion ? `Saved as ${label}.` : `Saved. The code is the same as ${label}.`);
   }
 
@@ -446,8 +349,9 @@
       return;
     }
     assistantDiff.close(versionNumber);
-    await loadStrategy(strategy.id, versionNumber);
-    writeOutput(`Kept ${formatVersionLabel(strategy.name, versionNumber)}.`);
+    const label = formatVersionLabel(strategy.name, versionNumber);
+    await openStrategy.load(fetch, strategy.id, versionNumber);
+    writeOutput(`Kept ${label}.`);
   }
 
   // Discard: the editor stays on the open version. The version list reads the discarded mark again.
@@ -457,10 +361,7 @@
     }
     assistantDiff.close(versionNumber);
     const label = formatVersionLabel(strategy.name, versionNumber);
-    const result = await readStrategy(fetch, strategy.id);
-    if (result.kind === 'ok') {
-      strategy = result.value;
-    }
+    await openStrategy.readVersions(fetch, strategy.id);
     writeOutput(`Discarded ${label}.`);
   }
 
@@ -636,7 +537,7 @@
             items={versionItems}
             value={String(openVersion?.version_number ?? '')}
             onValueChange={(versionNumber: string) => {
-              void openStrategyVersion(shownStrategy.id, Number(versionNumber));
+              void openStrategy.openVersion(fetch, shownStrategy.id, Number(versionNumber));
             }}
           />
         </div>
@@ -768,9 +669,9 @@
                 />
               {/if}
               {#if fileTab === 'rules' && !assistantDiff.isSelected}
-                {#if rules !== null}
-                  {#key `${String(shownStrategy.id)}.${String(rulesVersionNumber)}`}
-                    <RulesTab {rules} onRulesChange={changeRules} warning={rulesWarning} />
+                {#if openStrategy.rules !== null}
+                  {#key `${String(shownStrategy.id)}.${String(openStrategy.rulesVersionNumber)}`}
+                    <RulesTab rules={openStrategy.rules} onRulesChange={openStrategy.changeRules} warning={openStrategy.rulesWarning} />
                   {/key}
                 {/if}
               {:else if openVersion !== null}
@@ -778,9 +679,9 @@
                   {#key shownStrategy.id}
                     <CodeEditor
                       bind:this={codeEditor}
-                      code={editorCode}
+                      code={openStrategy.code}
                       label="Strategy code"
-                      onCodeChange={changeCode}
+                      onCodeChange={openStrategy.changeCode}
                       extensions={[languageServer.editorExtension]}
                     />
                   {/key}
@@ -834,8 +735,8 @@
           {/if}
         {/snippet}
       </PanelSplit>
-    {:else if strategyMessage !== ''}
-      <InlineNotification kind="error" title="Strategy not read" subtitle={strategyMessage} lowContrast />
+    {:else if openStrategy.message !== ''}
+      <InlineNotification kind="error" title="Strategy not read" subtitle={openStrategy.message} lowContrast />
     {:else if strategies.length === 0 && listMessage === '' && strategyId === null}
       <EmptyText text="No strategies" />
     {/if}
