@@ -33,6 +33,12 @@ async function expectErrorIconColor(button: Locator): Promise<void> {
   expect(iconColors.fill).toBe(iconColors.errorColor);
 }
 
+// A narrow header line clips the capital note, and the actions stay clickable.
+async function expectCapitalAndClickableActions(page: Page, chartPanel: Locator): Promise<void> {
+  await expect(chartPanel.getByText('Capital 1,000.00 USD', { exact: true })).toBeVisible();
+  await expectHeaderButtonsClickable(page, chartPanel);
+}
+
 async function expectNoPageScroll(page: Page): Promise<void> {
   const sizes = await page.evaluate(() => ({
     scrollHeight: document.documentElement.scrollHeight,
@@ -139,8 +145,7 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await expect(heading.getByRole('link', { name: `${strategyName} v1` })).toHaveAttribute('href', /^\/strategies\/\d+\/versions\/1$/);
   await expect(heading.getByRole('link', { name: symbol, exact: true })).toBeVisible();
   await expect(heading).toContainText('1 min');
-  await expect(chartPanel.getByText('Capital 1,000.00 USD', { exact: true })).toBeVisible();
-  await expectHeaderButtonsClickable(page, chartPanel);
+  await expectCapitalAndClickableActions(page, chartPanel);
   // The worker compares the states every 2 seconds, and the page reads the forward test every 2 seconds.
   const status = chartPanel.getByRole('status', { name: 'Forward test status' });
   await expect(status.getByRole('img', { name: 'Running', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });
