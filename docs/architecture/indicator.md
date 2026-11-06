@@ -1034,8 +1034,9 @@ of the table (docs/architecture.md section 13, "Live updates").
 - A chart shows a custom indicator with the price number format.
 - A row with `kept` false has the button "Keep". After the click, the row of an
   indicator of the AI assistant has the green "Kept" status icon before the
-  name. A row of the user has neither. The delete button is the Discard of a
-  screen.
+  name. A row of the user has neither. After a delete of the conversation, the
+  row has no icon: it no longer shows that the AI assistant made the indicator.
+  The delete button is the Discard of a screen.
 
 ### 23.10.6 AI assistant access
 

@@ -253,13 +253,13 @@ app           -> all modules
   `indicator`, so `assistant` can import only `foundation` (#179). A
   contract keeps the internal files of `assistant` private.
 - `assistant` does not import other capabilities. `app/` builds the port 8001
-  app from the routers of `strategy`, `backtest`, and `screen`
+  app from the routers of `strategy`, `backtest`, `screen`, and `market_data`
   (`docs/architecture/assistant.md`). `app/` also gives `assistant` the
   start context of a conversation (`strategy.read_strategy_outline()`,
   `backtest.read_last_backtest_ids()`) and the strategy template for the
   default system prompt (#184). The `conversation_id` foreign keys of
-  `strategy_version`, `backtest`, and the screen tables point at
-  `assistant_conversation` (section 6.3 allows a foreign key).
+  `strategy_version`, `backtest`, `custom_indicator`, and the screen tables
+  point at `assistant_conversation` (section 6.3 allows a foreign key).
 - `paper_trading` does not import `forward_test`. Since #215 the owner
   ledger replaces the refusal of paper orders by hand on the instrument of a
   running forward test (section 12.2), and `app/web.py` gives

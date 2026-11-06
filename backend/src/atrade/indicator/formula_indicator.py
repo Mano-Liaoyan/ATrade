@@ -345,11 +345,13 @@ def read_tree(expression: str) -> ast.expr:
         raise FormulaProblem(
             MAX_EXPRESSION_LENGTH + 1, f"An expression has at most {MAX_EXPRESSION_LENGTH} characters."
         )
+    text = expression.strip()
     try:
-        return ast.parse(expression.strip(), mode="eval").body
+        return ast.parse(text, mode="eval").body
     except SyntaxError as error:
-        # readability-exception: ast.parse reports a syntax error only as an exception.
-        raise FormulaProblem(error.offset or 1, f"The expression has a syntax error: {error.msg}.") from error
+        # readability-exception: ast.parse reports a syntax error only as an exception. Offset 0: the text ended early.
+        column = error.offset or len(text) + 1
+        raise FormulaProblem(column, f"The expression has a syntax error: {error.msg}.") from error
     except (ValueError, RecursionError, MemoryError) as error:
         # readability-exception: ast.parse reports a null byte or a very deep text only as these exceptions.
         raise FormulaProblem(1, "The expression is too deep or has a character that is not allowed.") from error

@@ -81,8 +81,9 @@ export function createCustomIndicatorTools(client: WebPortClient): ToolDefinitio
       label: 'Create custom indicator',
       description:
         'Saves a new custom indicator. It records this conversation and is not kept. Tell the user to click Keep on ' +
-        'the Settings page. Screens, strategies, and charts can use it at once with its catalog key. A failed check ' +
-        'gives the problem list. Correct the fields and try again.',
+        'the Settings page. A screen can use it at once: its reference needs the `formula` object that ' +
+        'list_indicators gives. Strategy code writes FormulaIndicator(<expression>). A failed check gives the ' +
+        'problem list. Correct the fields and try again.',
       parameters: Type.Object(Fields),
       execute: async (_id, params, signal) => answerResult(await client.request('POST', BASE_PATH, params, signal)),
     }),

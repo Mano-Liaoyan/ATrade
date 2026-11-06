@@ -725,8 +725,8 @@ Implemented (#179, #184):
   so the user can delete again.
 - A delete of the strategy deletes its conversation rows
   (`ON DELETE CASCADE`). Their JSONL files stay in the volume (#179).
-- The strategy versions, backtests, screens, and screen results stay. Their
-  conversation ID becomes null (`ON DELETE SET NULL`).
+- The strategy versions, backtests, screens, screen results, and custom
+  indicators stay. Their conversation ID becomes null (`ON DELETE SET NULL`).
 
 ## 25.9 System prompt and prompt versions
 
