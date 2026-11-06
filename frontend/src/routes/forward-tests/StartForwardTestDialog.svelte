@@ -195,7 +195,6 @@
     onsubmit={submitForwardTest}
   >
     <StrategyVersionSelects
-      {open}
       {strategyVersion}
       bind:strategyVersionId
       onError={(error: NotificationMessage) => {

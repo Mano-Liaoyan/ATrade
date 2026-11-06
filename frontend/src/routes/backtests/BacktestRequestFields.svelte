@@ -295,7 +295,7 @@
   }
 </script>
 
-<StrategyVersionSelects {open} {onError} {strategyVersion} bind:strategyVersionId />
+<StrategyVersionSelects {onError} {strategyVersion} bind:strategyVersionId />
 <Select
   label="Bar period"
   items={[...BAR_PERIODS]}

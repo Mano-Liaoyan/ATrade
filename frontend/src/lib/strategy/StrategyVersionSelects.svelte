@@ -1,5 +1,5 @@
 <!-- The Strategy select and the Strategy version select of a start form. The selects have no wrapper element, so they
-     are cells of the form grid. Each open reads the strategies again and, with `strategyVersion`, selects that strategy
+     are cells of the form grid. Each mount reads the strategies again and, with `strategyVersion`, selects that strategy
      version. A new strategy selects its latest version. -->
 <script lang="ts">
   import { Select, type NotificationMessage } from '#lib/foundation/carbon';
@@ -7,14 +7,13 @@
   import { formatVersionLabel, type StrategyVersionKey } from './strategy_drafts';
 
   interface Props {
-    open: boolean;
     onError: (error: NotificationMessage) => void;
     strategyVersion?: StrategyVersionKey | null;
     /** The selected strategy version ID, or an empty text. */
     strategyVersionId?: string;
   }
 
-  let { open, onError, strategyVersion = null, strategyVersionId = $bindable('') }: Props = $props();
+  let { onError, strategyVersion = null, strategyVersionId = $bindable('') }: Props = $props();
 
   let strategies: StrategyListItem[] = $state([]);
   let selectedStrategy = $state<StrategyDetail | null>(null);
@@ -30,10 +29,10 @@
   );
 
   $effect(() => {
-    if (!open) {
-      return;
-    }
-    if (strategyVersion !== null) {
+    if (strategyVersion === null) {
+      // The dialog removes this component when it closes, so the form can hold a version of an empty select.
+      strategyVersionId = '';
+    } else {
       void selectStrategy(String(strategyVersion.strategyId), String(strategyVersion.versionId));
     }
     void listStrategies(fetch).then((result) => {
