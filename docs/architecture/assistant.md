@@ -1108,8 +1108,11 @@ Implemented (#185):
 - The browser opens one `/ws/assistant` socket for the open conversation
   (`conversation_socket.ts`). The socket does not connect again after a
   close. Each `error` message goes to the Output tab of the "Problems and
-  output" panel with the UTC time. After `run_state` `settled`, the page
-  reads the conversation list again after 1 second for the generated title.
+  output" panel with the UTC time. After `run_state` `settled`, `web` calls
+  the title model. The page reads the conversation list again after 1
+  second for the generated title. While the open conversation has
+  `title_state` `generating` and the socket is open, the page reads the list
+  again each second, at most 125 times.
 
 Decided (each workbench page has the column):
 

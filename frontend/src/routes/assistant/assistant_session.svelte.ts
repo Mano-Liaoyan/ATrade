@@ -51,8 +51,10 @@ export interface VersionAddress {
   versionNumber: number;
 }
 
-// The title is generated after the run settles (25.8.3), so the list is read again a little later.
+// The title is generated after the run settles (25.8.3), so the list is read again a little later, and then again
+// while the title is `generating`. web waits at most 125 seconds for the model.
 const TITLE_READ_DELAY_MILLISECONDS = 1000;
+const MAX_TITLE_READS = 125;
 // The browser keeps the open conversation, so a reload opens it again.
 const OPEN_CONVERSATION_STORAGE_KEY = 'atrade.assistant-column.conversation';
 
@@ -222,8 +224,7 @@ export class AssistantSession {
         }
         this.log = addServerMessage(this.log, message, readNowUtc());
         if (message.type === 'run_state' && message.state === 'settled') {
-          clearTimeout(this.#titleTimer);
-          this.#titleTimer = setTimeout(() => void this.readConversations(id), TITLE_READ_DELAY_MILLISECONDS);
+          this.#readTitleLater(id, MAX_TITLE_READS);
         }
       },
       onError: (text) => {
@@ -241,6 +242,18 @@ export class AssistantSession {
       },
     });
     this.#socket = opened;
+  }
+
+  #readTitleLater(id: number, readsLeft: number): void {
+    clearTimeout(this.#titleTimer);
+    this.#titleTimer = setTimeout(() => {
+      void this.readConversations(id).then(() => {
+        const isGenerating = this.conversation?.id === id && this.conversation.title_state === 'generating';
+        if (isGenerating && readsLeft > 1 && this.#socketConversationId === id && this.#socketState === 'open') {
+          this.#readTitleLater(id, readsLeft - 1);
+        }
+      });
+    }, TITLE_READ_DELAY_MILLISECONDS);
   }
 
   #closeSocket(): void {
