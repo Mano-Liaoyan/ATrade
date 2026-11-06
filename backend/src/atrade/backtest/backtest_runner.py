@@ -48,14 +48,27 @@ class BacktestRunner:
         self.clock = clock
         self.process_command = process_command
         self.running_count = 0
+        self.queue_error: str | None = None
 
     async def keep_running(self) -> None:
         """Runs until it is cancelled. Cancellation stops the running children."""
         await self.retry_until_database_answers(self.fail_running_backtests)
         async with asyncio.TaskGroup() as task_group:
             while True:
-                await self.retry_until_database_answers(lambda: self.start_queued_backtests(task_group))
+                await self.check_queue(task_group)
                 await asyncio.sleep(QUEUE_CHECK_INTERVAL_SECONDS)
+
+    async def check_queue(self, task_group: asyncio.TaskGroup) -> None:
+        """An error here must not leave the TaskGroup: that cancels the running children. The next check of
+        `keep_running` tries again. The same error gets one log entry."""
+        try:
+            await self.retry_until_database_answers(lambda: self.start_queued_backtests(task_group))
+        except Exception as error:
+            if self.queue_error != repr(error):
+                self.queue_error = repr(error)
+                logger.exception("The backtest queue check failed. The next check tries again.")
+        else:
+            self.queue_error = None
 
     async def retry_until_database_answers(self, database_step: Callable[[], Awaitable[None]]) -> None:
         """A PostgreSQL restart must not cancel the running children."""

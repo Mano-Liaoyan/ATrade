@@ -5,11 +5,14 @@ Real PostgreSQL. The child process is a short sleep: the database loss is the su
 
 import asyncio
 import sys
+import time
 
 import httpx
+import psycopg
 import pytest
 
-from atrade.backtest import BacktestRunner
+from atrade.backtest import BacktestRunner, backtest_runner
+from atrade.backtest.backtest_limits import BacktestLimits, read_backtest_limits
 from tests.backtest.real_runner import (
     TEST_STRATEGY_FILE,
     save_test_bars,
@@ -96,6 +99,35 @@ async def test_a_child_that_does_not_start_fails_its_backtest_and_the_runner_con
     assert first_backtest["error_message"] == CHILD_RUN_ERROR_MESSAGE
     assert second_backtest["status"] == "failed"
     assert runner.running_count == 0
+    runner_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await runner_task
+
+
+@pytest.mark.anyio
+async def test_an_error_of_the_queue_check_does_not_end_the_runner_and_it_waits_before_the_next_check(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    save_test_bars(database_url)
+    backtest_id = await start_backtest(web_client, TEST_STRATEGY_FILE.read_text())
+    check_times: list[float] = []
+
+    async def fail_two_times(connection: psycopg.AsyncConnection) -> BacktestLimits:
+        check_times.append(time.monotonic())
+        if len(check_times) <= 2:
+            message = "not an operational error"
+            raise ValueError(message)
+        return await read_backtest_limits(connection)
+
+    monkeypatch.setattr(backtest_runner, "read_backtest_limits", fail_two_times)
+    runner = BacktestRunner(database_url=database_url, clock=clock, process_command=SHORT_CHILD_COMMAND)
+    runner_task = asyncio.create_task(runner.keep_running())
+
+    await asyncio.wait({runner_task}, timeout=2.0)
+    assert not runner_task.done()
+    await wait_for_final_status(web_client, backtest_id)
+
+    assert check_times[1] - check_times[0] >= backtest_runner.QUEUE_CHECK_INTERVAL_SECONDS / 2
     runner_task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await runner_task
