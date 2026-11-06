@@ -26,6 +26,7 @@ from atrade.market_data import (
     StockSplitChange,
     StockSplitConfirmedError,
     apply_stock_split,
+    check_import_detections,
     read_daily_bar_summaries,
     read_daily_bar_summaries_before,
     read_saved_bars,
@@ -383,6 +384,53 @@ async def test_a_waiting_import_split_gives_no_second_candidate_and_new_ibkr_bar
 
     assert await read_stock_split_candidates(database_url=database_url) == []
     assert closes == [100.0, 100.0, 50.0, 50.0]
+
+
+async def read_older_bars_with_waiting_import_split(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection, ibkr_close: str
+) -> None:
+    """Databento: 100 before the ex-date and 48 from the ex-date. The import split of 2 waits. IBKR gives older days."""
+    stored_range = TimeRange(STORED_DAY_UTC, STORED_DAY_UTC + ONE_DAY * 2)
+    save_source_bars(database_url, "databento", APPLE, stored_range, [29], Decimal(100))
+    save_source_bars(database_url, "databento", APPLE, stored_range, [30], Decimal(48))
+    write_waiting_import_split(database_url, STORED_DAY_UTC + ONE_DAY)
+    older_range = TimeRange(STORED_DAY_UTC - ONE_DAY * 3, STORED_DAY_UTC)
+    gateway_connection.historical_bars[APPLE] = [
+        create_bar(older_range.start_utc + ONE_DAY * offset, ibkr_close) for offset in range(3)
+    ]
+    await read_daily_closes(client, older_range)
+
+
+@pytest.mark.anyio
+async def test_a_crash_that_waits_as_an_import_split_keeps_the_real_ibkr_prices(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    await read_older_bars_with_waiting_import_split(client, database_url, gateway_connection, ibkr_close="100")
+
+    all_days = TimeRange(STORED_DAY_UTC - ONE_DAY * 3, STORED_DAY_UTC + ONE_DAY * 2)
+    assert await read_daily_closes(client, all_days) == [100.0, 100.0, 100.0, 100.0, 48.0]
+
+
+@pytest.mark.anyio
+async def test_a_real_split_that_waits_as_an_import_split_has_one_form_in_both_tables_after_the_check(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    await read_older_bars_with_waiting_import_split(client, database_url, gateway_connection, ibkr_close="50")
+    all_days = TimeRange(STORED_DAY_UTC - ONE_DAY * 3, STORED_DAY_UTC + ONE_DAY * 2)
+    closes_before_the_check = await read_daily_closes(client, all_days)
+
+    check_import_detections(database_url=database_url, rejected_split_ids=set(), checked_at_utc=RECORDED_AT_UTC)
+
+    assert closes_before_the_check == [100.0, 100.0, 100.0, 100.0, 48.0]
+    assert await read_daily_closes(client, all_days) == [50.0, 50.0, 50.0, 50.0, 48.0]
+    for bar_source, days in ((BarSource.IBKR, 3), (BarSource.DATABENTO, 2)):
+        saved = await read_saved_bars(
+            database_url=database_url,
+            bar_request=BarRequest(APPLE, BarPeriod.ONE_DAY, all_days),
+            source_order=[bar_source],
+        )
+        assert len(saved.bars) == days
+        assert {bar.close for bar in saved.bars} == ({Decimal(50)} if days == 3 else {Decimal(50), Decimal(48)})
 
 
 @pytest.mark.anyio

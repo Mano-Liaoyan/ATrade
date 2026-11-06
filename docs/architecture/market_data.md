@@ -1226,6 +1226,12 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   applies to the bars route, the daily bar update, and
   `save_received_bars`. Thus all stored bars before the ex-date have one
   form, and the change divides each of them 1 time.
+- The detection rule of the Databento import also finds a real crash, and
+  IBKR does not adjust the bars of a crash. Thus the old form applies only
+  when the IBKR bars show the stock split: the last IBKR bar before the
+  ex-date and the nearest stored daily close before the ex-date differ by a
+  ratio that is nearer to the split ratio than to 1 (in log). Else the IBKR
+  bars stay as IBKR sent them, so a rejected detection leaves real prices.
 - Decided (#196): when a stock split with an ex-date after the stored day
   waits already, evidence A records no second candidate. `apply_stock_split()`
   does not confirm a Databento import split; the import check does. A failed
