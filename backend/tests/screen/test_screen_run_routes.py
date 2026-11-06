@@ -11,13 +11,16 @@ from typing import Any
 import httpx
 import psycopg
 import pytest
+from fastapi import HTTPException
 from psycopg.types.json import Jsonb
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarRequest, save_received_bars
+from atrade.screen.http_routes import ScreenRoutes
 from atrade.screen.screen_run import ScreenOutcome, run_screen_steps
 from atrade.screen.screen_running import read_start_summaries
+from tests.fakes.clock import FixedClock
 
 LAST_DAY = datetime(2025, 12, 31, tzinfo=UTC)
 NOW_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
@@ -161,6 +164,20 @@ async def test_a_run_saves_a_screen_result_that_the_read_route_gives_back(
             {"symbol": "TSLA", "exchange": "NASDAQ", "currency": "USD", "reason": "filters[0]: Close > 15"},
         ],
     }
+
+
+@pytest.mark.anyio
+async def test_a_conversation_deleted_during_a_run_is_named_and_not_the_screen(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    screen_id = await create_screen(web_client, make_definition())
+    routes = ScreenRoutes(database_url=database_url, clock=clock)
+
+    with pytest.raises(HTTPException) as refusal:
+        await routes.run_screen_of(screen_id, 999_999)
+
+    assert refusal.value.status_code == httpx.codes.NOT_FOUND
+    assert refusal.value.detail == "Conversation 999999 does not exist."
 
 
 @pytest.mark.anyio

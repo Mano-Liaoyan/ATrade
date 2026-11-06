@@ -19,7 +19,7 @@ from atrade.market_data import IndicatorResponse, list_indicator_catalog
 from atrade.screen import screen_store
 from atrade.screen.screen_check import MAX_NAME_LENGTH, ScreenProblem, check_screen
 from atrade.screen.screen_run import name_indicator
-from atrade.screen.screen_running import run_saved_screen
+from atrade.screen.screen_running import ConversationDeletedError, run_saved_screen
 
 # The screen list and the screen results: /ws/ sends a change message after a change (foundation/table_changes).
 SCREEN_CHANGE_SOCKET = ChangeSocket(path="/ws/screens", tables=frozenset({"screen", "screen_result"}))
@@ -409,9 +409,16 @@ class ScreenRoutes:
         problems = check_screen(name=screen.name, market=screen.market, definition=screen.definition)
         if problems:
             return check_failed(problems)
-        screen_result_id = await run_saved_screen(
-            database_url=self.database_url, clock=self.clock, screen=screen, assistant_conversation_id=conversation_id
-        )
+        try:
+            screen_result_id = await run_saved_screen(
+                database_url=self.database_url,
+                clock=self.clock,
+                screen=screen,
+                assistant_conversation_id=conversation_id,
+            )
+        except ConversationDeletedError as error:
+            detail = f"Conversation {conversation_id} does not exist."
+            raise HTTPException(status.HTTP_404_NOT_FOUND, detail=detail) from error
         if screen_result_id is None:
             raise screen_not_found(screen_id)
         return await self.read_screen_result(screen_result_id)

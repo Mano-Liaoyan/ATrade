@@ -25,6 +25,11 @@ from atrade.watchlist import read_watchlist_instruments
 
 MARKET_CURRENCIES = {"US": "USD", "HK": "HKD"}
 UNIVERSE_SIZE = 500
+CONVERSATION_FOREIGN_KEY = "screen_result_assistant_conversation_id_fkey"
+
+
+class ConversationDeletedError(Exception):
+    """The conversation of a run on port 8001 was deleted during the run."""
 
 
 async def read_start_instruments(
@@ -81,7 +86,9 @@ async def run_saved_screen(
     *, database_url: str, clock: Clock, screen: screen_store.ScreenRecord, assistant_conversation_id: int | None = None
 ) -> int | None:
     """Runs a checked screen and returns the ID of its new screen result, or None when the screen was deleted during
-    the run. A run of the user has no conversation."""
+    the run. A run of the user has no conversation.
+
+    Raises ConversationDeletedError when the conversation was deleted during the run."""
     run_at_utc = clock.read_now_utc()
     started = time.perf_counter()
     definition = screen.definition
@@ -124,8 +131,10 @@ async def run_saved_screen(
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         try:
             screen_result_id = await screen_store.insert_screen_result(connection, new_result)
-        except psycopg.errors.ForeignKeyViolation:
-            # readability-exception: PostgreSQL reports a deleted screen only as an error.
+        except psycopg.errors.ForeignKeyViolation as error:
+            # readability-exception: PostgreSQL reports a deleted screen or conversation only as an error.
+            if error.diag.constraint_name == CONVERSATION_FOREIGN_KEY:
+                raise ConversationDeletedError from error
             return None
         await connection.commit()
     return screen_result_id
