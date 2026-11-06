@@ -389,6 +389,11 @@ class OwnerLedgerExecutionClient(ExecutionClient):
     def make_price(self, instrument: Instrument, value: Decimal) -> Price:
         return Price.from_str(f"{value:.{self.find_price_precision(instrument)}f}")
 
+    def find_instrument(self, open_order: OpenOrder) -> Instrument:
+        instruments = self.instruments.values()
+        matches = (item for item in instruments if item.has_same_symbol_and_currency(open_order.instrument))
+        return next(matches, open_order.instrument)
+
     def is_own_order(self, open_order: OpenOrder) -> bool:
         source = read_order_source(open_order.order_ref)
         return (
@@ -400,9 +405,10 @@ class OwnerLedgerExecutionClient(ExecutionClient):
     def create_order_status_report(self, open_order: OpenOrder) -> OrderStatusReport:
         now = self.clock.timestamp_ns()
         is_limit = open_order.order_type == "LMT"
+        instrument = self.find_instrument(open_order)
         return OrderStatusReport(
             self.account_id,
-            create_instrument_id(open_order.instrument),
+            create_instrument_id(instrument),
             VenueOrderId(str(open_order.order_id)),
             OrderSide.BUY if open_order.side == "BUY" else OrderSide.SELL,
             OrderType.LIMIT if is_limit else OrderType.MARKET,
@@ -414,7 +420,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             now,
             now,
             client_order_id=ClientOrderId(open_order.order_ref),
-            price=self.make_price(open_order.instrument, open_order.limit_price)
+            price=self.make_price(instrument, open_order.limit_price)
             if is_limit and open_order.limit_price is not None
             else None,
         )

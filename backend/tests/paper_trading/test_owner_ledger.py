@@ -18,8 +18,10 @@ from httpx_ws import AsyncWebSocketSession, aconnect_ws
 from httpx_ws.transport import ASGIWebSocketTransport
 
 from atrade.app.web import create_web_app
+from atrade.foundation.instrument import Instrument
+from atrade.foundation.order_ref import MANUAL_ORDER_REF
 from atrade.foundation.settings import Settings
-from atrade.ibkr import AccountValue
+from atrade.ibkr import AccountValue, OpenOrder
 from atrade.ibkr import gateway_connection as gateway_connection_module
 from atrade.paper_trading import ManualOrderLedger, PaperAccountMonitor, manual_order_ledger
 from tests.fakes.clock import FixedClock
@@ -156,6 +158,44 @@ async def test_refuses_a_sell_order_larger_than_the_position_minus_the_open_sell
     }
     assert len(gateway_connection.open_orders) == 1
     assert count_manual_orders(database_url) == 1
+
+
+@pytest.mark.anyio
+async def test_counts_an_open_sell_order_of_an_earlier_session_that_has_the_exchange_smart(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = make_gateway()
+    gateway_connection.open_orders.append(
+        OpenOrder(
+            order_id=900,
+            client_id=WEB_CLIENT_ID,
+            perm_id=9000,
+            account=ACCOUNT_ID,
+            instrument=Instrument(symbol="700", exchange="SMART", currency="HKD"),
+            side="SELL",
+            quantity=Decimal(60),
+            order_type="LMT",
+            limit_price=Decimal(410),
+            time_in_force="GTC",
+            status="Submitted",
+            filled_quantity=Decimal(0),
+            order_ref=MANUAL_ORDER_REF,
+        )
+    )
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        response = await client.post(
+            ORDERS_PATH, json=make_order(symbol="700", side="SELL", quantity=100, limit_price="410")
+        )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == (
+        "By hand holds 100 700 and has open sell orders for 60. ATrade refuses a sell order for 100."
+    )
 
 
 @pytest.mark.anyio

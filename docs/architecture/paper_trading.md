@@ -667,6 +667,9 @@ Decided (#214):
 - Fills from outside ATrade are not written into the ledger. They show as
   "Unattributed". Whether `reqExecutions` returns the fills of other client
   IDs is not checked (section 21).
+- Rule 1 compares the open sell orders by symbol and currency. ib_async
+  decodes no primary exchange for an open order of an earlier session, so
+  that order has the exchange `SMART`.
 - Rule 3 (no short sale) is part of rule 1: the position of "By hand" is
   never below 0, so a sell larger than the position fails rule 1 with
   `sell_more_than_position`.

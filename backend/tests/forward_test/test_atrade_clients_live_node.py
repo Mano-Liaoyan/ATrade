@@ -13,6 +13,7 @@ from decimal import Decimal
 import pytest
 
 from atrade.forward_test import ForwardTestPosition, OwnerFill
+from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import read_order_source
 from atrade.ibkr import OpenOrder
 from tests.fakes.ibkr import LIVE_BAR_NOW_UTC, make_execution, make_forward_test_order
@@ -243,6 +244,23 @@ async def test_the_client_reports_only_the_orders_and_fills_of_its_own_client_id
     assert world.ledger.fills[0].order_ref == own_order.order_ref
     assert len(world.ledger.fills) == 1
     assert datetime.now(UTC) > world.ledger.fills[0].time_utc
+
+
+@pytest.mark.anyio
+async def test_the_open_order_of_an_earlier_session_gets_the_instrument_of_the_forward_test(database_url: str) -> None:
+    world = make_world(database_url)
+    earlier_order = make_forward_test_order(
+        ACCOUNT_ID, forward_test_id=FORWARD_TEST_ID, order_id=900, client_id=CLIENT_ID
+    )
+    world.gateway.open_orders.append(
+        replace(earlier_order, instrument=Instrument(symbol="AAPL", exchange="SMART", currency="USD"))
+    )
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1):
+        orders = strategy.cache.orders()  # pyright: ignore[reportUnknownMemberType]
+
+    assert [str(order.instrument_id) for order in orders] == ["AAPL.NASDAQ"]
 
 
 @pytest.mark.anyio

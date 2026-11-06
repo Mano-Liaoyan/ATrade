@@ -303,7 +303,7 @@ def check_sell(
         (
             open_order.quantity - open_order.filled_quantity
             for open_order in owner_open_orders
-            if open_order.side == "SELL" and open_order.instrument == order.instrument
+            if open_order.side == "SELL" and open_order.instrument.has_same_symbol_and_currency(order.instrument)
         ),
         Decimal(0),
     )
