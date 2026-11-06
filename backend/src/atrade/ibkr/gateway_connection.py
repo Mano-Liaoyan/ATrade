@@ -38,6 +38,7 @@ from atrade.ibkr.orders import (
     build_order,
     convert_fill,
     convert_trade,
+    has_commission_report,
 )
 
 DEFAULT_RETRY_SECONDS = 10.0
@@ -57,6 +58,9 @@ UTC_FORMAT_DATE = 2
 # The forex market closes on the weekend. 1 week of hourly bars always has a last bar.
 EXCHANGE_RATE_DURATION = "1 W"
 EXCHANGE_RATE_BAR_SIZE = "1 hour"
+# A commission report comes after its execution, also after the end of a reqExecutions answer.
+COMMISSION_REPORT_WAIT_SECONDS = 2.0
+COMMISSION_REPORT_CHECK_SECONDS = 0.05
 # While no live bar update comes, the live bar stream checks the connection this often.
 LIVE_BAR_CONNECTION_CHECK_SECONDS = 1.0
 # IB Gateway sends these codes when its connection to the IBKR servers is lost (1100, 2110) or comes back (1101, 1102).
@@ -153,7 +157,8 @@ class GatewayConnection(Protocol):
         ...
 
     async def read_executions(self) -> list[Execution]:
-        """The executions that IBKR returns for reqExecutions, of all client IDs of the account that IBKR shows."""
+        """The executions that IBKR returns for reqExecutions, of all client IDs of the account that IBKR shows. A fill
+        without its commission report stays out of the list until a later read."""
         ...
 
     async def read_historical_bars(
@@ -475,14 +480,23 @@ class IbAsyncGatewayConnection:
             await asyncio.sleep(CANCEL_CONFIRMATION_CHECK_SECONDS)
 
     async def read_executions(self) -> list[Execution]:
-        """https://interactivebrokers.github.io/tws-api/executions_commissions.html"""
+        """https://interactivebrokers.github.io/tws-api/executions_commissions.html
+
+        For an execId that ib_async knows, the answer holds a new Fill with an empty commission report. Only the
+        stored Fill of the execId gets the report, so this function reads the stored Fill.
+        """
         self.require_connection()
         try:
             fills = await asyncio.wait_for(self.ib.reqExecutionsAsync(), OPEN_ORDERS_TIMEOUT_SECONDS)
         except (ConnectionError, RequestError, TimeoutError) as error:
             message = f"IB Gateway did not return the executions: {error}"
             raise GatewayRequestError(message) from error
-        return [convert_fill(fill) for fill in fills]
+        stored_fills = [self.ib.wrapper.fills.get(fill.execution.execId, fill) for fill in fills]
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + COMMISSION_REPORT_WAIT_SECONDS
+        while not all(map(has_commission_report, stored_fills)) and loop.time() < deadline:
+            await asyncio.sleep(COMMISSION_REPORT_CHECK_SECONDS)
+        return [convert_fill(fill) for fill in stored_fills if has_commission_report(fill)]
 
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange

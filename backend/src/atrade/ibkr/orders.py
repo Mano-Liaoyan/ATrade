@@ -70,8 +70,13 @@ class Execution:
     side: str
     quantity: Decimal
     price: Decimal
-    # The commission of the IBKR commission report. 0 when the report did not come yet.
+    # The commission of the IBKR commission report. `read_executions` holds a fill until this report arrives.
     commission: Decimal
+    # The orderRef of the order. It tells the source of the order (`read_order_source`).
+    order_ref: str
+    # The contract of the execution. Its exchange is the execution venue, not the primary exchange of an instrument.
+    symbol: str
+    currency: str
 
 
 def build_contract(instrument: Instrument) -> Contract:
@@ -108,6 +113,11 @@ def read_price(price: float | Decimal | None) -> Decimal | None:
     return Decimal(str(price))
 
 
+def has_commission_report(fill: Fill) -> bool:
+    """The empty report of ib_async has no execId. A report can have the commission 0."""
+    return bool(fill.commissionReport.execId)
+
+
 def convert_fill(fill: Fill) -> Execution:
     execution = fill.execution
     return Execution(
@@ -120,6 +130,9 @@ def convert_fill(fill: Fill) -> Execution:
         quantity=Decimal(str(execution.shares)),
         price=Decimal(str(execution.price)),
         commission=Decimal(str(fill.commissionReport.commission)),
+        order_ref=execution.orderRef,
+        symbol=fill.contract.symbol,
+        currency=fill.contract.currency,
     )
 
 

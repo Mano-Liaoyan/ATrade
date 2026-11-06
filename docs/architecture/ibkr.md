@@ -129,8 +129,15 @@ The public entry `atrade.ibkr` exports:
   more needs no cancel.
 - `read_executions()` calls `reqExecutions` and returns `Execution` values
   (`execution_id`, `order_id`, `client_id`, `account`, `time_utc`, `side`,
-  `quantity`, `price`, `commission`). `paper_trading` uses it for the fills
-  of orders by hand.
+  `quantity`, `price`, `commission`, `order_ref`, `symbol`, `currency`).
+  `paper_trading` uses it for the fills of orders by hand. `forward_test`
+  uses it for the fills of a forward test. `symbol` and `currency` come from
+  the contract of the execution. The commission comes from the fill that
+  `ib_async` stores for the execId, because the `reqExecutions` answer holds
+  an empty report for an execId that the connection already knows. A fill
+  stays out of the list until its commission report arrives. The function
+  waits up to 2 seconds for a missing report, because a report can come after
+  the end of the answer. The next read tries again.
 - The order functions raise `GatewayRequestError` when the connection is
   not there.
 - `read_exchange_rate(currency, quote_currency)` returns the IBKR forex

@@ -13,7 +13,7 @@ from atrade.paper_trading.forward_test_ledger import (
     write_capital_allocation,
 )
 from atrade.paper_trading.http_routes import create_paper_trading_router
-from atrade.paper_trading.manual_order_ledger import ManualOrderLedger
+from atrade.paper_trading.manual_order_ledger import BOUGHT_SIDE, ManualOrderLedger
 from atrade.paper_trading.owner_ledger_store import LedgerFill
 from atrade.paper_trading.paper_account_check import PaperAccountCheck, PaperAccountCheckError, require_paper_account
 from atrade.paper_trading.paper_account_monitor import (
@@ -39,6 +39,7 @@ from atrade.paper_trading.stock_split_rules import (
 )
 
 __all__ = [
+    "BOUGHT_SIDE",
     "PAPER_TRADING_SOCKET_MESSAGE_MODELS",
     "ForwardTestLedger",
     "InstrumentCheck",

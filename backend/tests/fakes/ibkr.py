@@ -412,6 +412,9 @@ def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument
     side: str = "BOT",
     commission: str = "0",
     execution_id: str | None = None,
+    order_ref: str = "",
+    symbol: str = "AAPL",
+    currency: str = "USD",
 ) -> Execution:
     """One fill from reqExecutions. The default execution ID is unique for the order, the quantity, and the price."""
     return Execution(
@@ -424,4 +427,7 @@ def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument
         quantity=Decimal(quantity),
         price=Decimal(price),
         commission=Decimal(commission),
+        order_ref=order_ref,
+        symbol=symbol,
+        currency=currency,
     )
