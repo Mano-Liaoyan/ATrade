@@ -267,6 +267,7 @@ prompt does not list the tools.
 - While it waits, the tool sends the queue state and the run state with the
   pi `onUpdate` call. The browser shows them as a tool step (25.10).
 - After 15 minutes, the tool returns "still running" and the backtest ID.
+  A stopped run or a `web` restart during the wait gives the same result.
   The AI assistant can read the result later with `read_backtest`.
 - The backtests of the AI assistant and of the user use one queue and the
   same backtest limits.

@@ -152,11 +152,17 @@ async function waitForEnd(
   let state = started;
   options.onUpdate?.(stateResult(state));
   while (!FINAL_STATUSES.has(state.status)) {
-    if (wait.now() >= deadline || options.signal?.aborted === true) {
+    if (wait.now() >= deadline) {
       return stillRunningResult(state, options.warning);
     }
     await sleep(Math.min(wait.pollMilliseconds, Math.max(deadline - wait.now(), 0)), options.signal);
-    const answer = await client.request('GET', `/api/backtests/${String(state.id)}`, undefined, options.signal);
+    let answer: WebPortAnswer;
+    try {
+      answer = await client.request('GET', `/api/backtests/${String(state.id)}`, undefined, options.signal);
+    } catch {
+      // A stopped run or a web restart ends the wait, not the backtest. The result keeps the backtest ID.
+      return stillRunningResult(state, options.warning);
+    }
     if (!isSuccess(answer)) {
       return answerResult(answer, { backtest: state });
     }

@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'vite-plus/test';
 import { ASSISTANT_TOOL_NAMES, createAssistantTools } from '../src/assistant_tools.ts';
 import { runBacktest, summarizeBacktest, SURVIVORSHIP_BIAS_WARNING, type BacktestWait } from '../src/backtest_tools.ts';
 import { Conversations, type RunEvent } from '../src/conversations.ts';
-import { WebPortClient } from '../src/web_port_client.ts';
+import { WebPortClient, type WebPortAnswer } from '../src/web_port_client.ts';
 import { createFakeOpenModel } from './fake_model.ts';
 import { startFakeModelServer, type ChatMessage, type FakeModelServer, type ModelStep } from './fake_model_server.ts';
 import {
@@ -255,6 +255,45 @@ describe('run_backtest', () => {
       expect.objectContaining({ status: 'succeeded', backtest_id: 11, backtest_status: 'running' }),
     );
     expect(web.requests.filter((request) => request.method !== 'GET')).toHaveLength(1);
+  });
+
+  test('returns "still running" and the backtest ID when the user stops the run during the wait', async () => {
+    web.backtestStatuses = ['running'];
+    const stop = new AbortController();
+
+    const result = await runBacktest(new WebPortClient(web.baseUrl, CONVERSATION_ID), BACKTEST_ARGUMENTS, {
+      budget: { startedBacktests: 0 },
+      wait: { limitMilliseconds: 10_000, pollMilliseconds: 5_000, now: () => Date.now() },
+      signal: stop.signal,
+      onUpdate: () => {
+        setTimeout(() => {
+          stop.abort();
+        }, 5);
+      },
+    });
+
+    expect(result.details).toEqual({ backtest: { id: 11, status: 'running' } });
+    expect(result.isError).toBeUndefined();
+  });
+
+  test('returns "still running" and the backtest ID when web does not answer during the wait', async () => {
+    web.backtestStatuses = ['running'];
+    class RestartingWebPortClient extends WebPortClient {
+      override async request(...args: Parameters<WebPortClient['request']>): Promise<WebPortAnswer> {
+        if (args[0] === 'GET') {
+          throw new TypeError('fetch failed');
+        }
+        return super.request(...args);
+      }
+    }
+
+    const result = await runBacktest(new RestartingWebPortClient(web.baseUrl, CONVERSATION_ID), BACKTEST_ARGUMENTS, {
+      budget: { startedBacktests: 0 },
+      wait: QUICK_WAIT,
+    });
+
+    expect(result.details).toEqual({ backtest: { id: 11, status: 'running' } });
+    expect(result.isError).toBeUndefined();
   });
 
   test('starts at most 5 backtests for one user message, and 5 again for the next message', async () => {
