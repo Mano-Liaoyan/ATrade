@@ -2,9 +2,11 @@
 export {
   BACKEND_NOT_REACHABLE,
   describeErrorBody,
+  jsonRequest,
   readErrorMessage,
   readJsonBody,
   requestJson,
+  sendCommand,
   sendRequest,
 } from './http_request';
 export type { RequestResult } from './http_request';

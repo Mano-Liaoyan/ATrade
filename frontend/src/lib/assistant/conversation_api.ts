@@ -1,23 +1,13 @@
 // Calls the conversation routes of port 8000 (docs/architecture/assistant.md 25.11) and the discard route of a
 // strategy version (strategy section 9.6).
 import type { components } from '#lib/api';
-import {
-  BACKEND_NOT_REACHABLE,
-  readErrorMessage,
-  requestJson,
-  sendRequest,
-  type RequestResult,
-} from '#lib/foundation/http_request';
+import { jsonRequest, requestJson, sendCommand, type RequestResult } from '#lib/foundation/http_request';
 
 export type Conversation = components['schemas']['ConversationResponse'];
 export type ConversationDetail = components['schemas']['ConversationDetailResponse'];
 
 const CONVERSATIONS_PATH = '/api/assistant/conversations';
 const FAILED_ACTION = 'The conversation request';
-
-function createJsonRequest(method: string, body: unknown): RequestInit {
-  return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
-}
 
 /** All conversations, the newest first. Each workbench page lists the same conversations (25.12). */
 export async function listConversations(fetchFunction: typeof fetch): Promise<RequestResult<Conversation[]>> {
@@ -33,7 +23,7 @@ export function createConversation(
 ): Promise<RequestResult<Conversation>> {
   const body =
     openStrategy === null ? {} : { strategy_id: openStrategy.strategyId, version_number: openStrategy.versionNumber };
-  return requestJson(fetchFunction, FAILED_ACTION, CONVERSATIONS_PATH, createJsonRequest('POST', body));
+  return requestJson(fetchFunction, FAILED_ACTION, CONVERSATIONS_PATH, jsonRequest('POST', body));
 }
 
 export function readConversation(fetchFunction: typeof fetch, conversationId: number): Promise<RequestResult<ConversationDetail>> {
@@ -46,15 +36,12 @@ export function renameConversation(
   title: string,
 ): Promise<RequestResult<Conversation>> {
   const path = `${CONVERSATIONS_PATH}/${String(conversationId)}`;
-  return requestJson(fetchFunction, FAILED_ACTION, path, createJsonRequest('PATCH', { title }));
+  return requestJson(fetchFunction, FAILED_ACTION, path, jsonRequest('PATCH', { title }));
 }
 
 async function sendAction(fetchFunction: typeof fetch, path: string, init: RequestInit, failedAction: string): Promise<string | null> {
-  const response = await sendRequest(fetchFunction, path, init);
-  if (response === null) {
-    return BACKEND_NOT_REACHABLE;
-  }
-  return response.ok ? null : readErrorMessage(response, failedAction);
+  const result = await sendCommand(fetchFunction, failedAction, path, init);
+  return result.kind === 'failed' ? result.message : null;
 }
 
 /** Deletes a conversation. Null when it is deleted, else the error message. */

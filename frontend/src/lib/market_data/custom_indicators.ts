@@ -1,6 +1,6 @@
 // Calls the custom indicator routes (docs/architecture/indicator.md section 23.10).
 import type { components } from '#lib/api';
-import { BACKEND_NOT_REACHABLE, readErrorMessage, readJsonBody, requestJson, sendRequest, type RequestResult } from '#lib/foundation/http_request';
+import { BACKEND_NOT_REACHABLE, jsonRequest, readErrorMessage, readJsonBody, requestJson, sendCommand, sendRequest, type RequestResult } from '#lib/foundation/http_request';
 
 export type CustomIndicator = components['schemas']['CustomIndicatorResponse'];
 export type CustomIndicatorFields = components['schemas']['CustomIndicatorBody'];
@@ -29,11 +29,7 @@ export function groupProblems(problems: readonly IndicatorProblem[]): CustomIndi
 
 /** Creates a custom indicator, or changes the one with `customIndicatorId`. */
 export async function saveCustomIndicator(fetchFunction: typeof fetch, customIndicatorId: number | null, fields: CustomIndicatorFields): Promise<SaveResult> {
-  const response = await sendRequest(fetchFunction, customIndicatorId === null ? BASE_PATH : `${BASE_PATH}/${String(customIndicatorId)}`, {
-    method: customIndicatorId === null ? 'POST' : 'PUT',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(fields),
-  });
+  const response = await sendRequest(fetchFunction, customIndicatorId === null ? BASE_PATH : `${BASE_PATH}/${String(customIndicatorId)}`, jsonRequest(customIndicatorId === null ? 'POST' : 'PUT', fields));
   if (response === null) {
     return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
   }
@@ -49,20 +45,9 @@ export async function saveCustomIndicator(fetchFunction: typeof fetch, customInd
 
 /** Keep: the AI assistant cannot change the custom indicator after it (section 23.10.6). */
 export function keepCustomIndicator(fetchFunction: typeof fetch, customIndicatorId: number): Promise<RequestResult<undefined>> {
-  return sendAction(fetchFunction, `${BASE_PATH}/${String(customIndicatorId)}/keep`, 'POST');
+  return sendCommand(fetchFunction, FAILED_ACTION, `${BASE_PATH}/${String(customIndicatorId)}/keep`, { method: 'POST' });
 }
 
 export function deleteCustomIndicator(fetchFunction: typeof fetch, customIndicatorId: number): Promise<RequestResult<undefined>> {
-  return sendAction(fetchFunction, `${BASE_PATH}/${String(customIndicatorId)}`, 'DELETE');
-}
-
-async function sendAction(fetchFunction: typeof fetch, path: string, method: 'POST' | 'DELETE'): Promise<RequestResult<undefined>> {
-  const response = await sendRequest(fetchFunction, path, { method });
-  if (response === null) {
-    return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
-  }
-  if (!response.ok) {
-    return { kind: 'failed', message: await readErrorMessage(response, FAILED_ACTION) };
-  }
-  return { kind: 'ok', value: undefined };
+  return sendCommand(fetchFunction, FAILED_ACTION, `${BASE_PATH}/${String(customIndicatorId)}`, { method: 'DELETE' });
 }

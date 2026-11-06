@@ -1,7 +1,7 @@
 // Bar sources and the source order (docs/architecture/market_data.md section 8.7): the read and the save of the
 // global source order, a move of one bar source, and the source order choices of the backtest form.
 import type { components } from '#lib/api';
-import { requestJson, type RequestResult } from '#lib/foundation/http_request';
+import { jsonRequest, requestJson, type RequestResult } from '#lib/foundation/http_request';
 
 export type BarSource = components['schemas']['BarSource'];
 
@@ -47,11 +47,7 @@ export async function saveSourceOrder(
     fetchFunction,
     'Saving the source order',
     SOURCE_ORDER_PATH,
-    {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ source_order: sourceOrder }),
-    },
+    jsonRequest('PUT', { source_order: sourceOrder }),
   );
   return result.kind === 'ok' ? { kind: 'ok', value: result.value.source_order } : result;
 }

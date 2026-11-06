@@ -1,6 +1,6 @@
 // Calls the screen HTTP routes (backend/src/atrade/screen/http_routes.py, screen.md section 24.7).
 import type { components } from '#lib/api';
-import { readJsonBody, readErrorMessage, requestJson, sendRequest, BACKEND_NOT_REACHABLE, type RequestResult } from '#lib/foundation/http_request';
+import { jsonRequest, readJsonBody, readErrorMessage, requestJson, sendCommand, sendRequest, BACKEND_NOT_REACHABLE, type RequestResult } from '#lib/foundation/http_request';
 
 export type ScreenListItem = components['schemas']['ScreenListItemResponse'];
 export type Screen = components['schemas']['ScreenResponse'];
@@ -26,8 +26,6 @@ export function listScreens(fetchFunction: typeof fetch): Promise<RequestResult<
 export function readScreen(fetchFunction: typeof fetch, screenId: number): Promise<RequestResult<Screen>> {
   return requestJson(fetchFunction, FAILED_ACTION, `/api/screens/${String(screenId)}`);
 }
-
-const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 const UNPROCESSABLE_CONTENT = 422;
 
@@ -58,11 +56,7 @@ export function runScreenDraft(
   screenId: number,
   draft: { market: string; definition: unknown },
 ): Promise<ScreenCheckResult<ScreenResult>> {
-  return requestChecked(fetchFunction, `/api/screens/${String(screenId)}/runs`, {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify(draft),
-  });
+  return requestChecked(fetchFunction, `/api/screens/${String(screenId)}/runs`, jsonRequest('POST', draft));
 }
 
 /** The indicator catalog for the edit popover (section 24.7). */
@@ -76,11 +70,7 @@ export function saveScreen(
   screen: { id: number; name: string },
   definition: unknown,
 ): Promise<ScreenCheckResult<Screen>> {
-  return requestChecked(fetchFunction, `/api/screens/${String(screen.id)}`, {
-    method: 'PUT',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ name: screen.name, definition }),
-  });
+  return requestChecked(fetchFunction, `/api/screens/${String(screen.id)}`, jsonRequest('PUT', { name: screen.name, definition }));
 }
 
 /** "Save as new screen". */
@@ -88,19 +78,12 @@ export function createScreen(
   fetchFunction: typeof fetch,
   screen: { name: string; market: string; definition: unknown },
 ): Promise<ScreenCheckResult<Screen>> {
-  return requestChecked(fetchFunction, '/api/screens', {
-    method: 'POST',
-    headers: JSON_HEADERS,
-    body: JSON.stringify(screen),
-  });
+  return requestChecked(fetchFunction, '/api/screens', jsonRequest('POST', screen));
 }
 
 async function sendScreenAction(fetchFunction: typeof fetch, path: string, method: string): Promise<string | null> {
-  const response = await sendRequest(fetchFunction, path, { method });
-  if (response === null) {
-    return BACKEND_NOT_REACHABLE;
-  }
-  return response.ok ? null : readErrorMessage(response, FAILED_ACTION);
+  const result = await sendCommand(fetchFunction, FAILED_ACTION, path, { method });
+  return result.kind === 'failed' ? result.message : null;
 }
 
 /** Keep of the condition card: the AI assistant cannot change the screen after it (section 24.8). Null when kept,

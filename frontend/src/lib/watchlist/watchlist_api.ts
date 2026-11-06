@@ -1,12 +1,6 @@
 // Calls the watchlist HTTP routes (backend/src/atrade/watchlist/http_routes.py).
 import type { components } from '#lib/api';
-import {
-  BACKEND_NOT_REACHABLE,
-  readErrorMessage,
-  requestJson,
-  sendRequest,
-  type RequestResult,
-} from '#lib/foundation/http_request';
+import { jsonRequest, requestJson, sendCommand, type RequestResult } from '#lib/foundation/http_request';
 
 export type WatchlistInstrument = components['schemas']['WatchlistInstrumentResponse'];
 export type InstrumentToAdd = components['schemas']['AddInstrumentRequest'];
@@ -33,27 +27,14 @@ export function addToWatchlist(
   instrument: InstrumentToAdd,
 ): Promise<RequestResult<WatchlistInstrument>> {
   const body = { symbol: instrument.symbol, exchange: instrument.exchange, currency: instrument.currency };
-  return requestJson<WatchlistInstrument>(fetchFunction, FAILED_ACTION, WATCHLIST_PATH, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  return requestJson<WatchlistInstrument>(fetchFunction, FAILED_ACTION, WATCHLIST_PATH, jsonRequest('POST', body));
 }
 
-export async function deleteFromWatchlist(
+export function deleteFromWatchlist(
   fetchFunction: typeof fetch,
   watchlistInstrumentId: number,
 ): Promise<RequestResult<undefined>> {
-  const response = await sendRequest(fetchFunction, `${WATCHLIST_PATH}/${String(watchlistInstrumentId)}`, {
-    method: 'DELETE',
-  });
-  if (response === null) {
-    return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
-  }
-  if (!response.ok) {
-    return { kind: 'failed', message: await readErrorMessage(response, FAILED_ACTION) };
-  }
-  return { kind: 'ok', value: undefined };
+  return sendCommand(fetchFunction, FAILED_ACTION, `${WATCHLIST_PATH}/${String(watchlistInstrumentId)}`, { method: 'DELETE' });
 }
 
 export function formatWatchlistInstrument(instrument: InstrumentToAdd): string {

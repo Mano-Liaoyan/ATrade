@@ -645,8 +645,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   (`ErrorResponse` of `foundation/error_response`), so the frontend does not
   write error types by hand.
 - `foundation/http_request` sends the HTTP requests of the capabilities:
-  `sendRequest`, `requestJson`, `readJsonBody`, `readErrorMessage`,
-  `describeErrorBody`, `BACKEND_NOT_REACHABLE`, and the type `RequestResult`.
+  `sendRequest`, `requestJson`, `sendCommand`, `jsonRequest`, `readJsonBody`,
+  `readErrorMessage`, `describeErrorBody`, `BACKEND_NOT_REACHABLE`, and the
+  type `RequestResult`.
   An error message is the `detail` text, the first field error of a list
   `detail` ("<field>: <message>"), or "<action> failed with HTTP status N.".
 - `foundation/live_socket` also has `readSocketMessage`: it returns a parsed
