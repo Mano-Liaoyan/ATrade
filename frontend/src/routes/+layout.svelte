@@ -181,7 +181,7 @@
   /* A header tooltip is the light Carbon high-contrast bubble. On the light page, the Carbon popover drop shadow
      separates it from the page background. */
   .app-header-global :global(.cds--popover--high-contrast .cds--popover) {
-    filter: drop-shadow(0 var(--cds-spacing-01) var(--cds-spacing-01) var(--cds-shadow));
+    filter: drop-shadow(0 var(--cds-spacing-01) var(--cds-spacing-01) color-mix(in srgb, var(--cds-shadow) 25%, transparent));
   }
 
   /* The page heading of each document page. A workbench gives its headings their own style. */
