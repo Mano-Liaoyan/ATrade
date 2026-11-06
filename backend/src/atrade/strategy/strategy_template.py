@@ -87,6 +87,9 @@ class MovingAverageStrategy(Strategy):
     def on_order_canceled(self, event: object) -> None:
         self.order_is_lost = True
 
+    def on_order_cancel_rejected(self, event: object) -> None:
+        self.order_is_lost = True
+
     def can_send_order(self, bar: Bar) -> bool:
         """A lost order gets at most 1 retry each day, so that a permanent refusal does not repeat on each bar."""
         if not self.order_is_lost:
@@ -104,12 +107,14 @@ class MovingAverageStrategy(Strategy):
 
     def send_exit_orders(self, positions: list[Position], bar: Bar) -> None:
         open_orders = self.cache.orders_open(instrument_id=self.settings.instrument_id, strategy_id=self.strategy_id)
-        for order in open_orders:
-            if order.side == OrderSide.BUY:
+        buy_orders = [order for order in open_orders if order.side == OrderSide.BUY]
+        sell_is_due = positions and not self.has_orders(OrderSide.SELL)
+        if (buy_orders or sell_is_due) and self.can_send_order(bar):
+            for order in buy_orders:
                 self.cancel_order(order.client_order_id)
-        if positions and not self.has_orders(OrderSide.SELL) and self.can_send_order(bar):
-            for position in positions:
-                self.close_position(position)
+            if sell_is_due:
+                for position in positions:
+                    self.close_position(position)
 
     def send_buy_order(self) -> None:
         order = self.order_factory.market(

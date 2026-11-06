@@ -14,7 +14,10 @@ from nautilus_trader.model import Price
 
 from atrade.forward_test import OwnerFill
 from atrade.foundation.order_ref import format_forward_test_order_tag
+from atrade.ibkr import GatewayRequestError
 from atrade.strategy import STRATEGY_TEMPLATE, load_strategy_classes
+from atrade.strategy.rules_code import make_rules_code
+from atrade.strategy.strategy_rules import StrategyRules
 from atrade.strategy.strategy_templates import TEMPLATES_BY_ID
 from tests.fakes.ibkr import LIVE_BAR_NOW_UTC, make_execution
 from tests.forward_test.atrade_clients_node import (
@@ -33,6 +36,7 @@ from tests.forward_test.atrade_clients_node import (
     today_start_utc,
     wait_until,
 )
+from tests.strategy.rules_examples import condition, group, make_rules, number, price
 
 RESTORED_SHARES = 40
 REFUSAL_WAIT_SECONDS = 0.2
@@ -69,8 +73,13 @@ def create_config(config_class: Any, **fields: Any) -> StrategyConfig:
     return config
 
 
-def make_template_strategy(tmp_path: Path) -> Any:
-    strategy_class, config_class = load_strategy_classes(STRATEGY_TEMPLATE, tmp_path)
+def make_rules_strategy_code() -> str:
+    entry = group("all_of", condition(price(), "above", number(0)))
+    return make_rules_code(StrategyRules.model_validate(make_rules(entry, exits={"exit_after_bars": 1})))
+
+
+def make_template_strategy(tmp_path: Path, code: str = STRATEGY_TEMPLATE) -> Any:
+    strategy_class, config_class = load_strategy_classes(code, tmp_path)
     return strategy_class(create_config(config_class, instrument_id=APPLE_ID, bar_type=DAY_BAR_TYPE))
 
 
@@ -162,10 +171,13 @@ async def test_the_default_template_buys_again_on_the_next_bar_after_a_rejected_
 
 
 @pytest.mark.anyio
-async def test_the_default_template_retries_a_refused_buy_once_a_day(database_url: str, tmp_path: Path) -> None:
+@pytest.mark.parametrize("code", [STRATEGY_TEMPLATE, make_rules_strategy_code()], ids=["template", "rule_builder"])
+async def test_a_single_instrument_strategy_retries_a_refused_buy_once_a_day(
+    database_url: str, tmp_path: Path, code: str
+) -> None:
     world = make_world(database_url)
     await save_warm_up_bars(database_url)
-    strategy = make_template_strategy(tmp_path)
+    strategy = make_template_strategy(tmp_path, code)
     world.ledger.split_check_needed.add(APPLE)
 
     async with run_node(world, strategy, 1) as data_factory:
@@ -182,10 +194,13 @@ async def test_the_default_template_retries_a_refused_buy_once_a_day(database_ur
 
 
 @pytest.mark.anyio
-async def test_the_default_template_retries_a_refused_sell_once_a_day(database_url: str, tmp_path: Path) -> None:
+@pytest.mark.parametrize("code", [STRATEGY_TEMPLATE, make_rules_strategy_code()], ids=["template", "rule_builder"])
+async def test_a_single_instrument_strategy_retries_a_refused_sell_once_a_day(
+    database_url: str, tmp_path: Path, code: str
+) -> None:
     world = await make_world_with_position(database_url)
     await save_warm_up_bars(database_url)
-    strategy = make_template_strategy(tmp_path)
+    strategy = make_template_strategy(tmp_path, code)
     world.ledger.split_check_needed.add(APPLE)
 
     async with run_node(world, strategy, 1) as data_factory:
@@ -199,6 +214,30 @@ async def test_the_default_template_retries_a_refused_sell_once_a_day(database_u
         assert len(world.ledger.checked_orders) == 2
         send_next_day_bar(strategy)
         await wait_until(lambda: len(world.ledger.checked_orders) == 3)
+
+
+@pytest.mark.anyio
+async def test_the_default_template_retries_a_refused_cancel_once_a_day(database_url: str, tmp_path: Path) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    cancel_requests: list[int] = []
+
+    async def refuse_cancel(order_id: int) -> None:
+        cancel_requests.append(order_id)
+        raise GatewayRequestError("Refused by IBKR")
+
+    world.gateway.cancel_order = refuse_cancel
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        low_bar = replace_close(strategy.cache.bar(DAY_BAR_TYPE), 50)
+        for _ in range(5):
+            strategy.on_bar(low_bar)
+            await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+
+    assert len(cancel_requests) == 2
 
 
 @pytest.mark.anyio

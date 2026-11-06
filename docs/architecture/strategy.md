@@ -167,7 +167,8 @@ New columns of `strategy_version`:
   order counts, so a denied, rejected, or canceled order gets a new order on
   the next bar. A lost order gets at most 1 retry each day (UTC day of the
   bar), so a permanent refusal on 1-minute bars does not send an order each
-  minute. A partly filled order gets no new order, because a position exists.
+  minute. A cancel that IBKR refuses has the same limit. A partly filled order
+  gets no new order, because a position exists.
   An exit cancels the open buy orders of the instrument
   and uses `close_position`, so a backtest exit fills at the next open, as a
   forward test does. A saved version keeps its code (ADR 0006), so a version
@@ -587,7 +588,9 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
   JSON value (`int` or `float`).
 - Decided (#172): at each bar close, the code reads the prices and the
   indicator outputs of the rules. When an output has no value, or an order
-  of the strategy is open or in flight, no rule runs on that bar. A cross
+  of the strategy is open or in flight, no rule runs on that bar. A denied,
+  rejected, or canceled order gets at most 1 retry each day (UTC day of the
+  bar), so a permanent refusal does not repeat on each bar. A cross
   compares with the values of the previous bar. The previous bar of the first
   bar is the last look-back bar (`on_historical_bars`). A cross is false when
   the previous bar had no value. A saved version keeps its code (ADR 0006), so
