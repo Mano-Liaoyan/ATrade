@@ -31,7 +31,7 @@
     type TableColumn,
   } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { ScrollRegion } from '#lib/foundation/scroll_region';
+  import { HorizontalScrollTrack, ScrollRegion } from '#lib/foundation/scroll_region';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { formatVersionLabel } from '#lib/strategy';
   import {
@@ -89,6 +89,9 @@
   let sortDirection = $state<SortDirection>('descending');
   let isDeleteDialogOpen = $state(false);
   let isDeleting = $state(false);
+  const runsColumnsId = $props.id();
+  let runsColumns = $state<HTMLDivElement>();
+  let runsTable = $state<HTMLTableElement>();
   let deleteMessage = $state('');
 
   const shownSweep = $derived(workbench.detail !== null && workbench.detail.id === sweepId ? workbench.detail : null);
@@ -323,8 +326,8 @@
             <Panel {...state} label="Runs">
               <div class="table-region">
                 <ScrollRegion label="Runs" fill>
-                  <div class="cds--data-table-container">
-                    <table class="cds--data-table cds--data-table--sm cds--data-table--sort runs">
+                  <div class="cds--data-table-content runs-columns" id={runsColumnsId} bind:this={runsColumns}>
+                    <table class="cds--data-table cds--data-table--sm cds--data-table--sort runs" bind:this={runsTable}>
                       <thead>
                         <tr>
                           {#each parameterNames as name (name)}
@@ -385,6 +388,7 @@
                     </table>
                   </div>
                 </ScrollRegion>
+                <HorizontalScrollTrack label="Runs columns" viewport={runsColumns} content={runsTable} viewportId={runsColumnsId} wheelScrolls={false} />
               </div>
             </Panel>
           {/if}
@@ -439,10 +443,24 @@
     white-space: nowrap;
   }
 
-  /* Fixed column widths: the tables are never wider than their region. Long text ends with an ellipsis. */
+  /* Fixed column widths. Long text ends with an ellipsis. */
   .sweep-list :global(table),
   .runs {
     table-layout: fixed;
+  }
+
+  /* All Runs columns stay readable: a narrow region scrolls them sideways with its own track. The sideways scroll makes
+     the header scroll away with the rows. */
+  .runs {
+    min-inline-size: 54rem;
+  }
+
+  .runs-columns {
+    scrollbar-width: none;
+  }
+
+  .runs-columns::-webkit-scrollbar {
+    display: none;
   }
 
   /* The status icon and the number. */

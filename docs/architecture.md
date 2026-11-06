@@ -701,11 +701,13 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   region takes the full height of its parent, for example a workbench panel.
   `role` is `region` (the default) or `log`. The bindable `viewport` gives
   the scrolling element to a parent that scrolls it, for example `ChatLog`.
-  `HorizontalScrollTrack` (`label`, `viewport`, `content`, `viewportId`) is
-  the same track and thumb for an element that scrolls sideways, for example
-  the tab strip of `Tabs` (`aria-orientation="horizontal"`, Arrow Left and
-  Right, Page Up, Page Down, Home, End). A vertical mouse wheel on the element
-  scrolls it sideways. The parent places the track.
+  `HorizontalScrollTrack` (`label`, `viewport`, `content`, `viewportId`,
+  `wheelScrolls`) is the same track and thumb for an element that scrolls
+  sideways, for example the tab strip of `Tabs`
+  (`aria-orientation="horizontal"`, Arrow Left and Right, Page Up, Page Down,
+  Home, End). A vertical mouse wheel on the element scrolls it sideways, unless
+  `wheelScrolls` is false, for example the Runs table of a parameter sweep. The
+  parent places the track.
 - WebSocket reconnection and heartbeat are our own code. Reconnection is
   required, because browsers suspend background tabs in different ways.
   `foundation/live_socket` does it: a server heartbeat every 10 seconds, a

@@ -89,8 +89,28 @@ async function checkHeatmap(page: Page, sweepId: string): Promise<void> {
   await expect(tradesHeatmap.getByRole('cell', { name: /^\d+$/ }).first()).toBeVisible();
 }
 
+/** The values of all columns of the Runs table can be read, and the sideways track reaches the last column. */
+async function checkRunsWidth(page: Page, width: number): Promise<void> {
+  await page.setViewportSize({ width, height: 720 });
+  const runs = page.getByRole('region', { name: 'Runs' });
+  await expect(runs.getByRole('row').nth(1).getByRole('cell').last()).toBeAttached();
+  // A long header can end with an ellipsis, but a header has a width and a value is whole.
+  const emptyHeaders = await runs.getByRole('columnheader').evaluateAll((headers) => headers.filter((header) => header.clientWidth === 0).length);
+  expect(emptyHeaders).toBe(0);
+  const cutValues = await runs.getByRole('cell').evaluateAll((cells) => cells.filter((cell) => cell.scrollWidth > cell.clientWidth).map((cell) => cell.textContent));
+  expect(cutValues).toEqual([]);
+  const track = page.getByRole('scrollbar', { name: 'Runs columns scroll bar' });
+  await expect(track).toBeInViewport({ ratio: 1 });
+  await track.press('End');
+  await expect(runs.getByRole('columnheader').last()).toBeInViewport({ ratio: 1 });
+  await track.press('Home');
+}
+
 /** Sorts the Runs table, scrolls to its last row, opens the backtest of that run, and goes back to the sweep. */
 async function checkRuns(page: Page, sweepId: string): Promise<void> {
+  for (const width of [1440, 1280]) {
+    await checkRunsWidth(page, width);
+  }
   const runs = page.getByRole('region', { name: 'Runs' });
   const periodHeader = runs.getByRole('columnheader', { name: 'average_period' });
   await periodHeader.getByRole('button').click();
