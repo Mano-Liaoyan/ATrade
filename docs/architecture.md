@@ -475,6 +475,12 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   fields of a form or of a list of values: as many columns as fit, each at
   least 12rem wide (9rem with `atrade-auto-grid--narrow`, 14rem with
   `atrade-auto-grid--wide`), with a `--cds-spacing-05` gap.
+- The global classes `atrade-run-*` of `carbon.scss` are the parts of the run
+  pages (backtest, forward test, parameter sweep, comparison, and strategy pages):
+  the empty main area, the title line, the status, the actions, and the log text.
+- `routes/run_workbench.svelte.ts` (`RunWorkbench`) holds the state of the
+  backtest, forward test, and parameter sweep pages: the list, the navigation
+  to the newest run, the read of the open run, and the New dialog.
 - While a button action runs, the button is disabled and its text says why,
   for example "Saving…", "Creating…", or "Starting…".
 - UI rule: a status icon stands alone, with no word next to it, before the
@@ -500,7 +506,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   [#105](https://github.com/Mano-Liaoyan/ATrade/issues/105)) is a workbench
   with the structure of the backtest page: the "Forward tests" `SideColumn`
   with the live list (`routes/forward-tests/ForwardTestList.svelte`, 32px
-  rows, from `ForwardTestsOnInstrumentsFeed.forwardTests`) and the
+  rows, from `RunWorkbench.items`, `routes/run_workbench.svelte.ts`) and the
   "New forward test" dialog (form id `start-forward-test`); the forward test
   panel (header line with the status icon before "#<id>", the red "Stop forward test" icon button
   while the forward test can stop, and the "Backtest the same period" icon
@@ -907,7 +913,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   of `paper_trading` and the running forward tests with
   `ForwardTestsOnInstrumentsFeed` of `forward_test` (the one
   forward test list, read again after each `/ws/forward-tests` change: `forwardTests`, `onInstruments`, `isConnected`;
-  the forward test page uses it for its list and the strategy page for
+  the comparison page uses it and the strategy page uses it for
   its Stop forward test button; the home page uses the
   same paper account feed). While a socket is not connected, the panel and
   the column show `LiveUpdatesNotification`.

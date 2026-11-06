@@ -88,6 +88,63 @@
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
 }
 
+// ATrade classes of the run pages (backtest, forward test, parameter sweep, comparison, and strategy pages).
+// Carbon has no class for them.
+.atrade-run-empty {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.atrade-run-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--cds-spacing-04);
+}
+
+// One type size in the heading: Carbon links set their own size. This rule is after the Carbon modules, so it wins
+// against `.cds--link`.
+.atrade-run-title > * {
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.atrade-run-title--numbers {
+  font-variant-numeric: tabular-nums;
+}
+
+// After `.atrade-run-title > *`: that rule also resets `font-variant-numeric`.
+.atrade-run-number {
+  font-variant-numeric: tabular-nums;
+  color: var(--cds-text-secondary);
+}
+
+.atrade-run-period {
+  color: var(--cds-text-secondary);
+}
+
+.atrade-run-status {
+  display: flex;
+  flex: none;
+}
+
+.atrade-run-actions {
+  display: flex;
+  flex: none;
+  gap: var(--cds-spacing-02);
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.atrade-run-log {
+  margin: 0;
+  padding: var(--cds-spacing-05);
+  color: var(--cds-text-error);
+  font-family: var(--cds-code-01-font-family);
+  font-size: var(--cds-code-01-font-size);
+  line-height: var(--cds-code-01-line-height);
+  white-space: pre-wrap;
+}
+
 // A Carbon tab panel takes the focus (tabindex 0) and draws its focus outline on `:focus`, so a mouse click in a
 // panel body draws a frame around the whole panel. Only the keyboard focus (`:focus-visible`) keeps the outline.
 .cds--tab-content:focus:not(:focus-visible) {

@@ -13,7 +13,7 @@
   import Add16 from '@carbon/icons/es/add/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { navigating, page } from '$app/state';
+  import { page } from '$app/state';
   import { describeBacktestStatus, findBacktestStatusKind } from '#lib/backtest';
   import {
     ContextMenu,
@@ -28,7 +28,6 @@
     type TableColumn,
   } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
   import { formatVersionLabel } from '#lib/strategy';
@@ -54,6 +53,7 @@
   import StartSweepDialog from '../StartSweepDialog.svelte';
   import SweepPointChart from '../SweepPointChart.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
+  import { RunWorkbench } from '../../run_workbench.svelte';
 
   const PANELS: PanelSpec[] = [
     { id: 'overview', minPixels: 160 },
@@ -69,75 +69,27 @@
   const routeSweepId = $derived(page.params['sweepId']);
   const sweepId = $derived(routeSweepId === undefined ? null : Number(routeSweepId));
 
-  let sweeps = $state<Sweep[]>([]);
-  let isListRead = $state(false);
-  let listMessage = $state('');
-  let sweep = $state<SweepDetail | null>(null);
-  let detailMessage = $state('');
+  // /ws/sweeps pushes each change of a sweep or of one of its runs. The open sweep reads again when its list row changes
+  // (the run counts).
+  const workbench = new RunWorkbench<Sweep, SweepDetail>({
+    socketPath: SWEEPS_SOCKET_PATH,
+    list: () => listSweeps(fetch),
+    readDetail: (id) => readSweep(fetch, id),
+    href: (id) => resolve('/sweeps/[[sweepId]]', { sweepId: String(id) }),
+    openId: () => sweepId,
+  });
   let metric = $state<SweepMetricKey>(DEFAULT_SWEEP_METRIC);
   let sliceValue = $state<ParameterValue | null>(null);
   let sortColumn = $state<string>(DEFAULT_SWEEP_METRIC);
   let sortDirection = $state<SortDirection>('descending');
-  let isStartDialogOpen = $state(false);
 
-  const shownSweep = $derived(sweep !== null && sweep.id === sweepId ? sweep : null);
+  const shownSweep = $derived(workbench.detail !== null && workbench.detail.id === sweepId ? workbench.detail : null);
   const parameterNames = $derived(shownSweep === null ? [] : readParameterNames(shownSweep));
   const chart = $derived(shownSweep === null ? null : readSweepChart(shownSweep, metric, sliceValue));
   const metricLabel = $derived(SWEEP_METRICS.find((item) => item.value === metric)?.label ?? '');
   const sortedRows = $derived(
     shownSweep === null ? [] : sortSweepRows(readSweepRows(shownSweep), sortColumn, sortDirection),
   );
-
-  // /ws/sweeps pushes each change of a sweep or of one of its runs.
-  $effect(() =>
-    readOnChange({
-      socketPath: SWEEPS_SOCKET_PATH,
-      read: () => listSweeps(fetch),
-      onResult: (result) => {
-        isListRead = true;
-        if (result.kind === 'failed') {
-          listMessage = result.message;
-          return;
-        }
-        listMessage = '';
-        sweeps = result.value;
-      },
-    }),
-  );
-
-  // /sweeps opens the newest sweep, like /backtests.
-  $effect(() => {
-    const newest = sweeps[0];
-    if (navigating.to === null && sweepId === null && newest !== undefined) {
-      void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(newest.id) }), { replace: true, reset: false });
-    }
-  });
-
-  // The open sweep reads again when its list row changes (the run counts): the list comes from /ws/sweeps.
-  const openListRowText = $derived(JSON.stringify(sweeps.find((item) => item.id === sweepId) ?? null));
-
-  $effect(() => {
-    if (sweepId === null) {
-      return;
-    }
-    openListRowText satisfies string;
-    const id = sweepId;
-    let isActive = true;
-    void readSweep(fetch, id).then((result) => {
-      if (!isActive) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        detailMessage = result.message;
-        return;
-      }
-      detailMessage = '';
-      sweep = result.value;
-    });
-    return () => {
-      isActive = false;
-    };
-  });
 
   function sortBy(column: string): void {
     if (sortColumn === column) {
@@ -184,19 +136,19 @@
         label="New parameter sweep"
         icon={Add16}
         onclick={() => {
-          isStartDialogOpen = true;
+          workbench.isStartDialogOpen = true;
         }}
       />
     {/snippet}
-    {#if listMessage !== ''}
-      <InlineNotification kind="error" title="Parameter sweeps not read" subtitle={listMessage} lowContrast />
+    {#if workbench.listMessage !== ''}
+      <InlineNotification kind="error" title="Parameter sweeps not read" subtitle={workbench.listMessage} lowContrast />
     {:else}
       <div class="table-region sweep-list">
         <ContextMenu readLabel={(key: string) => `Parameter sweep #${key}`} readItems={readMenuItems}>
           <ScrollRegion label="Parameter sweep list" fill>
             <DataTable columns={LIST_COLUMNS} size="sm">
               {#snippet rows()}
-                {#each sweeps as item (item.id)}
+                {#each workbench.items as item (item.id)}
                   {@const status = readSweepStatus(item.status_counts)}
                   <tr
                     data-context-key={item.id}
@@ -234,10 +186,10 @@
   </SideColumn>
 
   {#if shownSweep === null || chart === null}
-    <div class="empty-main">
-      {#if detailMessage !== ''}
-        <InlineNotification kind="error" title="Parameter sweep not read" subtitle={detailMessage} lowContrast />
-      {:else if isListRead && sweeps.length === 0 && listMessage === ''}
+    <div class="atrade-run-empty">
+      {#if workbench.detailMessage !== ''}
+        <InlineNotification kind="error" title="Parameter sweep not read" subtitle={workbench.detailMessage} lowContrast />
+      {:else if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === ''}
         <EmptyText text="No parameter sweeps" />
       {/if}
     </div>
@@ -249,8 +201,8 @@
         {#if id === 'overview'}
           <Panel {...state} label={`Parameter sweep #${String(detail.id)}`}>
             {#snippet header()}
-              <h1 class="run-title">
-                <span class="run-number">#{detail.id}</span>
+              <h1 class="atrade-run-title">
+                <span class="atrade-run-number">#{detail.id}</span>
                 <a
                   class="cds--link"
                   href={resolve('/strategies/[strategyId]/versions/[versionNumber]', {
@@ -408,19 +360,12 @@
 </Workbench>
 
 <StartSweepDialog
-  open={isStartDialogOpen}
-  onOpenChange={(open: boolean) => {
-    isStartDialogOpen = open;
-  }}
+  open={workbench.isStartDialogOpen}
+  onOpenChange={workbench.changeStartDialog}
   onStarted={openStartedSweep}
 />
 
 <style>
-  .empty-main {
-    flex: 1;
-    min-inline-size: 0;
-  }
-
   .table-region {
     display: flex;
     flex: 1;
@@ -492,22 +437,6 @@
   .row-link:focus-visible {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
-  }
-
-  .run-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--cds-spacing-04);
-  }
-
-  .run-title > :global(*) {
-    font: inherit;
-    letter-spacing: inherit;
-  }
-
-  .run-number {
-    font-variant-numeric: tabular-nums;
-    color: var(--cds-text-secondary);
   }
 
   .status-line {

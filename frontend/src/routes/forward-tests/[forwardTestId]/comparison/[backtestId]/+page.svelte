@@ -130,7 +130,7 @@
   </SideColumn>
 
   {#if comparison === null}
-    <div class="empty-main">
+    <div class="atrade-run-empty">
       {#if errorMessage !== ''}
         <InlineNotification kind="error" title="Forward test not compared" subtitle={errorMessage} lowContrast />
       {/if}
@@ -143,13 +143,13 @@
         {#if id === 'chart'}
           <Panel {...state} label={title}>
             {#snippet header()}
-              <span class="run-status" role="status" aria-label="Backtest status">
+              <span class="atrade-run-status" role="status" aria-label="Backtest status">
                 <StatusIndicator
                   label={describeBacktestStatus(compared.backtest.status)}
                   kind={findBacktestStatusKind(compared.backtest.status)}
                 />
               </span>
-              <h1 class="run-title">
+              <h1 class="atrade-run-title atrade-run-title--numbers">
                 <span>{title}</span>
                 <a
                   class="cds--link"
@@ -157,7 +157,7 @@
                   >{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</a
                 >
                 {@render instrumentOrUniverse(forwardTest)}
-                <span class="run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
+                <span class="atrade-run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
               </h1>
             {/snippet}
             <div class="compare-area">
@@ -193,7 +193,7 @@
               <EmptyText text="No logs" />
             {:else}
               <ScrollRegion label="Logs" fill>
-                <pre class="log-text">{compared.backtest.error_message}</pre>
+                <pre class="atrade-run-log">{compared.backtest.error_message}</pre>
               </ScrollRegion>
             {/if}
           </Panel>
@@ -204,33 +204,6 @@
 </Workbench>
 
 <style>
-  .empty-main {
-    flex: 1;
-    min-inline-size: 0;
-  }
-
-  .run-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--cds-spacing-04);
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* One type size in the heading: Carbon links set their own size. */
-  .run-title > :global(*) {
-    font: inherit;
-    letter-spacing: inherit;
-  }
-
-  .run-period {
-    color: var(--cds-text-secondary);
-  }
-
-  .run-status {
-    display: flex;
-    flex: none;
-  }
-
   /* The metrics over the chart: the chart keeps at least 6rem, and the metrics take the rest up to their full height.
      In a low panel the metrics scroll in their own region (ComparedKeyMetrics) with a visible track. */
   .compare-area {
@@ -249,15 +222,5 @@
     position: relative;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
-  }
-
-  .log-text {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    color: var(--cds-text-error);
-    font-family: var(--cds-code-01-font-family);
-    font-size: var(--cds-code-01-font-size);
-    line-height: var(--cds-code-01-line-height);
-    white-space: pre-wrap;
   }
 </style>

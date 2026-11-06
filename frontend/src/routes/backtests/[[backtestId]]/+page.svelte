@@ -17,13 +17,12 @@
      "Instrument" select, a Trades row, or an Instruments row selects it.
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
-  import { untrack } from 'svelte';
   import Add16 from '@carbon/icons/es/add/16.js';
   import ConnectionSignal16 from '@carbon/icons/es/connection-signal/16.js';
   import Settings16 from '@carbon/icons/es/settings/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { navigating, page } from '$app/state';
+  import { page } from '$app/state';
   import {
     BACKTESTS_SOCKET_PATH,
     ChartInstrumentSelect,
@@ -52,7 +51,6 @@
   } from '#lib/backtest';
   import { Dialog, IconButton, InlineNotification, StatusIndicator } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatBarPeriod } from '#lib/foundation/value_format';
   import { Panel, PanelSplit, SideColumn, Workbench, type PanelSpec } from '#lib/foundation/workbench';
@@ -68,12 +66,11 @@
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_BACKTEST_FORM_ID } from '../../palette_commands';
+  import { RunWorkbench } from '../../run_workbench.svelte';
   import BacktestList from '../BacktestList.svelte';
   import BarSourceTable from '../BarSourceTable.svelte';
   import StartBacktestDialog from '../StartBacktestDialog.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
-
-  const START_BACKTEST_HASH = `#${START_BACKTEST_FORM_ID}`;
 
   const PANELS: PanelSpec[] = [
     { id: 'chart', minPixels: 160 },
@@ -92,18 +89,24 @@
   const routeBacktestId = $derived(page.params['backtestId']);
   const backtestId = $derived(routeBacktestId === undefined ? null : Number(routeBacktestId));
 
-  let backtests: Backtest[] = $state([]);
-  let isListRead = $state(false);
-  let listMessage = $state('');
-  let backtest = $state<BacktestDetail | null>(null);
-  let detailMessage = $state('');
+  // /ws/backtests pushes each change of a backtest, also from other tabs, the assistant, and the backtest process. The
+  // open backtest reads again when its list row changes (status or metrics).
+  const workbench = new RunWorkbench<Backtest, BacktestDetail>({
+    socketPath: BACKTESTS_SOCKET_PATH,
+    list: () => listBacktests(fetch),
+    readDetail: (id) => readBacktest(fetch, id),
+    href: (id) => resolve('/backtests/[[backtestId]]', { backtestId: String(id) }),
+    openId: () => backtestId,
+    // A final backtest does not change any more.
+    isFinal: (detail, id) => detail.id === id && isFinalStatus(detail.status),
+    startHash: `#${START_BACKTEST_FORM_ID}`,
+  });
   let selectedTable: BacktestTable = $state('trades');
-  let isStartDialogOpen = $state(false);
   let isLimitsDialogOpen = $state(false);
   let forwardTestMessage = $state('');
   let isStartingForwardTest = $state(false);
 
-  const shownBacktest = $derived(backtest !== null && backtest.id === backtestId ? backtest : null);
+  const shownBacktest = $derived(workbench.detail !== null && workbench.detail.id === backtestId ? workbench.detail : null);
   // A forward test runs on live bars: the bar period of the backtest must be a live bar period.
   const hasLiveBarPeriod = $derived(shownBacktest !== null && isLiveBarPeriod(shownBacktest.bar_period));
 
@@ -142,97 +145,15 @@
     void goto(page.url.pathname + formatChartViewSearch(page.url.searchParams, view), { replace: true, reset: false });
   }
 
-  // /ws/backtests pushes each change of a backtest, also from other tabs, the assistant, and the backtest process.
-  $effect(() =>
-    readOnChange({
-      socketPath: BACKTESTS_SOCKET_PATH,
-      read: () => listBacktests(fetch),
-      onResult: (result) => {
-        isListRead = true;
-        if (result.kind === 'failed') {
-          listMessage = result.message;
-          return;
-        }
-        listMessage = '';
-        backtests = result.value;
-      },
-    }),
-  );
-
-  // /backtests opens the newest backtest. The same page component stays, so an open dialog stays open. A navigation
-  // that runs (for example a click on a header link) wins.
-  $effect(() => {
-    if (navigating.to !== null) {
-      return;
-    }
-    const newest = backtests.reduce<Backtest | undefined>(
-      (found, item) => (found === undefined || item.id > found.id ? item : found),
-      undefined,
-    );
-    if (backtestId === null && newest !== undefined) {
-      void goto(resolve('/backtests/[[backtestId]]', { backtestId: String(newest.id) }), {
-        replace: true,
-        reset: false,
-      });
-    }
-  });
-
-  // The open backtest reads again when its list row changes (status or metrics): the list comes from /ws/backtests.
-  const openListRowText = $derived(JSON.stringify(backtests.find((item) => item.id === backtestId) ?? null));
-
-  $effect(() => {
-    if (backtestId === null) {
-      return;
-    }
-    openListRowText satisfies string;
-    const id = backtestId;
-    // A final backtest does not change any more.
-    const shown = untrack(() => backtest);
-    if (shown !== null && shown.id === id && isFinalStatus(shown.status)) {
-      return;
-    }
-    let isActive = true;
-    void readBacktest(fetch, id).then((result) => {
-      if (!isActive) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        detailMessage = result.message;
-        return;
-      }
-      detailMessage = '';
-      backtest = result.value;
-    });
-    return () => {
-      isActive = false;
-    };
-  });
-
   // A new open backtest has no failed start of a forward test.
   $effect(() => {
     backtestId satisfies number | null;
     forwardTestMessage = '';
   });
 
-  // The command palette goes to #start-backtest.
-  $effect(() => {
-    if (page.url.hash === START_BACKTEST_HASH) {
-      isStartDialogOpen = true;
-    }
-  });
-
-  function changeStartDialog(open: boolean): void {
-    isStartDialogOpen = open;
-    if (!open && page.url.hash === START_BACKTEST_HASH) {
-      // Without the hash, the palette can open the dialog again.
-      // eslint-disable-next-line svelte/no-navigation-without-resolve -- the current path, without its hash.
-      void goto(page.url.pathname + page.url.search, { replace: true, reset: false });
-    }
-  }
-
   // A deleted open backtest: /backtests opens the newest backtest that is left.
   function removeDeletedBacktests(deletedIds: number[]): void {
-    backtests = backtests.filter((item) => !deletedIds.includes(item.id));
+    workbench.items = workbench.items.filter((item) => !deletedIds.includes(item.id));
     if (backtestId !== null && deletedIds.includes(backtestId)) {
       void goto(resolve('/backtests/[[backtestId]]', { backtestId: undefined }), { replace: true });
     }
@@ -283,7 +204,7 @@
         label="New backtest"
         icon={Add16}
         onclick={() => {
-          isStartDialogOpen = true;
+          workbench.isStartDialogOpen = true;
         }}
       />
       <IconButton
@@ -294,14 +215,14 @@
         }}
       />
     {/snippet}
-    <BacktestList {backtests} errorMessage={listMessage} openBacktestId={backtestId} onDeleted={removeDeletedBacktests} />
+    <BacktestList backtests={workbench.items} errorMessage={workbench.listMessage} openBacktestId={backtestId} onDeleted={removeDeletedBacktests} />
   </SideColumn>
 
   {#if shownBacktest === null}
-    <div class="empty-main">
-      {#if detailMessage !== ''}
-        <InlineNotification kind="error" title="Backtest not read" subtitle={detailMessage} lowContrast />
-      {:else if isListRead && backtests.length === 0 && listMessage === ''}
+    <div class="atrade-run-empty">
+      {#if workbench.detailMessage !== ''}
+        <InlineNotification kind="error" title="Backtest not read" subtitle={workbench.detailMessage} lowContrast />
+      {:else if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === ''}
         <EmptyText text="No backtests" />
       {/if}
     </div>
@@ -317,11 +238,11 @@
         {#if id === 'chart'}
           <Panel {...state} label={`Backtest #${String(detail.id)}`}>
             {#snippet header()}
-              <span class="run-status" role="status" aria-label="Backtest status">
+              <span class="atrade-run-status" role="status" aria-label="Backtest status">
                 <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
               </span>
-              <h1 class="run-title">
-                <span class="run-number">#{detail.id}</span>
+              <h1 class="atrade-run-title">
+                <span class="atrade-run-number">#{detail.id}</span>
                 <a class="cds--link" href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(detail.strategy_id), versionNumber: String(detail.version_number) })}
                   >{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
                 >
@@ -331,14 +252,14 @@
                 {:else if universeLabel !== undefined}
                   <span>{universeLabel}</span>
                 {/if}
-                <span class="run-period">{formatBarPeriod(detail.bar_period)}</span>
+                <span class="atrade-run-period">{formatBarPeriod(detail.bar_period)}</span>
                 {#if detail.sweep_id !== null}
                   <a class="cds--link" href={resolve('/sweeps/[[sweepId]]', { sweepId: String(detail.sweep_id) })}
                     >Parameter sweep #{detail.sweep_id}</a
                   >
                 {/if}
               </h1>
-              <span class="run-actions">
+              <span class="atrade-run-actions">
                 {#if chartInstrument !== undefined}
                   <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
                 {/if}
@@ -464,7 +385,7 @@
               <EmptyText text="No logs" />
             {:else}
               <ScrollRegion label="Logs" fill>
-                <pre class="log-text">{detail.error_message}</pre>
+                <pre class="atrade-run-log">{detail.error_message}</pre>
               </ScrollRegion>
             {/if}
           </Panel>
@@ -476,7 +397,11 @@
   <AssistantColumn />
 </Workbench>
 
-<StartBacktestDialog open={isStartDialogOpen} onOpenChange={changeStartDialog} onStarted={openStartedBacktest} />
+<StartBacktestDialog
+  open={workbench.isStartDialogOpen}
+  onOpenChange={workbench.changeStartDialog}
+  onStarted={openStartedBacktest}
+/>
 
 <Dialog
   open={isLimitsDialogOpen}
@@ -491,60 +416,11 @@
 </Dialog>
 
 <style>
-  .empty-main {
-    flex: 1;
-    min-inline-size: 0;
-  }
-
-  .run-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--cds-spacing-04);
-  }
-
-  /* One type size in the heading: Carbon links set their own size. */
-  .run-title > :global(*) {
-    font: inherit;
-    letter-spacing: inherit;
-  }
-
-  .run-number {
-    font-variant-numeric: tabular-nums;
-    color: var(--cds-text-secondary);
-  }
-
-  .run-period {
-    color: var(--cds-text-secondary);
-  }
-
-  .run-status {
-    display: flex;
-    flex: none;
-  }
-
-  .run-actions {
-    display: flex;
-    flex: none;
-    gap: var(--cds-spacing-02);
-    align-items: center;
-    margin-inline-start: auto;
-  }
-
   /* The chart fills the rest of the panel body and follows its size (EquityDrawdownChart fill). */
   .chart {
     position: relative;
     flex: 1;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
-  }
-
-  .log-text {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    color: var(--cds-text-error);
-    font-family: var(--cds-code-01-font-family);
-    font-size: var(--cds-code-01-font-size);
-    line-height: var(--cds-code-01-line-height);
-    white-space: pre-wrap;
   }
 </style>
