@@ -217,8 +217,11 @@ test('shows a note instead of an empty code difference for the same strategy ver
   await expect(page.locator('.cm-mergeView')).toContainText('from nautilus_trader.trading import Strategy');
   await expect(page.locator('.cm-collapsedLines')).toHaveCount(0);
   // The code scrolls inside its region, and CodeMirror draws the lines that the scroll shows.
-  await page.getByRole('region', { name: 'Code difference' }).evaluate((region) => {
-    region.scrollTop = region.scrollHeight;
-  });
-  await expect(page.locator('.cm-mergeView')).toContainText('self.submit_order(order)');
+  // The height of the lines that CodeMirror has not drawn is an estimate, so the scroll repeats until the end shows.
+  await expect(async () => {
+    await page.getByRole('region', { name: 'Code difference' }).evaluate((region) => {
+      region.scrollTop = region.scrollHeight;
+    });
+    await expect(page.locator('.cm-mergeView')).toContainText('self.submit_order(order)', { timeout: 500 });
+  }).toPass();
 });
