@@ -252,9 +252,9 @@
     if (id !== null) {
       // The address gives the first version only. A later version change writes the address (showOpenVersion).
       const versionNumber = untrack(() => addressVersionNumber);
-      void openStrategy.load(fetch, id, versionNumber).then((isCurrent) => {
+      void openStrategy.load(fetch, id, versionNumber).then(() => {
         // A diff card on another page opened this strategy for its diff.
-        const diffVersionNumber = isCurrent ? assistantSession.takeRequestedDiff(id) : null;
+        const diffVersionNumber = openStrategy.strategy?.id === id ? assistantSession.takeRequestedDiff(id) : null;
         if (diffVersionNumber !== null) {
           void openDiff(diffVersionNumber);
         }
@@ -284,9 +284,13 @@
       return;
     }
     if (fileTab === 'rules' && openStrategy.rules !== null && openStrategy.rulesWarning !== null) {
+      const id = strategy.id;
       isSaving = true;
       const result = await generateRulesCode(fetch, openStrategy.rules);
       isSaving = false;
+      if (openStrategy.strategy?.id !== id) {
+        return;
+      }
       if (result.kind === 'ok') {
         replacingCode = result.value;
         return;
@@ -310,10 +314,9 @@
         ? await saveStrategyVersion(fetch, id, openStrategy.code)
         : await saveStrategyRules(fetch, id, rulesToSave);
     isSaving = false;
-    problems = [];
+    showSaveProblems(id, []);
     if (result.kind === 'check_failed') {
-      problems = result.problems;
-      openOutput('problems');
+      showSaveProblems(id, result.problems);
       writeOutput(`Not saved: ${String(result.problems.length)} problems.`);
       return;
     }
@@ -331,15 +334,26 @@
     writeOutput(result.isNewVersion ? `Saved as ${label}.` : `Saved. The code is the same as ${label}.`);
   }
 
+  // A save can end after a strategy change: its problems do not belong to the strategy that is open then.
+  function showSaveProblems(id: number, saveProblems: CodeProblem[]): void {
+    if (openStrategy.strategy?.id !== id) {
+      return;
+    }
+    problems = saveProblems;
+    if (saveProblems.length > 0) {
+      openOutput('problems');
+    }
+  }
+
   async function openDiff(versionNumber: number): Promise<void> {
     if (strategy === null) {
       return;
     }
     const error = await assistantDiff.open(fetch, strategy.id, versionNumber);
-    if (error === null) {
-      panelSplit?.openPanel('editor');
-    } else {
+    if (error !== null) {
       writeOutputError(`Diff not read: ${error}`);
+    } else if (assistantDiff.isSelected) {
+      panelSplit?.openPanel('editor');
     }
   }
 
@@ -361,7 +375,7 @@
     }
     assistantDiff.close(versionNumber);
     const label = formatVersionLabel(strategy.name, versionNumber);
-    await openStrategy.readVersions(fetch, strategy.id);
+    await openStrategy.readVersions(fetch);
     writeOutput(`Discarded ${label}.`);
   }
 
@@ -537,7 +551,7 @@
             items={versionItems}
             value={String(openVersion?.version_number ?? '')}
             onValueChange={(versionNumber: string) => {
-              void openStrategy.openVersion(fetch, shownStrategy.id, Number(versionNumber));
+              void openStrategy.openVersion(fetch, Number(versionNumber));
             }}
           />
         </div>

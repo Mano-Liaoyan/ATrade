@@ -8,7 +8,7 @@ const RULES = { entry: 'rules of the fake backend' } as unknown as StrategyRules
 interface FakeBackend {
   fetchFunction: typeof fetch;
   /** Answers the waiting read of the path. */
-  answer: (path: string, status?: number) => Promise<void>;
+  answer: (path: string, status?: number, body?: unknown) => Promise<void>;
 }
 
 function findAnswerBody(path: string): unknown {
@@ -42,14 +42,15 @@ function createBackend(): FakeBackend {
     });
   return {
     fetchFunction,
-    answer: async (path, status = 200) => {
+    answer: async (path, status = 200, body) => {
       const fullPath = `/api/strategies/${path}`;
       const answer = waiting.get(fullPath);
       if (answer === undefined) {
         throw new Error(`No waiting read of ${fullPath}. Waiting: ${[...waiting.keys()].join(', ')}`);
       }
       waiting.delete(fullPath);
-      answer(new Response(JSON.stringify(status === 200 ? findAnswerBody(fullPath) : { detail: 'Read failed.' }), { status }));
+      const shownBody = status === 200 ? (body ?? findAnswerBody(fullPath)) : { detail: 'Read failed.' };
+      answer(new Response(JSON.stringify(shownBody), { status }));
       await settle();
     },
   };
@@ -73,6 +74,25 @@ function createOpenStrategy(): { openStrategy: OpenStrategy; errors: string[]; o
   });
   return { openStrategy, errors, openedVersions };
 }
+
+async function createLoadedOpenStrategy(backend: FakeBackend): Promise<ReturnType<typeof createOpenStrategy>> {
+  const created = createOpenStrategy();
+  const load = created.openStrategy.load(backend.fetchFunction, 1, 1);
+  await backend.answer('1');
+  await backend.answer('1/versions/1');
+  await load;
+  return created;
+}
+
+const NEW_VERSION_LIST = {
+  id: 1,
+  name: 'Strategy 1',
+  versions: [
+    { version_number: 1, source: 'rule_builder', discarded: false },
+    { version_number: 2, source: 'code', discarded: false },
+    { version_number: 3, source: 'code', discarded: false },
+  ],
+};
 
 describe('OpenStrategy', () => {
   beforeEach(() => {
@@ -104,8 +124,8 @@ describe('OpenStrategy', () => {
     expect(openStrategy.version?.strategy_id).toBe(2);
     expect(openStrategy.code).toBe('code 2.2');
     expect(openedVersions).toEqual(['2.2']);
-    expect(await firstLoad).toBe(false);
-    expect(await secondLoad).toBe(true);
+    await firstLoad;
+    await secondLoad;
   });
 
   it('drops the read error of the old strategy', async () => {
@@ -134,8 +154,8 @@ describe('OpenStrategy', () => {
     expect(openStrategy.strategy?.id).toBe(2);
     expect(openStrategy.code).toBe('code 2.2');
     expect(openedVersions).toEqual(['2.2']);
-    expect(await firstLoad).toBe(false);
-    expect(await secondLoad).toBe(true);
+    await firstLoad;
+    await secondLoad;
   });
 
   it('drops a rules read and its error after a strategy change', async () => {
@@ -150,30 +170,52 @@ describe('OpenStrategy', () => {
     expect(openStrategy.version).toBeNull();
     expect(errors).toEqual([]);
     expect(openedVersions).toEqual([]);
-    expect(await load).toBe(false);
+    await load;
   });
 
   it('opens the last selected version of a strategy', async () => {
     const backend = createBackend();
-    const { openStrategy, openedVersions } = createOpenStrategy();
-    const firstOpen = openStrategy.openVersion(backend.fetchFunction, 1, 2);
-    const secondOpen = openStrategy.openVersion(backend.fetchFunction, 1, 1);
+    const { openStrategy, openedVersions } = await createLoadedOpenStrategy(backend);
+    const firstOpen = openStrategy.openVersion(backend.fetchFunction, 2);
+    const secondOpen = openStrategy.openVersion(backend.fetchFunction, 1);
     await backend.answer('1/versions/1');
     await backend.answer('1/versions/2');
 
     expect(openStrategy.code).toBe('code 1.1');
-    expect(openedVersions).toEqual(['1.1']);
-    expect(await firstOpen).toBe(false);
-    expect(await secondOpen).toBe(true);
+    expect(openedVersions).toEqual(['1.1', '1.1']);
+    await firstOpen;
+    await secondOpen;
+  });
+
+  it('keeps the version list of a save when a version pick replaces the save read', async () => {
+    const backend = createBackend();
+    const { openStrategy } = await createLoadedOpenStrategy(backend);
+    const reload = openStrategy.reload(backend.fetchFunction, 1, 3);
+    const pick = openStrategy.openVersion(backend.fetchFunction, 2);
+    await backend.answer('1', 200, NEW_VERSION_LIST);
+    await backend.answer('1/versions/2');
+    await backend.answer('1/versions/1');
+    await Promise.all([reload, pick]);
+
+    expect(openStrategy.strategy?.versions).toHaveLength(3);
+    expect(openStrategy.code).toBe('code 1.2');
+  });
+
+  it('keeps the version list of a Discard when a version pick starts during the read', async () => {
+    const backend = createBackend();
+    const { openStrategy } = await createLoadedOpenStrategy(backend);
+    const read = openStrategy.readVersions(backend.fetchFunction);
+    const pick = openStrategy.openVersion(backend.fetchFunction, 1);
+    await backend.answer('1', 200, NEW_VERSION_LIST);
+    await backend.answer('1/versions/1');
+    await Promise.all([read, pick]);
+
+    expect(openStrategy.strategy?.versions).toHaveLength(3);
   });
 
   it('does not open the saved strategy when the save ends after a strategy change', async () => {
     const backend = createBackend();
-    const { openStrategy } = createOpenStrategy();
-    const load = openStrategy.load(backend.fetchFunction, 1, 1);
-    await backend.answer('1');
-    await backend.answer('1/versions/1');
-    await load;
+    const { openStrategy } = await createLoadedOpenStrategy(backend);
     openStrategy.reset();
     const secondLoad = openStrategy.load(backend.fetchFunction, 2, 1);
     await backend.answer('2');
@@ -183,17 +225,13 @@ describe('OpenStrategy', () => {
 
     expect(openStrategy.strategy?.id).toBe(2);
     expect(openStrategy.code).toBe('code 2.1');
-    expect(await secondLoad).toBe(true);
+    await secondLoad;
   });
 
   it('drops a read of the version list after a strategy change', async () => {
     const backend = createBackend();
-    const { openStrategy } = createOpenStrategy();
-    const load = openStrategy.load(backend.fetchFunction, 1, 1);
-    await backend.answer('1');
-    await backend.answer('1/versions/1');
-    await load;
-    const read = openStrategy.readVersions(backend.fetchFunction, 1);
+    const { openStrategy } = await createLoadedOpenStrategy(backend);
+    const read = openStrategy.readVersions(backend.fetchFunction);
     openStrategy.reset();
     await backend.answer('1');
     await read;
@@ -209,7 +247,7 @@ describe('OpenStrategy', () => {
     await backend.answer('1/versions/2');
     await backend.answer('1/versions/1', 500);
 
-    expect(await load).toBe(true);
+    await load;
     expect(openStrategy.code).toBe('code 1.2');
     expect(errors).toEqual(['Rules not read: Read failed.']);
     expect(openedVersions).toEqual(['1.2']);
@@ -217,13 +255,9 @@ describe('OpenStrategy', () => {
 
   it('keeps a code draft for the open version and opens it again', async () => {
     const backend = createBackend();
-    const { openStrategy } = createOpenStrategy();
-    const load = openStrategy.load(backend.fetchFunction, 1, 1);
-    await backend.answer('1');
-    await backend.answer('1/versions/1');
-    await load;
+    const { openStrategy } = await createLoadedOpenStrategy(backend);
     openStrategy.changeCode('edited code');
-    const open = openStrategy.openVersion(backend.fetchFunction, 1, 1);
+    const open = openStrategy.openVersion(backend.fetchFunction, 1);
     await backend.answer('1/versions/1');
     await open;
 
