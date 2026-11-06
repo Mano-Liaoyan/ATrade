@@ -32,7 +32,9 @@ interface StrategyVersion {
 
 async function createStrategy(request: APIRequestContext, name: string): Promise<{ id: number; version: StrategyVersion }> {
   // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
-  const strategy = (await (await request.post('/api/strategies', { data: { name } })).json()) as { id: number };
+  const response = await request.post('/api/strategies', { data: { name } });
+  expect(response.status(), await response.text()).toBe(201);
+  const strategy = (await response.json()) as { id: number };
   const version = (await (await request.get(`/api/strategies/${String(strategy.id)}/versions/1`)).json()) as StrategyVersion;
   return { id: strategy.id, version };
 }
@@ -55,7 +57,7 @@ async function startBacktest(
       paper_capital_usd: '10000',
     },
   });
-  expect(response.status()).toBe(201);
+  expect(response.status(), await response.text()).toBe(201);
   return ((await response.json()) as { id: number }).id;
 }
 

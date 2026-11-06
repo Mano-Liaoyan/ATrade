@@ -1,5 +1,5 @@
 // readOnChange: a read at once, after each socket open, and after each "changed" message; one read at a time.
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import { readOnChange, type LiveSocketOptions } from './index';
 
 const LOCATION = { protocol: 'http:', host: 'localhost' };
@@ -117,11 +117,7 @@ describe('readOnChange', () => {
     const { socket, openSocket } = createFakeSocket();
     const results: number[] = [];
     let readCount = 0;
-    // readNow keeps the rejection for the browser console. The test runner must not count it as an error.
-    const runnerListeners = process.listeners('unhandledRejection');
-    const rejections: unknown[] = [];
-    process.removeAllListeners('unhandledRejection');
-    process.on('unhandledRejection', (reason) => rejections.push(reason));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     readOnChange({
       socketPath: '/ws/x',
       read: () => {
@@ -135,12 +131,10 @@ describe('readOnChange', () => {
     await settle();
     socket.options?.onMessage({ type: 'changed' });
     await settle();
-    await new Promise((resolve) => setTimeout(resolve));
-    process.removeAllListeners('unhandledRejection');
-    runnerListeners.forEach((listener) => process.on('unhandledRejection', listener));
 
     expect(results).toEqual([2]);
-    expect(rejections).toHaveLength(1);
+    expect(consoleError).toHaveBeenCalledOnce();
+    consoleError.mockRestore();
   });
 
   it('closes the socket at stop and gives no result after it', async () => {
