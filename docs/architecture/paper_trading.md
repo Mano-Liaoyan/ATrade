@@ -129,7 +129,9 @@ orders only when all 4 conditions are true:
   ID of the row, the Web client ID, and the account of the row. Both values
   are `null` when the check did not pass or IB Gateway does not answer.
   `reqExecutions` returns only the executions of the current day (section
-  21), so an older fill shows `filled_quantity` `"0"`.
+  21), so an older fill shows `filled_quantity` `"0"`. `filled_quantity` does
+  not include a held fill (`ibkr.md`): a fill without its commission report
+  counts when the report arrives.
 - The "Filled today" tab of the home page and the instrument page shows the
   list "Filled orders by hand"
   (`FilledManualOrderList.svelte`, `ScrollRegion` with the same label): the

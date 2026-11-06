@@ -5,6 +5,7 @@ replace only the socket: IB Gateway messages go into the real `ib_async` wrapper
 """
 
 import asyncio
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -83,6 +84,48 @@ async def test_holds_a_fill_until_its_commission_report_arrives(gateway: Gateway
 
     assert held == []
     assert [execution.commission for execution in released] == [Decimal("1.25")]
+
+
+@pytest.mark.anyio
+async def test_a_held_fill_gets_one_warning_and_stops_the_wait_of_later_reads(
+    gateway: GatewayMessages, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    gateway.send_live_execution()
+    await gateway.connection.read_executions()
+    caplog.clear()
+    monkeypatch.setattr(gateway_connection_module, "COMMISSION_REPORT_WAIT_SECONDS", 60.0)
+
+    with caplog.at_level(logging.WARNING, logger="atrade.ibkr"):
+        async with asyncio.timeout(1):
+            await gateway.connection.read_executions()
+            await gateway.connection.read_executions()
+
+    assert caplog.messages == []
+    gateway.send_commission_report(1.25)
+    assert len(await gateway.connection.read_executions()) == 1
+
+
+@pytest.mark.anyio
+async def test_the_warning_of_a_held_fill_names_the_execution(
+    gateway: GatewayMessages, caplog: pytest.LogCaptureFixture
+) -> None:
+    gateway.send_live_execution()
+
+    with caplog.at_level(logging.WARNING, logger="atrade.ibkr"):
+        await gateway.connection.read_executions()
+
+    [message] = caplog.messages
+    assert EXECUTION_ID in message
+
+
+@pytest.mark.anyio
+async def test_a_read_with_held_fills_returns_them_with_their_state(gateway: GatewayMessages) -> None:
+    gateway.send_live_execution()
+
+    [execution] = await gateway.connection.read_executions(include_held=True)
+
+    assert execution.execution_id == EXECUTION_ID
+    assert not execution.is_commission_reported
 
 
 @pytest.mark.anyio

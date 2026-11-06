@@ -225,6 +225,15 @@ This replaces the rules above:
   each execId once, so a fill that the execution client saved adds no row.
   `reqExecutions` returns only the current day, so a fill stays lost when no
   child reads it on its day.
+- A held fill (`ibkr.md`, no commission report yet) of the forward test fails
+  step 5: the status is `stop_failed`, and the worker runs the stop steps
+  again on a new connection. No transfer to "By hand" happens before the fill
+  is in the ledger. End condition: the retries end when the report arrives,
+  or when the fill is 5 minutes old (`COMMISSION_REPORT_LIMIT`, measured from
+  the execution time). At that age, the child saves the fill with commission
+  0 and logs a warning with the execId. A wrong commission costs less than a
+  wrong owner position. A held fill that is already this old at the first
+  read gets only the 2 second wait of `read_executions()`.
 
 ## 12.7 Recovery after restart
 
@@ -241,7 +250,9 @@ This replaces the rules above:
   1. Cancel all open orders of this client ID (section 12.6). This prevents
      duplicate orders. Then save the fills of this forward test (step 5 of
      section 12.6), so that the owner position is correct before the
-     `LiveNode` starts.
+     `LiveNode` starts. A held fill is not a crash: the child runs the start
+     steps again every 30 seconds with the status `waiting_for_gateway`, with
+     the end condition of section 12.6.
   2. Start the `LiveNode`. Set `external_order_instrument_ids` and
      `reconciliation_instrument_ids` to the instrument. The account position
      on this instrument belongs to this strategy (section 12.2).
@@ -639,7 +650,7 @@ Phase 3 table changes (#146). The column names are choices of this document.
 | `waiting_for_gateway` | IB Gateway is not reachable. The child retries every 30 seconds, or the worker starts a new child after a lost Gateway. The client ID stays taken. |
 | `stopping` | The worker sent the stop request, or a `cancel_orders` child runs. |
 | `stopped` | The orders are cancelled and the child ended. The client ID is free. |
-| `stop_failed` | A cancel failed. The client ID stays taken. The next comparison starts a `cancel_orders` child again. |
+| `stop_failed` | A cancel or the save of a fill failed. The client ID stays taken. The next comparison starts a `cancel_orders` child again. |
 | `failed` | The paper account check failed (client ID free, no retry), or 3 crashes in a row (client ID taken until a stop cancels the orders). |
 
 - Writers: the Web process inserts the row (`desired_state = running`,

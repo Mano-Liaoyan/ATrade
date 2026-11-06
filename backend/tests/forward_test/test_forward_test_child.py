@@ -6,7 +6,8 @@ The IBKR connection is the fake. The function that runs the LiveNode is a fake: 
 """
 
 import asyncio
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -28,7 +29,7 @@ from atrade.forward_test import (
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.order_ref import MANUAL_ORDER_REF
 from atrade.foundation.settings import Settings
-from atrade.ibkr import AccountValue
+from atrade.ibkr import AccountValue, Execution
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import (
     FakeGatewayConnection,
@@ -49,6 +50,7 @@ CHILD_NOW_UTC = datetime(2026, 1, 2, 3, 10, 30, tzinfo=UTC)
 TEST_GATEWAY_RETRY_SECONDS = 0.01
 FORWARD_TEST_CLIENT_ID = 10
 WEB_CLIENT_ID = 1
+HELD_EXECUTION_ID = "0000e0d5.held"
 
 type JsonObject = dict[str, Any]
 
@@ -552,6 +554,109 @@ async def test_the_stop_saves_only_the_fills_of_this_forward_test_after_the_canc
         ("AAPL", "NASDAQ", Decimal(10), Decimal(0)),
         ("AAPL", "NASDAQ", Decimal(-5), Decimal(0)),
     ]
+
+
+def make_held_execution(forward_test_id: int, *, time_utc: datetime) -> Execution:
+    execution = make_execution(
+        ACCOUNT_ID,
+        order_id=8,
+        quantity="10",
+        price="20.5",
+        client_id=FORWARD_TEST_CLIENT_ID,
+        execution_id=HELD_EXECUTION_ID,
+        order_ref=f"O-20260102-030405-001-FT{forward_test_id}-1",
+        is_commission_reported=False,
+    )
+    return replace(execution, time_utc=time_utc)
+
+
+@pytest.mark.anyio
+async def test_a_stop_with_a_held_fill_fails_and_the_retry_saves_the_fill(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    gateway_connection = make_forward_test_gateway()
+    held = make_held_execution(forward_test["id"], time_utc=CHILD_NOW_UTC - timedelta(minutes=1))
+    gateway_connection.executions = [held]
+    settings = make_settings(database_url, frontend_build_dir)
+
+    exit_code, _ = await run_child(settings, forward_test["id"], "cancel_orders", FakeLiveNode(gateway_connection))
+
+    assert exit_code == 1
+    assert read_ledger_fills(database_url) == []
+    listed = (await web_client.get(FORWARD_TESTS_PATH)).json()[0]
+    assert HELD_EXECUTION_ID in listed["error_message"]
+
+    gateway_connection.executions = [replace(held, commission=Decimal("1.25"), is_commission_reported=True)]
+    retry_exit_code, _ = await run_child(
+        settings, forward_test["id"], "cancel_orders", FakeLiveNode(gateway_connection)
+    )
+
+    assert retry_exit_code == 0
+    assert read_ledger_fills(database_url) == [("AAPL", "NASDAQ", Decimal(10), Decimal("1.25"))]
+
+
+@pytest.mark.anyio
+async def test_the_stop_ends_with_commission_0_when_the_report_does_not_come_in_5_minutes(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    gateway_connection = make_forward_test_gateway()
+    gateway_connection.executions = [
+        make_held_execution(forward_test["id"], time_utc=CHILD_NOW_UTC - timedelta(minutes=5))
+    ]
+
+    with caplog.at_level(logging.WARNING, logger="atrade.forward_test_child"):
+        exit_code, _ = await run_child(
+            make_settings(database_url, frontend_build_dir),
+            forward_test["id"],
+            "cancel_orders",
+            FakeLiveNode(gateway_connection),
+        )
+
+    assert exit_code == 0
+    assert read_ledger_fills(database_url) == [("AAPL", "NASDAQ", Decimal(10), Decimal(0))]
+    assert any(HELD_EXECUTION_ID in message for message in caplog.messages)
+
+
+@pytest.mark.anyio
+async def test_a_restart_with_a_held_fill_waits_for_the_report_and_is_not_a_crash(
+    web_client: httpx.AsyncClient, database_url: str, frontend_build_dir: Path
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    gateway_connection = make_forward_test_gateway()
+    held = make_held_execution(forward_test["id"], time_utc=CHILD_NOW_UTC - timedelta(minutes=1))
+    gateway_connection.executions = [held]
+    read_executions = gateway_connection.read_executions
+
+    async def read_and_then_report(*, include_held: bool = False) -> list[Execution]:
+        executions = await read_executions(include_held=include_held)
+        gateway_connection.executions = [replace(held, commission=Decimal("1.25"), is_commission_reported=True)]
+        return executions
+
+    gateway_connection.read_executions = read_and_then_report  # pyright: ignore[reportAttributeAccessIssue]
+    live_node = FakeLiveNode(gateway_connection)
+    run_fake_live_node = live_node.run_live_node
+    fills_at_start: list[tuple[str, str, Decimal, Decimal]] = []
+
+    async def run_live_node(live_node_input: LiveNodeInput, stop_requested: asyncio.Event) -> LiveNodeEnd:
+        fills_at_start.extend(read_ledger_fills(database_url))
+        stop_requested.set()
+        return await run_fake_live_node(live_node_input, stop_requested)
+
+    live_node.run_live_node = run_live_node  # pyright: ignore[reportAttributeAccessIssue]
+
+    exit_code, opened_client_ids = await run_child(
+        make_settings(database_url, frontend_build_dir),
+        forward_test["id"],
+        "run",
+        live_node,
+        ChildRunOptions(is_stop_requested_at_start=False),
+    )
+
+    assert exit_code == 0
+    assert fills_at_start == [("AAPL", "NASDAQ", Decimal(10), Decimal("1.25"))]
+    assert len(opened_client_ids) == 3
 
 
 @pytest.mark.anyio

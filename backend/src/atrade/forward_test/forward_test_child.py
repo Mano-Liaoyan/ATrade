@@ -10,6 +10,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from datetime import timedelta
 from decimal import Decimal
 from typing import Literal
 
@@ -45,8 +46,14 @@ SUCCESS_EXIT_CODE = 0
 FAILURE_EXIT_CODE = 1
 # When IB Gateway is not reachable, the child tries again after this time (section 12.5).
 GATEWAY_RETRY_SECONDS = 30.0
+# The end condition of a retry for a held fill: at this age, ATrade saves the fill with commission 0 (section 12.6).
+COMMISSION_REPORT_LIMIT = timedelta(minutes=5)
 
 logger = logging.getLogger("atrade.forward_test_child")
+
+
+class HeldFillError(GatewayRequestError):
+    """A fill of the forward test has no commission report yet. A later read on a new connection tries again."""
 
 
 @dataclass(frozen=True)
@@ -194,14 +201,24 @@ async def save_fills(job: ChildJob, gateway_connection: GatewayConnection) -> No
 
     A fill after a crash, a lost IB Gateway, or the last read of the LiveNode has no other way into the owner ledger.
     The owner ledger stores each execId once. reqExecutions returns only the current day (section 12.6).
+
+    Raises HeldFillError for a held fill that is younger than COMMISSION_REPORT_LIMIT. An older one is saved with
+    commission 0, because a wrong commission costs less than a wrong owner position.
     """
     executions = [
         execution
-        for execution in await gateway_connection.read_executions()
+        for execution in await gateway_connection.read_executions(include_held=True)
         if read_order_source(execution.order_ref).forward_test_id == job.row.id
     ]
     if not executions:
         return
+    held = [execution for execution in executions if not execution.is_commission_reported]
+    now_utc = job.ibkr_access.clock.read_now_utc()
+    for execution in held:
+        if now_utc - execution.time_utc < COMMISSION_REPORT_LIMIT:
+            message = f"Execution {execution.execution_id} has no commission report."
+            raise HeldFillError(message)
+        logger.warning("Forward test %s: execution %s has commission 0.", job.row.id, execution.execution_id)
     # The exchange of an execution is the venue, not the primary exchange of the instrument.
     instruments = {
         (instrument.symbol, instrument.currency): instrument for instrument in await read_forward_test_instruments(job)
@@ -216,7 +233,7 @@ async def save_fills(job: ChildJob, gateway_connection: GatewayConnection) -> No
     for execution in executions:
         instrument = instruments.get((execution.symbol, execution.currency))
         if instrument is None:
-            logger.warning("Forward test %s: order %s has no instrument.", job.row.id, execution.order_id)
+            logger.warning("Forward test %s: execution %s has no instrument.", job.row.id, execution.execution_id)
             continue
         await ledger.save_fill(make_owner_fill(job, execution, instrument))
 
@@ -246,6 +263,10 @@ async def prepare_live_node_start(job: ChildJob) -> CheckedAccount | int:
             for order in await gateway_connection.read_own_open_orders():
                 await gateway_connection.cancel_order_and_wait(order.order_id)
             await save_fills(job, gateway_connection)
+        except HeldFillError as error:
+            # Not a crash. The start steps run again after the retry time, until the fill is saved (section 12.7).
+            logger.warning("Forward test %s: %s", job.row.id, error)
+            return GATEWAY_UNREACHABLE_EXIT_CODE
         except GatewayRequestError as error:
             await write_error_message(
                 job, f"The open orders were not cancelled or their fills were not saved before the start: {error}"

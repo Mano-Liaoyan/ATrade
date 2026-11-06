@@ -268,9 +268,9 @@ class FakeGatewayConnection:
             raise GatewayRequestError(self.cancel_error_message)
         await self.cancel_order(order_id)
 
-    async def read_executions(self) -> list[Execution]:
+    async def read_executions(self, *, include_held: bool = False) -> list[Execution]:
         self.require_connection()
-        return list(self.executions)
+        return [execution for execution in self.executions if include_held or execution.is_commission_reported]
 
     async def read_historical_bars(
         self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
@@ -415,6 +415,7 @@ def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument
     order_ref: str = "",
     symbol: str = "AAPL",
     currency: str = "USD",
+    is_commission_reported: bool = True,
 ) -> Execution:
     """One fill from reqExecutions. The default execution ID is unique for the order, the quantity, and the price."""
     return Execution(
@@ -427,6 +428,7 @@ def make_execution(  # noqa: PLR0913 readability-exception: one keyword argument
         quantity=Decimal(quantity),
         price=Decimal(price),
         commission=Decimal(commission),
+        is_commission_reported=is_commission_reported,
         order_ref=order_ref,
         symbol=symbol,
         currency=currency,
