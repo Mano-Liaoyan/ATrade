@@ -5,6 +5,7 @@ Each `run_node` is one start of a forward test child. The restart steps: send an
 the strategy position. Then a stock split changes the owner position, and a restart restores the new position.
 """
 
+import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -21,6 +22,7 @@ from tests.forward_test.atrade_clients_node import (
     BUY_QUANTITY,
     CLIENT_ID,
     FORWARD_TEST_ID,
+    POLL_SECONDS,
     ClientsWorld,
     make_strategy,
     make_world,
@@ -189,3 +191,32 @@ async def test_two_equal_partial_fills_of_one_order_both_go_into_the_owner_ledge
 
     assert world.ledger.read_quantity(FORWARD_TEST_ID, APPLE) == BUY_QUANTITY
     assert strategy.positions_at_stop == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))]
+
+
+@pytest.mark.anyio
+async def test_the_client_connects_again_after_a_gateway_restart_and_reads_the_fill_of_the_gap(
+    database_url: str,
+) -> None:
+    """ib_async does not connect again by itself. The order stays open at IBKR and fills while the socket is down."""
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        open_order = world.gateway.open_orders.pop()
+        world.gateway.connected = False
+        world.gateway.is_gateway_reachable = False
+        world.gateway.executions.append(
+            make_execution(
+                ACCOUNT_ID, order_id=open_order.order_id, quantity="10", price=FILL_PRICE, client_id=CLIENT_ID
+            )
+        )
+        # The failed connect does not end the fill check.
+        await asyncio.sleep(POLL_SECONDS * 5)
+        assert world.ledger.fills == []
+        world.gateway.is_gateway_reachable = True
+        await wait_until(lambda: strategy.own_positions() == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))])
+
+    assert world.gateway.connected is False  # The stop disconnects.
+    assert world.ledger.read_quantity(FORWARD_TEST_ID, APPLE) == BUY_QUANTITY

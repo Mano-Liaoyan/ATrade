@@ -8,6 +8,8 @@ and keeps its fills in the owner ledger (docs/architecture/forward_test.md secti
   sends a fill for each new execution (execId) of an order that it sent in this run. It reads them once more at the
   stop. A failed save is tried again at the next read. The child saves all other fills after each cancel step
   (section 12.6).
+- ib_async does not connect again by itself. The fill check connects again after a socket loss, for example at the
+  daily IB Gateway restart, and then reads the fills of the gap (section 12.7).
 - Reconciliation reports the owner positions and the owner cash, not the account positions and the account cash.
 """
 
@@ -59,7 +61,7 @@ from atrade.forward_test.atrade_instruments import PRICE_PRECISION, create_instr
 from atrade.forward_test.owner_ledger import OwnerFill, OwnerLedger, OwnerOrder
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.order_ref import read_order_source
-from atrade.ibkr import Execution, GatewayRequestError, OpenOrder, OrderRequest
+from atrade.ibkr import Execution, GatewayRequestError, GatewayStatus, OpenOrder, OrderRequest
 from atrade.ibkr import OrderSide as IbkrOrderSide
 from atrade.ibkr import OrderType as IbkrOrderType
 from atrade.ibkr import TimeInForce as IbkrTimeInForce
@@ -68,6 +70,7 @@ from atrade.strategy import FORWARD_TEST_VENUE
 OWNER_LEDGER_EXECUTION_CLIENT_NAME = "ATRADE_OWNER_LEDGER"
 ACCOUNT_CURRENCY = "USD"
 DEFAULT_FILL_CHECK_INTERVAL_SECONDS = 1.0
+DEFAULT_RECONNECT_INTERVAL_SECONDS = 10.0
 NANOSECONDS_PER_SECOND = 1_000_000_000
 ORDER_TYPES: dict[OrderType, IbkrOrderType] = {OrderType.MARKET: "MKT", OrderType.LIMIT: "LMT"}
 TIMES_IN_FORCE: dict[TimeInForce, IbkrTimeInForce] = {TimeInForce.DAY: "DAY", TimeInForce.GTC: "GTC"}
@@ -82,6 +85,8 @@ class OrderGateway(Protocol):
     forward test."""
 
     async def connect(self) -> None: ...
+
+    def read_status(self) -> GatewayStatus: ...
 
     async def place_order(self, request: OrderRequest) -> int: ...
 
@@ -102,6 +107,7 @@ class OwnerLedgerInput:
     account_id: str
     instruments: tuple[Instrument, ...]
     fill_check_interval_seconds: float = DEFAULT_FILL_CHECK_INTERVAL_SECONDS
+    reconnect_interval_seconds: float = DEFAULT_RECONNECT_INTERVAL_SECONDS
 
 
 @dataclass
@@ -154,6 +160,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
         # IBKR order ID -> the order that this client sent in this run.
         self.sent_orders: dict[int, SentOrder] = {}
         self.fill_check_task: asyncio.Task[None] | None = None
+        self.next_reconnect_at = 0.0
 
     def add_instruments(self, instruments: tuple[Instrument, ...]) -> None:
         """The new members of a quarter of a multi-instrument forward test (section 12.17)."""
@@ -187,7 +194,19 @@ class OwnerLedgerExecutionClient(ExecutionClient):
     async def check_fills(self) -> None:
         while True:
             await asyncio.sleep(self.ledger_input.fill_check_interval_seconds)
+            await self.reconnect_after_socket_loss()
             await self.read_new_fills()
+
+    async def reconnect_after_socket_loss(self) -> None:
+        """Only for a lost socket: a Gateway without its IBKR link keeps the socket (status "no_ibkr_connection")."""
+        now = asyncio.get_running_loop().time()
+        if self.gateway.read_status() != "unreachable" or now < self.next_reconnect_at:
+            return
+        self.next_reconnect_at = now + self.ledger_input.reconnect_interval_seconds
+        try:
+            await self.gateway.connect()
+        except GatewayRequestError as error:
+            logger.warning("Forward test %s has no IB Gateway connection: %s", self.ledger_input.forward_test_id, error)
 
     async def read_new_fills(self) -> None:
         """A failed read or save does not stop the fill check. The next check tries the execution again."""

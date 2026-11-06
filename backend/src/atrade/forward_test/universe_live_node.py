@@ -275,7 +275,9 @@ async def run_universe_node(
     poller = UniversePoller(live_node_input, clients, strategy, options.clock)
     poll_task = asyncio.create_task(poller.keep_polling(options.poll_seconds))
     try:
-        return await wait_for_end_or_stop(live_node, live_node_input, stop_requested, options.gateway_watch)
+        return await wait_for_end_or_stop(
+            live_node, live_node_input, stop_requested, options.gateway_watch, clients.execution_factory.gateway
+        )
     finally:
         poll_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):

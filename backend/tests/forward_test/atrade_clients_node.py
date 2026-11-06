@@ -141,6 +141,7 @@ def build_node[LedgerT: OwnerLedger](
             account_id=ACCOUNT_ID,
             instruments=(APPLE,),
             fill_check_interval_seconds=POLL_SECONDS,
+            reconnect_interval_seconds=POLL_SECONDS,
         ),
         world.ledger,
         world.gateway,

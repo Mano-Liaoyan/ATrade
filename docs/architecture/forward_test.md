@@ -234,10 +234,19 @@ This replaces the rules above:
 
 ## 12.7 Recovery after restart
 
-- Daily IB Gateway restart: NautilusTrader reconnects and subscribes to bars
-  again. When the IB execution client is disconnected for more than 5 minutes,
-  the child exits. The worker waits for the Gateway (section 12.5) and starts
-  it again. This does not count toward the 3-crash limit.
+- Daily IB Gateway restart: the IB data client of NautilusTrader connects again
+  and subscribes to bars again. `ib_async` does not connect again by itself, so
+  the fill check of the ATrade execution client (section 12.19) connects again,
+  at most once every 10 seconds, and then reads the fills of the gap. Open
+  orders stay at IBKR and keep their order IDs, so these fills reach the owner
+  ledger. While the socket is down, the owner ledger check denies each order.
+  When IB Gateway is not reachable or the execution client has no socket for
+  more than 5 minutes, the child exits. The worker waits for the Gateway
+  (section 12.5) and starts it again. This does not count toward the 3-crash
+  limit.
+- A new connection does not run the paper account check again. The check runs
+  before each `LiveNode` start (section 12.5). Each order names the checked
+  paper account, and IBKR refuses it on any other login.
 - Other stops are a restart of the `forward-test` service, a server restart,
   or a child crash. After each of them, the worker restarts the forward test.
   It uses the same client ID and the same strategy version.
@@ -296,12 +305,12 @@ Implementation (#77):
   account check and before the `LiveNode` start (step 1), on the same
   connection. A failed cancel or a failed save of a fill there ends the child
   with exit code 1, which is a crash.
-- IB Gateway lost: the child opens a TCP connection to the Gateway port every
-  30 seconds while the `LiveNode` runs. After 5 minutes without a
-  connection, it stops the `LiveNode` and exits with code 4
-  (`GATEWAY_UNREACHABLE_EXIT_CODE`) without the stop steps. The NautilusTrader
-  2.0.0rc7 `LiveNode` does not show the connection state of its IB execution
-  client to Python, so the probe is the replacement. The worker writes
+- IB Gateway lost: the child opens a TCP connection to the Gateway port and
+  reads the socket state of the ATrade execution client every 30 seconds while
+  the `LiveNode` runs. The port alone is not enough, because it answers after a
+  Gateway restart before a new API connection exists. After 5 minutes without
+  both, it stops the `LiveNode` and exits with code 4
+  (`GATEWAY_UNREACHABLE_EXIT_CODE`) without the stop steps. The worker writes
   `waiting_for_gateway`, opens a `gateway` interruption, and starts a new
   `run` child, which waits for IB Gateway (section 12.5). `crash_count` does
   not change.
