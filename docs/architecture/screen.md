@@ -396,6 +396,24 @@ kinds:
 - A point-in-time run uses the rules of sections 23.1 and 24.5 with a date.
   It uses only bars that close at or before the rebalance. Its filter
   values must equal the values that the daily bar summary had at that date.
+- A stock split changes the stored bars in place (market_data.md section
+  8.13.3). Thus a stock split after the rebalance can change a stored value of
+  that date. The filters do not change:
+  - `last_price` is the real close of that date. The summary multiplies the
+    stored close by the split ratio of each confirmed stock split with a
+    later ex-date that changed the bar table of the last bar (market_data.md
+    section 8.11).
+  - `average_trading_value_20` uses close × volume. A stock split does not
+    change this value.
+  - `still_trading` and `exchange` use no price.
+- Limit: the summary does not multiply an IBKR close for a stock split of
+  the IBKR stock split check. The bar does not show if IBKR adjusted it. When
+  IBKR adjusted the bar, a later stock split changes `last_price`.
+- Limit: the indicator values of a point-in-time run stay adjusted for all
+  confirmed stock splits. A later stock split can change a `compare` or
+  `rank` condition on an absolute-price indicator, for example ATR compared
+  to a number. `close_versus_line` compares the adjusted close to an adjusted
+  line, so a later stock split does not change it.
 - Done in #208: `POST /api/backtests` takes a fixed list by
   `screen_result_id` (backtest.md section 10.10.6). The public entry of
   `screen` exports `read_screen_result_members(*, database_url,

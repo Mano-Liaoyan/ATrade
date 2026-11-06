@@ -989,6 +989,18 @@ Table `daily_bar_summary`: one row for each instrument.
   only the daily bars that start before `before_utc`, with the calculation of
   the saved summary. The point-in-time screen run of a backtest uses it
   (`screen.md` section 24.9). It saves nothing.
+- `read_daily_bar_summaries_before` gives the real close of the last day. It
+  multiplies the stored close by the split ratio of each confirmed stock
+  split (section 8.13.1) with an ex-date after that day, when that stock split
+  changed the bar table of the last bar. The average trading value does not
+  change, because a stock split does not change close × volume.
+  - `both_evidences`, `user_apply`, `import_check`, and `bar_evidence` with
+    the source `ibkr_evidence` change `ibkr_bar` and `databento_bar`
+    (section 8.13.3).
+  - `bar_evidence` with the source `databento_import` changes only
+    `databento_bar` (section 8.8.3.1). An IBKR bar before that ex-date can
+    have the real close or the adjusted close, and the bar does not show
+    which. The function does not multiply such a close.
 - Code (#195): `market_data/daily_bar_summary.py` (the bulk read and the
   summary), `market_data/daily_bar_update.py` (`DailyBarUpdate`, started by
   `app/web.py`). Tests: `tests/market_data/test_daily_bar_summary.py` and

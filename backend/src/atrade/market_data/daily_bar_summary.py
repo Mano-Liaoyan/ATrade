@@ -6,7 +6,7 @@ SQL statement, so a read of many instruments is one database query.
 """
 
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, LiteralString
@@ -35,6 +35,7 @@ class DailyBarSummary:
 @dataclass(frozen=True)
 class InstrumentBarRow:
     instrument_position: int
+    bar_source: str
     start_utc: datetime
     open: Decimal
     high: Decimal
@@ -70,7 +71,7 @@ def create_source_bars_query(bar_source: BarSource) -> sql.Composed:
         if other_source != bar_source
     ]
     return sql.SQL("""
-        SELECT bar.start_utc, bar.open, bar.high, bar.low, bar.close, bar.volume
+        SELECT {source_name} AS bar_source, bar.start_utc, bar.open, bar.high, bar.low, bar.close, bar.volume
         FROM {bar_table} AS bar
         WHERE bar.symbol = instrument.symbol AND bar.exchange = instrument.exchange
             AND bar.currency = instrument.currency AND bar.bar_period = %(bar_period)s
@@ -78,6 +79,7 @@ def create_source_bars_query(bar_source: BarSource) -> sql.Composed:
             AND {own_range}
             {earlier_sources}
     """).format(
+        source_name=sql.Literal(bar_source.value),
         bar_table=bar_table(bar_source),
         own_range=create_range_contains_bar(bar_source),
         earlier_sources=sql.SQL(" ").join(sql.SQL("AND ") + condition for condition in earlier_source_conditions),
@@ -89,8 +91,8 @@ LAST_DAILY_BARS_QUERY = sql.SQL("""
     WITH global_order AS (
         SELECT coalesce((SELECT bar_sources FROM source_order), %(default_source_order)s::text[]) AS bar_sources
     )
-    SELECT instrument.position AS instrument_position, merged.start_utc, merged.open, merged.high, merged.low,
-        merged.close, merged.volume
+    SELECT instrument.position AS instrument_position, merged.bar_source, merged.start_utc, merged.open, merged.high,
+        merged.low, merged.close, merged.volume
     FROM unnest(%(symbols)s::text[], %(exchanges)s::text[], %(currencies)s::text[])
             WITH ORDINALITY AS instrument (symbol, exchange, currency, position)
         CROSS JOIN global_order
@@ -136,15 +138,24 @@ def group_bar_rows(instruments: list[Instrument], rows: list[InstrumentBarRow]) 
     return {instrument: bars_by_instrument[instrument] for instrument in instruments}
 
 
-async def select_last_daily_bars(
-    connection: psycopg.AsyncConnection, instruments: list[Instrument], before_utc: datetime | None, bar_count: int
-) -> dict[Instrument, list[Bar]]:
-    unique_instruments = list(dict.fromkeys(instruments))
+async def select_last_daily_bar_rows(
+    connection: psycopg.AsyncConnection,
+    unique_instruments: list[Instrument],
+    before_utc: datetime | None,
+    bar_count: int,
+) -> list[InstrumentBarRow]:
     async with connection.cursor(row_factory=class_row(InstrumentBarRow)) as cursor:
         await cursor.execute(
             LAST_DAILY_BARS_QUERY, create_last_daily_bars_parameters(unique_instruments, before_utc, bar_count)
         )
-        rows = await cursor.fetchall()
+        return await cursor.fetchall()
+
+
+async def select_last_daily_bars(
+    connection: psycopg.AsyncConnection, instruments: list[Instrument], before_utc: datetime | None, bar_count: int
+) -> dict[Instrument, list[Bar]]:
+    unique_instruments = list(dict.fromkeys(instruments))
+    rows = await select_last_daily_bar_rows(connection, unique_instruments, before_utc, bar_count)
     return group_bar_rows(unique_instruments, rows)
 
 
@@ -184,16 +195,66 @@ def calculate_daily_bar_summary(instrument: Instrument, bars: list[Bar]) -> Dail
     )
 
 
+# The confirmed stock splits with an ex-date after the last day of a summary, that changed the bar table of its last
+# bar. A stock split that waits for the user check, or that the user rejected, changed no stored bar. A stock split of
+# the IBKR stock split check (`databento_import`, `bar_evidence`) changed only `databento_bar` (section 8.8.3.1). An
+# IBKR bar of that day has the real close or the adjusted close, and the bar does not show which: no ratio applies.
+SELECT_LATER_SPLITS: LiteralString = """
+    SELECT split.symbol, split.exchange, split.currency, split.split_ratio
+    FROM stock_split AS split
+    JOIN unnest(
+            %(symbols)s::text[], %(exchanges)s::text[], %(currencies)s::text[], %(last_day_start_utc)s::timestamptz[],
+            %(last_bar_sources)s::text[]
+        ) AS summary (symbol, exchange, currency, last_day_start_utc, last_bar_source)
+        ON split.symbol = summary.symbol AND split.exchange = summary.exchange
+            AND split.currency = summary.currency AND split.ex_date_utc > summary.last_day_start_utc
+    WHERE split.confirmation IN ('both_evidences', 'bar_evidence', 'user_apply', 'import_check')
+        AND NOT (
+            summary.last_bar_source = 'ibkr' AND split.source = 'databento_import'
+            AND split.confirmation = 'bar_evidence'
+        )
+"""
+
+
+async def restore_last_closes(
+    connection: psycopg.AsyncConnection, summaries: list[DailyBarSummary], last_bar_sources: dict[Instrument, str]
+) -> list[DailyBarSummary]:
+    """The summaries with the real close of the last day: the stored close times the split ratios of the later stock
+    splits. The average trading value needs no change, because a stock split does not change close x volume."""
+    cursor = await connection.execute(
+        SELECT_LATER_SPLITS,
+        {
+            **create_instrument_parameters([summary.instrument for summary in summaries]),
+            "last_day_start_utc": [summary.last_day_start_utc for summary in summaries],
+            "last_bar_sources": [last_bar_sources[summary.instrument] for summary in summaries],
+        },
+    )
+    ratios: defaultdict[Instrument, Decimal] = defaultdict(lambda: Decimal(1))
+    for symbol, exchange, currency, split_ratio in await cursor.fetchall():
+        ratios[Instrument(symbol=symbol, exchange=exchange, currency=currency)] *= split_ratio
+    return [replace(summary, last_close=summary.last_close * ratios[summary.instrument]) for summary in summaries]
+
+
 async def read_daily_bar_summaries_before(
     *, database_url: str, instruments: list[Instrument], before_utc: datetime
 ) -> list[DailyBarSummary]:
     """The summary rows that `instruments` had with only the daily bars that start before `before_utc`, in the order
-    of `instruments`. The same calculation as the saved summary, so a point-in-time screen run gets the values that
-    the summary had at that time (docs/architecture/screen.md section 24.9). An instrument without such bars has no
-    row. One database query."""
+    of `instruments`. The same calculation as the saved summary, and the real close of that day, so a point-in-time
+    screen run gets the values that the summary had at that time, also after a later stock split
+    (docs/architecture/screen.md section 24.9). An instrument without such bars has no row. 2 database queries in 1
+    snapshot."""
+    unique_instruments = list(dict.fromkeys(instruments))
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        bars_by_instrument = await select_last_daily_bars(connection, instruments, before_utc, SUMMARY_BAR_COUNT)
-    return [calculate_daily_bar_summary(instrument, bars) for instrument, bars in bars_by_instrument.items() if bars]
+        await connection.set_isolation_level(psycopg.IsolationLevel.REPEATABLE_READ)
+        rows = await select_last_daily_bar_rows(connection, unique_instruments, before_utc, SUMMARY_BAR_COUNT)
+        summaries = [
+            calculate_daily_bar_summary(instrument, bars)
+            for instrument, bars in group_bar_rows(unique_instruments, rows).items()
+            if bars
+        ]
+        # The rows of an instrument go from old to new, so the last row gives the bar source.
+        last_bar_sources = {unique_instruments[row.instrument_position - 1]: row.bar_source for row in rows}
+        return await restore_last_closes(connection, summaries, last_bar_sources)
 
 
 UPSERT_SUMMARIES_QUERY = sql.SQL("""
