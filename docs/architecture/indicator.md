@@ -786,7 +786,9 @@ section 6.2).
     colors keep their contrast), below a "B" mark and above an "S" mark.
   - The name, the values, and a shown button of a legend row over a mark
     take the pointer first. A hidden button does not, so the mark that the
-    Trades row centers in a short chart keeps its tooltip.
+    Trades row centers in a short chart keeps its tooltip. The last pointer
+    move makes a row active, not `:hover`, so the buttons of a row that moved
+    away from a still pointer take the next click in each browser.
 - Each trade of `GET /api/backtests/{backtest_id}` and each fill of
   `GET /api/forward-tests/{id}` gets `round_trip_net_profit_usd` (decimal
   text, or null). The backend calculates it with the round trip rule of the

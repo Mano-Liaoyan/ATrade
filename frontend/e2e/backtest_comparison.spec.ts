@@ -108,7 +108,7 @@ async function expectComparisonWorkbench(page: Page, chartPanel: Locator, labels
   await expect(tables.locator('.cm-mergeView')).toContainText(CHANGED_CODE_LINE);
   // Only the changed lines and a few lines around them show. The unchanged lines are collapsed.
   await expect(tables.locator('.cm-collapsedLines').first()).toBeVisible();
-  await expect(tables.locator('.cm-mergeView')).not.toContainText('class MovingAverageStrategy(Strategy):');
+  await expect(tables.locator('.cm-mergeView')).not.toContainText('Moving average cross: buy when the close');
   const diffTrack = tables.getByRole('scrollbar', { name: 'Code difference scroll bar' });
   await expect(diffTrack).toBeVisible();
   await expect(diffTrack.locator('.scroll-thumb')).toBeVisible();

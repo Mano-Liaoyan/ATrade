@@ -23,7 +23,17 @@
   const { bar = null, rows, actions }: Props = $props();
 
   const rowElements: HTMLLIElement[] = $state([]);
+  // The last pointer move sets this, not :hover. A row can move away from a pointer that stands still, for example when
+  // the OHLC row comes, and its buttons must still take the next click.
+  let activeRowIndex = $state(-1);
+
+  function findActiveRow(event: PointerEvent): void {
+    const { target } = event;
+    activeRowIndex = target instanceof Node ? rowElements.findIndex((element) => element.contains(target)) : -1;
+  }
 </script>
+
+<svelte:window onpointermovecapture={findActiveRow} />
 
 {#if bar !== null || rows.length > 0}
   <ul class="chart-legend" aria-label="Legend">
@@ -40,7 +50,10 @@
       </li>
     {/if}
     {#each rows as row, index (index)}
-      <li class={['legend-row', actions !== undefined && 'legend-row--actions', row.hidden && 'legend-row--hidden']} bind:this={rowElements[index]}>
+      <li
+        class={['legend-row', actions !== undefined && 'legend-row--actions', index === activeRowIndex && 'legend-row--active', row.hidden && 'legend-row--hidden']}
+        bind:this={rowElements[index]}
+      >
         {#if actions === undefined}
           <span class="legend-name">{row.name}</span>
         {:else}
@@ -108,7 +121,7 @@
 <style>
   /* The legend does not take pointer events, so the crosshair follows the pointer also over the legend. In a row with
      buttons, the name, the values, and a shown button take them, so a trade mark under a hidden button stays reachable.
-     The row with the pointer or the focus takes them all. */
+     The active row and the row with the focus take them all. */
   .chart-legend {
     margin: 0;
     padding: 0;
@@ -131,7 +144,7 @@
   .legend-row--actions .legend-name,
   .legend-row--actions .legend-value,
   .legend-row--actions .legend-action--shown,
-  .legend-row--actions:hover,
+  .legend-row--actions.legend-row--active,
   .legend-row--actions:focus-within {
     pointer-events: auto;
   }
@@ -168,12 +181,12 @@
     display: flex;
   }
 
-  /* The buttons show when the pointer is on the row or the focus is in it. They stay in the tab order. */
+  /* The buttons show in the active row and when the focus is in the row. They stay in the tab order. */
   .legend-action {
     opacity: 0;
   }
 
-  .legend-row:hover .legend-action,
+  .legend-row--active .legend-action,
   .legend-row:focus-within .legend-action,
   .legend-action--shown {
     opacity: 1;

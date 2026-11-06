@@ -39,7 +39,7 @@ async function openStrategyWithFakeBacktests(page: Page, currentTest: TestInfo, 
   await page.getByRole('button', { name: 'Create strategy' }).click();
   await expect(page).toHaveURL(/\/strategies\/\d+$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);
-  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('class MovingAverageStrategy(Strategy):');
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('Moving average cross: buy when the close');
   const strategyId = Number(page.url().split('/').at(-1));
   const backtests = Array.from({ length: count }, (_, index) => fakeBacktest(count - index, strategyId, count));
   await page.route('**/api/backtests', async (route) => {

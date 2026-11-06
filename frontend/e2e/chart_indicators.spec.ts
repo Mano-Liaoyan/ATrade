@@ -256,6 +256,7 @@ const LIGHT_COLOR_1 = '#6929c4';
 const DARK_COLOR_1 = '#8a3ffc';
 // Antialiasing gives some pixels of other lines a near color; a drawn line gives many more.
 const LINE_PIXELS = 200;
+const MOVED_ROW_WAIT_MS = 300;
 
 async function hoverRow(page: Page, name: string): Promise<Locator> {
   const row = legendRow(page, name);
@@ -269,6 +270,20 @@ async function addSma(page: Page): Promise<Locator> {
   await expect(row.locator('.legend-value')).toHaveText([NUMBER_PATTERN]);
   return row;
 }
+
+test('a legend row keeps its buttons when it moves away from a pointer that stands still', async ({ page }) => {
+  await openChart(page);
+  const row = await addSma(page);
+  await row.locator('.legend-name').hover();
+  await row.evaluate((element) => {
+    element.style.marginTop = '48px';
+  });
+  await page.waitForTimeout(MOVED_ROW_WAIT_MS);
+
+  await row.getByRole('button', { name: 'Settings for SMA 50' }).click({ timeout: 3000 });
+
+  await expect(page.getByRole('dialog', { name: 'SMA' })).toBeVisible();
+});
 
 test('Tab to a legend row shows its buttons', async ({ page }) => {
   await openChart(page);
