@@ -9,6 +9,7 @@ import { CredentialFile } from '../src/credential_file.ts';
 import { Logins, type LoginEvent } from '../src/logins.ts';
 import type { ModelSelection } from '../src/model_selection.ts';
 import { toToolRunEvents } from '../src/tool_events.ts';
+import type { ToolDetails } from '../src/tool_results.ts';
 import EVENT_LINES from './event_lines.json' with { type: 'json' };
 import { createFakeOpenModel } from './fake_model.ts';
 import { startFakeModelServer, type FakeModelServer } from './fake_model_server.ts';
@@ -33,10 +34,10 @@ afterEach(async () => {
 });
 
 /** The tool details without `type`. With `type`, the spread in tool_events.ts hides a renamed event. */
-function fieldsOf(line: { type: string }): object {
-  const fields: Partial<typeof line> = { ...line };
+function fieldsOf<Line extends { type: string }>(line: Line): Omit<Line, 'type'> {
+  const fields: Partial<Line> = { ...line };
   delete fields.type;
-  return fields;
+  return fields as Omit<Line, 'type'>;
 }
 
 test('a run emits the text and message end lines', async () => {
@@ -59,7 +60,8 @@ test('a failed run emits the error line', async () => {
 });
 
 test('the end of a tool call emits the tool lines', () => {
-  const details = {
+  // ToolDetails is the type of the real tool results, so tsc fails when a field of the file does not match them.
+  const details: ToolDetails = {
     backtest: { id: EVENT_LINES.tool_step.backtest_id, status: EVENT_LINES.tool_step.backtest_status },
     savedVersion: fieldsOf(EVENT_LINES.strategy_version_saved),
     finishedBacktestId: EVENT_LINES.backtest_finished.backtest_id,
