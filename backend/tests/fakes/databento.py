@@ -224,6 +224,8 @@ class FakeDatabentoClient:
         self.downloaded_job_ids: list[str] = []
         self.summary_downloads: list[tuple[date, date]] = []
         self.summary_end_reads = 0
+        # The next downloads that fail. Each failed download is in `summary_downloads`.
+        self.summary_download_failures = 0
         self.hourly_cost_requests: list[tuple[list[str], date, date]] = []
 
     def download_batch_job(self, job_id: str, output_dir: Path) -> list[Path]:
@@ -246,6 +248,9 @@ class FakeDatabentoClient:
             message = f"The EQUS.SUMMARY data ends on {self.summary_end}. The request ends on {end}."
             raise ValueError(message)
         self.summary_downloads.append((start, end))
+        if self.summary_download_failures > 0:
+            self.summary_download_failures -= 1
+            raise OSError
         records = [record for record in self.summary_records if start <= record.trading_day < end]
         dbn_file = DbnFile("EQUS.SUMMARY", DAILY_SCHEMA, start, end, daily_records=records)
         return write_dbn_files(output_dir, [dbn_file])[0]

@@ -35,7 +35,8 @@ class DatabentoClient(Protocol):
 
     def download_daily_summary(self, start: date, end: date, output_dir: Path) -> Path:
         """Downloads the EQUS.SUMMARY `ohlcv-1d` bars of all symbols from `start` to `end` (not included) to one DBN
-        file in `output_dir` and returns its path. This costs money (about 1.3 USD for a quarter)."""
+        file in `output_dir` and returns its path. This costs money (about 1.3 USD for a quarter). After an error, no
+        file is at that path."""
         ...
 
 
@@ -83,7 +84,10 @@ class DatabentoHistoricalClient:
     def download_daily_summary(self, start: date, end: date, output_dir: Path) -> Path:
         output_dir.mkdir(parents=True, exist_ok=True)
         path = output_dir / f"equs-summary-{start:%Y%m%d}-{end:%Y%m%d}.{DAILY_SCHEMA}.dbn.zst"
+        # `get_range` refuses a path that exists, and a failed stream leaves a partial file at its path.
+        partial_path = path.with_name(f"partial-{path.name}")
+        partial_path.unlink(missing_ok=True)
         self.historical.timeseries.get_range(
-            dataset=SUMMARY_DATASET, schema=DAILY_SCHEMA, symbols="ALL_SYMBOLS", start=start, end=end, path=path
+            dataset=SUMMARY_DATASET, schema=DAILY_SCHEMA, symbols="ALL_SYMBOLS", start=start, end=end, path=partial_path
         )
-        return path
+        return partial_path.replace(path)

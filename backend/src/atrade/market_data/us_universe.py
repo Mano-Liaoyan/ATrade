@@ -63,6 +63,10 @@ SELECT_MEMBERS: LiteralString = """
 
 HAS_MEMBERS: LiteralString = "SELECT EXISTS (SELECT 1 FROM us_universe_member WHERE quarter_start_utc = %s)"
 
+SELECT_CURRENT_QUARTER: LiteralString = (
+    "SELECT max(quarter_start_utc) FROM us_universe_member WHERE quarter_start_utc <= %s"
+)
+
 SELECT_LAST_BAR_DAY: LiteralString = """
     SELECT max(start_utc) FROM databento_bar WHERE currency = 'USD' AND bar_period = '1-DAY'
 """
@@ -175,6 +179,15 @@ async def read_us_universe_members(
         )
         for row in rows
     ]
+
+
+async def read_current_us_universe_quarter(*, database_url: str, now_utc: datetime) -> datetime | None:
+    """The current quarter of all readers of the US universe: the start of the last saved quarter on or before
+    `now_utc`. A quarter without saved members does not count. None when no quarter is saved."""
+    async with await psycopg.AsyncConnection.connect(database_url) as connection:
+        cursor = await connection.execute(SELECT_CURRENT_QUARTER, (now_utc,))
+        row = await cursor.fetchone()
+    return None if row is None else row[0]
 
 
 async def read_us_universe_quarter_starts(*, database_url: str, end_utc: datetime) -> list[datetime]:

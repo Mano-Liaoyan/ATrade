@@ -331,8 +331,8 @@ of the same files adds no row. After the import, the program calculates the
 quarterly US universe of each quarter from 2018-10-01 that has no members.
 
 With `DATABENTO_API_KEY` in `.env`, the `forward-test` service updates the
-universe at 06:00 ET on the first trading day of each quarter (about 1.3 USD
-each quarter). With an empty key, the update does not run.
+universe from 06:00 ET on the first trading day of each quarter, until the
+quarter has members (about 1.3 USD each quarter). With an empty key, the update does not run.
 
 The import does not need IB Gateway. It sends no request to IBKR. It finds
 the stock splits of the instruments that stopped trading with the detection

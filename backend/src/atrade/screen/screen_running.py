@@ -2,8 +2,7 @@
 screen result in one transaction (docs/architecture/screen.md sections 24.2 and 24.5)."""
 
 import time
-from datetime import UTC, datetime
-from datetime import time as day_time
+from datetime import datetime
 from typing import Any
 
 import psycopg
@@ -13,7 +12,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import (
     DailyBarSummary,
-    find_first_trading_day_of_quarter,
+    read_current_us_universe_quarter,
     read_daily_bar_summaries,
     read_daily_bar_summaries_of_currency,
     read_hk_instrument_list,
@@ -30,11 +29,11 @@ UNIVERSE_SIZE = 500
 
 async def read_quarter_universe(database_url: str, now_utc: datetime) -> list[Instrument]:
     """The universe of the current quarter (market_data.md section 8.9), by rank."""
-    quarter_start = find_first_trading_day_of_quarter(now_utc.date())
+    quarter_start_utc = await read_current_us_universe_quarter(database_url=database_url, now_utc=now_utc)
+    if quarter_start_utc is None:
+        return []
     members = await read_us_universe_members(
-        database_url=database_url,
-        quarter_start_utc=datetime.combine(quarter_start, day_time(), tzinfo=UTC),
-        top_n=UNIVERSE_SIZE,
+        database_url=database_url, quarter_start_utc=quarter_start_utc, top_n=UNIVERSE_SIZE
     )
     return [member.instrument for member in members]
 

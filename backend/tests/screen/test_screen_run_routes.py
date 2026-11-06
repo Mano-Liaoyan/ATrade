@@ -16,6 +16,7 @@ from psycopg.types.json import Jsonb
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarRequest, save_received_bars
+from atrade.screen.screen_running import read_start_summaries
 
 LAST_DAY = datetime(2025, 12, 31, tzinfo=UTC)
 NOW_UTC = datetime(2026, 1, 2, 3, 4, 5, tzinfo=UTC)
@@ -216,6 +217,29 @@ async def test_the_start_instruments_of_each_kind(web_client: httpx.AsyncClient,
         "all_with_daily_bars": ["AAPL", "MSFT"],
         "hk_instrument_list": ["700"],
     }
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "now_utc",
+    [datetime(2026, 1, 1, 1, 30, tzinfo=UTC), datetime(2022, 10, 1, 12, tzinfo=UTC)],
+    ids=["evening_of_the_last_day_of_a_quarter", "weekend_before_the_first_trading_day"],
+)
+async def test_the_quarter_universe_is_the_last_saved_quarter(database_url: str, now_utc: datetime) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO us_universe_member (
+                quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+            )
+            VALUES (%(quarter_start_utc)s, 1, 'AAPL', 'NASDAQ', 'USD', 1, %(quarter_start_utc)s)
+            """,
+            {"quarter_start_utc": now_utc - timedelta(days=60)},
+        )
+
+    instruments, _ = await read_start_summaries(database_url, market="US", start="quarter_universe", now_utc=now_utc)
+
+    assert instruments == [stock("AAPL")]
 
 
 @pytest.mark.anyio

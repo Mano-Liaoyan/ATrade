@@ -1,17 +1,22 @@
-"""Quarterly US universe update: at 06:00 ET on the first trading day of the quarter, download the EQUS.SUMMARY bars,
-import them, and save the members (docs/architecture/market_data.md section 8.9).
+"""Quarterly US universe update: from 06:00 ET on the first trading day of the quarter until the quarter has members,
+download the EQUS.SUMMARY bars, import them, and save the members (docs/architecture/market_data.md section 8.9).
 
 Real PostgreSQL, a fixed clock, and the Databento fake.
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 
-from atrade.market_data import UsUniverseUpdate, read_us_universe_members
+from atrade.market_data import (
+    UsUniverseCalculationError,
+    UsUniverseUpdate,
+    read_us_universe_members,
+    us_universe_update,
+)
 from tests.fakes.clock import FixedClock
 from tests.fakes.databento import DailyRecord, FakeDatabentoClient
 from tests.us_universe_bars import insert_daily_bars, nasdaq, nyse, weekdays
@@ -72,7 +77,7 @@ async def test_the_update_at_06_00_et_downloads_the_100_days_to_the_last_ranking
 
 
 @pytest.mark.anyio
-async def test_the_update_runs_only_on_the_first_trading_day_of_the_quarter_and_only_one_time(
+async def test_the_update_does_not_run_before_the_first_trading_day_of_the_quarter_and_runs_only_one_time(
     database_url: str, client: FakeDatabentoClient, tmp_path: Path
 ) -> None:
     # 2025-01-01 is New Year's Day.
@@ -132,3 +137,97 @@ async def test_a_bar_that_becomes_available_before_09_00_et_gives_the_full_windo
     assert client.summary_downloads == [(date(2024, 9, 22), date(2025, 1, 1))]
     last_day = datetime(2024, 12, 31, tzinfo=UTC)
     assert await read_ranked_symbols(database_url) == [(1, "IBM", last_day), (2, "AAPL", last_day)]
+
+
+@pytest.mark.anyio
+async def test_the_update_runs_on_a_later_day_when_the_quarter_has_no_members(
+    database_url: str, client: FakeDatabentoClient, tmp_path: Path
+) -> None:
+    update = create_update(database_url, FixedClock(at_new_york_time(date(2025, 1, 6), 7)), client, tmp_path)
+
+    update.update_if_due()
+
+    assert client.summary_downloads == [(date(2024, 9, 22), date(2025, 1, 1))]
+    last_day = datetime(2024, 12, 31, tzinfo=UTC)
+    assert await read_ranked_symbols(database_url) == [(1, "IBM", last_day), (2, "AAPL", last_day)]
+
+
+def test_a_saved_quarter_stops_the_database_reads_of_the_update(
+    database_url: str, client: FakeDatabentoClient, tmp_path: Path
+) -> None:
+    clock = FixedClock(at_new_york_time(date(2025, 1, 2), 6))
+    update = create_update(database_url, clock, client, tmp_path)
+    update.update_if_due()
+    clock.now_utc = at_new_york_time(date(2025, 1, 2), 6, 1)
+    update.update_if_due()
+
+    # A database read raises an error now.
+    update.database_url = "postgresql://localhost:1/none"
+    clock.now_utc = at_new_york_time(date(2025, 1, 2), 6, 2)
+    update.update_if_due()
+
+    assert len(client.summary_downloads) == 1
+
+
+def test_a_failed_save_uses_the_downloaded_file_again(
+    database_url: str, client: FakeDatabentoClient, tmp_path: Path
+) -> None:
+    client.summary_records = client.summary_records[:10]
+    clock = FixedClock(at_new_york_time(date(2025, 1, 2), 6))
+    update = create_update(database_url, clock, client, tmp_path)
+
+    for _ in range(3):
+        with pytest.raises(UsUniverseCalculationError):
+            update.update_if_due()
+        clock.now_utc += timedelta(minutes=15)
+
+    assert len(client.summary_downloads) == 1
+
+
+@pytest.mark.anyio
+async def test_a_failed_import_uses_the_downloaded_file_again(
+    database_url: str, client: FakeDatabentoClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail_import(**_: object) -> None:
+        raise OSError
+
+    update = create_update(database_url, FixedClock(at_new_york_time(date(2025, 1, 2), 6)), client, tmp_path)
+    with monkeypatch.context() as patch:
+        patch.setattr(us_universe_update, "import_databento_files", fail_import)
+        with pytest.raises(OSError):
+            update.update_if_due()
+
+    update.update_if_due()
+
+    assert len(client.summary_downloads) == 1
+    assert len(await read_ranked_symbols(database_url)) == 2
+
+
+@pytest.mark.anyio
+async def test_a_failed_download_is_not_used_again(
+    database_url: str, client: FakeDatabentoClient, tmp_path: Path
+) -> None:
+    client.summary_download_failures = 1
+    update = create_update(database_url, FixedClock(at_new_york_time(date(2025, 1, 2), 6)), client, tmp_path)
+    with pytest.raises(OSError):
+        update.update_if_due()
+
+    update.update_if_due()
+
+    assert len(client.summary_downloads) == 2
+    assert len(await read_ranked_symbols(database_url)) == 2
+
+
+def test_a_process_makes_at_most_3_paid_downloads_of_a_quarter(
+    database_url: str, client: FakeDatabentoClient, tmp_path: Path
+) -> None:
+    client.summary_download_failures = 10
+    update = create_update(database_url, FixedClock(at_new_york_time(date(2025, 1, 2), 6)), client, tmp_path)
+    for _ in range(3):
+        with pytest.raises(OSError):
+            update.update_if_due()
+
+    with pytest.raises(UsUniverseCalculationError, match="3 paid downloads"):
+        update.update_if_due()
+
+    assert len(client.summary_downloads) == 3

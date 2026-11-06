@@ -1,9 +1,9 @@
 """The daily bar update of the `web` process (docs/architecture/market_data.md section 8.11).
 
-At 18:00 ET of each US trading day, the update reads the daily bars of the current quarter's US universe, the HK
-instrument list, and the watchlist from IBKR into ibkr_bar, and updates the daily bar summary. 18:00 ET is after the
-US close and after the Hong Kong close of the same day. When IB Gateway is not reachable, the update does not run
-that day.
+At 21:00 ET of each US trading day, the update reads the daily bars of the current quarter's US universe, the HK
+instrument list, and the watchlist from IBKR into ibkr_bar, and updates the daily bar summary. 21:00 ET is after the
+US close and after the Hong Kong close of the same day. It is also after 00:00 UTC of the next day in all seasons, so
+the read range holds the daily bar of the day. When IB Gateway is not reachable, the update does not run that day.
 """
 
 import asyncio
@@ -22,12 +22,12 @@ from atrade.market_data import bar_store, hk_instrument_list_store
 from atrade.market_data.bar_source import BarSource
 from atrade.market_data.daily_bar_summary import select_last_daily_bars, update_daily_bar_summaries
 from atrade.market_data.stock_split_evidence import record_evidence, to_stored_form
-from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, is_trading_day
-from atrade.market_data.us_universe import MEMBER_COUNT, read_us_universe_members, to_utc_day
+from atrade.market_data.us_trading_days import is_trading_day
+from atrade.market_data.us_universe import MEMBER_COUNT, read_current_us_universe_quarter, read_us_universe_members
 
 logger = logging.getLogger(__name__)
 NEW_YORK = ZoneInfo("America/New_York")
-UPDATE_TIME_ET = time(18, 0)
+UPDATE_TIME_ET = time(21, 0)
 CHECK_INTERVAL_SECONDS = 60.0
 # An instrument without IBKR daily bars gets the daily bars of 1 year, the warm-up of section 8.12.
 FIRST_READ_LENGTH = timedelta(days=366)
@@ -78,10 +78,16 @@ class DailyBarUpdate:
         await self.update(due_day)
         return True
 
-    async def read_update_instruments(self, connection: psycopg.AsyncConnection, day: date) -> list[Instrument]:
-        quarter_start_utc = to_utc_day(find_first_trading_day_of_quarter(day))
-        members = await read_us_universe_members(
-            database_url=self.database_url, quarter_start_utc=quarter_start_utc, top_n=MEMBER_COUNT
+    async def read_update_instruments(self, connection: psycopg.AsyncConnection) -> list[Instrument]:
+        quarter_start_utc = await read_current_us_universe_quarter(
+            database_url=self.database_url, now_utc=self.clock.read_now_utc()
+        )
+        members = (
+            []
+            if quarter_start_utc is None
+            else await read_us_universe_members(
+                database_url=self.database_url, quarter_start_utc=quarter_start_utc, top_n=MEMBER_COUNT
+            )
         )
         hk_members = await hk_instrument_list_store.select_members(connection)
         watchlist = await self.read_watchlist_instruments()
@@ -115,7 +121,7 @@ class DailyBarUpdate:
 
     async def update(self, day: date) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            instruments = await self.read_update_instruments(connection, day)
+            instruments = await self.read_update_instruments(connection)
             updated_instruments: list[Instrument] = []
             for instrument in instruments:
                 time_range = await self.find_read_range(connection, instrument)

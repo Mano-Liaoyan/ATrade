@@ -1,8 +1,9 @@
 """The daily bar update of the `web` process: IBKR fake, fixed clock, and real PostgreSQL
 (docs/architecture/market_data.md section 8.11)."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 import psycopg
 import pytest
@@ -18,14 +19,17 @@ from atrade.market_data import (
     read_stock_split_candidates,
     save_received_bars,
 )
+from atrade.market_data.daily_bar_update import UPDATE_TIME_ET
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection, HistoricalBarRequest
 
 APPLE = Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")
 TENCENT = Instrument(symbol="700", exchange="SEHK", currency="HKD")
 TESLA = Instrument(symbol="TSLA", exchange="NASDAQ", currency="USD")
-# Wednesday 3 December 2025, 18:30 ET: after the US close and after the Hong Kong close.
-AFTER_CLOSE_UTC = datetime(2025, 12, 3, 23, 30, tzinfo=UTC)
+NEW_YORK = ZoneInfo("America/New_York")
+# Wednesday 3 December 2025, 21:30 ET: after the US close and after the Hong Kong close.
+AFTER_CLOSE_UTC = datetime(2025, 12, 4, 2, 30, tzinfo=UTC)
+DECEMBER_4_UTC = datetime(2025, 12, 4, tzinfo=UTC)
 DECEMBER_3_UTC = datetime(2025, 12, 3, tzinfo=UTC)
 DECEMBER_2_UTC = datetime(2025, 12, 2, tzinfo=UTC)
 # The first trading day of the fourth quarter of 2025.
@@ -54,6 +58,10 @@ def save_update_instruments(database_url: str) -> None:
 
 async def read_watchlist() -> list[Instrument]:
     return [TESLA, APPLE]
+
+
+async def read_empty_watchlist() -> list[Instrument]:
+    return []
 
 
 def create_update(database_url: str, gateway_connection: FakeGatewayConnection, now_utc: datetime) -> DailyBarUpdate:
@@ -87,29 +95,57 @@ async def test_reads_the_daily_bars_of_the_universe_the_hk_list_and_the_watchlis
 
     assert await update.update_if_due() is True
 
-    first_read_start_utc = DECEMBER_3_UTC - timedelta(days=366)
+    first_read_start_utc = DECEMBER_4_UTC - timedelta(days=366)
     assert gateway_connection.historical_bar_requests == [
-        HistoricalBarRequest(APPLE, BarPeriod.ONE_DAY, TimeRange(DECEMBER_2_UTC, DECEMBER_3_UTC)),
-        HistoricalBarRequest(TENCENT, BarPeriod.ONE_DAY, TimeRange(first_read_start_utc, DECEMBER_3_UTC)),
-        HistoricalBarRequest(TESLA, BarPeriod.ONE_DAY, TimeRange(first_read_start_utc, DECEMBER_3_UTC)),
+        HistoricalBarRequest(APPLE, BarPeriod.ONE_DAY, TimeRange(DECEMBER_2_UTC, DECEMBER_4_UTC)),
+        HistoricalBarRequest(TENCENT, BarPeriod.ONE_DAY, TimeRange(first_read_start_utc, DECEMBER_4_UTC)),
+        HistoricalBarRequest(TESLA, BarPeriod.ONE_DAY, TimeRange(first_read_start_utc, DECEMBER_4_UTC)),
     ]
     saved_bars = await read_saved_bars(
         database_url=database_url,
-        bar_request=BarRequest(TENCENT, BarPeriod.ONE_DAY, TimeRange(first_read_start_utc, DECEMBER_3_UTC)),
+        bar_request=BarRequest(TENCENT, BarPeriod.ONE_DAY, TimeRange(first_read_start_utc, DECEMBER_4_UTC)),
         source_order=[BarSource.IBKR, BarSource.DATABENTO],
     )
     assert saved_bars.bar_counts[BarSource.IBKR] == 366
     summaries = await read_daily_bar_summaries(database_url=database_url, instruments=[APPLE, TENCENT, TESLA])
-    # The fake bar of 2025-12-02 is day 20424 from the epoch: close 100 + 20424 % 50 + 0.5 = 124.5.
+    # The fake bar of 2025-12-03 is day 20425 from the epoch: close 100 + 20425 % 50 + 0.5 = 125.5.
     assert [(summary.instrument, summary.last_day_start_utc, summary.last_close) for summary in summaries] == [
-        (APPLE, DECEMBER_2_UTC, Decimal("124.5")),
-        (TENCENT, DECEMBER_2_UTC, Decimal("124.5")),
-        (TESLA, DECEMBER_2_UTC, Decimal("124.5")),
+        (APPLE, DECEMBER_3_UTC, Decimal("125.5")),
+        (TENCENT, DECEMBER_3_UTC, Decimal("125.5")),
+        (TESLA, DECEMBER_3_UTC, Decimal("125.5")),
     ]
 
 
 @pytest.mark.anyio
-async def test_runs_1_time_on_each_trading_day_and_not_before_18_00_et(
+@pytest.mark.parametrize("day", [date(2025, 7, 9), date(2025, 12, 3)], ids=["daylight_saving_time", "standard_time"])
+async def test_the_first_minute_of_the_update_reads_the_daily_bar_of_that_day(
+    database_url: str, gateway_connection: FakeGatewayConnection, day: date
+) -> None:
+    run_at_utc = datetime.combine(day, UPDATE_TIME_ET, NEW_YORK).astimezone(UTC)
+    update = create_update(database_url, gateway_connection, run_at_utc)
+
+    assert await update.update_if_due() is True
+
+    end_utc = datetime.combine(day + timedelta(days=1), time(), UTC)
+    assert {request.time_range.end_utc for request in gateway_connection.historical_bar_requests} == {end_utc}
+
+
+@pytest.mark.anyio
+async def test_a_quarter_without_saved_members_keeps_the_members_of_the_last_saved_quarter(
+    database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    save_update_instruments(database_url)
+    # Monday 5 January 2026, 21:30 ET: the first trading day of the quarter was 2 January.
+    update = create_update(database_url, gateway_connection, datetime(2026, 1, 6, 2, 30, tzinfo=UTC))
+    update.read_watchlist_instruments = read_empty_watchlist
+
+    assert await update.update_if_due() is True
+
+    assert [request.instrument for request in gateway_connection.historical_bar_requests] == [APPLE, TENCENT]
+
+
+@pytest.mark.anyio
+async def test_runs_1_time_on_each_trading_day_and_not_before_21_00_et(
     database_url: str, gateway_connection: FakeGatewayConnection
 ) -> None:
     before_time_update = create_update(database_url, gateway_connection, AFTER_CLOSE_UTC - timedelta(hours=1))
@@ -169,7 +205,8 @@ async def test_the_day_that_is_read_again_gives_evidence_a_and_keeps_its_stored_
         bar_request=BarRequest(APPLE, BarPeriod.ONE_DAY, TimeRange(DECEMBER_2_UTC, DECEMBER_3_UTC)),
         bars=[Bar(DECEMBER_2_UTC, stored_close, stored_close, stored_close, stored_close, Decimal(1))],
     )
-    update = create_update(database_url, gateway_connection, AFTER_CLOSE_UTC)
+    # The run of 2 December reads only 2 December.
+    update = create_update(database_url, gateway_connection, AFTER_CLOSE_UTC - timedelta(days=1))
 
     assert await update.update_if_due() is True
 

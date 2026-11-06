@@ -7,6 +7,7 @@ Real PostgreSQL with hand-made daily bars in databento_bar.
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
+import psycopg
 import pytest
 
 from atrade.foundation.instrument import Instrument
@@ -16,6 +17,7 @@ from atrade.market_data import (
     calculate_us_universe_history,
     find_first_trading_day_of_quarter,
     find_previous_trading_day,
+    read_current_us_universe_quarter,
     read_us_universe_members,
     save_us_universe,
 )
@@ -187,3 +189,26 @@ async def test_the_history_does_not_change_a_saved_quarter(database_url: str) ->
 
     members = await read_us_universe_members(database_url=database_url, quarter_start_utc=first_quarter_utc, top_n=1)
     assert members[0].last_ranking_day_utc == datetime(2018, 9, 27, tzinfo=UTC)
+
+
+@pytest.mark.anyio
+async def test_the_current_quarter_is_the_last_saved_quarter_on_or_before_now(database_url: str) -> None:
+    assert await read_current_us_universe_quarter(database_url=database_url, now_utc=QUARTER_START_UTC) is None
+
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO us_universe_member (
+                quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+            )
+            VALUES ('2024-10-01T00:00:00Z', 1, 'AAPL', 'NASDAQ', 'USD', 1, '2024-09-30T00:00:00Z'),
+                ('2025-01-02T00:00:00Z', 1, 'AAPL', 'NASDAQ', 'USD', 1, '2024-12-31T00:00:00Z')
+            """
+        )
+
+    before_start_utc = QUARTER_START_UTC - timedelta(seconds=1)
+    assert await read_current_us_universe_quarter(database_url=database_url, now_utc=before_start_utc) == datetime(
+        2024, 10, 1, tzinfo=UTC
+    )
+    for now_utc in (QUARTER_START_UTC, QUARTER_START_UTC + timedelta(days=200)):
+        assert await read_current_us_universe_quarter(database_url=database_url, now_utc=now_utc) == QUARTER_START_UTC

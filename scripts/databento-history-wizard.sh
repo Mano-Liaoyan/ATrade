@@ -526,7 +526,7 @@ say "Quarterly US universe (expected: each quarter from 2018-10-01, 500 members 
 psql_query "SELECT count(DISTINCT quarter_start_utc) AS quarters, min(quarter_start_utc)::date AS first, max(quarter_start_utc)::date AS last, count(*) AS members FROM us_universe_member WHERE currency = 'USD';"
 say "IBKR stock split check:"
 psql_query "SELECT count(*) FILTER (WHERE read_end_utc IS NULL OR read_end_utc < check_end_utc) AS read_waiting, count(*) FILTER (WHERE checked_end_utc IS NULL OR checked_end_utc < check_end_utc) AS apply_waiting, count(*) AS total FROM ibkr_split_check;"
-say "Tomorrow, after 18:00 ET, check that the daily bar update ran:"
+say "Tomorrow, after 21:00 ET, check that the daily bar update ran:"
 note "  docker compose --file deploy/compose.yaml --env-file .env logs web | grep 'daily bar update'"
 note "  Expected: 'The daily bar update of <day> saved the daily bars of <n> instruments.'"
 say "Then tick the steps of issue #324 and measure the screen backtest time (#150)."
