@@ -1,5 +1,5 @@
 // readOnChange: a read at once, after each socket open, and after each "changed" message; one read at a time.
-import { describe, expect, it } from 'vite-plus/test';
+import { describe, expect, it, vi } from 'vite-plus/test';
 import { readOnChange, type LiveSocketOptions } from './index';
 
 const LOCATION = { protocol: 'http:', host: 'localhost' };
@@ -111,6 +111,30 @@ describe('readOnChange', () => {
 
     expect(results).toEqual([1, 2]);
     expect(reads.count()).toBe(2);
+  });
+
+  it('reads again after a read that rejects', async () => {
+    const { socket, openSocket } = createFakeSocket();
+    const results: number[] = [];
+    let readCount = 0;
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    readOnChange({
+      socketPath: '/ws/x',
+      read: () => {
+        readCount += 1;
+        return readCount === 1 ? Promise.reject(new Error('Body read failed.')) : Promise.resolve(readCount);
+      },
+      onResult: (value) => results.push(value),
+      location: LOCATION,
+      openSocket,
+    });
+    await settle();
+    socket.options?.onMessage({ type: 'changed' });
+    await settle();
+
+    expect(results).toEqual([2]);
+    expect(consoleError).toHaveBeenCalledOnce();
+    consoleError.mockRestore();
   });
 
   it('closes the socket at stop and gives no result after it', async () => {

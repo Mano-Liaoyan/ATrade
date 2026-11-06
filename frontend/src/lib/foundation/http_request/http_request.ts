@@ -72,7 +72,7 @@ async function requestAccepted(
   return { kind: 'ok', value: response };
 }
 
-/** Sends the request and returns the JSON body, or a message when the backend is not reachable or refuses. */
+/** Sends the request and returns the JSON body, or a message when the backend is not reachable or refuses, or when the body cannot be read. */
 export async function requestJson<T>(
   fetchFunction: typeof fetch,
   failedAction: string,
@@ -80,7 +80,14 @@ export async function requestJson<T>(
   init?: RequestInit,
 ): Promise<RequestResult<T>> {
   const result = await requestAccepted(fetchFunction, failedAction, path, init);
-  return result.kind === 'ok' ? { kind: 'ok', value: (await result.value.json()) as T } : result;
+  if (result.kind === 'failed') {
+    return result;
+  }
+  try {
+    return { kind: 'ok', value: (await result.value.json()) as T };
+  } catch {
+    return { kind: 'failed', message: describeErrorBody(null, result.value.status, failedAction) };
+  }
 }
 
 /** Sends a request and does not read the answer body. Gives a message when the backend is not reachable or refuses. */
