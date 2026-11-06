@@ -22,18 +22,26 @@
 
   const { bar = null, rows, actions }: Props = $props();
 
-  const rowElements: HTMLLIElement[] = $state([]);
+  const rowElements: (HTMLLIElement | null)[] = $state([]);
   // The last pointer move sets this, not :hover. A row can move away from a pointer that stands still, for example when
   // the OHLC row comes, and its buttons must still take the next click.
   let activeRowIndex = $state(-1);
 
   function findActiveRow(event: PointerEvent): void {
     const { target } = event;
-    activeRowIndex = target instanceof Node ? rowElements.findIndex((element) => element.contains(target)) : -1;
+    // A removed row leaves null in rowElements.
+    activeRowIndex = target instanceof Node ? rowElements.findIndex((element) => element?.contains(target)) : -1;
+  }
+
+  /** A pointer that leaves the window gives a pointerout without a next element. */
+  function endActiveRow(event: PointerEvent): void {
+    if (event.relatedTarget === null) {
+      activeRowIndex = -1;
+    }
   }
 </script>
 
-<svelte:window onpointermovecapture={findActiveRow} />
+<svelte:window onpointermovecapture={findActiveRow} onpointerout={endActiveRow} />
 
 {#if bar !== null || rows.length > 0}
   <ul class="chart-legend" aria-label="Legend">

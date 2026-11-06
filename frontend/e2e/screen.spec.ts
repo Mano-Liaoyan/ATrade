@@ -132,14 +132,17 @@ test('/screens opens the last opened screen, and a long screen list scrolls in i
 
   const list = page.getByRole('region', { name: 'Screen list' });
   // The list has the last changed screen first; other projects can add screens before ours, not after.
-  const lastScreen = list.getByRole('listitem').last();
+  const lastHref = await list.getByRole('listitem').last().getByRole('link').first().getAttribute('href');
+  const lastScreen = list.locator(`a[href="${String(lastHref)}"]`);
   await expect(lastScreen).not.toBeInViewport();
   const scrollTrack = page.getByRole('scrollbar', { name: 'Screen list scroll bar' });
   await expect(scrollTrack).toBeVisible();
   await scrollTrack.focus();
-  await page.keyboard.press('End');
-  await expect(lastScreen).toBeInViewport();
-  await expect(scrollTrack).toHaveAttribute('aria-valuenow', '100');
+  // A /ws/screens push can add rows at the top after a key press, so the press repeats until the last row shows.
+  await expect(async () => {
+    await page.keyboard.press('End');
+    await expect(lastScreen).toBeInViewport({ timeout: 500 });
+  }).toPass();
 });
 
 // #212: the edit popover of each tag, "Add condition", the run at once after each change, and the save buttons.

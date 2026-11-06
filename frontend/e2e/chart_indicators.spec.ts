@@ -285,6 +285,35 @@ test('a legend row keeps its buttons when it moves away from a pointer that stan
   await expect(page.getByRole('dialog', { name: 'SMA' })).toBeVisible();
 });
 
+test('a removed legend row gives no page error on a later pointer move', async ({ page }) => {
+  const errors: Error[] = [];
+  page.on('pageerror', (error) => errors.push(error));
+  await openChart(page);
+  const row = await addSma(page);
+  await row.locator('.legend-name').hover();
+  await page.getByRole('button', { name: 'Remove SMA 50' }).click();
+  await expect(row).toHaveCount(0);
+
+  await page.mouse.move(0, 0);
+  await page.mouse.move(1, 1);
+
+  expect(errors).toEqual([]);
+});
+
+test('a pointer that leaves the window ends the active legend row', async ({ page }) => {
+  await openChart(page);
+  const row = await addSma(page);
+  const hideButton = page.locator('.legend-action').filter({ has: page.getByRole('button', { name: 'Hide SMA 50' }) });
+  await row.locator('.legend-name').hover();
+  await expect(hideButton).toHaveCSS('opacity', '1');
+
+  await page.evaluate(() => {
+    document.documentElement.dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: null }));
+  });
+
+  await expect(hideButton).toHaveCSS('opacity', '0');
+});
+
 test('Tab to a legend row shows its buttons', async ({ page }) => {
   await openChart(page);
   await addSma(page);
