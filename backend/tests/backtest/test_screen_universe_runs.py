@@ -23,9 +23,7 @@ from tests.screen.test_screen_run_routes import add_to_watchlist, create_screen,
 MARCH_START_UTC = datetime(2026, 3, 1, tzinfo=UTC)
 
 
-async def run_screen_backtest(
-    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, rebalance_period: str
-) -> dict[str, Any]:
+async def queue_screen_backtest(web_client: httpx.AsyncClient, database_url: str, rebalance_period: str) -> int:
     save_universe_test_data(database_url)
     add_to_watchlist(database_url, AAA, BBB, CCC)
     definition = make_definition(filters=[{"field": "last_price", "operator": ">", "value": "520"}])
@@ -37,8 +35,15 @@ async def run_screen_backtest(
         web_client, version["id"], screen_id=screen_id, rebalance_period=rebalance_period
     )
     assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+async def run_screen_backtest(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, rebalance_period: str
+) -> dict[str, Any]:
+    backtest_id = await queue_screen_backtest(web_client, database_url, rebalance_period)
     async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=120):
-        backtest = await wait_for_final_status(web_client, response.json()["id"])
+        backtest = await wait_for_final_status(web_client, backtest_id)
     assert backtest["status"] == "finished", backtest["error_message"]
     return backtest
 

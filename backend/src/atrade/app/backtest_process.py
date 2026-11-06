@@ -6,7 +6,9 @@ DATABASE_URL (docs/architecture/backtest.md section 10.1).
 
 import logging
 import os
+import signal
 import sys
+import threading
 from pathlib import Path
 
 from atrade.foundation.clock import SystemClock
@@ -27,7 +29,17 @@ def lower_own_priority() -> None:
     os.nice(NICENESS_INCREMENT)
 
 
+def stop_after_web_process() -> None:
+    """Only the Web process holds the write end of the standard input, so the read returns when the Web process ends
+    in any way. The runner starts the child in its own process group: the signal of a terminal or of a container stop
+    does not reach it, and a child without this thread could outlive the Web process with its workers (section 10.1).
+    """
+    os.read(sys.stdin.fileno(), 1)
+    os.killpg(os.getpid(), signal.SIGKILL)
+
+
 def main() -> None:
+    threading.Thread(target=stop_after_web_process, daemon=True).start()
     # Standard output: the parent reads the standard error only for a failure text (section 10.3), so only standard
     # output reaches the log of the web container.
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
