@@ -132,6 +132,10 @@
     if (screenId !== null) {
       writeLastScreenId(screenId);
     }
+    // The answer of a run after a change of screen or after the page closes is stale: it must not move the user.
+    return () => {
+      runNumber += 1;
+    };
   });
 
   $effect(() => {
