@@ -279,8 +279,9 @@ def run_universe(
     trades = run_universe_strategy(run, work_directory, changed_orders)
     equity_curve = calculate_universe_equity_curve(
         start_cash=starting_cash,
+        # A member that leaves still sells at its next open, so the curve needs its bars after its periods.
         bars_by_instrument={
-            (member.instrument.symbol, member.instrument.exchange): member.bars for member in universe.bars.members
+            (member.instrument.symbol, member.instrument.exchange): member.open_bars for member in universe.bars.members
         },
         bar_period=request.bar_period,
         trades=trades,
