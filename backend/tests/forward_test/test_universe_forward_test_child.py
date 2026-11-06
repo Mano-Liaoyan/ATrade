@@ -10,6 +10,7 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import override
 
 import httpx
 import psycopg
@@ -31,10 +32,12 @@ from atrade.forward_test import (
     run_forward_test_child,
     run_universe_node,
 )
+from atrade.forward_test.universe_live_node import UniverseClients, run_universe_live_node
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.instrument import Instrument
 from atrade.market_data import BarRequest, save_received_bars
 from atrade.paper_trading import ForwardTestLedger
+from atrade.strategy.strategy_templates import TEMPLATES_BY_ID
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection, make_execution
 from tests.fakes.owner_ledger import FakeOwnerLedger
@@ -52,6 +55,7 @@ from tests.forward_test.test_forward_test_routes import (
     save_test_strategy_version,
 )
 from tests.forward_test.test_universe_forward_test_detail import APPLE
+from tests.strategy.rules_examples import make_universe_rules
 
 MICROSOFT = Instrument(symbol="MSFT", exchange="NASDAQ", currency="USD")
 NVIDIA = Instrument(symbol="NVDA", exchange="NASDAQ", currency="USD")
@@ -167,11 +171,19 @@ def read_recorded_quarters(database_url: str, forward_test_id: int) -> dict[date
     return quarters
 
 
-async def start_top_2_forward_test(web_client: httpx.AsyncClient, database_url: str) -> int:
+async def start_top_2_forward_test(
+    web_client: httpx.AsyncClient, database_url: str, version_body: dict[str, object] | None = None
+) -> int:
+    """`version_body` is the body of the strategy version to start. Without it, the test strategy of the routes."""
     save_us_universe(database_url, THIS_QUARTER_UTC, [APPLE, MICROSOFT, NVIDIA])
     for instrument in (APPLE, MICROSOFT, NVIDIA):
         await save_daily_bars(database_url, instrument, TODAY_UTC - timedelta(days=SAVED_DAY_COUNT), SAVED_DAY_COUNT)
-    strategy_version_id = await save_test_strategy_version(web_client)
+    if version_body is None:
+        strategy_version_id = await save_test_strategy_version(web_client)
+    else:
+        strategy = (await web_client.post("/api/strategies", json={"name": "Universe"})).json()
+        path = f"/api/strategies/{strategy['id']}/versions"
+        strategy_version_id = (await web_client.post(path, json=version_body)).json()["id"]
     response = await web_client.post(
         FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "rule", "top_n": 2})
     )
@@ -258,6 +270,62 @@ async def test_the_live_node_gives_the_strategy_1_year_of_warm_up_and_new_daily_
     assert [str(bar.bar_type) for bar in child.strategy.bars] == [bar_type_name(APPLE)]
     # No bar request to IBKR: not in the child and not in the LiveNode.
     assert child.gateway.historical_bar_requests == []
+
+
+class SavedVersionChildRun(UniverseChildRun):
+    """The real path of the child: `run_universe_live_node` loads the code of the version and makes its configuration.
+    Only the production connections are fakes."""
+
+    def __init__(self, database_url: str, frontend_build_dir: Path, clock: FixedClock) -> None:
+        super().__init__(database_url, frontend_build_dir, clock)
+        self.clients: list[UniverseClients] = []
+
+    def create_clients(self, live_node_input: LiveNodeInput) -> UniverseClients:
+        self.clients.append(
+            create_universe_clients(
+                live_node_input,
+                FakeOwnerLedger(cash_usd=Decimal(10000)),
+                FakeGatewayConnection(managed_accounts=[ACCOUNT_ID], client_id=live_node_input.client_id),
+            )
+        )
+        return self.clients[-1]
+
+    @override
+    async def run_node(self, live_node_input: LiveNodeInput, stop_requested: asyncio.Event) -> LiveNodeEnd:
+        options = UniverseRunOptions(
+            clock=self.clock, gateway_watch=GatewayWatch(lost_after_seconds=3600.0), poll_seconds=POLL_SECONDS
+        )
+        return await run_universe_live_node(live_node_input, stop_requested, options)
+
+    def has_member_subscriptions(self) -> bool:
+        client = self.clients[0].data_factory.client if self.clients else None
+        return client is not None and len(client.next_bar_starts) == 2
+
+
+@pytest.mark.parametrize(
+    "version_body",
+    [{"rules": make_universe_rules()}, {"code": TEMPLATES_BY_ID["m1"].code}],
+    ids=["rule builder", "code template"],
+)
+@pytest.mark.anyio
+async def test_the_child_starts_the_saved_strategy_version_in_the_live_node(  # noqa: PLR0913 - the fixtures of the run
+    web_client: httpx.AsyncClient,
+    database_url: str,
+    frontend_build_dir: Path,
+    clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+    version_body: dict[str, object],
+) -> None:
+    forward_test_id = await start_top_2_forward_test(web_client, database_url, version_body)
+    child = SavedVersionChildRun(database_url, frontend_build_dir, clock)
+    monkeypatch.setattr("atrade.forward_test.universe_live_node.create_production_clients", child.create_clients)
+    child.start(forward_test_id)
+    try:
+        await wait_until(child.has_member_subscriptions)
+    finally:
+        exit_code = await child.stop()
+
+    assert exit_code == 0
 
 
 @pytest.mark.anyio

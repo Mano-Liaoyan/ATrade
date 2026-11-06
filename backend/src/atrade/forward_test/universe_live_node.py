@@ -131,12 +131,19 @@ def create_universe_strategy_config(
     config_class: type[StrategyConfig], live_node_input: LiveNodeInput
 ) -> StrategyConfig:
     """A multi-instrument configuration has no `instrument_id` and no `bar_type` (backtest.md section 10.10.8). The
-    strategy owns the restored positions of all known members (section 12.7). A multi-instrument `__init__` passes
-    the other keywords to `StrategyConfig.__init__` (strategy.md section 9.2), as in the multi-instrument backtest."""
+    strategy owns the restored positions of all known members (section 12.7)."""
     instrument_ids = [
         create_instrument_id(instrument) for instrument in find_node_instruments(read_universe(live_node_input))
     ]
-    return config_class(order_id_tag=live_node_input.order_id_tag, external_order_instrument_ids=instrument_ids)  # pyright: ignore[reportCallIssue]
+    # readability-exception: the user __init__ forwards other keywords to object.__init__, which refuses them. The
+    # NautilusTrader fields go to __new__ directly, as in `live_node_run.create_strategy_config` (E1).
+    nautilus_fields: dict[str, object] = {
+        "order_id_tag": live_node_input.order_id_tag,
+        "external_order_instrument_ids": instrument_ids,
+    }
+    config: StrategyConfig = config_class.__new__(config_class, **nautilus_fields)
+    config.__init__()  # pyright: ignore[reportUnknownMemberType]
+    return config
 
 
 async def record_universe_equity(
