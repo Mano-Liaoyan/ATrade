@@ -7,13 +7,21 @@ from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pytest
+from nautilus_trader.model import InstrumentId, OrderSide
 
 from atrade.backtest.backtest_metrics import BacktestTrade
 from atrade.backtest.backtest_store import BacktestRequest, ParameterValues, UniversePeriod
 from atrade.backtest.backtest_universe import MemberBars
-from atrade.backtest.strategy_engine_run import StrategyRun, make_fill_warning, run_strategy_on_bars
+from atrade.backtest.strategy_engine_run import (
+    HeldOrder,
+    HeldOrderCache,
+    StrategyRun,
+    make_fill_warning,
+    run_strategy_on_bars,
+)
 from atrade.backtest.universe_engine_run import UniverseRun, run_universe_strategy
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
@@ -356,3 +364,30 @@ def test_a_member_without_later_bars_sells_at_its_last_close_at_once(tmp_path: P
     trades = run_universe(members, make_exit_periods(), tmp_path)
 
     assert ("AAA", "SELL", Decimal("180.00"), START_UTC + timedelta(days=3)) in read_symbol_fills(trades)
+
+
+class RecordingEngineCache:
+    """The engine cache with 0 orders. It records the arguments of its count."""
+
+    def __init__(self) -> None:
+        self.arguments: list[tuple[Any, ...]] = []
+
+    def orders_inflight_count(self, *arguments: Any) -> int:
+        self.arguments.append(arguments)
+        return 0
+
+
+def test_the_held_order_count_respects_the_filters_of_the_engine_count() -> None:
+    apple = InstrumentId.from_str("AAPL.NASDAQ")
+    other = InstrumentId.from_str("MSFT.NYSE")
+    engine_cache = RecordingEngineCache()
+    cache = HeldOrderCache(engine_cache, {"held": HeldOrder(apple, OrderSide.BUY, lambda: None)})
+
+    assert cache.orders_inflight_count() == 1
+    assert cache.orders_inflight_count(side=OrderSide.BUY) == 1
+    assert cache.orders_inflight_count(side=OrderSide.SELL) == 0
+    assert cache.orders_inflight_count(instrument_id=apple) == 1
+    assert cache.orders_inflight_count(instrument_id=other) == 0
+    assert cache.orders_inflight_count(None, other) == 0
+    assert cache.orders_inflight_count(other.venue) == 0
+    assert engine_cache.arguments[-2] == (None, other, None, None, None)

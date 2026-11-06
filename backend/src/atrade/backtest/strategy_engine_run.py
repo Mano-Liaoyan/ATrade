@@ -23,6 +23,7 @@ from nautilus_trader.backtest import BacktestEngine, BacktestEngineConfig
 from nautilus_trader.common import CacheConfig, FileWriterConfig, LoggerConfig, LogLevel, TimeEvent, logger_flush
 from nautilus_trader.execution import FixedFeeModel
 from nautilus_trader.model import (
+    AccountId,
     AccountType,
     AggressorSide,
     BarType,
@@ -37,8 +38,10 @@ from nautilus_trader.model import (
     OrderSide,
     OrderType,
     Position,
+    PositionSide,
     Price,
     Quantity,
+    StrategyId,
     Symbol,
     TradeId,
     TradeTick,
@@ -337,6 +340,7 @@ def run_engine(engine: BacktestEngine, inputs: EngineInputs, work_directory: Pat
 @dataclass(frozen=True)
 class HeldOrder:
     instrument_id: InstrumentId
+    side: OrderSide
     send: Callable[[], None]
 
 
@@ -351,10 +355,22 @@ class HeldOrderCache:
     def __getattr__(self, name: str) -> Any:
         return getattr(self.engine_cache, name)
 
-    def orders_inflight_count(self, *args: Any, **kwargs: Any) -> int:
-        instrument_id = kwargs.get("instrument_id")
-        held_count = sum(instrument_id in {None, held.instrument_id} for held in self.held_orders.values())
-        return self.engine_cache.orders_inflight_count(*args, **kwargs) + held_count
+    def orders_inflight_count(
+        self,
+        venue: Venue | None = None,
+        instrument_id: InstrumentId | None = None,
+        strategy_id: StrategyId | None = None,
+        account_id: AccountId | None = None,
+        side: OrderSide | None = None,
+    ) -> int:
+        """Each held order belongs to the strategy of this run, on the only account of its venue."""
+        held_count = sum(
+            venue in {None, held.instrument_id.venue}
+            and instrument_id in {None, held.instrument_id}
+            and side in {None, held.side}
+            for held in self.held_orders.values()
+        )
+        return self.engine_cache.orders_inflight_count(venue, instrument_id, strategy_id, account_id, side) + held_count
 
 
 class NextOpenOrders(Strategy):
@@ -377,7 +393,7 @@ class NextOpenOrders(Strategy):
     def cache(self) -> Any:
         return HeldOrderCache(super().cache, self._atrade_waiting_orders)
 
-    def _atrade_send_at_next_open(self, instrument_id: InstrumentId, send: Callable[[], None]) -> None:
+    def _atrade_send_at_next_open(self, instrument_id: InstrumentId, side: OrderSide, send: Callable[[], None]) -> None:
         times_ns = self._atrade_open_times_ns.get(instrument_id, [])
         index = bisect_right(times_ns, self.clock.timestamp_ns())
         if index == len(times_ns):
@@ -385,7 +401,7 @@ class NextOpenOrders(Strategy):
             return
         waiting_orders = self._atrade_waiting_orders
         name = f"next-open-{self.clock.timestamp_ns()}-{len(waiting_orders)}"
-        waiting_orders[name] = HeldOrder(instrument_id, send)
+        waiting_orders[name] = HeldOrder(instrument_id, side, send)
         # 1 nanosecond apart. The last close tick of the instrument comes after the last alert: each order sees the cash after the fill of the order before.
         self.clock.set_time_alert_ns(name, times_ns[index] + len(waiting_orders), self._atrade_send_waiting_order)
 
@@ -422,7 +438,9 @@ class NextOpenOrders(Strategy):
             return
         parent = super()
         self._atrade_send_at_next_open(
-            order.instrument_id, lambda: parent.submit_order(self._atrade_fit_to_cash(order), *args, **kwargs)
+            order.instrument_id,
+            order.side,
+            lambda: parent.submit_order(self._atrade_fit_to_cash(order), *args, **kwargs),
         )
 
     def close_position(self, position: Position, *args: Any, **kwargs: Any) -> None:
@@ -437,7 +455,8 @@ class NextOpenOrders(Strategy):
             parent.close_position(position, *args, **kwargs)
 
         closing_instruments.add(position.instrument_id)
-        self._atrade_send_at_next_open(position.instrument_id, close)
+        side = OrderSide.SELL if position.side == PositionSide.LONG else OrderSide.BUY
+        self._atrade_send_at_next_open(position.instrument_id, side, close)
 
 
 def fill_at_next_open[StrategyClass: type](
