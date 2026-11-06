@@ -26,6 +26,7 @@ from atrade.backtest.strategy_engine_run import (
     create_engine,
     create_instrument,
     create_wrangler,
+    make_last_close_tick,
     make_open_ticks,
     read_trades,
     run_engine,
@@ -91,6 +92,7 @@ def run_universe_strategy(
     instruments: list[Equity] = []
     member_data: list[MemberData] = []
     open_ticks: list[list[TradeTick]] = []
+    last_close_ticks: list[TradeTick] = []
     for member in run.members:
         all_bars = member.look_back_bars + member.bars
         if not all_bars:
@@ -98,6 +100,8 @@ def run_universe_strategy(
         # The open bars of the whole range hold more bars than `all_bars`: their prices also need a precision.
         nautilus_instrument = create_instrument(member.instrument, all_bars + member.open_bars, SIMULATED_VENUE)
         open_ticks.append(make_open_ticks(nautilus_instrument, member.open_bars))
+        if member.open_bars:
+            last_close_ticks.append(make_last_close_tick(nautilus_instrument, member.open_bars, run.bar_period))
         wrangler = create_wrangler(nautilus_instrument, run.bar_period, all_bars)
         instruments.append(nautilus_instrument)
         member_data.append(
@@ -127,5 +131,9 @@ def run_universe_strategy(
     # Data with the same time comes in the order of the `add_data` calls. The bars come first, so the bar that closes
     # at a period start comes before the list of that period (section 10.10.3).
     engine.add_data(make_universe_updates(run))
-    run_engine(engine, EngineInputs(run.code, dict(run.parameters), open_ticks, changed_orders), work_directory)
+    run_engine(
+        engine,
+        EngineInputs(run.code, dict(run.parameters), open_ticks, last_close_ticks, changed_orders),
+        work_directory,
+    )
     return read_trades(engine, {member.instrument.symbol: member.instrument.exchange for member in run.members})

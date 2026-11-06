@@ -281,6 +281,6 @@ async def test_a_same_period_backtest_runs_on_the_bars_that_the_forward_test_sav
     assert (backtest["start_utc"], backtest["end_utc"]) == ("2026-03-01T00:00:00Z", "2026-03-12T00:00:00Z")
     # The same bars give the same 2 trades as the forward test records.
     assert [(trade["time_utc"], trade["side"]) for trade in backtest["trades"]] == [
-        ("2026-03-05T00:00:00.000001Z", "BUY"),
-        ("2026-03-10T00:00:00.000001Z", "SELL"),
+        ("2026-03-05T00:00:00.001000Z", "BUY"),
+        ("2026-03-10T00:00:00.001000Z", "SELL"),
     ]

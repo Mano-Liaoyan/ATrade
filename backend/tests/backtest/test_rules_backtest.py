@@ -85,7 +85,7 @@ async def test_the_look_back_follows_the_longest_indicator_of_the_rules(
 
     backtest = await run_saved_rules(web_client, database_url, clock, rules)
 
-    assert backtest["trades"][0]["time_utc"] == "2026-03-03T00:00:00.000001Z"
+    assert backtest["trades"][0]["time_utc"] == "2026-03-03T00:00:00.001000Z"
     assert backtest["trades"][0]["side"] == "BUY"
     # Look-back bars make no fill and no equity point (section 10.3.1).
     assert backtest["equity_curve"][0]["time_utc"] == "2026-03-03T00:00:00Z"
@@ -102,7 +102,7 @@ async def test_without_saved_bars_before_the_start_the_indicators_warm_up_on_the
 
     backtest = await run_saved_rules(web_client, database_url, clock, rules)
 
-    assert backtest["trades"][0]["time_utc"] == "2026-03-05T00:00:00.000001Z"
+    assert backtest["trades"][0]["time_utc"] == "2026-03-05T00:00:00.001000Z"
 
 
 @pytest.mark.anyio

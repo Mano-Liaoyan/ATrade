@@ -72,7 +72,7 @@ export const BAR_PERIOD_SECONDS: Record<BarPeriod, number> = {
   '1-DAY': 86_400,
 };
 
-/** The bar with start < `tradeTime` ≤ start + bar period (a backtest fills at the bar end), else -1. */
+/** The bar with start < `tradeTime` ≤ start + bar period, else -1. A backtest fill at an open is at bar start + 1 ms. */
 export function findTradeBarIndex(
   barTimes: readonly number[],
   periodSeconds: number,

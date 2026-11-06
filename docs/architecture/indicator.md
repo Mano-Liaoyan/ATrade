@@ -761,8 +761,10 @@ section 6.2).
   no mark. The marks have no lines between trades.
 - A `lightweight-charts` series primitive (`attachPrimitive` on the
   candlestick series) draws the marks. Do not use `createSeriesMarkers`.
-- A trade goes on the bar with start < `time_utc` ≤ start + bar period. (A
-  backtest records the fill at the bar end, `ts_event`.)
+- A trade goes on the bar with start < `time_utc` ≤ start + bar period. A
+  backtest fill at an open has the time bar start + 1 millisecond, so it
+  goes on the bar of that open. A backtest fill at the last close has the
+  time of the bar end (`backtest.md` section 10.10.3).
 - Mark (style M3):
   - A 16 × 16 px square, `--cds-background-inverse`, with "B" (buy) or "S"
     (sell) in IBM Plex Mono semibold 11px, `--cds-text-inverse`.

@@ -41,7 +41,7 @@ async def test_a_rule_template_runs_in_a_backtest_and_buys(
     first_trade = backtest["trades"][0]
     # 95% of the equity of 10000 at the close of 100: 95 shares.
     assert (first_trade["time_utc"], first_trade["side"], first_trade["quantity_shares"]) == (
-        "2026-03-03T00:00:00.000001Z",
+        "2026-03-03T00:00:00.001000Z",
         "BUY",
         "95",
     )

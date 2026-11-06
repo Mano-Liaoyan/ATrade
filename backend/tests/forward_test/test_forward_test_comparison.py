@@ -63,7 +63,7 @@ def test_a_live_fill_after_the_bar_close_and_the_backtest_fill_at_the_next_open_
 
     rows = compare_fills(
         forward_test_fills=[make_fill(datetime(2026, 1, 10, 0, 0, 5, tzinfo=UTC), 150)],
-        backtest_fills=[make_fill(datetime(2026, 1, 12, 0, 0, 0, 1, tzinfo=UTC), 151)],
+        backtest_fills=[make_fill(datetime(2026, 1, 12, 0, 0, 0, 1000, tzinfo=UTC), 151)],
         equity_curves=[equity_curve],
     )
 

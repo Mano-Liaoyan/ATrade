@@ -214,8 +214,8 @@ _Avoid_: optimization, grid search, batch backtest
 
 **Fill warning**:
 The warning of a backtest in which the free cash did not pay for a market
-order at the open of the next bar: the order became smaller, or the engine
-refused it. In Chinese, write 成交警告.
+order at the price of its fill, so the order became smaller, or in which the
+engine refused or rejected an order. In Chinese, write 成交警告.
 _Avoid_: margin call, order error
 
 **Trade**:

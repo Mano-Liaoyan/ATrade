@@ -38,6 +38,23 @@ describe('findTradeBarIndex', () => {
     expect(findTradeBarIndex(BAR_TIMES, DAY, FIRST_BAR + 2 * DAY)).toBe(1);
   });
 
+  it('puts a backtest fill at the open, at bar start + 1 ms, on the fill bar and not on the signal bar', () => {
+    const fill = {
+      symbol: 'AAPL',
+      exchange: 'NASDAQ',
+      time_utc: '2025-11-04T00:00:00.001000Z',
+      side: 'BUY' as const,
+      quantity_shares: '10',
+      price_usd: '150',
+      commission_usd: '0',
+      round_trip_net_profit_usd: null,
+    };
+
+    const { trades } = listChartTrades([fill]);
+
+    expect(findTradeBarIndex(BAR_TIMES, DAY, trades[0]?.time ?? 0)).toBe(1);
+  });
+
   it('finds no bar for a trade before the first bar, after the last bar, or in a gap', () => {
     expect(findTradeBarIndex(BAR_TIMES, DAY, FIRST_BAR)).toBe(-1);
     expect(findTradeBarIndex(BAR_TIMES, DAY, FIRST_BAR + 5 * DAY + 1)).toBe(-1);
