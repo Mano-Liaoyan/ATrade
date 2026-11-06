@@ -45,7 +45,7 @@ from atrade.foundation.bar import Bar, BarPeriod, TimeRange, floor_to_bar_start
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import IbAsyncGatewayConnection
-from atrade.market_data import BarRequest, read_saved_bars, read_source_order, read_unsaved_ranges
+from atrade.market_data import BarRequest, read_saved_bars_of_many, read_source_order, read_unsaved_ranges
 from atrade.paper_trading import ForwardTestLedger, read_forward_test_fills
 from atrade.strategy import load_strategy_classes
 
@@ -150,14 +150,6 @@ def create_universe_strategy_config(
     return config_class(order_id_tag=live_node_input.order_id_tag, external_order_instrument_ids=instrument_ids)  # pyright: ignore[reportCallIssue]
 
 
-async def read_daily_bars(database_url: str, instrument: Instrument, time_range: TimeRange) -> list[Bar]:
-    source_order = await read_source_order(database_url=database_url)
-    saved_bars = await read_saved_bars(
-        database_url=database_url, bar_request=BarRequest(instrument, DAILY, time_range), source_order=source_order
-    )
-    return saved_bars.bars
-
-
 async def record_universe_equity(
     live_node_input: LiveNodeInput, members: tuple[Instrument, ...], now_utc: datetime
 ) -> list[EquityPoint]:
@@ -172,9 +164,14 @@ async def record_universe_equity(
         ]
         instruments = dict.fromkeys([*members, *(fill.instrument for fill in fills)])
         time_range = TimeRange(floor_to_bar_start(universe.row.created_at_utc, DAILY), now_utc)
+        saved_bars_of_instruments = await read_saved_bars_of_many(
+            database_url=database_url,
+            bar_requests=[BarRequest(instrument, DAILY, time_range) for instrument in instruments],
+            source_order=await read_source_order(database_url=database_url),
+        )
         bars_by_instrument: dict[tuple[str | None, str | None], list[Bar]] = {
-            (instrument.symbol, instrument.exchange): await read_daily_bars(database_url, instrument, time_range)
-            for instrument in instruments
+            (instrument.symbol, instrument.exchange): saved_bars.bars
+            for instrument, saved_bars in zip(instruments, saved_bars_of_instruments, strict=True)
         }
         equity_curve = [
             point

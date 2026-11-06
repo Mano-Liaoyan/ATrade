@@ -188,6 +188,12 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   `SavedBars(bars, bar_counts)`: the merged bars, oldest first, and the bar
   count of each bar source in the source order. Backtests use it (section
   10) with the global source order from `read_source_order(database_url)`.
+  `read_saved_bars_of_many(*, database_url, bar_requests, source_order)`
+  does the same for a list of bar requests on one connection. It returns one
+  `SavedBars` for each bar request, in the same order. The merge of the
+  source order applies to each range, so it runs the same queries for each
+  bar request. A multi-instrument backtest and the multi-instrument forward
+  test equity use it.
 - The public entry exports `save_received_bars(*, database_url, bar_request,
   bars)` (async) and `save_received_bars_blocking(...)` (the same, for
   synchronous callers). They save complete bars that a caller received from

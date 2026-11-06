@@ -12,7 +12,7 @@ from atrade.market_data import (
     BarRequest,
     BarSource,
     has_saved_bars,
-    read_saved_bars,
+    read_saved_bars_of_many,
     read_us_universe_members,
     read_us_universe_quarter_starts,
 )
@@ -194,29 +194,32 @@ async def read_universe_bars(
     each range of periods (section 10.10.1)."""
     bar_count_by_source = dict.fromkeys(source_order, 0)
     members: list[MemberBars] = []
-    for member, ranges in find_member_ranges(periods, request.time_range.end_utc).items():
+    member_ranges = find_member_ranges(periods, request.time_range.end_utc)
+    bar_requests = [
+        bar_request
+        for member, ranges in member_ranges.items()
+        for time_range in ranges
+        for bar_request in (
+            BarRequest(instrument=member, bar_period=request.bar_period, time_range=time_range),
+            BarRequest(
+                instrument=member,
+                bar_period=request.bar_period,
+                time_range=TimeRange(start_utc=time_range.start_utc - look_back_length, end_utc=time_range.start_utc),
+            ),
+        )
+    ]
+    saved_bars_of_requests = iter(
+        await read_saved_bars_of_many(database_url=database_url, bar_requests=bar_requests, source_order=source_order)
+    )
+    for member, ranges in member_ranges.items():
         bars: list[Bar] = []
         look_back_by_start: dict[datetime, Bar] = {}
-        for time_range in ranges:
-            saved = await read_saved_bars(
-                database_url=database_url,
-                bar_request=BarRequest(instrument=member, bar_period=request.bar_period, time_range=time_range),
-                source_order=source_order,
-            )
+        for _ in ranges:
+            saved = next(saved_bars_of_requests)
             bars.extend(saved.bars)
             for bar_source, count in saved.bar_counts.items():
                 bar_count_by_source[bar_source] = bar_count_by_source.get(bar_source, 0) + count
-            look_back = await read_saved_bars(
-                database_url=database_url,
-                bar_request=BarRequest(
-                    instrument=member,
-                    bar_period=request.bar_period,
-                    time_range=TimeRange(
-                        start_utc=time_range.start_utc - look_back_length, end_utc=time_range.start_utc
-                    ),
-                ),
-                source_order=source_order,
-            )
+            look_back = next(saved_bars_of_requests)
             look_back_by_start.update((bar.start_utc, bar) for bar in look_back.bars)
         members.append(
             MemberBars(
