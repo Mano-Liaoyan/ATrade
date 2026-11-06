@@ -163,10 +163,13 @@ New columns of `strategy_version`:
 - The "Blank code" start point is the code in
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
   cross strategy: buy 10 shares when the close goes above SMA(20), sell the
-  whole position when it goes below. A saved version keeps its code (ADR
-  0006), so a version from before this exit sells 10 shares, also when a stock
-  split or a partial fill changed the position. It shows only the file format.
-  It cites no research, so it
+  whole position when it goes below. Each bar reads the position and the
+  order counts, so a denied, rejected, or partly filled order gets a new
+  order on the next bar. An exit cancels the open buy orders of the instrument
+  and uses `close_position`, so a backtest exit fills at the next open, as a
+  forward test does. A saved version keeps its code (ADR 0006), so a version
+  from before these rules must be saved again to get them. It shows only the
+  file format. It cites no research, so it
   is not a strategy template and is not in the template library
   ([#139](https://github.com/Mano-Liaoyan/ATrade/issues/139), T8).
 - The "Blank rules" start point and the rule templates make version 1 with

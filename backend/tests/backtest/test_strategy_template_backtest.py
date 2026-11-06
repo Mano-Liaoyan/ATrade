@@ -104,3 +104,35 @@ def test_without_look_back_bars_the_template_does_not_trade_on_the_first_bars(tm
     )
 
     assert trades == []
+
+
+def test_a_template_exit_fills_at_the_open_of_the_next_bar_and_not_at_the_close_of_its_bar(tmp_path: Path) -> None:
+    # The average is 100. Day 1 buys. Day 3 closes at 80, below the average. Day 4 opens at 90.
+    start_utc = FIRST_BAR_UTC + timedelta(days=LOOK_BACK_BAR_COUNT)
+    look_back_bars = [make_bar(FIRST_BAR_UTC + timedelta(days=index), Decimal(100)) for index in range(60)]
+    closes = [110, 110, 110, 80]
+    bars = [make_bar(start_utc + timedelta(days=index), Decimal(close)) for index, close in enumerate(closes)]
+    next_open = Decimal(90)
+    bars.append(
+        Bar(
+            start_utc=start_utc + timedelta(days=4),
+            open=next_open,
+            high=next_open + 1,
+            low=next_open - 1,
+            close=next_open,
+            volume=Decimal(1000),
+        )
+    )
+
+    trades = run_strategy_on_bars(
+        StrategyRun(
+            code=STRATEGY_TEMPLATE,
+            request=make_request(start_utc, len(bars)),
+            starting_cash=PAPER_CAPITAL_USD,
+            bars=bars,
+            look_back_bars=look_back_bars,
+        ),
+        tmp_path,
+    )
+
+    assert [(trade.side, trade.price_usd) for trade in trades] == [("BUY", Decimal("110.00")), ("SELL", Decimal("90.00"))]

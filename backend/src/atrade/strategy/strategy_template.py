@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.indicators import SimpleMovingAverage
-from nautilus_trader.model import Bar, BarType, InstrumentId, OrderSide, Quantity
+from nautilus_trader.model import Bar, BarType, InstrumentId, OrderSide, Position, Quantity
 from nautilus_trader.trading import Strategy
 
 # The warm-up asks for 3 average periods of bars, and for 1 week at least, so that nights, weekends,
@@ -54,12 +54,8 @@ class MovingAverageStrategy(Strategy):
         super().__init__(config)
         self.settings = config
         self.average = SimpleMovingAverage(config.average_period)
-        self.is_long = False
 
     def on_start(self) -> None:
-        # A forward test restart restores the position, and the new strategy object must know it.
-        positions = self.cache.positions_open(instrument_id=self.settings.instrument_id, strategy_id=self.strategy_id)
-        self.is_long = bool(positions)
         self.register_indicator_for_bars(self.settings.bar_type, self.average)
         # Warm up the indicator with historical bars before live bars arrive.
         warm_up_length = find_warm_up_length(self.settings.bar_type, self.settings.average_period)
@@ -70,14 +66,26 @@ class MovingAverageStrategy(Strategy):
     def on_bar(self, bar: Bar) -> None:
         if not self.average.initialized:
             return
+        # Each bar reads the position and the orders, because an order can be denied, rejected, or fill in parts.
         close_price = bar.close.as_double()
-        if close_price > self.average.value and not self.is_long:
+        positions = self.cache.positions_open(instrument_id=self.settings.instrument_id, strategy_id=self.strategy_id)
+        if close_price > self.average.value and not positions and not self.has_orders():
             self.send_buy_order()
-            self.is_long = True
-        elif close_price < self.average.value and self.is_long:
-            # A stock split or a partial fill changes the position, so the exit sells the position, not a fixed count.
-            self.close_all_positions(self.settings.instrument_id)
-            self.is_long = False
+        elif close_price < self.average.value:
+            self.send_exit_orders(positions)
+
+    def has_orders(self, side: OrderSide | None = None) -> bool:
+        filters = {"instrument_id": self.settings.instrument_id, "strategy_id": self.strategy_id, "side": side}
+        return self.cache.orders_inflight_count(**filters) + self.cache.orders_open_count(**filters) > 0
+
+    def send_exit_orders(self, positions: list[Position]) -> None:
+        open_orders = self.cache.orders_open(instrument_id=self.settings.instrument_id, strategy_id=self.strategy_id)
+        for order in open_orders:
+            if order.side == OrderSide.BUY:
+                self.cancel_order(order.client_order_id)
+        if not self.has_orders(OrderSide.SELL):
+            for position in positions:
+                self.close_position(position)
 
     def send_buy_order(self) -> None:
         order = self.order_factory.market(
