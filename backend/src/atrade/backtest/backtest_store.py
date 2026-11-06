@@ -475,16 +475,18 @@ async def select_finished_backtests_of(connection: psycopg.AsyncConnection, row:
         return await cursor.fetchall()
 
 
-async def select_equity_curves(
+async def select_daily_equity_curves(
     connection: psycopg.AsyncConnection, backtest_ids: list[int]
 ) -> dict[int, list[EquityPoint]]:
-    """The equity curves of the backtests, by backtest ID, with one query. A backtest without points has []."""
+    """The last equity point of each UTC date of the backtests, by backtest ID, with one query. These points give the
+    same `calculate_daily_returns` result as the full curve. A backtest without points has []."""
     equity_curves: dict[int, list[EquityPoint]] = {backtest_id: [] for backtest_id in backtest_ids}
     cursor = await connection.execute(
         """
-        SELECT backtest_id, time_utc, equity_usd FROM backtest_equity_point
+        SELECT DISTINCT ON (backtest_id, (time_utc AT TIME ZONE 'UTC')::date) backtest_id, time_utc, equity_usd
+        FROM backtest_equity_point
         WHERE backtest_id = ANY(%(backtest_ids)s)
-        ORDER BY backtest_id, time_utc
+        ORDER BY backtest_id, (time_utc AT TIME ZONE 'UTC')::date, time_utc DESC
         """,
         {"backtest_ids": backtest_ids},
     )
