@@ -97,3 +97,58 @@ async def test_a_single_instrument_forward_test_has_no_instrument_rows(web_clien
     response = await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")
 
     assert response.json()["instruments"] == []
+
+
+def write_split_round_trips(database_url: str, forward_test_id: int) -> None:
+    """Buy 100 at 100, a 2:1 split, sell 200 at 55: a win of 1000. Buy 100 at 50, sell 100 at 45: a loss of 500."""
+    with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
+        cursor.executemany(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, price, commission, cash_change, ibkr_execution_id, ibkr_order_id)
+            VALUES ('forward_test', %s, 'fill', %s, 'DU1234567', 'AAPL', 'NASDAQ', 'USD', %s, %s, 0, %s, %s, %s)
+            """,
+            [
+                (forward_test_id, make_day(1), 100, "100", "-10000", "E-1", 1),
+                (forward_test_id, make_day(4), -200, "55", "11000", "E-2", 2),
+                (forward_test_id, make_day(5), 100, "50", "-5000", "E-3", 3),
+                (forward_test_id, make_day(6), -100, "45", "4500", "E-4", 4),
+            ],
+        )
+        cursor.execute(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, cash_change, stock_split_id)
+            VALUES ('forward_test', %s, 'split_adjustment', %s, 'DU1234567', 'AAPL', 'NASDAQ', 'USD', 100, 0, 1)
+            """,
+            (forward_test_id, make_day(2)),
+        )
+        cursor.executemany(
+            "INSERT INTO forward_test_equity_point (forward_test_id, time_utc, equity_usd) VALUES (%s, %s, 100000)",
+            [(forward_test_id, make_day(day)) for day in range(1, 9)],
+        )
+
+
+@pytest.mark.anyio
+async def test_a_split_adjustment_counts_for_the_position_but_not_as_a_trade(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_watchlist_forward_test(web_client, database_url, ["AAPL"])
+    write_split_round_trips(database_url, forward_test["id"])
+
+    detail = (await web_client.get(f"/api/forward-tests/{forward_test['id']}")).json()
+
+    metrics = detail["metrics"]
+    assert Decimal(metrics["win_rate_percent"]) == 50
+    assert Decimal(metrics["profit_factor"]) == 2
+    assert Decimal(metrics["average_loss_usd"]) == -500
+    assert Decimal(metrics["exposure_percent"]) == 50
+    assert metrics["trade_count"] == 4
+    [instrument] = detail["instruments"]
+    assert instrument["trade_count"] == 4
+    assert Decimal(instrument["net_profit_usd"]) == 500
+    assert [fill["round_trip_net_profit_usd"] for fill in detail["fills"]] == [None, None, "1000", None, "-500"]
+
+
+def make_day(day: int) -> datetime:
+    return datetime(2026, 2, day, 15, tzinfo=UTC)

@@ -62,5 +62,6 @@ async def test_a_forward_test_fill_has_the_round_trip_net_profit_and_a_split_adj
     assert [(fill["kind"], fill["round_trip_net_profit_usd"]) for fill in fills] == [
         ("fill", None),
         ("split_adjustment", None),
-        ("fill", "100"),
+        # 10 * 110 - 10 * 100 + 7.5 cash in lieu of the split adjustment.
+        ("fill", "107.5"),
     ]

@@ -4,6 +4,7 @@ the same period, start a backtest of the same period, and compare the forward te
 """
 
 import dataclasses
+from collections import Counter
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
@@ -238,12 +239,12 @@ def to_compared_backtest(backtest: BacktestSummary) -> ComparedBacktestSummaryRe
 
 
 def to_forward_test_fill_responses(forward_test_fills: list[ForwardTestFill]) -> list[ForwardTestFillResponse]:
-    """The fills with the round trip rule of the Instruments tab: the split adjustments are not in it."""
-    fills = [fill for fill in forward_test_fills if fill.kind == "fill"]
-    net_profits = dict(
-        zip((id(fill) for fill in fills), find_round_trip_net_profits([fill.trade for fill in fills]), strict=True)
-    )
-    return [to_forward_test_fill_response(fill, net_profits.get(id(fill))) for fill in forward_test_fills]
+    """The fills with the round trip rule of the Instruments tab. The split adjustments change the positions."""
+    net_profits = find_round_trip_net_profits(forward_test_records.list_trades(forward_test_fills))
+    return [
+        to_forward_test_fill_response(fill, net_profit)
+        for fill, net_profit in zip(forward_test_fills, net_profits, strict=True)
+    ]
 
 
 def to_forward_test_fill_response(
@@ -280,34 +281,49 @@ def to_forward_test_fill_response(
 
 
 def to_instrument_responses(
-    fills: list[BacktestTrade], members: dict[datetime, list[Instrument]]
+    forward_test_fills: list[ForwardTestFill], members: dict[datetime, list[Instrument]]
 ) -> list[ForwardTestInstrumentResponse]:
-    """The fills and the recorded quarters of each member (section 12.12)."""
+    """The fills and the recorded quarters of each member (section 12.12). The net profit counts the split
+    adjustments, and the trade count does not."""
     quarter_counts: dict[tuple[str, str], int] = {}
     for quarter_members in members.values():
         for member in quarter_members:
             key = (member.symbol, member.exchange)
             quarter_counts[key] = quarter_counts.get(key, 0) + 1
+    instruments = summarize_instruments(forward_test_records.list_trades(forward_test_fills), quarter_counts)
+    fill_counts = Counter(
+        (fill.instrument.symbol, fill.instrument.exchange) for fill in forward_test_fills if fill.kind == "fill"
+    )
     return [
-        ForwardTestInstrumentResponse(**dataclasses.asdict(instrument))
-        for instrument in summarize_instruments(fills, quarter_counts)
+        ForwardTestInstrumentResponse(
+            symbol=instrument.symbol,
+            exchange=instrument.exchange,
+            trade_count=fill_counts[(instrument.symbol, instrument.exchange)],
+            net_profit_usd=instrument.net_profit_usd,
+            quarter_count=instrument.quarter_count,
+        )
+        for instrument in instruments
     ]
 
 
 def calculate_forward_test_metrics(
-    row: ForwardTestRow, equity_curve: list[EquityPoint], fills: list[BacktestTrade], now_utc: datetime
+    row: ForwardTestRow, equity_curve: list[EquityPoint], forward_test_fills: list[ForwardTestFill], now_utc: datetime
 ) -> ForwardTestMetrics | None:
     """The range of a forward test goes from its start to its stop, or to now while it runs. The recorded equity
-    points (one at each bar end) count as the bars of the exposure. The recorded fills are the trades."""
+    points (one at each bar end) count as the bars of the exposure. The recorded ledger rows are the trades, and the
+    trade count has the fills only."""
     if row.start_capital_usd is None:
         return None
     metrics = calculate_metrics(
         paper_capital_usd=row.start_capital_usd,
         time_range=TimeRange(start_utc=row.created_at_utc, end_utc=row.stopped_at_utc or now_utc),
         equity_curve=equity_curve,
-        trades=fills,
+        trades=forward_test_records.list_trades(forward_test_fills),
     )
-    return ForwardTestMetrics(metrics=metrics, start_capital_usd=row.start_capital_usd)
+    trade_count = sum(fill.kind == "fill" for fill in forward_test_fills)
+    return ForwardTestMetrics(
+        metrics=dataclasses.replace(metrics, trade_count=trade_count), start_capital_usd=row.start_capital_usd
+    )
 
 
 def calculate_win_rate_in_period(fills: list[BacktestTrade], period: TimeRange) -> Decimal | None:
@@ -437,7 +453,6 @@ class ComparisonRoutes:
         row = await self.read_forward_test_row(forward_test_id)
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             forward_test_fills = await forward_test_records.select_forward_test_fills(connection, forward_test_id)
-            fills = forward_test_records.list_trades(forward_test_fills)
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             backtest_ids = await forward_test_records.select_same_period_backtest_ids(connection, forward_test_id)
             members = await forward_test_store.select_universe_members(connection, forward_test_id)
@@ -452,11 +467,11 @@ class ComparisonRoutes:
                 strategy_indicators=list_version_chart_indicators(strategy_version, {}),
             ),
             metrics=to_forward_test_metrics_response(
-                calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc())
+                calculate_forward_test_metrics(row, equity_curve, forward_test_fills, self.clock.read_now_utc())
             ),
             equity_curve=to_equity_curve_response(equity_curve),
             fills=to_forward_test_fill_responses(forward_test_fills),
-            instruments=to_instrument_responses(fills, members),
+            instruments=to_instrument_responses(forward_test_fills, members),
             same_period_backtests=[to_compared_backtest(backtest) for backtest in backtests],
         )
 
@@ -469,12 +484,11 @@ class ComparisonRoutes:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=describe_other_setup(row))
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             forward_test_fills = await forward_test_records.select_forward_test_fills(connection, forward_test_id)
-            fills = forward_test_records.list_trades(forward_test_fills)
             equity_curve = await forward_test_records.select_equity_curve(connection, forward_test_id)
             interruptions = await forward_test_store.select_interruptions(connection, forward_test_id)
         forward_test_metrics = limit_win_rate_to_period(
-            calculate_forward_test_metrics(row, equity_curve, fills, self.clock.read_now_utc()),
-            fills,
+            calculate_forward_test_metrics(row, equity_curve, forward_test_fills, self.clock.read_now_utc()),
+            forward_test_records.list_trades(forward_test_fills),
             backtest.request.time_range,
         )
         fill_rows = compare_fills(

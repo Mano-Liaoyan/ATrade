@@ -511,12 +511,13 @@ Phase 3 changes (#146, #149):
     backtest period (the comparison route calculates it, #170).
   - Metrics: `calculate_metrics` with `start_balance_usd`, the range from
     the forward test start to its stop (or to now while it runs), the
-    recorded equity points, and the recorded fills.
+    recorded equity points, and all ledger rows of the forward test.
   - Decided (#170): the exposure counts the recorded equity points as the
     bars, because a forward test has no saved bars and the DataActor
     records one point at each bar end (section 12.8). The recorded fills
     go to `find_round_trips` with no change: `list_trades` gives
-    `BacktestTrade` rows.
+    `BacktestTrade` rows, also for the stock split adjustments. Without them
+    the position after a split does not reach 0 (section 12.16).
   - Decided (#170): the forward test metrics have the fields of the backtest
     `metrics` (backtest section 10.5, Phase 1 row) and `net_profit_usd`
     (the final equity minus `start_balance_usd`). They have no
@@ -985,6 +986,13 @@ than the worker clock.
     shows the split, for example "Split 4:1". The quantity column shows the
     change of the share count. The price column is empty. The amount column
     shows the cash in lieu.
+  - A stock split adjustment counts in the metrics, the
+    `round_trip_net_profit_usd` of the fills, and the net profit of the
+    Instruments tab: its shares change the position and its cash in lieu adds
+    to the profit of the round trip. Its price is 0, so the turnover does not
+    change. `trade_count` of the metrics and of the Instruments tab counts the
+    fills only. A round trip that a split adjustment ends has no
+    `round_trip_net_profit_usd` on a row, but it counts in the other values.
 - Phase 3 (#149): when an instrument of the forward test is in the
   "Split check needed" state, the header line shows a warning icon before
   "#<id>" with the tooltip "Split check needed: AAPL". The Home page has the actions

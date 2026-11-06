@@ -81,8 +81,10 @@ def convert_ledger_fill(fill: LedgerFill) -> ForwardTestFill:
 
 
 def list_trades(fills: list[ForwardTestFill]) -> list[BacktestTrade]:
-    """The trades of the fills, without the split adjustments: the metrics and the comparison count fills only."""
-    return [fill.trade for fill in fills if fill.kind == "fill"]
+    """All ledger rows as trades. A split adjustment changes the position and adds the cash in lieu, so without it
+    a round trip does not end. Its price is 0, so the turnover does not change. It is not a trade: the trade counts
+    must count only the rows with the kind "fill" (section 12.16)."""
+    return [fill.trade for fill in fills]
 
 
 def select_ledger_fills_blocking(connection: psycopg.Connection, forward_test_id: int) -> list[ForwardTestFill]:
