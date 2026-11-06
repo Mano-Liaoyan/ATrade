@@ -15,13 +15,14 @@
     FilledManualOrderList,
     listBalanceMetrics,
     OpenOrderList,
-    PaperAccountFeed,
+    paperAccountFeed as accountFeed,
     PositionTable,
   } from '#lib/paper_trading';
   import InstrumentWatchlist from './InstrumentWatchlist.svelte';
 
-  const accountFeed = new PaperAccountFeed();
-  $effect(() => accountFeed.start(fetch, window.location));
+  $effect(() => {
+    void accountFeed.refreshFilledOrders(fetch);
+  });
   const account = $derived(accountFeed.account);
   const checkDescription = $derived(account === null ? null : describePaperAccountCheck(account.check));
 

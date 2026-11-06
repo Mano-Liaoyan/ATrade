@@ -283,8 +283,8 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   liquidation in the base currency and the rate, for example
   "USD per EUR 1.1139". Without a rate, the line shows the `message` of the
   balance as an error status, and the USD values show `–`.
-- The page uses `PaperAccountFeed` (`foundation/live_socket` for
-  reconnection and heartbeat) and `foundation/scroll_region` for the tables
+- The page reads the one `paperAccountFeed`, which the layout starts
+  (`foundation/live_socket` for reconnection and heartbeat), and `foundation/scroll_region` for the tables
   (section 13). The tables have 32px rows.
 - The "Paper order" column of the instrument page has the paper order panel
   (`InstrumentOrderPanel.svelte`, section 13): the order is for the instrument

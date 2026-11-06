@@ -1,4 +1,5 @@
 // Public entry of the strategy capability: the strategy HTTP client and the unsaved drafts in the browser.
+export { default as StrategyVersionSelects } from './StrategyVersionSelects.svelte';
 export {
   createStrategy,
   deleteStrategy,

@@ -36,14 +36,7 @@
   } from '#lib/market_data';
   import { readPaperCapital } from '#lib/paper_trading';
   import { listScreens, readScreen, type Screen, type ScreenListItem } from '#lib/screen';
-  import {
-    formatVersionLabel,
-    listStrategies,
-    readStrategy,
-    type StrategyDetail,
-    type StrategyListItem,
-    type StrategyVersionKey,
-  } from '#lib/strategy';
+  import { StrategyVersionSelects, type StrategyVersionKey } from '#lib/strategy';
   import {
     describeSavedBars,
     findSavedBars,
@@ -77,9 +70,6 @@
     strategyVersionId = $bindable(''),
   }: Props = $props();
 
-  let strategies: StrategyListItem[] = $state([]);
-  let selectedStrategy = $state<StrategyDetail | null>(null);
-  let strategyId = $state('');
   let watchlistInstruments: WatchlistInstrument[] = $state([]);
   let watchlistMessage = $state('Loading the watchlist.');
   let watchlistInstrumentId = $state('');
@@ -148,15 +138,6 @@
   const selectedSavedBars = $derived(
     selectedInstrument === undefined ? undefined : findSavedBars(selectedInstrument, barPeriod),
   );
-  const strategyItems = $derived(strategies.map((strategy) => ({ value: String(strategy.id), label: strategy.name })));
-  const versionItems = $derived(
-    selectedStrategy === null
-      ? []
-      : selectedStrategy.versions.map((version) => ({
-          value: String(version.id),
-          label: formatVersionLabel(selectedStrategy?.name ?? '', version.version_number),
-        })),
-  );
   const sourceOrderItems = $derived(
     sourceOrders.map((sourceOrder) => ({ value: sourceOrder.join(','), label: formatSourceOrder(sourceOrder) })),
   );
@@ -169,20 +150,12 @@
     onRequestChange(readRequest(), topNReason, missingChoice);
   });
 
-  // Each open reads the choices again: a strategy or a watchlist instrument can be new.
+  // Each open reads the choices again: a watchlist instrument can be new.
   $effect(() => {
     if (!open) {
       return;
     }
     onError(null);
-    if (strategyVersion !== null) {
-      void selectStrategy(String(strategyVersion.strategyId), String(strategyVersion.versionId));
-    }
-    void listStrategies(fetch).then((result) => {
-      if (result.kind === 'ok') {
-        strategies = result.value;
-      }
-    });
     void listWatchlist(fetch).then((result) => {
       if (result.kind === 'ok') {
         watchlistInstruments = result.value;
@@ -236,21 +209,6 @@
       watchlistInstrumentId = '';
     }
   });
-
-  // Without a version id, the latest version of the strategy is selected.
-  async function selectStrategy(selectedId: string, versionId: string | null = null): Promise<void> {
-    strategyId = selectedId;
-    selectedStrategy = null;
-    strategyVersionId = '';
-    const result = await readStrategy(fetch, Number(selectedId));
-    if (result.kind === 'failed') {
-      onError({ kind: 'error', title: 'Strategy not read', subtitle: result.message });
-      return;
-    }
-    selectedStrategy = result.value;
-    const latestVersion = result.value.versions.at(-1);
-    strategyVersionId = versionId ?? (latestVersion === undefined ? '' : String(latestVersion.id));
-  }
 
   // Without a screen result, the fixed list is the last run of the screen.
   async function selectScreen(
@@ -337,23 +295,7 @@
   }
 </script>
 
-<Select
-  label="Strategy"
-  placeholder="Select a strategy"
-  items={strategyItems}
-  value={strategyId}
-  onValueChange={(selectedId: string) => void selectStrategy(selectedId)}
-/>
-<Select
-  label="Strategy version"
-  placeholder="Select a strategy first"
-  items={versionItems}
-  value={strategyVersionId}
-  disabled={versionItems.length === 0}
-  onValueChange={(versionId: string) => {
-    strategyVersionId = versionId;
-  }}
-/>
+<StrategyVersionSelects {onError} {strategyVersion} bind:strategyVersionId />
 <Select
   label="Bar period"
   items={[...BAR_PERIODS]}
