@@ -676,7 +676,10 @@ undo the import.
   (section 8.14).
 - A second import adjusts its bars with all confirmed stock splits of the
   instrument, also the stock splits of the IBKR stock split check. A stock
-  split that is in `stock_split` keeps its row and its confirmation.
+  split that is in `stock_split` keeps its row and its confirmation. The
+  import records no row when an applied stock split of the instrument has
+  an ex-date up to 5 days earlier: evidence A gives the day after the last
+  stored bar as the ex-date, so that row is the same stock split.
 - Code (#191): `market_data/stock_split_detection.py` (the 2 rules),
   `market_data/databento_import_adjustment.py` (links and adjustment in
   the import), `market_data/import_check.py` (the user check), and the

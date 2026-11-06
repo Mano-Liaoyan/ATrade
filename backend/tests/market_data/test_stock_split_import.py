@@ -21,6 +21,7 @@ from atrade.market_data import (
     DatabentoImportReport,
     ImportCheckError,
     check_import_detections,
+    import_databento_files,
     read_saved_bars,
 )
 from tests.databento_import_runs import import_and_check_splits
@@ -211,6 +212,54 @@ async def test_the_detection_rule_finds_a_stock_split_of_an_instrument_that_stop
     assert [(split.instrument.symbol, split.ex_date) for split in report.stock_splits] == [("GONE", TRADING_DAYS[2])]
     bars = await read_bars(database_url, "GONE")
     assert [bar.close for bar in bars] == [Decimal(80), Decimal(80), Decimal(41), Decimal(42)]
+
+
+def insert_ibkr_evidence_split(database_url: str, ex_date_utc: datetime, confirmation: str) -> None:
+    with psycopg.connect(database_url) as connection:
+        connection.execute(
+            """
+            INSERT INTO stock_split (
+                symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc
+            )
+            VALUES ('GONE', 'NASDAQ', 'USD', %(ex_date_utc)s, 2, 'ibkr_evidence', %(confirmation)s, %(recorded_at_utc)s)
+            """,
+            {"ex_date_utc": ex_date_utc, "confirmation": confirmation, "recorded_at_utc": CHECKED_AT_UTC},
+        )
+
+
+# The import finds the stock split of GONE on Monday 2020-01-13. Evidence A has the ex-date Saturday 2020-01-11.
+GONE_EX_DATE = TRADING_DAYS[5]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("days_earlier", "confirmation", "expected_new_rows"),
+    [
+        (2, "both_evidences", 0),
+        (2, "user_apply", 0),
+        (5, "bar_evidence", 0),
+        (6, "both_evidences", 1),
+        (2, "import_rejected", 1),
+    ],
+)
+async def test_the_import_records_no_second_row_for_a_stock_split_that_is_applied_at_an_earlier_ex_date(
+    database_url: str, tmp_path: Path, days_earlier: int, confirmation: str, expected_new_rows: int
+) -> None:
+    ex_date_utc = utc_day(GONE_EX_DATE) - timedelta(days=days_earlier)
+    insert_ibkr_evidence_split(database_url, ex_date_utc, confirmation)
+    gone_bars = create_bars(
+        "GONE",
+        [TRADING_DAYS[4], GONE_EX_DATE],
+        [("80", "80", 1000), ("40", "41", 2100)],
+    )
+    other_bars = create_bars("OTHR", TRADING_DAYS, [("10", "10", 500)] * len(TRADING_DAYS))
+
+    import_databento_files(
+        database_url=database_url, file_paths=write_dbn_files(tmp_path, create_history_files([*gone_bars, *other_bars]))
+    )
+
+    new_rows = [row for row in read_table(database_url, STOCK_SPLIT_QUERY) if row[5] == "databento_import"]
+    assert len(new_rows) == expected_new_rows
 
 
 @pytest.mark.anyio

@@ -189,10 +189,20 @@ SELECT_IMPORT_PRICES: LiteralString = """
     ORDER BY symbol, exchange, currency, start_utc
 """
 
+# Evidence A gives the day after the last stored bar as the ex-date, so the import can find an applied stock split on a
+# later day. A second row would wait, and it would change the next IBKR bars before its ex-date. The window is the
+# `MATCH_DAYS` of the stock split report.
 INSERT_STOCK_SPLIT: LiteralString = """
     INSERT INTO stock_split (symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc)
-    VALUES (%(symbol)s, %(exchange)s, %(currency)s, %(ex_date_utc)s, %(split_ratio)s, 'databento_import',
-        %(confirmation)s, now())
+    SELECT %(symbol)s::text, %(exchange)s::text, %(currency)s::text, %(ex_date_utc)s::timestamptz,
+        %(split_ratio)s::numeric, 'databento_import', %(confirmation)s::text, now()
+    WHERE NOT EXISTS (
+        SELECT FROM stock_split AS applied
+        WHERE applied.symbol = %(symbol)s AND applied.exchange = %(exchange)s AND applied.currency = %(currency)s
+            AND applied.confirmation IN ('both_evidences', 'bar_evidence', 'user_apply', 'import_check')
+            AND applied.ex_date_utc < %(ex_date_utc)s
+            AND applied.ex_date_utc >= %(ex_date_utc)s::timestamptz - interval '5 days'
+    )
     ON CONFLICT (symbol, exchange, currency, ex_date_utc) DO NOTHING
 """
 
