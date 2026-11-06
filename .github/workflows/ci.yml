@@ -12,6 +12,9 @@ permissions:
 
 env:
   ATRADE_TEST_DATABASE_URL: postgresql://atrade:atrade@127.0.0.1:5432/atrade
+  # Only main saves caches. All pull requests read the caches of main, but no other pull request can read the caches
+  # of a pull request. So they only take space (GitHub limit: 10 GB).
+  SAVE_CACHES: ${{ github.ref == 'refs/heads/main' }}
 
 jobs:
   backend:
@@ -32,6 +35,8 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.13.5"
+          cache-python: true
+          save-cache: ${{ env.SAVE_CACHES }}
       - run: ./scripts/check backend
 
   frontend:
@@ -42,6 +47,8 @@ jobs:
         with:
           working-directory: frontend
           cache: true
+          cache-toolchain: true
+          cache-save: ${{ env.SAVE_CACHES }}
       - run: ./scripts/check frontend
 
   assistant:
@@ -52,6 +59,7 @@ jobs:
         with:
           working-directory: assistant
           cache: true
+          cache-save: ${{ env.SAVE_CACHES }}
       - run: ./scripts/check assistant
 
   e2e:
@@ -83,14 +91,41 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           version: "0.13.5"
+          cache-python: true
+          save-cache: ${{ env.SAVE_CACHES }}
       - uses: voidzero-dev/setup-vp@v1.22.0
         with:
           working-directory: frontend
           cache: true
+          cache-toolchain: true
+          cache-save: ${{ env.SAVE_CACHES }}
+      # The apt mirror of the runners can be slow: on 2026-11-05 it took more than 15 minutes for 114 MB. So the apt
+      # packages and the browsers come from the cache. A mirror change is not needed then.
+      - uses: actions/cache/restore@v6
+        id: playwright-cache
+        with:
+          path: |
+            ~/apt-archives
+            ~/.cache/ms-playwright
+          key: playwright-ubuntu-24.04-${{ matrix.browser }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}
+          restore-keys: playwright-ubuntu-24.04-${{ matrix.browser }}-
+      - run: |
+          mkdir -p ~/apt-archives/partial
+          echo "Dir::Cache::Archives \"$HOME/apt-archives\";" | sudo tee /etc/apt/apt.conf.d/99-ci-cache
       - run: vp exec playwright install --with-deps ${{ matrix.browser }}
         working-directory: frontend
-        # A normal install takes from 19 seconds to 11 minutes. A hang stops here, not at the job timeout.
+        # A hang stops here, not at the job timeout.
         timeout-minutes: 15
+      # Before the tests, so a test failure does not lose the cache. apt writes as root.
+      - run: sudo chown -R "$USER" ~/apt-archives
+        if: env.SAVE_CACHES == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+      - uses: actions/cache/save@v6
+        if: env.SAVE_CACHES == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/apt-archives
+            ~/.cache/ms-playwright
+          key: ${{ steps.playwright-cache.outputs.cache-primary-key }}
       - run: ./scripts/check e2e
         # The step stops before the job does, so the artifact step below still runs.
         timeout-minutes: 25
