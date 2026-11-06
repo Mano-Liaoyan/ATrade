@@ -449,12 +449,29 @@ kinds:
     the prefilter. The rows are the only output that a backtest uses.
   - The run of the screen page has no prefilter, because it shows the
     exclusion reasons.
-- The backtest child writes one log line for each period of a `screen`
-  universe to its standard output, for example `Screen period 2026-03-01:
-  2133 candidates, 31.2 seconds.` The count is the number of instruments in
-  the read of step 2. The parent keeps only the standard error, for the
-  failure text, so standard output is the path to the log of the `web`
-  container.
+- Done in #414: the periods of a `screen` universe run at the same time in a
+  `ProcessPoolExecutor` with at most 4 worker processes. These rules apply:
+  - The workers come from a forkserver, because the child has the threads of
+    its libraries.
+  - The screen indicators wrap NautilusTrader indicators (ADR 0001), so each
+    worker imports NautilusTrader. The import costs about 160 MB in each
+    worker. Preloading it in the forkserver is not allowed: the import starts
+    threads, and a fork in a process with threads can deadlock.
+  - The public entry of `screen` exports `run_screen_period(*, database_url,
+    market, definition, as_of_utc)`. Each worker runs it for one period. It
+    returns only the instruments of the result rows. No bars and no rows go
+    between the processes.
+  - The result stays in period order. The first failed period raises its
+    error in the child, so the backtest is `failed` with this error. The
+    periods that wait do not start, and the run kills the workers of the periods
+    that run, so a period that does not end cannot hold the failed backtest.
+  - [`backtest.md`](backtest.md) section 10.1 has the isolation controls of
+    the workers and the stop of the process group.
+- Each worker writes one log line for each period of a `screen` universe to
+  its standard output, for example `Screen period 2026-03-01: 2133
+  candidates, 31.2 seconds.` The count is the number of instruments in the
+  read of step 2. The parent keeps only the standard error, for the failure
+  text, so standard output is the path to the log of the `web` container.
 - For a fixed list from the AI assistant, the tool result has the
   survivorship bias warning. The AI assistant must write the warning in its
   answer.

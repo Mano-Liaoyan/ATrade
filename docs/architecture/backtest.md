@@ -91,12 +91,12 @@ puts the new parts of this section in phases.
 
 | Control | Rule |
 |---|---|
-| Timeout | Default 120 minutes. After the timeout, the parent stops the child. The status is "timed out". |
+| Timeout | Default 120 minutes. After the timeout, the parent stops the process group of the child. The status is "timed out". |
 | Concurrency | Default 1 backtest at a time. Other backtests wait in a queue. |
 | Defaults | The user can change the timeout and the concurrency in the UI. PostgreSQL stores them. |
-| Memory | Do not use `RLIMIT_AS`. The `web` container has a memory limit. The child sets `oom_score_adj` to 1000, so the kernel stops the backtest first when memory is low. |
-| CPU | The child runs with `nice 10`. |
-| Environment | Allow list: `PATH`, `HOME`, `TZ`, `DATABASE_URL`. IBKR and Cloudflare secrets are not passed. `create_child_environment()` of `foundation/process_protection.py` makes the list. The forward test child, the language server, and ruff use the same function. |
+| Memory | Do not use `RLIMIT_AS`. The `web` container has a memory limit. The child sets `oom_score_adj` to 1000, so the kernel stops the backtest first when memory is low. The worker processes of a `screen` universe inherit this value. |
+| CPU | The child runs with `nice 10`. Its worker processes inherit this value. |
+| Environment | Allow list: `PATH`, `HOME`, `TZ`, `DATABASE_URL`. IBKR and Cloudflare secrets are not passed. `create_child_environment()` of `foundation/process_protection.py` makes the list. The forward test child, the language server, and ruff use the same function. The worker processes inherit this environment. CPython can add `LC_CTYPE` for its locale. |
 | Parent process | At start, `web` and the forward-test worker call `prctl(PR_SET_DUMPABLE, 0)` (`foundation/process_protection.py`, Linux only). A child cannot read `/proc/<parent>/environ`, and the parent writes no core dump. |
 | Network | No network isolation. The child must connect to PostgreSQL. |
 | File system | The container root file system is read-only. Only `/tmp` is writable. |
@@ -115,6 +115,25 @@ Implementation of the controls:
   `/proc/self/oom_score_adj` and calls `os.nice(10)` before it imports the
   strategy. Any process can make its own priority lower, so this needs no
   privilege.
+- Done in #414: the child and its worker processes are one process group.
+  The runner starts the child with `process_group=0`. These processes are in
+  the group: the child, the forkserver, the resource tracker of
+  `multiprocessing`, and the worker processes of a `screen` universe
+  ([`screen.md`](screen.md) section 24.9). The workers do not read the
+  standard input.
+  - After each end of the child, the runner sends SIGKILL to the group: after
+    the timeout, at cancellation, and also after the child ended itself. A
+    killed child leaves its workers.
+  - The Web process holds the write end of the standard input of the child. A
+    thread of the child reads this input. When the Web process ends in any
+    way, the read returns and the thread sends SIGKILL to the group. So no
+    child stays after the Web process, also when the Web process is not
+    process 1 of a container.
+  - The standard error of the child goes to a temporary file in `/tmp`, not to
+    a pipe, so the runner sees the end of a killed child when its workers
+    still run.
+  - The semaphores of a killed worker pool stay in `/dev/shm` of the
+    container until the container stops: 5 files of 4 KB each.
 - The memory limit of the `web` container is `ATRADE_WEB_MEMORY_LIMIT`.
   Done in #199: the default changed from `4g` to `8g`
   ([#142](https://github.com/Mano-Liaoyan/ATrade/issues/142)): a
@@ -224,7 +243,7 @@ New columns are null on existing rows, except where a default is given.
    `finished` in one transaction. Phase 1: the metrics include the metrics of
    section 10.9.2.
 7. When the child ends, the parent ends a backtest that is still `running`:
-   `timed_out` after the timeout (the parent kills the child), else `failed`
+   `timed_out` after the timeout (the parent kills the process group of the child), else `failed`
    with the end of the child error output.
 
 Failures that the user sees in `error_message`:

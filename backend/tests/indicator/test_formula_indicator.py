@@ -1,6 +1,7 @@
 """Formula expressions: the parser, the values, "no value", and the look-back (indicator.md section 23.10)."""
 
 import math
+import pickle
 import random
 import re
 import statistics
@@ -22,6 +23,7 @@ from atrade.indicator import (
     count_formula_bars,
     make_nautilus_bar,
 )
+from atrade.indicator.formula_indicator import FormulaProblem
 from tests.indicator.test_atrade_indicators import make_long_test_bars
 from tests.indicator.test_wrapped_indicators import (
     IndicatorCase,
@@ -422,3 +424,10 @@ def test_the_screen_path_and_the_strategy_path_give_the_same_values(tmp_path: Pa
     assert screen_outputs == read_strategy_path_outputs(case, bars, tmp_path)
     assert screen_outputs[0] == [None]
     assert None not in screen_outputs[-1]
+
+
+def test_a_formula_problem_keeps_its_column_and_message_through_pickle() -> None:
+    # A process pool sends the exception of a screen period back with pickle (screen.md section 24.9).
+    problem = pickle.loads(pickle.dumps(FormulaProblem(3, "The expression is not correct.")))
+
+    assert (problem.column, problem.message) == (3, "The expression is not correct.")

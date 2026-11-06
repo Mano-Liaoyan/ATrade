@@ -7,6 +7,9 @@ applies to the next backtest that starts.
 
 import asyncio
 import logging
+import os
+import signal
+import tempfile
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 
@@ -83,7 +86,8 @@ class BacktestRunner:
 
     async def fail_running_backtests(self) -> None:
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            # No child of an earlier Web process is still running: the children end with their parent.
+            # No child of an earlier Web process is still running: a child kills its process group when the standard
+            # input from its parent closes (backtest_process.py).
             await backtest_store.fail_running_backtests(
                 connection, ended_at_utc=self.clock.read_now_utc(), error_message=RESTART_ERROR_MESSAGE
             )
@@ -117,30 +121,37 @@ class BacktestRunner:
             logger.exception("The backtest runner could not write the end of backtest %s.", backtest_id)
 
     async def run_child_until_end(self, backtest_id: int, *, timeout_seconds: int) -> None:
-        process = await asyncio.create_subprocess_exec(
-            *self.process_command,
-            str(backtest_id),
-            env={**create_child_environment(), "DATABASE_URL": self.database_url},
-            stderr=asyncio.subprocess.PIPE,
-        )
-        try:
-            _, error_output = await asyncio.wait_for(process.communicate(), timeout=timeout_seconds)
-        except TimeoutError:
-            # readability-exception: asyncio reports the timeout only as an exception (G1).
-            await self.stop_child(process)
+        # A file and not a pipe: the workers of a killed child would hold a pipe open.
+        with tempfile.TemporaryFile() as error_file:
+            process = await asyncio.create_subprocess_exec(
+                *self.process_command,
+                str(backtest_id),
+                env={**create_child_environment(), "DATABASE_URL": self.database_url},
+                stdin=asyncio.subprocess.PIPE,
+                stderr=error_file,
+                process_group=0,
+            )
+            try:
+                return_code = await asyncio.wait_for(process.wait(), timeout=timeout_seconds)
+            except TimeoutError:
+                # readability-exception: asyncio reports the timeout only as an exception (G1).
+                return_code = None
+            finally:
+                await self.stop_child(process)
+            error_file.seek(0)
+            error_output = await asyncio.to_thread(error_file.read)
+        if return_code is None:
             await self.end_backtest(backtest_id, status_if_running="timed_out", error_message=None)
             return
-        finally:
-            if process.returncode is None:
-                await self.stop_child(process)
-        return_code = 0 if process.returncode is None else process.returncode
         await self.end_backtest(
             backtest_id, status_if_running="failed", error_message=describe_child_failure(return_code, error_output)
         )
 
     async def stop_child(self, process: asyncio.subprocess.Process) -> None:
+        """Kills the process group: the child and its workers. Also after the end of the child: a killed child leaves
+        its workers."""
         with suppress(ProcessLookupError):
-            process.kill()
+            os.killpg(process.pid, signal.SIGKILL)
         await process.wait()
 
     async def end_backtest(

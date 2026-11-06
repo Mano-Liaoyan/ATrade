@@ -5,6 +5,10 @@ filters get the daily bar summary that these bars give, so a filter value equals
 that time. The run saves no screen result.
 """
 
+import asyncio
+import logging
+import sys
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -13,6 +17,8 @@ from atrade.foundation.instrument import Instrument
 from atrade.market_data import read_daily_bar_summaries_before, read_last_daily_bars, read_us_universe_quarter_starts
 from atrade.screen.screen_run import ScreenOutcome, run_screen_steps
 from atrade.screen.screen_running import read_start_instruments
+
+logger = logging.getLogger("atrade.screen")
 
 # `read_us_universe_quarter_starts` gives the quarters that start before its end. 1 microsecond more keeps a quarter
 # that starts exactly at `as_of_utc`.
@@ -57,3 +63,27 @@ async def run_screen_at(
         read_daily_bars=read_daily_bars,
         prefilter=True,
     )
+
+
+def prepare_screen_period_process() -> None:
+    """The initializer of a worker process. A new worker has no log configuration. Only standard output reaches the
+    log of the web container (section 24.9)."""
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
+
+def run_screen_period(
+    *, database_url: str, market: str, definition: dict[str, Any], as_of_utc: datetime
+) -> list[Instrument]:
+    """One period of a `screen` universe in a worker process. It sends back only the members: no bars and no rows go
+    between the processes (section 24.9)."""
+    run_start = time.monotonic()
+    outcome = asyncio.run(
+        run_screen_at(database_url=database_url, market=market, definition=definition, as_of_utc=as_of_utc)
+    )
+    logger.info(
+        "Screen period %s: %d candidates, %.1f seconds.",
+        f"{as_of_utc:%Y-%m-%d}",
+        outcome.after_prefilter_count,
+        time.monotonic() - run_start,
+    )
+    return [row.instrument for row in outcome.rows]

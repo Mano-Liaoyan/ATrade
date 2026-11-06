@@ -1,8 +1,9 @@
 """The universe of a multi-instrument backtest: the universe periods and their members, the saved-bar check, and the
 bars of each member (docs/architecture/backtest.md section 10.10)."""
 
-import logging
-import time
+import asyncio
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Final
@@ -18,15 +19,16 @@ from atrade.market_data import (
     read_us_universe_members,
     read_us_universe_quarter_starts,
 )
-from atrade.screen import run_screen_at
-
-logger = logging.getLogger("atrade.backtest")
+from atrade.screen import prepare_screen_period_process, run_screen_period
 
 MAX_UNIVERSE_SIZE: Final = 500
 MONTHS_IN_PERIOD: Final[dict[UniverseRebalancePeriod, int]] = {"quarter": 3, "month": 1}
 UNIVERSE_BAR_PERIODS: Final = (BarPeriod.ONE_DAY, BarPeriod.ONE_HOUR)
 # Section 10.10.1: a multi-instrument backtest on 1-day bars reads 1 year of look-back bars (#146).
 ONE_DAY_UNIVERSE_LOOK_BACK: Final = timedelta(days=365)
+# Each worker reads and calculates one period, so this limit holds the memory of a backtest below the limit of the
+# web container (docs/architecture/screen.md section 24.9).
+MAX_SCREEN_PERIOD_PROCESSES: Final = 4
 
 
 def check_universe(request: BacktestRequest) -> str | None:
@@ -108,24 +110,39 @@ async def run_screen_periods(
     *, database_url: str, screen: UniverseScreen, rebalance_period: UniverseRebalancePeriod, time_range: TimeRange
 ) -> list[UniversePeriod]:
     """Runs the copy of the screen at each period start on the daily bars that start before it. The result rows are
-    the members of the period (docs/architecture/screen.md section 24.9). A period can have no member."""
-    periods: list[UniversePeriod] = []
-    for start_utc in find_screen_period_starts(time_range, rebalance_period):
-        run_start = time.monotonic()
-        outcome = await run_screen_at(
-            database_url=database_url,
-            market=screen.market,
-            definition=screen.definition,
-            as_of_utc=find_screen_run_time(start_utc),
+    the members of the period (docs/architecture/screen.md section 24.9). A period can have no member.
+
+    The periods run at the same time in worker processes. The first failed period raises its error and kills the
+    workers. The child already has the threads of its libraries, so the workers come from a forkserver.
+    """
+    period_starts = find_screen_period_starts(time_range, rebalance_period)
+    pool = ProcessPoolExecutor(
+        max_workers=MAX_SCREEN_PERIOD_PROCESSES,
+        mp_context=multiprocessing.get_context("forkserver"),
+        initializer=prepare_screen_period_process,
+    )
+    try:
+        members_of_periods = await asyncio.gather(
+            *(
+                asyncio.wrap_future(
+                    pool.submit(
+                        run_screen_period,
+                        database_url=database_url,
+                        market=screen.market,
+                        definition=screen.definition,
+                        as_of_utc=find_screen_run_time(start_utc),
+                    )
+                )
+                for start_utc in period_starts
+            )
         )
-        logger.info(
-            "Screen period %s: %d candidates, %.1f seconds.",
-            f"{start_utc:%Y-%m-%d}",
-            outcome.after_prefilter_count,
-            time.monotonic() - run_start,
-        )
-        periods.append(UniversePeriod(start_utc=start_utc, members=[row.instrument for row in outcome.rows]))
-    return periods
+    finally:
+        # Not `shutdown`: it waits on the event loop, and a period that does not end would stop the end of the backtest.
+        pool.kill_workers()
+    return [
+        UniversePeriod(start_utc=start_utc, members=members)
+        for start_utc, members in zip(period_starts, members_of_periods, strict=True)
+    ]
 
 
 def describe_missing_universe(time_range: TimeRange) -> str:
