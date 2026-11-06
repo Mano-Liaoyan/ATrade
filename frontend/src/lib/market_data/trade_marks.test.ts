@@ -22,7 +22,7 @@ function makeTrade(
   side: 'BUY' | 'SELL',
   roundTripNetProfit: string | null = null,
 ): ChartTrade {
-  return { time, side, quantity: '50', price: '182.35', roundTripNetProfit };
+  return { time, side, quantity: '50', price: '182.35', priceSuffix: '', roundTripNetProfit };
 }
 
 describe('findTradeBarIndex', () => {
@@ -175,6 +175,27 @@ describe('readCenteredRange', () => {
 });
 
 describe('listChartTrades', () => {
+  it('marks the USD prices of a chart in another currency', () => {
+    const trade = {
+      time_utc: '2025-11-04T00:00:01Z',
+      side: 'BUY' as const,
+      quantity_shares: '10',
+      price_usd: '42.24',
+      commission_usd: '0',
+      symbol: '700',
+      exchange: 'SEHK',
+      round_trip_net_profit_usd: '15',
+    };
+
+    const { trades } = listChartTrades([trade], undefined, 'HKD');
+
+    expect(trades[0]?.priceSuffix).toBe(' USD');
+    expect(trades[0] === undefined ? null : formatTradeLine(trades[0])).toEqual({
+      text: 'Buy 10 @ 42.24 USD',
+      profit: { text: '+15.00 USD', kind: 'success' },
+    });
+  });
+
   it('gives each fill row its chart trade and a split adjustment row none', () => {
     const fill = {
       symbol: 'FTBAR',
@@ -203,6 +224,7 @@ describe('listChartTrades', () => {
           side: 'SELL',
           quantity: '10',
           price: '101.5',
+          priceSuffix: '',
           roundTripNetProfit: '15',
         },
       ],

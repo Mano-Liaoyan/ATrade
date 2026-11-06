@@ -778,7 +778,8 @@ section 6.2).
 - When the pointer is on a mark, the mark gets a 2px `--cds-focus` ring.
   A tooltip shows one line for each trade of the mark, in IBM Plex Mono
   with tabular numbers:
-  - "Buy 50 @ 182.35"
+  - "Buy 50 @ 182.35". The API gives prices and profits in USD, so a chart in
+    another currency shows "Buy 10 @ 42.24 USD" and "+15.00 USD".
   - "Sell 50 @ 190.10  +387.50". The signed number is the net profit of the
     round trip that the trade ends, after commissions, in
     `--cds-support-success` or `--cds-support-error`. A trade that ends no

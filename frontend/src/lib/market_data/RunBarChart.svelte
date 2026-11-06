@@ -33,7 +33,7 @@
   const { instrument, barPeriod, range, label, chart, runKey, strategyIndicators, records, isUniverseMember = false }: Props = $props();
 
   const panes = $derived(chart.indicators.readPanes(runKey, strategyIndicators));
-  const chartTrades = $derived(listChartTrades(records, isUniverseMember ? instrument : undefined));
+  const chartTrades = $derived(listChartTrades(records, isUniverseMember ? instrument : undefined, instrument.currency));
   const selectedRow = $derived(chart.readSelectedRow(runKey));
   const ringTrades = $derived(findRingTrades(chartTrades.tradeIndexByRow, chart.pointedRow, selectedRow));
   const centerTrade = $derived(findRowTrade(chartTrades.tradeIndexByRow, selectedRow));

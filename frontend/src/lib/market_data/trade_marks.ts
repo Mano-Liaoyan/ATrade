@@ -30,6 +30,8 @@ export interface ChartTrade {
   side: TradeSide;
   quantity: string;
   price: string;
+  /** The text after a price and a profit. The API gives USD, so a chart in another currency shows " USD". */
+  priceSuffix: string;
   /** The net profit of the round trip that the trade ends, after commissions, else null. */
   roundTripNetProfit: string | null;
 }
@@ -101,6 +103,7 @@ export function findTradeBarIndex(
 export function listChartTrades(
   records: readonly TradeRecord[],
   member?: Pick<Instrument, 'symbol' | 'exchange'>,
+  chartCurrency = 'USD',
 ): {
   trades: ChartTrade[];
   tradeIndexByRow: (number | null)[];
@@ -118,6 +121,7 @@ export function listChartTrades(
       side: record.side,
       quantity: record.quantity_shares,
       price: record.price_usd,
+      priceSuffix: chartCurrency === 'USD' ? '' : ' USD',
       roundTripNetProfit: record.round_trip_net_profit_usd,
     });
     return trades.length - 1;
@@ -215,12 +219,12 @@ export function findMarkAt(
 
 /** "Buy 50 @ 182.35", or "Sell 50 @ 190.10" with "+387.50": the net profit of the round trip that the trade ends. */
 export function formatTradeLine(trade: ChartTrade): TradeLine {
-  const text = `${trade.side === 'BUY' ? 'Buy' : 'Sell'} ${trade.quantity} @ ${formatAmount(trade.price)}`;
+  const text = `${trade.side === 'BUY' ? 'Buy' : 'Sell'} ${trade.quantity} @ ${formatAmount(trade.price)}${trade.priceSuffix}`;
   if (trade.roundTripNetProfit === null) {
     return { text, profit: null };
   }
   const profit = Number(trade.roundTripNetProfit);
-  const amount = formatAmount(String(Math.abs(profit)));
+  const amount = `${formatAmount(String(Math.abs(profit)))}${trade.priceSuffix}`;
   return profit < 0
     ? { text, profit: { text: `−${amount}`, kind: 'error' } }
     : { text, profit: { text: `+${amount}`, kind: 'success' } };
