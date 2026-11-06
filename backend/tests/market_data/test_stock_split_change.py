@@ -3,6 +3,7 @@
 Real PostgreSQL and the IBKR fake (docs/architecture/market_data.md sections 8.13.2 and 8.13.3).
 """
 
+import threading
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -32,6 +33,7 @@ from atrade.market_data import (
     read_unsaved_ranges,
     save_received_bars,
 )
+from atrade.market_data.daily_bar_summary import DailyBarSummary, calculate_daily_bar_summary
 from tests.backtest.real_runner import (
     TEST_STRATEGY_FILE,
     run_backtest_runner,
@@ -506,6 +508,25 @@ async def test_a_summary_before_a_date_has_the_real_close_of_its_last_day(databa
     assert await read_close_before(database_url, BAR_DAYS_UTC[4] + ONE_DAY) == Decimal(120)
     [saved_summary] = await read_daily_bar_summaries(database_url=database_url, instruments=[APPLE])
     assert saved_summary.last_close == Decimal(120)
+
+
+@pytest.mark.anyio
+async def test_a_summary_before_a_date_is_not_calculated_on_the_event_loop(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await save_stored_week(database_url)
+    calculation_threads: list[threading.Thread] = []
+
+    def record_thread(instrument: Instrument, bars: list[Bar]) -> DailyBarSummary:
+        calculation_threads.append(threading.current_thread())
+        return calculate_daily_bar_summary(instrument, bars)
+
+    monkeypatch.setattr("atrade.market_data.daily_bar_summary.calculate_daily_bar_summary", record_thread)
+
+    await read_close_before(database_url, BAR_DAYS_UTC[2])
+
+    assert calculation_threads
+    assert threading.current_thread() not in calculation_threads
 
 
 @pytest.mark.anyio

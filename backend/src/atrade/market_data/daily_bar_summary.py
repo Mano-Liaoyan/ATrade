@@ -163,15 +163,24 @@ async def select_last_daily_bars(
     return group_bar_rows(unique_instruments, rows)
 
 
-def select_last_daily_bars_blocking(
-    connection: psycopg.Connection, instruments: list[Instrument], before_utc: datetime | None, bar_count: int
-) -> dict[Instrument, list[Bar]]:
-    unique_instruments = list(dict.fromkeys(instruments))
+def select_last_daily_bar_rows_blocking(
+    connection: psycopg.Connection,
+    unique_instruments: list[Instrument],
+    before_utc: datetime | None,
+    bar_count: int,
+) -> list[InstrumentBarRow]:
     with connection.cursor(row_factory=class_row(InstrumentBarRow)) as cursor:
         cursor.execute(
             LAST_DAILY_BARS_QUERY, create_last_daily_bars_parameters(unique_instruments, before_utc, bar_count)
         )
-        rows = cursor.fetchall()
+        return cursor.fetchall()
+
+
+def select_last_daily_bars_blocking(
+    connection: psycopg.Connection, instruments: list[Instrument], before_utc: datetime | None, bar_count: int
+) -> dict[Instrument, list[Bar]]:
+    unique_instruments = list(dict.fromkeys(instruments))
+    rows = select_last_daily_bar_rows_blocking(connection, unique_instruments, before_utc, bar_count)
     return group_bar_rows(unique_instruments, rows)
 
 
@@ -225,12 +234,12 @@ SELECT_LATER_SPLITS: LiteralString = """
 """
 
 
-async def restore_last_closes(
-    connection: psycopg.AsyncConnection, summaries: list[DailyBarSummary], last_bar_sources: dict[Instrument, str]
+def restore_last_closes(
+    connection: psycopg.Connection, summaries: list[DailyBarSummary], last_bar_sources: dict[Instrument, str]
 ) -> list[DailyBarSummary]:
     """The summaries with the real close of the last day: the stored close times the split ratios of the later stock
     splits. The average trading value needs no change, because a stock split does not change close x volume."""
-    cursor = await connection.execute(
+    cursor = connection.execute(
         SELECT_LATER_SPLITS,
         {
             **create_instrument_parameters([summary.instrument for summary in summaries]),
@@ -239,7 +248,7 @@ async def restore_last_closes(
         },
     )
     ratios: defaultdict[Instrument, Decimal] = defaultdict(lambda: Decimal(1))
-    for symbol, exchange, currency, split_ratio in await cursor.fetchall():
+    for symbol, exchange, currency, split_ratio in cursor.fetchall():
         ratios[Instrument(symbol=symbol, exchange=exchange, currency=currency)] *= split_ratio
     return [replace(summary, last_close=summary.last_close * ratios[summary.instrument]) for summary in summaries]
 
@@ -251,19 +260,23 @@ async def read_daily_bar_summaries_before(
     of `instruments`. The same calculation as the saved summary, and the real close of that day, so a point-in-time
     screen run gets the values that the summary had at that time, also after a later stock split
     (docs/architecture/screen.md section 24.9). An instrument without such bars has no row. 2 database queries in 1
-    snapshot."""
+    snapshot. The read of many instruments stops the event loop for seconds, so it runs in a thread."""
     unique_instruments = list(dict.fromkeys(instruments))
-    async with await psycopg.AsyncConnection.connect(database_url) as connection:
-        await connection.set_isolation_level(psycopg.IsolationLevel.REPEATABLE_READ)
-        rows = await select_last_daily_bar_rows(connection, unique_instruments, before_utc, SUMMARY_BAR_COUNT)
-        summaries = [
-            calculate_daily_bar_summary(instrument, bars)
-            for instrument, bars in group_bar_rows(unique_instruments, rows).items()
-            if bars
-        ]
-        # The rows of an instrument go from old to new, so the last row gives the bar source.
-        last_bar_sources = {unique_instruments[row.instrument_position - 1]: row.bar_source for row in rows}
-        return await restore_last_closes(connection, summaries, last_bar_sources)
+
+    def read_blocking() -> list[DailyBarSummary]:
+        with psycopg.connect(database_url) as connection:
+            connection.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ
+            rows = select_last_daily_bar_rows_blocking(connection, unique_instruments, before_utc, SUMMARY_BAR_COUNT)
+            summaries = [
+                calculate_daily_bar_summary(instrument, bars)
+                for instrument, bars in group_bar_rows(unique_instruments, rows).items()
+                if bars
+            ]
+            # The rows of an instrument go from old to new, so the last row gives the bar source.
+            last_bar_sources = {unique_instruments[row.instrument_position - 1]: row.bar_source for row in rows}
+            return restore_last_closes(connection, summaries, last_bar_sources)
+
+    return await asyncio.to_thread(read_blocking)
 
 
 UPSERT_SUMMARIES_QUERY = sql.SQL("""
