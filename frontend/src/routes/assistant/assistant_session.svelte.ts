@@ -14,6 +14,7 @@ import {
   describeThinkingSelect,
   discardStrategyVersion,
   EMPTY_LOG,
+  endRun,
   findDefaultSelection,
   isThinkingLevel,
   listConversations,
@@ -233,6 +234,9 @@ export class AssistantSession {
       onConnectionChange: (connected) => {
         if (this.#socket === opened) {
           this.#socketState = connected ? 'open' : 'closed';
+          if (!connected) {
+            this.log = endRun(this.log);
+          }
         }
       },
     });

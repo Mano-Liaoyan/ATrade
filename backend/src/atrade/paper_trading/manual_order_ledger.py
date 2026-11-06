@@ -66,9 +66,7 @@ async def find_split_check_refusal(
         return None
     return OrderRefusal(
         rule="split_check_needed",
-        detail=(
-            f"{instrument.symbol} needs a split check. Apply the split or keep the ledger on the paper trading page."
-        ),
+        detail=f"{instrument.symbol} needs a split check. Apply the split or keep the ledger on the Home page.",
     )
 
 

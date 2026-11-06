@@ -162,6 +162,11 @@ function endStreaming(log: ConversationLog): ConversationLog {
   return streaming === null ? log : replaceLast(log, { ...streaming, streaming: false });
 }
 
+/** Ends the run. A closed socket sends no `settled` message, and `web` stops the run on the close (25.10). */
+export function endRun(log: ConversationLog): ConversationLog {
+  return { ...endStreaming(log), isRunning: false };
+}
+
 function addToolStep(log: ConversationLog, message: Schemas['ToolStepMessage'], sentAtUtc: string): ConversationLog {
   const fields = {
     toolName: message.tool_name,
@@ -200,7 +205,7 @@ export function addServerMessage(log: ConversationLog, message: ServerMessage, s
     case 'message_end':
       return endMessage(log, message, sentAtUtc);
     case 'run_state':
-      return message.state === 'running' ? { ...log, isRunning: true } : { ...endStreaming(log), isRunning: false };
+      return message.state === 'running' ? { ...log, isRunning: true } : endRun(log);
     case 'tool_step':
       return addToolStep(log, message, sentAtUtc);
     case 'strategy_version_saved':

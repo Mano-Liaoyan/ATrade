@@ -4,6 +4,7 @@ import {
   addUserMessage,
   describeToolStep,
   EMPTY_LOG,
+  endRun,
   readConversationLog,
   type ConversationLog,
 } from './conversation_log';
@@ -63,6 +64,16 @@ describe('the conversation log', () => {
       streaming: false,
     });
     expect(log.isRunning).toBe(false);
+  });
+
+  it('ends a run without a settled message: the streaming message ends, and the kept text stays', () => {
+    let log = addServerMessage(EMPTY_LOG, { type: 'run_state', state: 'running' }, NOW);
+    log = addServerMessage(log, { type: 'message_delta', text: 'Hel' }, NOW);
+
+    log = endRun(log);
+
+    expect(log.isRunning).toBe(false);
+    expect(log.items.at(-1)).toMatchObject({ role: 'assistant', text: 'Hel', streaming: false });
   });
 
   it('keeps one line for each tool call and updates it', () => {

@@ -171,12 +171,9 @@
     stoppingId = forwardTest.id;
     actionFailure = null;
     const result = await stopForwardTest(fetch, forwardTest.id);
+    stoppingId = null;
     if (result.kind === 'failed') {
-      stoppingId = null;
       actionFailure = { title: 'Forward test not stopped', message: result.message };
-    } else if (forwardTest.id !== forwardTestId) {
-      // A stop from the list context menu: the header line shows only the open forward test.
-      stoppingId = null;
     }
   }
 
@@ -235,18 +232,22 @@
       />
     {/snippet}
     <LiveUpdatesNotification isConnected={workbench.isConnected} />
-    <ForwardTestList
-      forwardTests={workbench.items}
-      openForwardTestId={forwardTestId}
-      onStop={(forwardTest: ForwardTest) => void stop(forwardTest)}
-    />
+    {#if workbench.listMessage !== ''}
+      <InlineNotification kind="error" title="Forward tests not read" subtitle={workbench.listMessage} lowContrast />
+    {:else}
+      <ForwardTestList
+        forwardTests={workbench.items}
+        openForwardTestId={forwardTestId}
+        onStop={(forwardTest: ForwardTest) => void stop(forwardTest)}
+      />
+    {/if}
   </SideColumn>
 
   {#if shownDetail === null}
     <div class="atrade-run-empty">
       {#if workbench.detailMessage !== ''}
         <InlineNotification kind="error" title="Forward test not read" subtitle={workbench.detailMessage} lowContrast />
-      {:else if workbench.isConnected && workbench.items.length === 0}
+      {:else if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === ''}
         <EmptyText text="No forward tests" />
       {/if}
     </div>
@@ -313,6 +314,9 @@
                 />
               </span>
             {/snippet}
+            {#if workbench.detailMessage !== ''}
+              <InlineNotification kind="error" title="Forward test not read" subtitle={workbench.detailMessage} lowContrast />
+            {/if}
             {#if actionFailure !== null}
               <InlineNotification
                 kind="error"

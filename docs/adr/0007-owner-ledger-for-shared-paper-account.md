@@ -37,7 +37,7 @@ section 12.2 and `docs/architecture/paper_trading.md` section 11.3.
   the buying power of another.
 - Orders from outside ATrade (TWS, IBKR website, phone app) belong to "by
   hand". ATrade cannot refuse them. When the account position differs from
-  the sum of the owner positions, the paper trading page shows the difference.
+  the sum of the owner positions, the Home page shows the difference.
 - When a forward test stops, its positions and cash go to "by hand".
 - Each NautilusTrader upgrade must run the tests of both clients, because
   `nautilus_trader.live.clients` is new in 2.0.

@@ -1864,7 +1864,7 @@ The map [Wayfinder: indicators, screens, and strategy help](https://github.com/M
 ### 20.2 Limits of the first version
 
 - The first version does not handle cash dividends. Backtests do not include
-  dividends. On the paper trading page, a dividend shows as an
+  dividends. On the Home page, a dividend shows as an
   "Unattributed" difference (section 11).
 
 ### 20.3 Later work

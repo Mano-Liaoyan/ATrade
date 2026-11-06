@@ -78,7 +78,7 @@ E2E_UNIVERSE_COMPARED_MEMBERS = {
     datetime(2026, 4, 1, tzinfo=UTC): ("FTUA", "FTUC"),
 }
 # The ledger fills of this forward test are on another account: add_owner_ledger_start() clears the rows of the fake
-# account, and the paper trading page shows only the rows of the fake account.
+# account, and the Home page shows only the rows of the fake account.
 E2E_UNIVERSE_COMPARED_ACCOUNT = "DU7654321"
 # The look-back bars of the strategy (SMA 20 on 60 days) start before the forward test.
 E2E_UNIVERSE_COMPARED_FIRST_BAR_START_UTC = datetime(2026, 1, 1, tzinfo=UTC)

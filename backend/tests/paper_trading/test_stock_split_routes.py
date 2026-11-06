@@ -23,7 +23,7 @@ from tests.paper_trading.stock_split_setup import (
 from tests.paper_trading.test_owner_ledger import BY_HAND, ORDERS_PATH, find_position, open_client, read_account
 
 MICROSOFT = Instrument(symbol="MSFT", exchange="NASDAQ", currency="USD")
-SPLIT_CHECK_NEEDED_DETAIL = "AAPL needs a split check. Apply the split or keep the ledger on the paper trading page."
+SPLIT_CHECK_NEEDED_DETAIL = "AAPL needs a split check. Apply the split or keep the ledger on the Home page."
 
 
 def make_gateway() -> FakeGatewayConnection:

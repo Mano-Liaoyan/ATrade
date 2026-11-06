@@ -853,7 +853,10 @@ than the worker clock.
   act). A refused start shows the `detail` text. A started
   forward test opens at once.
 - The page reads `GET /api/forward-tests/{id}` again after each change that
-  `/ws/forward-tests` pushes. The header
+  `/ws/forward-tests` pushes. When a read fails, the panel keeps the shown
+  numbers and shows "Forward test not read" with the reason. When the list
+  read fails, the side column shows "Forward tests not read" with the reason.
+  The header
   line shows the number, the strategy version (link to that version on the strategy page),
   the symbol (link to the instrument page), the bar period, the status, the
   crash count when it is not 0 and the status is not `stopped`, the red
@@ -950,7 +953,7 @@ than the worker clock.
     shows the cash in lieu.
 - Phase 3 (#149): when an instrument of the forward test is in the
   "Split check needed" state, the header line shows a warning icon before
-  "#<id>" with the tooltip "Split check needed: AAPL". The paper trading page has the actions
+  "#<id>" with the tooltip "Split check needed: AAPL". The Home page has the actions
   ([`paper_trading.md`](paper_trading.md) section 11.7).
 - Implemented (#220): the "Fills" table has one more column, "Amount (USD)":
   the quantity times the price of a fill, or the cash in lieu of a split
@@ -1334,12 +1337,12 @@ Implemented (#220) with the IBKR fake only:
 ## 12.23 Limits and later work
 
 - Version 1 does not handle cash dividends. A cash dividend changes the
-  paper account cash without a fill. The paper trading page shows the
+  paper account cash without a fill. The Home page shows the
   difference as "Unattributed" ([`paper_trading.md`](paper_trading.md)
   section 11.12). Cash dividends are in the "Not yet specified" list of the
   planning map.
 - Spin-offs, mergers, symbol changes, and delistings are not handled. The
-  paper trading page shows the difference as "Unattributed".
+  Home page shows the difference as "Unattributed".
 - The owner ledger is long only (section 12.18).
 - Later work: a multi-instrument forward test on hourly bars. First measure
   the time that the bar fetcher needs to read the hourly bars of 500

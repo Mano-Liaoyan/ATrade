@@ -21,6 +21,7 @@ export {
   addUserMessage,
   describeToolStep,
   EMPTY_LOG,
+  endRun,
   readConversationLog,
   type ConversationLog,
   type DiffItem,
