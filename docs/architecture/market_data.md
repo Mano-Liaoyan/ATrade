@@ -268,6 +268,8 @@ Source: [Bars and the bar chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   - Code: `older_bars.ts` (range, join, trigger) and `BarChart.svelte`
     (`onNeedOlderBars`). Backtest and forward test charts have a fixed range
     and read no older bars.
+  - The chart keeps the live bars that it drew and draws them again after
+    older bars, because the chart series is the only holder of these bars.
 - TradingView attribution: the chart shows the TradingView logo link
   (`attributionLogo`), the text under the chart links to
   `https://www.tradingview.com/`, and `BarChart.svelte` holds the

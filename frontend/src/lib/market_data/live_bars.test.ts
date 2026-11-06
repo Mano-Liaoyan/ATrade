@@ -1,6 +1,7 @@
 // Reads the /ws/market-data messages and decides which live bars the chart can draw.
 import { describe, expect, it } from 'vite-plus/test';
 import { canDrawLiveBar, describeLiveBar, formatLiveBarsPath, readLiveBarMessage } from './index';
+import { addDrawnLiveBar } from './live_bars';
 
 const TENCENT = { symbol: '700', exchange: 'SEHK', currency: 'HKD' };
 const BAR = { time: 1767322800, open: 123, high: 125, low: 122, close: 123.25, volume: 20 };
@@ -10,6 +11,15 @@ describe('formatLiveBarsPath', () => {
     const path = formatLiveBarsPath({ instrument: { ...TENCENT, symbol: 'BRK B' }, barPeriod: '1-HOUR' });
 
     expect(path).toBe('/ws/market-data?symbol=BRK+B&exchange=SEHK&currency=HKD&bar_period=1-HOUR');
+  });
+});
+
+describe('addDrawnLiveBar', () => {
+  it('replaces the live bar of the same time and adds a later bar', () => {
+    const update = { ...BAR, close: 124 };
+    const nextBar = { ...BAR, time: BAR.time + 3600 };
+
+    expect(addDrawnLiveBar(addDrawnLiveBar([BAR], update), nextBar)).toEqual([update, nextBar]);
   });
 });
 

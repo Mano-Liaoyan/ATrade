@@ -1,5 +1,6 @@
 <!-- Bar chart: draws each bar as a candlestick with lightweight-charts. Bar times are UNIX timestamps (UTC).
      A live bar replaces the last candlestick or adds one after it (series.update), without a new fit of the view.
+     Only the chart series holds the live bars, so the chart keeps them and draws them again after older bars.
      ChartFrame (foundation/chart_frame) gives the canvas container and the TradingView attribution. With `fill`, the
      chart fills the height of its parent and follows each size change (autoSize).
      Indicators (docs/architecture/indicator.md section 23.9): each pane of `indicatorPanes` is a chart pane. The first
@@ -67,7 +68,7 @@
   import IndicatorSettings from './IndicatorSettings.svelte';
   import { replaceChartIndicator } from './indicator_settings';
   import type { IndicatorSeriesResult } from './indicator_series';
-  import { canDrawLiveBar } from './live_bars';
+  import { addDrawnLiveBar, canDrawLiveBar } from './live_bars';
   import { countPrependedBars, isMoveToFirstBar } from './older_bars';
   import TradeMarkLayer from './TradeMarkLayer.svelte';
   import {
@@ -153,10 +154,17 @@
   let axisLabels: { priceLine: IPriceLine; values: readonly (number | null)[] }[] = [];
   // The bars of the last setData, and whether the user moved the view after the last fit (a fit is no user move).
   let shownBars: readonly Bar[] = [];
+  // The live bars after the last setData.
+  let drawnLiveBars: readonly Bar[] = [];
   let isMovedByUser = false;
 
   function toCandlestick(bar: Bar): CandlestickData<UTCTimestamp> {
     return { time: bar.time as UTCTimestamp, open: bar.open, high: bar.high, low: bar.low, close: bar.close };
+  }
+
+  function drawLiveBar(series: ISeriesApi<'Candlestick'>, bar: Bar): void {
+    series.update(toCandlestick(bar));
+    drawnLiveBars = addDrawnLiveBar(drawnLiveBars, bar);
   }
 
   function readCandlestickOptions(): DeepPartial<CandlestickStyleOptions> {
@@ -257,6 +265,13 @@
     const prependedCount = countPrependedBars(shownBars, bars);
     const visibleRange = timeScale.getVisibleLogicalRange();
     candlestickSeries.setData(bars.map(toCandlestick));
+    // setData removes the live bars. Other bars than a prepend are a new chart. This draw comes before the visible range,
+    // because each added bar moves the view.
+    const keptLiveBars = prependedCount === null ? [] : drawnLiveBars;
+    drawnLiveBars = [];
+    for (const keptLiveBar of keptLiveBars) {
+      drawLiveBar(candlestickSeries, keptLiveBar);
+    }
     if (prependedCount !== null && visibleRange !== null) {
       // The older bars are left of the view: the same bars stay visible.
       timeScale.setVisibleLogicalRange({ from: visibleRange.from + prependedCount, to: visibleRange.to + prependedCount });
@@ -268,7 +283,7 @@
     // The live bar that came before the bars is drawn again. A new live bar does not run this effect.
     const currentLiveBar = untrack(() => liveBar);
     if (currentLiveBar !== null && canDrawLiveBar(bars, currentLiveBar)) {
-      candlestickSeries.update(toCandlestick(currentLiveBar));
+      drawLiveBar(candlestickSeries, currentLiveBar);
     }
   });
 
@@ -308,7 +323,7 @@
       return;
     }
     if (canDrawLiveBar(untrack(() => bars), liveBar)) {
-      candlestickSeries.update(toCandlestick(liveBar));
+      drawLiveBar(candlestickSeries, liveBar);
     }
   });
 

@@ -1,6 +1,6 @@
 // Bar chart on the instrument page, against the real backend with the IBKR fake. The fake has one bar for each bar
 // period, and the e2e server clock is 2026-01-02 03:04:05 UTC (backend/tests/e2e_server.py).
-import { expect, test, type Locator } from '@playwright/test';
+import { expect, test, type Locator, type WebSocketRoute } from '@playwright/test';
 
 /** The color of the chart background: a pixel near the top left corner of the largest chart canvas. */
 async function readChartBackground(chart: Locator): Promise<string> {
@@ -127,6 +127,70 @@ test('the chart stops loading older bars after an empty answer', async ({ page }
 
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
   expect(olderBarRequestCount).toBe(1);
+});
+
+/** The count of green pixels on the largest chart canvas. Only a bar that closes above its open is green. */
+async function countGreenPixels(chart: Locator): Promise<number> {
+  return chart.evaluate((element) => {
+    const canvases = Array.from(element.querySelectorAll('canvas'));
+    const largest = canvases.reduce((first, second) => (second.width * second.height > first.width * first.height ? second : first));
+    const pixels = largest.getContext('2d')?.getImageData(0, 0, largest.width, largest.height).data ?? new Uint8ClampedArray();
+    let count = 0;
+    for (let index = 0; index < pixels.length; index += 4) {
+      if ((pixels[index + 1] ?? 0) > (pixels[index] ?? 0) + 40 && (pixels[index + 1] ?? 0) > (pixels[index + 2] ?? 0) + 40) {
+        count += 1;
+      }
+    }
+    return count;
+  });
+}
+
+test('a drag to older bars keeps the live bars that the chart drew', async ({ page }) => {
+  const hourSeconds = 3600;
+  const firstTime = 1_767_000_000 - (1_767_000_000 % hourSeconds);
+  const makeBars = (start: number, count: number): object[] =>
+    Array.from({ length: count }, (_, index) => {
+      return { time: start + index * hourSeconds, open: 121, high: 122, low: 119, close: 120, volume: 10 };
+    });
+  await page.route('**/api/market-data/bars?*', async (route) => {
+    const isOlder = route.request().url().includes('start_utc=');
+    await route.fulfill({ json: { bars: isOlder ? makeBars(firstTime - 30 * hourSeconds, 30) : makeBars(firstTime, 30) } });
+  });
+  const sockets: WebSocketRoute[] = [];
+  await page.routeWebSocket(/\/ws\/market-data\?/, (socket) => {
+    sockets.push(socket);
+  });
+  await page.goto('/instruments/SEHK/388?currency=HKD&bar_period=1-HOUR');
+  const chart = page.getByRole('img', { name: 'Bar chart of 388 / SEHK / HKD, 1-HOUR bars' });
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('30 bars');
+  await expect.poll(() => sockets.length).toBeGreaterThan(0);
+
+  // 2 finished live bars close above their open. The current live bar does not, so only the finished bars are green.
+  const liveBarCloses = [122, 123, 120];
+  for (const [index, close] of liveBarCloses.entries()) {
+    const bar = { time: firstTime + (30 + index) * hourSeconds, open: 121, high: 124, low: 119, close, volume: 10 };
+    sockets.at(-1)?.send(JSON.stringify({ type: 'bar', bar }));
+    await expect(page.getByRole('status', { name: 'Live bar' })).toContainText(`close ${close.toFixed(2)}`);
+  }
+  await expect.poll(() => countGreenPixels(chart)).toBeGreaterThan(0);
+
+  const box = await chart.locator('canvas').first().boundingBox();
+  if (box === null) {
+    throw new Error('The chart has no canvas box.');
+  }
+  const y = box.y + box.height / 2;
+  await page.mouse.move(box.x + box.width / 2, y);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 10, y, { steps: 5 });
+  await page.mouse.up();
+
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('60 bars');
+  // The chart redraws at the next frames. A removed bar then leaves no green pixel.
+  await page.evaluate(async () => {
+    await new Promise(requestAnimationFrame);
+    await new Promise(requestAnimationFrame);
+  });
+  expect(await countGreenPixels(chart)).toBeGreaterThan(0);
 });
 
 test('the chart receives live bar updates over the WebSocket', async ({ page }) => {
