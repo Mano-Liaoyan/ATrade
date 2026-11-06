@@ -13,9 +13,9 @@ import math
 import traceback
 from bisect import bisect_right
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -60,6 +60,9 @@ from atrade.strategy import StrategyFileError, load_strategy_classes
 MIN_PRICE_PRECISION = 2
 # NautilusTrader refuses a precision above 9 in its standard-precision build. IBKR prices have fewer places.
 MAX_PRECISION = 9
+# The matching engine drops each bar whose volume precision is not the size precision of the instrument, and `Equity`
+# has size precision 0.
+ENGINE_VOLUME_PRECISION = 0
 ERROR_LOG_FILE_NAME = "strategy_errors"
 LOOK_BACK_CATALOG_DIRECTORY_NAME = "look_back_catalog"
 # The catalog says that it holds all bars from the first to the last UNIX nanosecond (1, not 0: 0 means "no time").
@@ -87,6 +90,12 @@ def count_decimal_places(value: Decimal) -> int:
     return min(-exponent, MAX_PRECISION)
 
 
+def round_up_volumes(bars: list[Bar]) -> list[Bar]:
+    """Rounds each volume up to whole shares (ENGINE_VOLUME_PRECISION). The stock split adjustment gives fractional
+    volumes. Rounding up keeps each volume above zero: the matching engine fills no order on a bar with volume 0."""
+    return [replace(bar, volume=bar.volume.to_integral_value(rounding=ROUND_CEILING)) for bar in bars]
+
+
 def create_instrument(instrument: Instrument, bars: list[Bar], venue: Venue | None = None) -> Equity:
     """An `Equity` on the exchange of the instrument, or on `venue` (the simulated venue SMART, ADR 0003)."""
     prices = [price for bar in bars for price in (bar.open, bar.high, bar.low, bar.close)]
@@ -102,11 +111,11 @@ def create_instrument(instrument: Instrument, bars: list[Bar], venue: Venue | No
     )
 
 
-def create_wrangler(nautilus_instrument: Equity, bar_period: BarPeriod, bars: list[Bar]) -> BarDataWrangler:
-    """The wrangler for `bars`. The volume precision comes from these bars."""
-    volume_precision = max((count_decimal_places(bar.volume) for bar in bars), default=0)
+def create_wrangler(nautilus_instrument: Equity, bar_period: BarPeriod) -> BarDataWrangler:
     return BarDataWrangler(
-        bar_period.external_bar_type(nautilus_instrument.id), nautilus_instrument.price_precision, volume_precision
+        bar_period.external_bar_type(nautilus_instrument.id),
+        nautilus_instrument.price_precision,
+        ENGINE_VOLUME_PRECISION,
     )
 
 
@@ -136,7 +145,7 @@ def write_look_back_catalog(
     """The look-back catalog of `create_look_back_catalog` for a forward test LiveNode, with the bar type
     `SYMBOL.EXCHANGE-<bar period>-LAST-EXTERNAL` (docs/architecture/forward_test.md section 12.15)."""
     nautilus_instrument = create_instrument(instrument, look_back_bars)
-    wrangler = create_wrangler(nautilus_instrument, bar_period, look_back_bars)
+    wrangler = create_wrangler(nautilus_instrument, bar_period)
     return create_look_back_catalog(look_back_bars, wrangler, bar_period, work_directory)
 
 
@@ -518,8 +527,10 @@ def run_strategy_on_bars(
     all_bars = run.look_back_bars + run.bars
     nautilus_instrument = create_instrument(instrument, all_bars)
     bar_type = BarType.from_str(request.bar_period.external_bar_type(nautilus_instrument.id))
-    wrangler = create_wrangler(nautilus_instrument, request.bar_period, all_bars)
-    nautilus_bars = wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(run.bars, request.bar_period))
+    wrangler = create_wrangler(nautilus_instrument, request.bar_period)
+    nautilus_bars = wrangler.process_record_batch_bytes(
+        convert_bars_to_arrow_bytes(round_up_volumes(run.bars), request.bar_period)
+    )
     engine = create_engine(
         starting_cash=run.starting_cash,
         currency=instrument.currency,

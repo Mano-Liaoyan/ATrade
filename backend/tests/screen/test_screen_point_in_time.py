@@ -3,6 +3,7 @@ the daily bars that close at or before the date, and its filter values are the d
 
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 import pytest
 
@@ -13,12 +14,16 @@ from atrade.market_data import (
     StockSplitChange,
     apply_stock_split,
     read_daily_bar_summaries,
+    read_last_daily_bars,
     save_received_bars,
 )
 from atrade.screen import run_screen_at
+from atrade.screen.screen_run import ScreenOutcome, run_screen_steps
 from tests.screen.test_screen_run_routes import add_to_watchlist, make_definition
 
 AAA = Instrument(symbol="AAA", exchange="NASDAQ", currency="USD")
+BBB = Instrument(symbol="BBB", exchange="NASDAQ", currency="USD")
+CCC = Instrument(symbol="CCC", exchange="NASDAQ", currency="USD")
 FIRST_DAY = datetime(2025, 11, 1, tzinfo=UTC)
 
 
@@ -26,9 +31,11 @@ def at_day(index: int) -> datetime:
     return FIRST_DAY + timedelta(days=index)
 
 
-async def save_rising_bars(database_url: str, first_index: int, end_index: int) -> None:
+async def save_rising_bars(
+    database_url: str, first_index: int, end_index: int, *, instrument: Instrument = AAA, volume_factor: int = 1000
+) -> None:
     """One daily bar on each day from `first_index` to `end_index` (not included). The close of day i is i + 1, the
-    volume 1000 × (i + 1), so the average trading value changes each day."""
+    volume `volume_factor` × (i + 1), so the average trading value changes each day."""
     bars = [
         Bar(
             start_utc=at_day(index),
@@ -36,11 +43,11 @@ async def save_rising_bars(database_url: str, first_index: int, end_index: int) 
             high=Decimal(index + 1),
             low=Decimal(index + 1),
             close=Decimal(index + 1),
-            volume=Decimal(1000 * (index + 1)),
+            volume=Decimal(volume_factor * (index + 1)),
         )
         for index in range(first_index, end_index)
     ]
-    bar_request = BarRequest(AAA, BarPeriod.ONE_DAY, TimeRange(at_day(first_index), at_day(end_index)))
+    bar_request = BarRequest(instrument, BarPeriod.ONE_DAY, TimeRange(at_day(first_index), at_day(end_index)))
     await save_received_bars(database_url=database_url, bar_request=bar_request, bars=bars)
 
 
@@ -126,3 +133,85 @@ async def test_a_later_stock_split_does_not_change_the_last_price_filter_of_a_po
     assert [row.instrument for row in after_split.rows] == [AAA]
     assert after_split.rows[0].last_price == before_split.rows[0].last_price == Decimal(100)
     assert after_split.rows[0].average_trading_value_20 == before_split.rows[0].average_trading_value_20
+
+
+@pytest.mark.anyio
+async def test_the_prefilter_gives_the_same_reads_and_the_restored_close_after_a_later_stock_split(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await save_rising_bars(database_url, 0, 60)
+    await save_rising_bars(database_url, 0, 60, instrument=BBB, volume_factor=100)
+    add_to_watchlist(database_url, AAA, BBB)
+    indicator = {"indicator": "average_trading_value", "parameters": {"period": 20}, "output": "value"}
+    definition = make_definition(
+        indicator_conditions=[{"kind": "compare", "indicator": indicator, "operator": ">=", "value": "963500"}]
+    )
+    reads: list[list[Instrument]] = []
+
+    async def count_reads(*, instruments: list[Instrument], **parts: Any) -> dict[Instrument, list[Bar]]:
+        reads.append(instruments)
+        return await read_last_daily_bars(instruments=instruments, **parts)
+
+    monkeypatch.setattr("atrade.screen.screen_point_in_time.read_last_daily_bars", count_reads)
+    before_split = await run_screen_at(
+        database_url=database_url, market="US", definition=definition, as_of_utc=at_day(40)
+    )
+
+    await apply_stock_split(
+        database_url=database_url,
+        change=StockSplitChange(AAA, at_day(50), Decimal(10)),
+        confirmation="bar_evidence",
+        recorded_at_utc=at_day(60),
+    )
+    after_split = await run_screen_at(
+        database_url=database_url, market="US", definition=definition, as_of_utc=at_day(40)
+    )
+
+    assert reads == [[AAA], [AAA]]
+    assert [row.instrument for row in after_split.rows] == [AAA]
+    assert after_split.rows[0].last_price == before_split.rows[0].last_price
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("operator", "value", "row_instrument"),
+    # On day 40 the average trading value of AAA is 963500 and of BBB 96350: each run has one equal value.
+    [(">=", "963500", AAA), ("<=", "96350", BBB)],
+    ids=[">=", "<="],
+)
+async def test_a_point_in_time_run_reads_fewer_instruments_and_gives_the_rows_of_a_run_without_the_prefilter(
+    database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    operator: str,
+    value: str,
+    row_instrument: Instrument,
+) -> None:
+    await save_rising_bars(database_url, 0, 60)
+    await save_rising_bars(database_url, 0, 60, instrument=BBB, volume_factor=100)
+    # 10 bars before day 40: an SMA(3) value, but no summary value.
+    await save_rising_bars(database_url, 30, 60, instrument=CCC)
+    add_to_watchlist(database_url, AAA, BBB, CCC)
+    indicator = {"indicator": "average_trading_value", "parameters": {"period": 20}, "output": "value"}
+    definition = make_definition(
+        indicator_conditions=[{"kind": "compare", "indicator": indicator, "operator": operator, "value": value}]
+    )
+    reads: list[list[Instrument]] = []
+
+    async def count_reads(*, instruments: list[Instrument], **parts: Any) -> dict[Instrument, list[Bar]]:
+        reads.append(instruments)
+        return await read_last_daily_bars(instruments=instruments, **parts)
+
+    async def run_steps_without_prefilter(*, prefilter: bool, **parts: Any) -> ScreenOutcome:
+        assert prefilter
+        return await run_screen_steps(**parts)
+
+    monkeypatch.setattr("atrade.screen.screen_point_in_time.read_last_daily_bars", count_reads)
+
+    filtered = await run_screen_at(database_url=database_url, market="US", definition=definition, as_of_utc=at_day(40))
+    monkeypatch.setattr("atrade.screen.screen_point_in_time.run_screen_steps", run_steps_without_prefilter)
+    plain = await run_screen_at(database_url=database_url, market="US", definition=definition, as_of_utc=at_day(40))
+
+    # CCC has no summary value, so it stays in the read.
+    assert reads == [[row_instrument, CCC], [AAA, BBB, CCC]]
+    assert filtered.rows == plain.rows
+    assert [row.instrument for row in filtered.rows] == [row_instrument]

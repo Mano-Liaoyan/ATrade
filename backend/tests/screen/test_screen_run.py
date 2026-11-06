@@ -17,6 +17,7 @@ from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
 from atrade.indicator import make_nautilus_bar
 from atrade.market_data import DailyBarSummary
+from atrade.market_data.daily_bar_summary import calculate_daily_bar_summary
 from atrade.screen.screen_run import ScreenOutcome, calculate_values, make_column, run_screen_steps
 
 LAST_DAY = datetime(2026, 1, 2, tzinfo=UTC)
@@ -350,3 +351,152 @@ async def test_the_event_loop_keeps_running_while_a_screen_run_calculates(monkey
 
     assert symbols(outcome) == ["S0", "S1", "S2"]
     assert ticks >= 10
+
+
+def average_trading_value(period: int | None = 20) -> dict[str, Any]:
+    parameters = {} if period is None else {"period": period}
+    return {"indicator": "average_trading_value", "parameters": parameters, "output": "value"}
+
+
+async def run_with_summaries_of_the_bars(
+    definition: dict[str, Any], bars_by_instrument: dict[Instrument, list[Bar]], *, prefilter: bool
+) -> tuple[ScreenOutcome, list[str]]:
+    """The outcome and the symbols of the daily bar read. The summaries are the real summaries of the bars."""
+    reader = DailyBarsReader(bars_by_instrument)
+    outcome = await run_screen_steps(
+        definition=definition,
+        start_instruments=list(bars_by_instrument),
+        summaries=[calculate_daily_bar_summary(instrument, bars) for instrument, bars in bars_by_instrument.items()],
+        read_daily_bars=reader,
+        prefilter=prefilter,
+    )
+    return outcome, [instrument.symbol for reads in reader.reads for instrument in reads[0]]
+
+
+# 20 daily bars with a volume of 1000 give an average trading value of 1000 x the close. 19 daily bars give no value.
+BARS_FOR_PREFILTER = {
+    stock("LOW"): make_bars("10", 20),
+    stock("EQUAL"): make_bars("20", 20),
+    stock("HIGH"): make_bars("30", 20),
+    stock("SHORT"): make_bars("40", 19),
+}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("operator", "kept_symbols"),
+    [
+        (">=", ["EQUAL", "HIGH", "SHORT"]),
+        (">", ["HIGH", "SHORT"]),
+        ("<=", ["LOW", "EQUAL", "SHORT"]),
+        ("<", ["LOW", "SHORT"]),
+    ],
+)
+async def test_the_prefilter_reads_fewer_instruments_and_gives_the_same_rows(
+    operator: str, kept_symbols: list[str]
+) -> None:
+    definition = make_definition(conditions=[compare(average_trading_value(), operator, "20000")])
+
+    plain, plain_read = await run_with_summaries_of_the_bars(definition, BARS_FOR_PREFILTER, prefilter=False)
+    filtered, filtered_read = await run_with_summaries_of_the_bars(definition, BARS_FOR_PREFILTER, prefilter=True)
+
+    assert plain_read == ["LOW", "EQUAL", "HIGH", "SHORT"]
+    assert filtered_read == kept_symbols
+    assert filtered.rows == plain.rows
+    assert filtered.rows
+    assert filtered.after_filters_count == plain.after_filters_count == 4
+    assert filtered.after_prefilter_count == len(kept_symbols)
+    assert plain.after_prefilter_count == 4
+    assert filtered.after_indicator_conditions_count == plain.after_indicator_conditions_count
+    # The instrument without a summary value stays out, with the reason of step 2.
+    assert reasons(filtered)["SHORT"] == reasons(plain)["SHORT"] == "No value: Average trading value(20)"
+
+
+@pytest.mark.anyio
+async def test_the_prefilter_gives_the_condition_as_the_reason() -> None:
+    definition = make_definition(conditions=[compare(average_trading_value(), ">=", "20000")])
+
+    outcome, _ = await run_with_summaries_of_the_bars(definition, BARS_FOR_PREFILTER, prefilter=True)
+
+    assert reasons(outcome)["LOW"] == "indicator_conditions[0]: Average trading value(20) >= 20000"
+
+
+@pytest.mark.anyio
+async def test_the_prefilter_uses_the_default_period_of_a_reference_without_a_period() -> None:
+    definition = make_definition(conditions=[compare(average_trading_value(None), ">=", "20000")])
+
+    _, read = await run_with_summaries_of_the_bars(definition, BARS_FOR_PREFILTER, prefilter=True)
+
+    assert read == ["EQUAL", "HIGH", "SHORT"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "condition",
+    [
+        compare(average_trading_value(19), ">=", "20000"),
+        compare(sma(3), ">=", "20"),
+        {"kind": "close_versus_line", "indicator": average_trading_value(), "side": "above"},
+    ],
+    ids=["other period", "other indicator", "not compare"],
+)
+async def test_the_prefilter_keeps_all_instruments_for_a_condition_that_the_summary_does_not_hold(
+    condition: dict[str, Any],
+) -> None:
+    definition = make_definition(conditions=[condition])
+
+    plain, _ = await run_with_summaries_of_the_bars(definition, BARS_FOR_PREFILTER, prefilter=False)
+    filtered, read = await run_with_summaries_of_the_bars(definition, BARS_FOR_PREFILTER, prefilter=True)
+
+    assert read == ["LOW", "EQUAL", "HIGH", "SHORT"]
+    assert filtered == plain
+
+
+@pytest.mark.anyio
+async def test_the_prefilter_does_not_run_when_the_definition_has_a_rank_condition() -> None:
+    # The top 50% of SMA(3) among all candidates. Without LOW, the percentiles would be different.
+    rank = {"kind": "rank", "indicator": sma(3), "end": "top", "percent": 50}
+    definition = make_definition(conditions=[compare(average_trading_value(), ">=", "20000"), rank])
+
+    plain, _ = await run_with_summaries_of_the_bars(definition, BARS_FOR_PREFILTER, prefilter=False)
+    filtered, read = await run_with_summaries_of_the_bars(definition, BARS_FOR_PREFILTER, prefilter=True)
+
+    assert read == ["LOW", "EQUAL", "HIGH", "SHORT"]
+    assert filtered == plain
+
+
+@pytest.mark.anyio
+async def test_the_prefilter_does_not_change_the_daily_bars_date_of_the_still_trading_filter() -> None:
+    # Only LOW has the newest bar. The prefilter removes it, but OLD must stay 30 days behind the daily bars date.
+    bars_by_instrument = {
+        stock("LOW"): make_bars("10", 20),
+        stock("OLD"): make_bars("30", 20, LAST_DAY - timedelta(days=30)),
+    }
+    definition = make_definition(
+        filters=[{"field": "still_trading"}], conditions=[compare(average_trading_value(), ">=", "20000")]
+    )
+
+    plain, _ = await run_with_summaries_of_the_bars(definition, bars_by_instrument, prefilter=False)
+    filtered, _ = await run_with_summaries_of_the_bars(definition, bars_by_instrument, prefilter=True)
+
+    assert filtered.rows == plain.rows == []
+    assert filtered.daily_bars_date == plain.daily_bars_date == LAST_DAY.date()
+
+
+@pytest.mark.anyio
+async def test_a_run_without_the_prefilter_reads_all_kept_instruments_and_gives_the_step_2_reasons() -> None:
+    """The screen page run: it shows the exclusion reasons (section 24.5)."""
+    bars_by_instrument = {stock("LOW"): make_bars("10", 20), stock("HIGH"): make_bars("30", 20)}
+    reader = DailyBarsReader(bars_by_instrument)
+    definition = make_definition(conditions=[compare(average_trading_value(), ">=", "20000")])
+
+    outcome = await run_screen_steps(
+        definition=definition,
+        start_instruments=list(bars_by_instrument),
+        summaries=[calculate_daily_bar_summary(instrument, bars) for instrument, bars in bars_by_instrument.items()],
+        read_daily_bars=reader,
+    )
+
+    assert [instrument.symbol for instrument in reader.reads[0][0]] == ["LOW", "HIGH"]
+    assert symbols(outcome) == ["HIGH"]
+    assert reasons(outcome) == {"LOW": "indicator_conditions[0]: Average trading value(20) >= 20000"}

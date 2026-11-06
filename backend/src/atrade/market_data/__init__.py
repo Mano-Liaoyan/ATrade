@@ -23,6 +23,7 @@ from atrade.market_data.custom_indicators import (
     list_indicator_catalog,
 )
 from atrade.market_data.daily_bar_summary import (
+    SUMMARY_BAR_COUNT,
     DailyBarSummary,
     read_daily_bar_summaries,
     read_daily_bar_summaries_before,
@@ -95,6 +96,7 @@ from atrade.market_data.us_universe_update import UsUniverseUpdate
 __all__ = [
     "CUSTOM_INDICATOR_CHANGE_SOCKET",
     "MARKET_DATA_SOCKET_MESSAGE_MODELS",
+    "SUMMARY_BAR_COUNT",
     "BarRequest",
     "BarResponse",
     "BarSource",

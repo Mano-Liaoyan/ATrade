@@ -4,6 +4,7 @@ Run with `python -m atrade.app.backtest_process <backtest ID>`. The environment 
 DATABASE_URL (docs/architecture/backtest.md section 10.1).
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -27,6 +28,9 @@ def lower_own_priority() -> None:
 
 
 def main() -> None:
+    # Standard output: the parent reads the standard error only for a failure text (section 10.3), so only standard
+    # output reaches the log of the web container.
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     lower_own_priority()
     # NautilusTrader and pyarrow load after the priority change, so their import also runs with the lower priority.
     from atrade.backtest import run_backtest

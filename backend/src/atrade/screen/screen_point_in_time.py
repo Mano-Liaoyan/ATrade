@@ -30,7 +30,7 @@ async def run_screen_at(
     *, database_url: str, market: str, definition: dict[str, Any], as_of_utc: datetime
 ) -> ScreenOutcome:
     """Runs a checked screen definition on the daily bars that start before `as_of_utc`. Daily bars are read in the
-    global source order, as for a run of the screen page (section 24.1)."""
+    global source order, as for a run of the screen page (section 24.1). The prefilter of section 24.9 applies."""
     start = definition["start"]
     quarter_start_utc = await read_quarter_start_at(database_url, as_of_utc) if start == "quarter_universe" else None
     instruments, _ = await read_start_instruments(
@@ -51,5 +51,9 @@ async def run_screen_at(
         )
 
     return await run_screen_steps(
-        definition=definition, start_instruments=instruments, summaries=summaries, read_daily_bars=read_daily_bars
+        definition=definition,
+        start_instruments=instruments,
+        summaries=summaries,
+        read_daily_bars=read_daily_bars,
+        prefilter=True,
     )

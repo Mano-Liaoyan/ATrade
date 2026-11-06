@@ -20,7 +20,7 @@ from nautilus_trader.model import Bar as NautilusBar
 from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
 from atrade.indicator import create_indicator, find_indicator_definition, make_nautilus_bar
-from atrade.market_data import DailyBarSummary
+from atrade.market_data import SUMMARY_BAR_COUNT, DailyBarSummary
 
 type DailyBarsReader = Callable[[list[Instrument], datetime, int], Awaitable[dict[Instrument, list[Bar]]]]
 type Definition = Mapping[str, Any]
@@ -63,6 +63,8 @@ class ScreenOutcome:
     daily_bars_date: date | None
     start_count: int
     after_filters_count: int
+    # The instruments of the daily bar read of step 2.
+    after_prefilter_count: int
     after_indicator_conditions_count: int
     rows: list[ScreenRow]
     exclusions: list[ScreenExclusion]
@@ -226,6 +228,43 @@ def apply_filters(
     return kept, exclusions
 
 
+def is_summary_condition(condition: Mapping[str, Any]) -> bool:
+    """True for a `compare` condition on `average_trading_value(20)`. The daily bar summary has the same value: the
+    same indicator class on the same last 20 daily bars (ADR 0001)."""
+    reference = condition["indicator"]
+    if condition["kind"] != "compare" or reference["indicator"] != "average_trading_value":
+        return False
+    parameters = find_indicator_definition(reference).with_defaults(reference.get("parameters", {}))
+    return parameters["period"] == SUMMARY_BAR_COUNT
+
+
+def find_prefilter_reason(conditions: Sequence[Mapping[str, Any]], summary: DailyBarSummary) -> str | None:
+    """The reason of the first summary condition that is false. A summary without a value passes: step 2 excludes
+    the instrument with the "No value" reason."""
+    if summary.average_trading_value_20 is None:
+        return None
+    for index, condition in enumerate(conditions):
+        if not is_summary_condition(condition):
+            continue
+        if not COMPARISONS[condition["operator"]](summary.average_trading_value_20, float(condition["value"])):
+            return f"indicator_conditions[{index}]: {describe_condition(condition)}"
+    return None
+
+
+def apply_prefilter(
+    conditions: Sequence[Mapping[str, Any]], kept: list[DailyBarSummary]
+) -> tuple[list[DailyBarSummary], list[ScreenExclusion]]:
+    """Excludes before the daily bar read of step 2 the instruments that a condition of step 2 excludes (section
+    24.9). With a rank condition it excludes no instrument: the percentiles use all candidates."""
+    if any(condition["kind"] == "rank" for condition in conditions):
+        return kept, []
+    reasons = {summary.instrument: find_prefilter_reason(conditions, summary) for summary in kept}
+    return (
+        [summary for summary in kept if reasons[summary.instrument] is None],
+        [ScreenExclusion(instrument, reason) for instrument, reason in reasons.items() if reason is not None],
+    )
+
+
 async def calculate_candidates(
     kept: list[DailyBarSummary], columns: list[IndicatorColumn], before_utc: datetime, read_daily_bars: DailyBarsReader
 ) -> tuple[list[Candidate], list[ScreenExclusion]]:
@@ -310,8 +349,12 @@ async def run_screen_steps(
     start_instruments: list[Instrument],
     summaries: list[DailyBarSummary],
     read_daily_bars: DailyBarsReader,
+    prefilter: bool = False,
 ) -> ScreenOutcome:
-    """Runs a checked definition on the summaries of the start instruments. `read_daily_bars` is called once."""
+    """Runs a checked definition on the summaries of the start instruments. `read_daily_bars` is called once.
+
+    `prefilter` is for a run that uses only the rows: the rows stay the same, but an exclusion reason can be different
+    (section 24.9). The screen page run does not use it."""
     instruments = list(dict.fromkeys(start_instruments))
     summary_by_instrument = {summary.instrument: summary for summary in summaries}
     start_summaries = {
@@ -322,18 +365,23 @@ async def run_screen_steps(
     daily_bars_date = find_daily_bars_date(list(start_summaries.values()))
     kept, filter_exclusions = apply_filters(definition["filters"], start_summaries, daily_bars_date)
     before_utc = datetime.combine(daily_bars_date or date.min, time(), tzinfo=UTC) + timedelta(days=1)
+    to_read, prefilter_exclusions = (
+        apply_prefilter(definition["indicator_conditions"], kept) if prefilter else (kept, [])
+    )
     candidates, value_exclusions = await calculate_candidates(
-        kept, list_columns(definition), before_utc, read_daily_bars
+        to_read, list_columns(definition), before_utc, read_daily_bars
     )
     passing, condition_exclusions = apply_conditions(definition["indicator_conditions"], candidates)
     excluded = {
-        exclusion.instrument: exclusion for exclusion in [*filter_exclusions, *value_exclusions, *condition_exclusions]
+        exclusion.instrument: exclusion
+        for exclusion in [*filter_exclusions, *prefilter_exclusions, *value_exclusions, *condition_exclusions]
     }
     no_daily_bars = {instrument: ScreenExclusion(instrument, NO_DAILY_BARS) for instrument in instruments}
     return ScreenOutcome(
         daily_bars_date=daily_bars_date,
         start_count=len(instruments),
         after_filters_count=len(kept),
+        after_prefilter_count=len(to_read),
         after_indicator_conditions_count=len(passing),
         rows=sort_rows(definition["order"], passing),
         exclusions=[

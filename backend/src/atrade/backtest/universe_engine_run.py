@@ -29,6 +29,7 @@ from atrade.backtest.strategy_engine_run import (
     make_last_close_tick,
     make_open_ticks,
     read_trades,
+    round_up_volumes,
     run_engine,
 )
 from atrade.backtest.universe_update import make_universe_update
@@ -102,11 +103,13 @@ def run_universe_strategy(
         open_ticks.append(make_open_ticks(nautilus_instrument, member.open_bars))
         if member.open_bars:
             last_close_ticks.append(make_last_close_tick(nautilus_instrument, member.open_bars, run.bar_period))
-        wrangler = create_wrangler(nautilus_instrument, run.bar_period, all_bars)
+        wrangler = create_wrangler(nautilus_instrument, run.bar_period)
         instruments.append(nautilus_instrument)
         member_data.append(
             MemberData(
-                bars=wrangler.process_record_batch_bytes(convert_bars_to_arrow_bytes(member.bars, run.bar_period))
+                bars=wrangler.process_record_batch_bytes(
+                    convert_bars_to_arrow_bytes(round_up_volumes(member.bars), run.bar_period)
+                )
                 if member.bars
                 else [],
                 look_back_bars=wrangler.process_record_batch_bytes(

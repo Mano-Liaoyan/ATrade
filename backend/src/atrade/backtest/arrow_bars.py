@@ -5,7 +5,7 @@
 # pyright: reportUnknownArgumentType=false, reportUnknownParameterType=false
 
 from datetime import datetime
-from decimal import Context, Decimal
+from decimal import ROUND_HALF_EVEN, Context, Decimal
 
 import pyarrow
 
@@ -14,19 +14,20 @@ from atrade.foundation.bar import Bar, BarPeriod, find_bar_end
 NANOSECONDS_PER_SECOND = 1_000_000_000
 # BarDataWrangler reads prices and volumes as Arrow decimal128(38, 16).
 ARROW_DECIMAL_TYPE = pyarrow.decimal128(38, 16)
-ARROW_DECIMAL_PLACES = Decimal(1).scaleb(-16)
-ARROW_DECIMAL_CONTEXT = Context(prec=38)
+ARROW_DECIMAL_STEP = Decimal("1e-16")
+# The default decimal context has 28 digits. A value of 13 integer digits and 16 decimal places needs more.
+ARROW_DECIMAL_CONTEXT = Context(prec=38, rounding=ROUND_HALF_EVEN)
 
 
 def convert_to_ns(time_utc: datetime) -> int:
     return int(time_utc.timestamp()) * NANOSECONDS_PER_SECOND
 
 
-def to_arrow_decimals(values: list[Decimal]) -> pyarrow.Array:
-    """SQL division at a stock split stores more than 16 decimal places, and pyarrow refuses them."""
-    return pyarrow.array(
-        [value.quantize(ARROW_DECIMAL_PLACES, context=ARROW_DECIMAL_CONTEXT) for value in values], ARROW_DECIMAL_TYPE
-    )
+def round_to_arrow_scale(value: Decimal) -> Decimal:
+    """Rounds half-even to 16 decimal places, so the error is at most 5e-17. The stock split adjustment of Databento
+    bars divides numeric prices and multiplies numeric volumes in PostgreSQL. Stock splits with ratios such as 1/15
+    give more than 16 decimal places, and Arrow refuses them. The rounding keeps low <= high."""
+    return value.quantize(ARROW_DECIMAL_STEP, context=ARROW_DECIMAL_CONTEXT)
 
 
 def convert_bars_to_arrow_bytes(bars: list[Bar], bar_period: BarPeriod) -> bytes:
@@ -34,11 +35,11 @@ def convert_bars_to_arrow_bytes(bars: list[Bar], bar_period: BarPeriod) -> bytes
     bar_end_ns = [convert_to_ns(find_bar_end(bar.start_utc, bar_period)) for bar in bars]
     table = pyarrow.table(
         {
-            "open": to_arrow_decimals([bar.open for bar in bars]),
-            "high": to_arrow_decimals([bar.high for bar in bars]),
-            "low": to_arrow_decimals([bar.low for bar in bars]),
-            "close": to_arrow_decimals([bar.close for bar in bars]),
-            "volume": to_arrow_decimals([bar.volume for bar in bars]),
+            "open": pyarrow.array([round_to_arrow_scale(bar.open) for bar in bars], ARROW_DECIMAL_TYPE),
+            "high": pyarrow.array([round_to_arrow_scale(bar.high) for bar in bars], ARROW_DECIMAL_TYPE),
+            "low": pyarrow.array([round_to_arrow_scale(bar.low) for bar in bars], ARROW_DECIMAL_TYPE),
+            "close": pyarrow.array([round_to_arrow_scale(bar.close) for bar in bars], ARROW_DECIMAL_TYPE),
+            "volume": pyarrow.array([round_to_arrow_scale(bar.volume) for bar in bars], ARROW_DECIMAL_TYPE),
             "ts_event": pyarrow.array(bar_end_ns, pyarrow.uint64()),
             "ts_init": pyarrow.array(bar_end_ns, pyarrow.uint64()),
         }
