@@ -5,7 +5,8 @@
 
 Without options, the program lists the detected stock splits that wait for the check and the symbol links that are
 not checked. With `--accept`, it confirms all listed stock splits except the rejected IDs, changes the stored bars
-before their ex-dates, and records the check of all listed links.
+before their ex-dates, and records the check of all listed links. The check moves no bar of a link. The list marks a
+rename from 2024-07-01 as a new listing.
 """
 
 import argparse
