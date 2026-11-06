@@ -578,7 +578,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   popover. The header has no status word and no clock of its own. The Paper
   tag is a Carbon operational tag with a tooltip. The tooltip shows the checked paper
   account number with its middle hidden, for example `DU****567`. The header
-  reads the account check from `/ws/paper-trading`. A header tooltip is the
+  reads the account check from the one `paperAccountFeed` of `paper_trading`.
+  The layout starts this feed, so the app has one `/ws/paper-trading` socket,
+  and the pages only read the feed. A header tooltip is the
   light Carbon high-contrast bubble. It has the Carbon popover drop shadow,
   so it stays visible on the light page. Carbon hides the header
   navigation below 1056 px. ATrade is a desktop app, so it keeps the
@@ -897,7 +899,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   shows in the Open orders tab from `/ws/paper-trading`. The fields and the
   button stay in view; only the numbers scroll, in their own `ScrollRegion`.
   The side column is the landmark; its content has no landmark with the same
-  name (the form is "Paper order of <symbol>"). The page reads the paper account with `PaperAccountFeed`
+  name (the form is "Paper order of <symbol>"). The page reads the paper account with `paperAccountFeed`
   of `paper_trading` and the running forward tests with
   `ForwardTestsOnInstrumentsFeed` of `forward_test` (the one
   forward test list, read again after each `/ws/forward-tests` change: `forwardTests`, `onInstruments`, `isConnected`;
@@ -2247,8 +2249,8 @@ option and records it in this document.
 - Decided (#221): the start dialog reads `GET /api/forward-tests/capital`
   each time it opens and after each refused start. It does not read it again
   when the "Capital (USD)" input changes. Without an unallocated amount, the
-  dialog reads the paper account check from `/ws/paper-trading` while it is
-  open and shows its reason (`docs/architecture/forward_test.md` section
+  dialog reads the paper account check from `paperAccountFeed` and shows its
+  reason (`docs/architecture/forward_test.md` section
   12.16).
 - Decided (#213): the owner ledger of the ATrade execution client is the
   interface `OwnerLedger` in `forward_test/owner_ledger.py`. The client

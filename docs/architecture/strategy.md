@@ -322,8 +322,10 @@ them by ID. A missing ID is not in the result. The forward test list uses it
   (`--cds-layer-selected-01`). `scrollLineIntoRegion(line, region)` scrolls
   only that region. The "Rules" tab uses these (section 9.8.5).
 - `frontend/src/lib/strategy/` holds the HTTP client of the strategy routes,
-  the version label (`formatVersionLabel`), the drafts in `localStorage`, and
-  the language server connection (`connectStrategyLanguageServer`).
+  the version label (`formatVersionLabel`), the drafts in `localStorage`, the
+  language server connection (`connectStrategyLanguageServer`), and
+  `StrategyVersionSelects`, the strategy and version selects of the backtest,
+  parameter sweep, and forward test start forms.
 - One draft exists for each strategy version. The `localStorage` key is
   `atrade.strategy-draft.<strategy id>.v<version number>`. A save removes the
   draft of the version that the user edited.

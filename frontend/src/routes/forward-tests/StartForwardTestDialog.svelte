@@ -14,9 +14,7 @@
     StatusMessage,
     TextInput,
     type NotificationMessage,
-    type SelectItem,
   } from '#lib/foundation/carbon';
-  import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import {
     describeUnallocated,
     findCapitalBlockReason,
@@ -33,18 +31,9 @@
   import {
     describePaperAccountCheck,
     describePaperAccountTag,
-    PAPER_TRADING_SOCKET_PATH,
-    readPaperAccountMessage,
-    type PaperAccountCheck,
+    paperAccountFeed,
   } from '#lib/paper_trading';
-  import {
-    formatVersionLabel,
-    listStrategies,
-    readStrategy,
-    type StrategyDetail,
-    type StrategyListItem,
-    type StrategyVersionKey,
-  } from '#lib/strategy';
+  import { StrategyVersionSelects, type StrategyVersionKey } from '#lib/strategy';
   import { START_FORWARD_TEST_FORM_ID } from '../palette_commands';
 
   interface Props {
@@ -63,9 +52,6 @@
   // The longest symbol, exchange, and currency that the API takes.
   const MAX_FIELD_LENGTH = 32;
 
-  let strategies: StrategyListItem[] = $state([]);
-  let selectedStrategy = $state<StrategyDetail | null>(null);
-  let strategyId = $state('');
   let strategyVersionId = $state('');
   let symbol = $state('');
   let exchange = $state('');
@@ -85,24 +71,12 @@
   let allocatedCapitalUsd = $state('');
   // 'reading' until GET /api/forward-tests/capital answers, null when the backend did not answer.
   let capital = $state<ForwardTestCapital | null | 'reading'>('reading');
-  let paperAccountCheck = $state<PaperAccountCheck | null>(null);
+  const paperAccountCheck = $derived(paperAccountFeed.account?.check ?? null);
   // The value of the datetime-local input: a local time, or '' for no end time.
   let endTimeLocal = $state('');
   let startError = $state<NotificationMessage | null>(null);
   let isStarting = $state(false);
   let form: HTMLFormElement | undefined = $state();
-
-  const strategyItems = $derived<SelectItem<string>[]>(
-    strategies.map((strategy) => ({ value: String(strategy.id), label: strategy.name })),
-  );
-  const versionItems = $derived<SelectItem<string>[]>(
-    selectedStrategy === null
-      ? []
-      : selectedStrategy.versions.map((version) => ({
-          value: String(version.id),
-          label: formatVersionLabel(selectedStrategy?.name ?? '', version.version_number),
-        })),
-  );
 
   const unallocatedUsd = $derived(capital === 'reading' || capital === null ? null : capital.unallocated_usd);
   const capitalBlockReason = $derived(
@@ -131,24 +105,7 @@
     });
   }
 
-  // The reason of the paper account check, while the dialog is open.
-  $effect(() => {
-    if (!open) {
-      return;
-    }
-    return openLiveSocket({
-      url: buildSocketUrl(PAPER_TRADING_SOCKET_PATH, window.location),
-      onMessage: (message) => {
-        const accountMessage = readPaperAccountMessage(message);
-        if (accountMessage !== null) {
-          paperAccountCheck = accountMessage.check;
-        }
-      },
-      onConnectionChange: () => undefined,
-    });
-  });
-
-  // Each open reads the choices and the unallocated amount again: a strategy, a backtest, or a forward test can be new.
+  // Each open reads the unallocated amount again: a backtest or a forward test can be new.
   $effect(() => {
     if (!open) {
       return;
@@ -156,30 +113,7 @@
     startError = null;
     capital = 'reading';
     refreshCapital();
-    if (strategyVersion !== null) {
-      void selectStrategy(String(strategyVersion.strategyId), String(strategyVersion.versionId));
-    }
-    void listStrategies(fetch).then((result) => {
-      if (result.kind === 'ok') {
-        strategies = result.value;
-      }
-    });
   });
-
-  // Without a version id, the latest version of the strategy is selected.
-  async function selectStrategy(selectedId: string, versionId: string | null = null): Promise<void> {
-    strategyId = selectedId;
-    selectedStrategy = null;
-    strategyVersionId = '';
-    const result = await readStrategy(fetch, Number(selectedId));
-    if (result.kind === 'failed') {
-      startError = { kind: 'error', title: 'Strategy not read', subtitle: result.message };
-      return;
-    }
-    selectedStrategy = result.value;
-    const latestVersion = result.value.versions.at(-1);
-    strategyVersionId = versionId ?? (latestVersion === undefined ? '' : String(latestVersion.id));
-  }
 
   type UniverseFields = Pick<ForwardTestRequest, 'symbol' | 'exchange' | 'currency' | 'universe'>;
 
@@ -260,21 +194,12 @@
     bind:this={form}
     onsubmit={submitForwardTest}
   >
-    <Select
-      label="Strategy"
-      placeholder="Select a strategy"
-      items={strategyItems}
-      value={strategyId}
-      onValueChange={(selectedId: string) => void selectStrategy(selectedId)}
-    />
-    <Select
-      label="Strategy version"
-      placeholder="Select a strategy first"
-      items={versionItems}
-      value={strategyVersionId}
-      disabled={versionItems.length === 0}
-      onValueChange={(versionId: string) => {
-        strategyVersionId = versionId;
+    <StrategyVersionSelects
+      {open}
+      {strategyVersion}
+      bind:strategyVersionId
+      onError={(error: NotificationMessage) => {
+        startError = error;
       }}
     />
     <Select

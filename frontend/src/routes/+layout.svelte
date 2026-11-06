@@ -15,18 +15,12 @@
   import { Tag, Tooltip, TooltipProvider } from '#lib/foundation/carbon';
   import { ThemeButton } from '#lib/foundation/color_scheme';
   import { CommandPalette } from '#lib/foundation/command_palette';
-  import { buildSocketUrl, openLiveSocket } from '#lib/foundation/live_socket';
   import {
     fetchGatewayStatus,
     GATEWAY_STATUS_REFRESH_MILLISECONDS,
     type GatewayStatus,
   } from '#lib/ibkr';
-  import {
-    describePaperAccountTag,
-    PAPER_TRADING_SOCKET_PATH,
-    readPaperAccountMessage,
-    type PaperAccountCheck,
-  } from '#lib/paper_trading';
+  import { describePaperAccountTag, paperAccountFeed } from '#lib/paper_trading';
   import { listWatchlist, type WatchlistInstrument } from '#lib/watchlist';
   import HeaderConnections from './HeaderConnections.svelte';
   import { summarizeConnections } from './header_connections';
@@ -47,12 +41,12 @@
 
   let backendHealth: BackendHealth = $state({ kind: 'checking' });
   let gatewayStatus: GatewayStatus = $state({ kind: 'checking' });
-  let paperAccountCheck: PaperAccountCheck | null = $state(null);
   let nowMilliseconds = $state(Date.now());
   let paletteWatchlist: WatchlistInstrument[] = $state([]);
   let paletteWatchlistReading = $state(false);
   const serverClock = $derived(readServerClock(backendHealth, nowMilliseconds));
   const connections = $derived(summarizeConnections(backendHealth, gatewayStatus, serverClock));
+  const paperAccountCheck = $derived(paperAccountFeed.account?.check ?? null);
   const paletteCommandGroups = $derived(createPaletteCommandGroups(paletteWatchlist));
 
   // The palette reads the watchlist each time it opens, so it shows the instruments that the user added since.
@@ -102,19 +96,8 @@
     };
   });
 
-  // The Paper tag names the checked paper account. The account check comes from /ws/paper-trading.
-  $effect(() => {
-    return openLiveSocket({
-      url: buildSocketUrl(PAPER_TRADING_SOCKET_PATH, window.location),
-      onMessage: (message) => {
-        const accountMessage = readPaperAccountMessage(message);
-        if (accountMessage !== null) {
-          paperAccountCheck = accountMessage.check;
-        }
-      },
-      onConnectionChange: () => undefined,
-    });
-  });
+  // The one /ws/paper-trading socket of the app. The Paper tag names the checked paper account, and the pages read it.
+  $effect(() => paperAccountFeed.start(fetch, window.location));
 </script>
 
 <TooltipProvider>

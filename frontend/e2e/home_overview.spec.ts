@@ -30,6 +30,19 @@ test('the home page fills the window and shows the key numbers of the paper acco
   expect(hasPageScroll).toBe(false);
 });
 
+test('the header and the home page share one paper account socket', async ({ page }) => {
+  const sockets: string[] = [];
+  page.on('websocket', (socket) => {
+    if (socket.url().endsWith('/ws/paper-trading')) {
+      sockets.push(socket.url());
+    }
+  });
+  await page.goto('/');
+
+  await expect(positionsPanel(page).getByRole('heading', { name: 'Positions (44)' })).toBeVisible();
+  expect(sockets).toHaveLength(1);
+});
+
 test('the Positions table shows the owner of each row and the unattributed difference', async ({ page }) => {
   await page.goto('/');
   const table = positionsPanel(page);
