@@ -114,7 +114,7 @@ async function expectMetricsWithoutClip(page: Page, metrics: Locator): Promise<v
     await page.setViewportSize({ width, height: 800 });
     for (const metric of await metrics.all()) {
       const isClipped = await metric.evaluate((element) => element.scrollWidth > element.clientWidth);
-      expect(isClipped, await metric.textContent()).toBe(false);
+      expect(isClipped, (await metric.textContent()) ?? '').toBe(false);
     }
   }
 }

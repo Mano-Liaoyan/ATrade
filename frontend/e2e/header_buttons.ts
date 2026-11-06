@@ -16,7 +16,7 @@ export async function expectHeaderButtonsClickable(page: Page, panel: Locator): 
         const target = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
         return target !== null && element.contains(target);
       });
-      expect(isOnTop, await button.getAttribute('aria-label')).toBe(true);
+      expect(isOnTop, (await button.getAttribute('aria-label')) ?? '').toBe(true);
     }
   }
 }
