@@ -913,7 +913,9 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
     millisecond after the bar start. A bar without volume also gets a tick,
     with a size of 1 share, because `on_bar` runs on such a bar.
     `make_last_close_tick` adds 1 trade tick at the close of the last bar
-    of each instrument, 1 nanosecond before the bar end.
+    of each instrument, 1 nanosecond before the bar end. This tick comes
+    before the OHLC of that bar, so a stop that the bar crosses on the last
+    bar fills at the close, not at the stop price.
   - `NextOpenOrders` holds each market order of `submit_order` and each
     `close_position` until the next open tick of the instrument. All
     instruments of one rebalance thus fill on one price basis, and the
