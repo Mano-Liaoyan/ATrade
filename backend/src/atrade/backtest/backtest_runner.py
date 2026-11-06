@@ -21,12 +21,14 @@ QUEUE_CHECK_INTERVAL_SECONDS = 0.5
 # A failed child shows the end of its error output. The start of a long traceback is less useful.
 MAX_ERROR_OUTPUT_CHARACTERS = 4000
 RESTART_ERROR_MESSAGE = "The Web process stopped during the backtest. Start the backtest again."
+CHILD_RUN_ERROR_MESSAGE = "ATrade could not run the backtest process. The Web log has the error."
 
 logger = logging.getLogger(__name__)
 
 
 def describe_child_failure(return_code: int, error_output: bytes) -> str:
-    error_text = error_output.decode(errors="replace").strip()[-MAX_ERROR_OUTPUT_CHARACTERS:]
+    # PostgreSQL text cannot hold a NUL byte.
+    error_text = error_output.decode(errors="replace").replace("\0", "").strip()[-MAX_ERROR_OUTPUT_CHARACTERS:]
     if not error_text:
         return f"The backtest process ended with exit code {return_code} and no result."
     return f"The backtest process ended with exit code {return_code} and no result:\n{error_text}"
@@ -86,10 +88,20 @@ class BacktestRunner:
                 task_group.create_task(self.run_child(backtest_id, timeout_seconds=limits.timeout_seconds))
 
     async def run_child(self, backtest_id: int, *, timeout_seconds: int) -> None:
+        """An error here must not leave this task: the TaskGroup would cancel all children and the queue."""
         try:
             await self.run_child_until_end(backtest_id, timeout_seconds=timeout_seconds)
+        except Exception:
+            logger.exception("The backtest runner could not run backtest %s.", backtest_id)
+            await self.fail_backtest(backtest_id)
         finally:
             self.running_count -= 1
+
+    async def fail_backtest(self, backtest_id: int) -> None:
+        try:
+            await self.end_backtest(backtest_id, status_if_running="failed", error_message=CHILD_RUN_ERROR_MESSAGE)
+        except Exception:
+            logger.exception("The backtest runner could not write the end of backtest %s.", backtest_id)
 
     async def run_child_until_end(self, backtest_id: int, *, timeout_seconds: int) -> None:
         process = await asyncio.create_subprocess_exec(
