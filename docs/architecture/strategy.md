@@ -715,8 +715,23 @@ Decided (#201):
   also a position outside the members: a buy that filled after the list
   removed its member, a sell that IBKR ended, or a position that a forward
   test restart restored in a new quarter. A position with an open order
-  waits for the next rebalance. It buys only when no order of the strategy is
-  open and no position outside the targets is open.
+  keeps that order. It buys only when no order of the strategy is open and no
+  position outside the targets is open.
+- A denied, rejected, or canceled order sets `order_is_lost`. At the next bar
+  time the strategy sends the sells and the buys of its targets again, also
+  when the next rebalance is months away. A target that an exit item sold
+  leaves the targets, so the retry does not buy it again.
+- A restored position sets the period of `on_start` to the current period, so
+  a restart does not rebalance a second time in a period. A restart between
+  a period start and its rebalance thus skips that rebalance. The exception
+  is a restored position outside the first member list: it marks a rebalance.
+  A restart loses the targets, so `order_is_lost` has no effect until the next
+  rebalance. A flat restart has no period and ranks at its first bar time.
+- Universe code has no `on_historical_bars`, so it has no look-back previous
+  value. A cross on the first bar of a new member is false, also when the
+  last look-back bar and that bar show a cross. A saved version keeps its
+  code (ADR 0006), so a saved universe version must be saved again to get the
+  rules of this list.
 - `on_start` subscribes to the 1-day bars of each restored position, because
   a market order needs a price in the cache.
 - A member that leaves loses its values and its last close. When it comes
@@ -869,10 +884,10 @@ Decided (#202):
   test restart restores the positions in a new strategy object. It also
   subscribes to the bars of each position, because a position can be outside
   the universe, and a market order needs a price in the cache.
-- A sell that IBKR or ATrade denied, rejected, or ended gives no fill. On the
-  first bar of a day without an open or in-flight order, the strategy clears
-  its sell count and ranks again. So a lost sell stops the rebalance for less
-  than 1 day, and a sell that fails again repeats once a day.
+- An order that IBKR or ATrade denied, rejected, or ended gives no fill. On
+  the first bar of a day without an open or in-flight order, the strategy
+  clears its sell count and ranks again. So a lost order waits for less than
+  1 day, and an order that fails again repeats once a day.
 - A saved version keeps its code (ADR 0006), so a saved M1 to M4 version must
   be saved again to get these 2 rules.
 
