@@ -296,6 +296,30 @@ describe('run_backtest', () => {
     expect(result.isError).toBeUndefined();
   });
 
+  test('returns the backtest ID when the read of the finished backtest fails', async () => {
+    web.backtestStatuses = ['running', 'finished'];
+    let getCount = 0;
+    class RestartingWebPortClient extends WebPortClient {
+      override async request(...args: Parameters<WebPortClient['request']>): Promise<WebPortAnswer> {
+        if (args[0] === 'GET') {
+          getCount += 1;
+          if (getCount > 1) {
+            throw new TypeError('fetch failed');
+          }
+        }
+        return super.request(...args);
+      }
+    }
+
+    const result = await runBacktest(new RestartingWebPortClient(web.baseUrl, CONVERSATION_ID), BACKTEST_ARGUMENTS, {
+      budget: { startedBacktests: 0 },
+      wait: QUICK_WAIT,
+    });
+
+    expect(result.details).toEqual({ backtest: { id: 11, status: 'finished' } });
+    expect(result.isError).toBeUndefined();
+  });
+
   test('starts at most 5 backtests for one user message, and 5 again for the next message', async () => {
     web.backtestStatuses = ['finished'];
     const sixCalls = Array.from({ length: 6 }, () => call('run_backtest', BACKTEST_ARGUMENTS));

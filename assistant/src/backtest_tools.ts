@@ -172,7 +172,7 @@ async function waitForEnd(
       options.onUpdate?.(stateResult(state));
     }
   }
-  return finishedResult(client, state, options.warning, options.signal);
+  return finishedResult(client, state, options.warning, options.signal).catch(() => stillRunningResult(state, options.warning));
 }
 
 /** The body of POST /api/backtests. A `screen` universe without a rebalance period rebalances each quarter. */
