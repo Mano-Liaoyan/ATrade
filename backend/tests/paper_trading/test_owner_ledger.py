@@ -280,6 +280,26 @@ async def test_a_market_buy_order_uses_the_last_daily_close_and_a_foreign_curren
 
 
 @pytest.mark.anyio
+async def test_an_unfilled_market_buy_order_uses_cash_for_the_next_buy_order(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=make_gateway(),
+    ) as client:
+        # The daily closes of the fake are between 100 and 149 USD: 1 order fits in 10000 USD, and 2 orders do not.
+        responses = [
+            await client.post(ORDERS_PATH, json=make_order(symbol="AAPL", side="BUY", quantity=60, limit_price=None))
+            for _ in range(3)
+        ]
+
+    assert [response.status_code for response in responses] == [201, 409, 409]
+    assert responses[1].json()["rule"] == "buy_more_than_cash"
+
+
+@pytest.mark.anyio
 async def test_records_each_fill_of_an_order_by_hand_once(
     database_url: str, clock: FixedClock, frontend_build_dir: Path
 ) -> None:

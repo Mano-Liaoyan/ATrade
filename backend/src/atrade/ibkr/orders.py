@@ -109,7 +109,8 @@ def build_order(request: OrderRequest) -> Order:
 
 
 def read_price(price: float | Decimal | None) -> Decimal | None:
-    if price is None or abs(float(price)) >= UNSET_PRICE_LIMIT:
+    # IBKR sends 0.0 as the limit price of a market order, and a very large value for other unset prices.
+    if price is None or float(price) == 0 or abs(float(price)) >= UNSET_PRICE_LIMIT:
         return None
     # str() first, so that the Decimal has the short form of the float, for example 1.1 and not 1.0999...
     return Decimal(str(price))

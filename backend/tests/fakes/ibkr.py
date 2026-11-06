@@ -28,6 +28,7 @@ from atrade.ibkr import (
     OrderRequest,
     PortfolioPosition,
 )
+from atrade.ibkr.orders import read_price
 
 # The fake checks the reachable flag this often. A short wait keeps the e2e server from using a full CPU.
 CHECK_INTERVAL_SECONDS = 0.05
@@ -239,7 +240,8 @@ class FakeGatewayConnection:
                 side=request.side,
                 quantity=Decimal(request.quantity),
                 order_type=request.order_type,
-                limit_price=request.limit_price,
+                # Like the real library: lmtPrice is 0.0 for a market order.
+                limit_price=read_price(0.0 if request.limit_price is None else request.limit_price),
                 time_in_force=request.time_in_force,
                 status="Submitted",
                 filled_quantity=Decimal(0),
