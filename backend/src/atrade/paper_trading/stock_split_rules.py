@@ -24,6 +24,7 @@ MAX_USUAL_NUMERATOR = 20
 MAX_USUAL_DENOMINATOR = 10
 # A ratio from decimal text has a small denominator.
 MAX_RATIO_DENOMINATOR = 1000
+SPLIT_QUANTITY_PLACES = Decimal(1).scaleb(-12)
 
 type SplitCheckEvidence = Literal[
     "bar_ratio_only", "position_only", "ratios_differ", "share_count_differs", "unusual_ratio"
@@ -48,8 +49,11 @@ class SplitEvidence:
 
 
 def find_whole_and_part(quantity: Decimal) -> tuple[Decimal, Decimal]:
-    whole = Decimal(math.floor(quantity))
-    return whole, quantity - whole
+    """`quantity` is a share count times a split ratio. A ratio like 1/3 is stored as 0.333...3, so the rounding keeps
+    300 times that ratio at 100, not 99."""
+    rounded_quantity = quantity.quantize(SPLIT_QUANTITY_PLACES)
+    whole = Decimal(math.floor(rounded_quantity))
+    return whole, rounded_quantity - whole
 
 
 def calculate_split_adjustments(
@@ -118,7 +122,7 @@ def find_split_evidence(
         return SplitEvidence(kind="bar_ratio_only", ratio=bar_ratio)
     if not is_usual_ratio(bar_ratio):
         return SplitEvidence(kind="unusual_ratio", ratio=bar_ratio)
-    if quantity_after == math.floor(quantity_before * bar_ratio):
+    if quantity_after == find_whole_and_part(quantity_before * bar_ratio)[0]:
         return SplitEvidence(kind="confirmed", ratio=bar_ratio)
     position_ratio = Fraction(quantity_after) / Fraction(quantity_before)
     if abs(position_ratio / to_fraction(bar_ratio) - 1) <= RATIO_TOLERANCE:
