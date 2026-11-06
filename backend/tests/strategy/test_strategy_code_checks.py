@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 import pytest
 
+from atrade.strategy import find_backtest_only_orders
 from atrade.strategy.code_checks import find_ruff_problems
 
 VALID_CODE = """from nautilus_trader.config import StrategyConfig
@@ -20,6 +21,24 @@ class EmptyConfig(StrategyConfig):
 class EmptyStrategy(Strategy):
     pass
 """
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        "self.order_factory.bracket(1)",
+        "strategy.order_factory.stop_market(1)",
+        "order_factory.trailing_stop_market(1)",
+        "self.submit_order_list(orders)",
+    ],
+)
+def test_the_order_check_finds_the_calls_of_the_nautilus_trader_api(call: str) -> None:
+    assert [problem.line for problem in find_backtest_only_orders(call)] == [1]
+
+
+@pytest.mark.parametrize("call", ["self.bracket(1)", "bands.stop_market(1)", "self.helpers.trailing_stop_limit(1)"])
+def test_the_order_check_accepts_a_method_of_the_user_with_the_same_name(call: str) -> None:
+    assert find_backtest_only_orders(call) == []
 
 
 @pytest.mark.anyio
