@@ -337,7 +337,7 @@ test('the version address opens that version, not the latest one', async ({ page
   const firstVersion = (await (await request.get(`${strategyPath}/versions/1`)).json()) as { code: string };
   await request.post(`${strategyPath}/versions`, {
     // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
-    data: { code: `${firstVersion.code}\n# Version 2.\n` },
+    data: { code: `# Version 2.\n${firstVersion.code}` },
   });
 
   await page.goto(`/strategies/${String(strategy.id)}/versions/1`);
