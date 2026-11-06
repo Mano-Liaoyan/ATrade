@@ -2,7 +2,7 @@
 
 The series route reads only saved bars and never calls IBKR. The chart first reads its bars with the bars route,
 which saves them. For each indicator the route also reads the last `screen_look_back_bars(parameters)` saved bars
-before the range (the warm-up), gives all bars to `update(bar)` of the indicator class, and returns the values of the
+before the range (the warm-up), gives all bars to `handle_bar` of the indicator class, and returns the values of the
 range. So a chart value is equal to the screen value at the same daily bar.
 """
 
@@ -24,6 +24,7 @@ from atrade.indicator import (
     check_indicator_reference,
     create_indicator,
     find_indicator_definition,
+    make_nautilus_bar,
 )
 from atrade.market_data.bar_models import InstrumentField, find_range_problem
 from atrade.market_data.bar_reading import BarRequest, limit_to_complete_bars, read_saved_bars
@@ -155,17 +156,17 @@ def check_indicator_list(indicators: list[JsonValue]) -> list[IndicatorProblemRe
 
 
 def calculate_series(reference: Mapping[str, Any], warm_up_bars: list[Bar], bars: list[Bar]) -> IndicatorSeries:
-    """Gives the last `screen_look_back_bars` warm-up bars and then the bars to `update(bar)` of a new indicator.
+    """Gives the last `screen_look_back_bars` warm-up bars and then the bars to `handle_bar` of a new indicator.
     Returns the outputs at the bars only."""
     definition = find_indicator_definition(reference)
     parameters = definition.with_defaults(reference.get("parameters", {}))
     indicator = create_indicator({**reference, "parameters": parameters}, has_output=False)
     warm_up_count = definition.screen_look_back_bars(parameters)
     for bar in warm_up_bars[-warm_up_count:]:
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
     outputs: dict[str, list[float | None]] = {output: [] for output in definition.outputs}
     for bar in bars:
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
         for output, values in outputs.items():
             value = cast("float | None", getattr(indicator, output))
             values.append(None if value is None else float(value))

@@ -405,9 +405,6 @@ class ScreenRoutes:
         if screen is None:
             raise screen_not_found(screen_id)
         if request is not None:
-            problems = check_screen(name=screen.name, market=request.market, definition=request.definition)
-            if problems:
-                return check_failed(problems)
             screen = replace(screen, market=request.market, definition=request.definition)
         problems = check_screen(name=screen.name, market=screen.market, definition=screen.definition)
         if problems:
@@ -499,43 +496,37 @@ def create_screen_assistant_router(
 def create_screen_router(*, database_url: str, clock: Clock) -> APIRouter:
     routes = ScreenRoutes(database_url=database_url, clock=clock)
     router = APIRouter()
-    not_found = NOT_FOUND
-    check_failed_response = CHECK_FAILED
-    router.add_api_route("/api/screens", routes.list_screens, methods=["GET"])
+    add_read_routes(router, routes)
     router.add_api_route(
         "/api/screens",
         routes.create_screen,
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         response_model=ScreenResponse,
-        responses=check_failed_response,
+        responses=CHECK_FAILED,
     )
-    router.add_api_route("/api/screens/{screen_id}", routes.read_screen, methods=["GET"], responses=not_found)
     router.add_api_route(
         "/api/screens/{screen_id}",
         routes.change_screen,
         methods=["PUT"],
         response_model=ScreenResponse,
-        responses={**not_found, **check_failed_response},
+        responses={**NOT_FOUND, **CHECK_FAILED},
     )
     router.add_api_route(
         "/api/screens/{screen_id}",
         routes.delete_screen,
         methods=["DELETE"],
         status_code=status.HTTP_204_NO_CONTENT,
-        responses=not_found,
+        responses=NOT_FOUND,
     )
-    router.add_api_route("/api/screens/{screen_id}/keep", routes.keep_screen, methods=["POST"], responses=not_found)
+    router.add_api_route("/api/screens/{screen_id}/keep", routes.keep_screen, methods=["POST"], responses=NOT_FOUND)
     router.add_api_route(
         "/api/screens/{screen_id}/runs",
         routes.run_screen,
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         response_model=ScreenResultResponse,
-        responses={**not_found, **check_failed_response},
-    )
-    router.add_api_route(
-        "/api/screen-results/{screen_result_id}", routes.read_screen_result, methods=["GET"], responses=not_found
+        responses={**NOT_FOUND, **CHECK_FAILED},
     )
     # The same body as GET /api/market-data/indicators (indicator.md section 23.9.6).
     router.add_api_route("/api/screen-indicators", routes.list_indicators, methods=["GET"])

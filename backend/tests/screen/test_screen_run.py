@@ -11,11 +11,13 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from nautilus_trader.model import Bar as NautilusBar
 
 from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
+from atrade.indicator import make_nautilus_bar
 from atrade.market_data import DailyBarSummary
-from atrade.screen.screen_run import ScreenOutcome, run_screen_steps
+from atrade.screen.screen_run import ScreenOutcome, calculate_values, make_column, run_screen_steps
 
 LAST_DAY = datetime(2026, 1, 2, tzinfo=UTC)
 TEN_MILLION = 10_000_000.0
@@ -306,6 +308,23 @@ async def test_a_custom_indicator_reads_the_bars_of_its_look_back() -> None:
 
     assert symbols(outcome) == ["LONG"]
     assert reasons(outcome) == {"SHORT": "No value: Custom"}
+
+
+def test_the_bars_of_an_instrument_convert_one_time_for_all_columns(monkeypatch: pytest.MonkeyPatch) -> None:
+    conversions = 0
+
+    def count_conversion(bar: Bar) -> NautilusBar:
+        nonlocal conversions
+        conversions += 1
+        return make_nautilus_bar(bar)
+
+    monkeypatch.setattr("atrade.screen.screen_run.make_nautilus_bar", count_conversion)
+    columns = [make_column(sma(2)), make_column(sma(3))]
+
+    values = calculate_values(columns, make_bars("5", 3))
+
+    assert values == {"SMA(2)": 5.0, "SMA(3)": 5.0}
+    assert conversions == 3
 
 
 @pytest.mark.anyio

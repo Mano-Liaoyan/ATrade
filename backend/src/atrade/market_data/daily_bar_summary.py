@@ -17,7 +17,7 @@ from psycopg.rows import class_row
 
 from atrade.foundation.bar import Bar, BarPeriod
 from atrade.foundation.instrument import Instrument
-from atrade.indicator import AverageTradingValue
+from atrade.indicator import AverageTradingValue, make_nautilus_bar
 from atrade.market_data.bar_source import DEFAULT_SOURCE_ORDER, BarSource, bar_table, saved_range_table
 
 SUMMARY_BAR_COUNT = 20
@@ -174,7 +174,7 @@ def calculate_daily_bar_summary(instrument: Instrument, bars: list[Bar]) -> Dail
     trading value, so screens and strategies get the same value (ADR 0001)."""
     average_trading_value = AverageTradingValue(SUMMARY_BAR_COUNT)
     for bar in bars[-SUMMARY_BAR_COUNT:]:
-        average_trading_value.update(bar)
+        average_trading_value.handle_bar(make_nautilus_bar(bar))
     last_bar = bars[-1]
     return DailyBarSummary(
         instrument=instrument,

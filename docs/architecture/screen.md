@@ -273,8 +273,13 @@ problem `["name"]` with the reason "A screen with the name '<name>' exists.".
 The market is a problem `["market"]` when it is not `US` or `HK`.
 
 A condition or the order can hold a reference to a custom indicator
-(indicator.md section 23.10). One name with 2 expressions in one definition is
-a problem at the second reference.
+(indicator.md section 23.10).
+
+One column name means one reference. A result names its columns by the
+indicator name, and a name does not show each parameter: `bars_per_year` of
+realized volatility is not in the name (section 23.3). So 2 references in one
+definition with one name and different parameters or expressions are a problem
+at the second reference. A missing parameter counts as its default.
 
 ## 24.7 HTTP routes
 

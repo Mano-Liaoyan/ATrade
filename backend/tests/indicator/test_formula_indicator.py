@@ -13,7 +13,15 @@ from pathlib import Path
 import pytest
 
 from atrade.foundation.bar import Bar
-from atrade.indicator import INDICATOR_CATALOG, RSI, SMA, FormulaIndicator, check_expression, count_formula_bars
+from atrade.indicator import (
+    INDICATOR_CATALOG,
+    RSI,
+    SMA,
+    FormulaIndicator,
+    check_expression,
+    count_formula_bars,
+    make_nautilus_bar,
+)
 from tests.indicator.test_atrade_indicators import make_long_test_bars
 from tests.indicator.test_wrapped_indicators import (
     IndicatorCase,
@@ -32,7 +40,7 @@ def make_bar(close: float, *, index: int = 0) -> Bar:
 def calculate(expression: str, closes: list[float]) -> float | None:
     indicator = FormulaIndicator(expression)
     for index, close in enumerate(closes):
-        indicator.update(make_bar(close, index=index))
+        indicator.handle_bar(make_nautilus_bar(make_bar(close, index=index)))
     return indicator.value
 
 
@@ -70,9 +78,9 @@ def test_a_call_of_a_catalog_indicator_gives_the_value_of_its_class() -> None:
     formula = FormulaIndicator("sma(10) + rsi(period=14)")
     for index, close in enumerate(closes):
         bar = make_bar(close, index=index)
-        sma.update(bar)
-        rsi.update(bar)
-        formula.update(bar)
+        sma.handle_bar(make_nautilus_bar(bar))
+        rsi.handle_bar(make_nautilus_bar(bar))
+        formula.handle_bar(make_nautilus_bar(bar))
     assert sma.value is not None
     assert rsi.value is not None
     assert formula.value == pytest.approx(sma.value + rsi.value)
@@ -103,10 +111,10 @@ def test_gives_no_value(expression: str, closes: list[float]) -> None:
 
 def test_infinity_gives_no_value_and_a_later_bar_gives_a_value_again() -> None:
     indicator = FormulaIndicator("1 / (close - 3)")
-    indicator.update(make_bar(3, index=0))
+    indicator.handle_bar(make_nautilus_bar(make_bar(3, index=0)))
     assert indicator.value is None
     assert indicator.initialized is False
-    indicator.update(make_bar(4, index=1))
+    indicator.handle_bar(make_nautilus_bar(make_bar(4, index=1)))
     assert indicator.value == 1.0
     assert indicator.initialized is True
 
@@ -123,7 +131,7 @@ def test_a_window_with_no_value_gives_no_value_until_the_bar_leaves_the_window()
     indicator = FormulaIndicator("mean(1 / (close - 3), 2)")
     values: list[float | None] = []
     for index, close in enumerate([4.0, 3.0, 4.0, 4.0]):
-        indicator.update(make_bar(close, index=index))
+        indicator.handle_bar(make_nautilus_bar(make_bar(close, index=index)))
         values.append(indicator.value)
     assert values == [None, None, None, 1.0]
 
@@ -134,11 +142,11 @@ def test_a_zero_price_in_a_catalog_class_gives_no_value() -> None:
 
 def test_reset_removes_the_bars() -> None:
     indicator = FormulaIndicator("mean(close, 2)")
-    indicator.update(make_bar(1, index=0))
-    indicator.update(make_bar(2, index=1))
+    indicator.handle_bar(make_nautilus_bar(make_bar(1, index=0)))
+    indicator.handle_bar(make_nautilus_bar(make_bar(2, index=1)))
     indicator.reset()
     assert indicator.value is None
-    indicator.update(make_bar(2, index=2))
+    indicator.handle_bar(make_nautilus_bar(make_bar(2, index=2)))
     assert indicator.value is None
 
 
@@ -350,7 +358,7 @@ def test_a_rolling_value_is_equal_to_the_function_of_the_full_window(
     closes[100] *= spike
     indicator = FormulaIndicator(f"{name}(close ** 4, {window})")
     for index, close in enumerate(closes):
-        indicator.update(make_bar(close, index=index))
+        indicator.handle_bar(make_nautilus_bar(make_bar(close, index=index)))
         if index + 1 < window:
             assert indicator.value is None
             continue
@@ -372,7 +380,7 @@ def test_a_rolling_value_has_no_value_until_the_no_value_leaves_the_window(
     indicator = FormulaIndicator(expression)
     values: list[float | None] = []
     for index, close in enumerate([3, 2, 2, 3, 3]):
-        indicator.update(make_bar(close, index=index))
+        indicator.handle_bar(make_nautilus_bar(make_bar(close, index=index)))
         values.append(indicator.value)
     assert values == expected
 
@@ -381,7 +389,7 @@ def test_a_rolling_sum_that_overflows_has_no_value_and_a_later_window_has_a_valu
     indicator = FormulaIndicator("sum(close * 1e308, 2)")
     values: list[float | None] = []
     for index, close in enumerate([1.5, 1.5, 0.001, 0.001]):
-        indicator.update(make_bar(close, index=index))
+        indicator.handle_bar(make_nautilus_bar(make_bar(close, index=index)))
         values.append(indicator.value)
     assert values[:2] == [None, None]
     assert values[3] == pytest.approx(2e305)
@@ -392,7 +400,7 @@ def test_a_long_rolling_standard_deviation_does_not_read_the_window_for_each_bar
     indicator = FormulaIndicator("std(close, 1000)")
     started = time.perf_counter()
     for bar in bars:
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
     assert indicator.value is not None
     assert time.perf_counter() - started < 2
 

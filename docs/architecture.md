@@ -2002,8 +2002,8 @@ option and records it in this document.
 - Decided (#161): the 7 wrapped indicators are the classes `SMA`, `EMA`,
   `ATR`, `RSI`, `MACD`, `BollingerBands`, and `DonchianChannel` of
   `atrade.indicator`. An output is `float | None` (None is "no value"). The
-  screen-path method is `update(bar)`: it makes a NautilusTrader bar from
-  the `foundation` bar and calls `handle_bar`. The defaults are in section
+  screen path makes a NautilusTrader bar from the `foundation` bar with
+  `make_nautilus_bar` and calls `handle_bar`. The defaults are in section
   23.2 of [`indicator.md`](architecture/indicator.md).
 - Decided (#162): the 4 indicators that ATrade writes are the classes
   `Momentum12_1`, `DistanceTo52WeekHigh`, `RealizedVolatility`, and

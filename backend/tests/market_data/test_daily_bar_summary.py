@@ -18,7 +18,7 @@ from atrade.app.web import create_web_app
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.settings import Settings
-from atrade.indicator import AverageTradingValue
+from atrade.indicator import AverageTradingValue, make_nautilus_bar
 from atrade.market_data import (
     BarRequest,
     DailyBarSummary,
@@ -173,7 +173,7 @@ async def test_the_average_trading_value_20_is_the_value_of_the_indicator_class(
     bars = create_varied_bars(25)
     indicator = AverageTradingValue(20)
     for bar in bars:
-        indicator.update(bar)
+        indicator.handle_bar(make_nautilus_bar(bar))
 
     await save_received_bars(database_url=database_url, bar_request=december_request(APPLE), bars=bars)
 

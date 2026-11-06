@@ -6,9 +6,7 @@ import statistics
 
 from nautilus_trader.model import Bar as NautilusBar
 
-from atrade.foundation.bar import Bar
 from atrade.indicator.bar_window import BarWindow
-from atrade.indicator.wrapped_indicator import make_nautilus_bar
 
 TRADING_DAYS_PER_YEAR = 252
 
@@ -42,9 +40,6 @@ class Momentum12_1:
     def handle_bar(self, bar: NautilusBar) -> None:
         self._window.add(bar)
 
-    def update(self, bar: Bar) -> None:
-        self._window.add(make_nautilus_bar(bar))
-
     def reset(self) -> None:
         self._window.clear()
 
@@ -67,9 +62,6 @@ class DistanceTo52WeekHigh:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._window.add(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._window.add(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._window.clear()
@@ -107,9 +99,6 @@ class RealizedVolatility:
     def handle_bar(self, bar: NautilusBar) -> None:
         self._window.add(bar)
 
-    def update(self, bar: Bar) -> None:
-        self._window.add(make_nautilus_bar(bar))
-
     def reset(self) -> None:
         self._window.clear()
 
@@ -132,9 +121,6 @@ class AverageTradingValue:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._window.add(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._window.add(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._window.clear()
@@ -162,9 +148,6 @@ class ADRPercent:
 
     def handle_bar(self, bar: NautilusBar) -> None:
         self._window.add(bar)
-
-    def update(self, bar: Bar) -> None:
-        self._window.add(make_nautilus_bar(bar))
 
     def reset(self) -> None:
         self._window.clear()
