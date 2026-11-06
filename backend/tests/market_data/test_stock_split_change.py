@@ -41,6 +41,7 @@ from tests.backtest.real_runner import (
 )
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import FakeGatewayConnection
+from tests.market_data.test_daily_bar_summary import save_source_bars, set_source_order
 
 BARS_PATH = "/api/market-data/bars"
 BTEST = Instrument(symbol="BTEST", exchange="ARCA", currency="USD")
@@ -450,17 +451,19 @@ async def test_a_failed_read_of_the_stored_day_does_not_stop_the_read_of_the_mis
     assert await read_stock_split_candidates(database_url=database_url) == []
 
 
-async def insert_stock_split(database_url: str, ex_date_utc: datetime, confirmation: str | None) -> None:
-    """A `stock_split` row that the bars do not follow: a waiting or rejected stock split changes no bar."""
+async def insert_stock_split(
+    database_url: str, ex_date_utc: datetime, confirmation: str | None, split_ratio: int = 2
+) -> None:
+    """A `stock_split` row from the Databento import or the IBKR stock split check. It does not change the bars."""
     async with await psycopg.AsyncConnection.connect(database_url) as connection:
         await connection.execute(
             """
             INSERT INTO stock_split (
                 symbol, exchange, currency, ex_date_utc, split_ratio, source, confirmation, recorded_at_utc
             )
-            VALUES ('AAPL', 'NASDAQ', 'USD', %s, 2, 'databento_import', %s, %s)
+            VALUES ('AAPL', 'NASDAQ', 'USD', %s, %s, 'databento_import', %s, %s)
             """,
-            (ex_date_utc, confirmation, RECORDED_AT_UTC),
+            (ex_date_utc, split_ratio, confirmation, RECORDED_AT_UTC),
         )
 
 
@@ -512,5 +515,20 @@ async def test_a_stock_split_that_changed_no_bar_does_not_change_the_close_of_a_
 ) -> None:
     await save_stored_week(database_url)
     await insert_stock_split(database_url, EX_DATE_UTC, confirmation)
+
+    assert await read_close_before(database_url, EX_DATE_UTC) == Decimal(120)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("bar_sources", [["ibkr", "databento"], ["databento", "ibkr"]])
+async def test_the_ibkr_stock_split_check_changes_only_the_close_of_a_summary_with_a_databento_last_bar(
+    database_url: str, bar_sources: list[str]
+) -> None:
+    """The IBKR bars were read before the ex-date and hold the real close 120. The check divided only the Databento
+    bars by 10 and wrote `bar_evidence` (section 8.8.3.1), and no IBKR read followed, so no evidence A row exists."""
+    await save_stored_week(database_url)
+    save_source_bars(database_url, "databento", APPLE, STORED_RANGE, [22, 23], Decimal(12))
+    set_source_order(database_url, bar_sources)
+    await insert_stock_split(database_url, EX_DATE_UTC, "bar_evidence", 10)
 
     assert await read_close_before(database_url, EX_DATE_UTC) == Decimal(120)

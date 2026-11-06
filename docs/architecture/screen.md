@@ -396,10 +396,14 @@ kinds:
   that date. The filters do not change:
   - `last_price` is the real close of that date. The summary multiplies the
     stored close by the split ratio of each confirmed stock split with a
-    later ex-date (market_data.md section 8.11).
+    later ex-date that changed the bar table of the last bar (market_data.md
+    section 8.11).
   - `average_trading_value_20` uses close × volume. A stock split does not
     change this value.
   - `still_trading` and `exchange` use no price.
+- Limit: the summary does not multiply an IBKR close for a stock split of
+  the IBKR stock split check. The bar does not show if IBKR adjusted it. When
+  IBKR adjusted the bar, a later stock split changes `last_price`.
 - Limit: the indicator values of a point-in-time run stay adjusted for all
   confirmed stock splits. A later stock split can change a `compare` or
   `rank` condition on an absolute-price indicator, for example ATR compared
