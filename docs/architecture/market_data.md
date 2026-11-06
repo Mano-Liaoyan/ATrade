@@ -292,8 +292,8 @@ Source: [Live bars on the chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
 - The generator raises `GatewayRequestError` when the request fails or when
   the connection or the IBKR link is lost (checked each second while no
   update comes). A subscription without an answer before the historical data
-  timeout (60 seconds) also fails and marks the IBKR link as lost, because
-  ib_async then cancels the request and no update comes. When
+  timeout (60 seconds) also fails, because ib_async then cancels the request
+  and no update comes. That failure does not mark the IBKR link as lost. When
   the generator closes, it cancels the IBKR subscription
   (`cancelHistoricalData`). Use `contextlib.aclosing`.
 - The live bars of `/ws/market-data` are not saved in PostgreSQL. The bars

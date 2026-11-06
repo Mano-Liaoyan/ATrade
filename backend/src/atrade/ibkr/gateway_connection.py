@@ -597,9 +597,9 @@ class IbAsyncGatewayConnection:
             raise GatewayRequestError(str(error)) from error
         # After a timeout, ib_async cancels the request and returns an empty list, but it keeps the subscriber. No
         # update comes for that list, so the stream must fail and the caller must subscribe again.
+        # One instrument can have no answer, so this does not mark the IBKR link as lost.
         if not bars_data and loop.time() - started_at >= HISTORICAL_DATA_TIMEOUT_SECONDS:
             self.ib.cancelHistoricalData(bars_data)
-            self.mark_ibkr_link_lost("a live bar subscription got no answer in time")
             message = "IB Gateway did not answer the live bar subscription in time."
             raise GatewayRequestError(message)
         return bars_data

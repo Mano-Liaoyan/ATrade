@@ -71,7 +71,9 @@ The public entry `atrade.ibkr` exports:
   (section 7.4). Each request then waits for its timeout. The connection
   thus keeps an IBKR link state:
   - Lost: IB Gateway sends code `1100` or `2110`, or a historical data
-    request or a live bar subscription gets no answer before its timeout.
+    request gets no answer before its timeout. A live bar subscription
+    without an answer does not change the state, because one instrument can
+    have no answer.
   - Restored: IB Gateway sends code `1101` or `1102`, or a historical data
     request gets an answer. An IBKR API error is also an answer.
   - A new API connection starts with the link restored.

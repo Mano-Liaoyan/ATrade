@@ -336,14 +336,16 @@ async def test_an_error_in_a_comparison_writes_a_log_and_does_not_end_the_compar
     monkeypatch.setattr("atrade.forward_test.forward_test_worker.COMPARE_INTERVAL_SECONDS", 0.01)
     forward_test = await start_forward_test(web_client)
     child_starter = FakeChildStarter()
+    worker = make_worker(database_url, clock, child_starter)
+    compare_states = worker.compare_states
     errors = [ValueError("unexpected")]
 
-    async def start_child_after_one_error(forward_test_id: int, mode: ChildMode) -> ForwardTestChild:
+    async def compare_states_after_one_error() -> None:
         if errors:
             raise errors.pop()
-        return await child_starter.start_child(forward_test_id, mode)
+        await compare_states()
 
-    worker = ForwardTestWorker(database_url=database_url, clock=clock, start_child=start_child_after_one_error)
+    monkeypatch.setattr(worker, "compare_states", compare_states_after_one_error)
     with caplog.at_level(logging.ERROR):
         comparison_task = asyncio.create_task(worker.keep_comparing())
         with anyio.fail_after(10):
@@ -356,6 +358,35 @@ async def test_an_error_in_a_comparison_writes_a_log_and_does_not_end_the_compar
     comparison_task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await comparison_task
+
+
+@pytest.mark.anyio
+async def test_a_failing_row_does_not_block_the_next_row_and_writes_one_log_for_each_error(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, caplog: pytest.LogCaptureFixture
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    for symbol in ["AAPL", "MSFT"]:
+        await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id, symbol=symbol))
+    [healthy, failing] = (await web_client.get(FORWARD_TESTS_PATH)).json()
+    child_starter = FakeChildStarter()
+    error_text = "first error"
+
+    async def start_child_with_failing_row(forward_test_id: int, mode: ChildMode) -> ForwardTestChild:
+        if forward_test_id == failing["id"]:
+            raise ValueError(error_text)
+        return await child_starter.start_child(forward_test_id, mode)
+
+    worker = ForwardTestWorker(database_url=database_url, clock=clock, start_child=start_child_with_failing_row)
+
+    with caplog.at_level(logging.ERROR):
+        await worker.compare_states()
+        await worker.compare_states()
+        assert len(caplog.records) == 1
+        error_text = "second error"
+        await worker.compare_states()
+
+    assert len(caplog.records) == 2
+    assert child_starter.read_started() == [(healthy["id"], "run")]
 
 
 def read_owner_sums(database_url: str) -> list[tuple[object, ...]]:

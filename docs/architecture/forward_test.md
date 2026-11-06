@@ -729,7 +729,8 @@ and the status codes of the new refusals are choices of this document.
 
 An error in a comparison goes to the log, and the next comparison tries
 again. The error does not end the worker process, because that end stops all
-children without their stop steps.
+children without their stop steps. An error in one row does not stop the
+comparison of the other rows. A row writes one log for each new error.
 
 Each comparison reads the rows that are not done. A row is done when it is
 `stopped`, or `failed` without a client ID. For each row:

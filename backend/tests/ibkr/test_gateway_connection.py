@@ -216,7 +216,7 @@ async def read_live_bars_until_end(connection: IbAsyncGatewayConnection, *, is_l
 
 
 @pytest.mark.anyio
-async def test_a_timed_out_live_bar_subscription_raises_and_marks_the_link_lost(
+async def test_a_timed_out_live_bar_subscription_raises_and_keeps_the_ibkr_link(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     connection, live_bar_gateway = make_live_bar_connection(monkeypatch)
@@ -225,7 +225,7 @@ async def test_a_timed_out_live_bar_subscription_raises_and_marks_the_link_lost(
     with pytest.raises(GatewayRequestError, match="in time"):
         await read_live_bars_until_end(connection)
 
-    assert connection.read_status() == "no_ibkr_connection"
+    assert connection.read_status() == "connected"
     assert live_bar_gateway.cancel_count == 1
 
 
@@ -258,7 +258,6 @@ async def test_the_hub_gets_a_live_bar_again_after_a_silent_subscription_and_a_l
         assert hub.read_bar(AAPL) is None
 
         live_bar_gateway.answers = True
-        connection.mark_ibkr_link_restored()
         await wait_for_live_bar(is_there=True)
 
         connection.mark_ibkr_link_lost("test")
