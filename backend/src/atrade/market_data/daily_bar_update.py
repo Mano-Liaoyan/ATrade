@@ -4,7 +4,8 @@ At 21:00 ET of each US trading day, the update reads the daily bars of the curre
 instrument list, and the watchlist from IBKR into ibkr_bar, and updates the daily bar summary. 21:00 ET is after the
 US close and after the Hong Kong close of the same day. It is also after 00:00 UTC of the next day in all seasons, so
 the read range holds the daily bar of the day. When IB Gateway is not reachable, the update does not run that day.
-After a start, the update waits for the first connection of the process.
+After a start, the update waits for the first connection of the process. An update that stops on a lost connection
+runs again in a later minute of the day, after the connection returns.
 """
 
 import asyncio
@@ -30,6 +31,8 @@ logger = logging.getLogger(__name__)
 NEW_YORK = ZoneInfo("America/New_York")
 UPDATE_TIME_ET = time(21, 0)
 CHECK_INTERVAL_SECONDS = 60.0
+# After a lost IBKR link, the link check runs within 70 seconds (ibkr/gateway_connection.py).
+IBKR_LINK_WAIT_SECONDS = 75.0
 # An instrument without IBKR daily bars gets the daily bars of 1 year, the warm-up of section 8.12.
 FIRST_READ_LENGTH = timedelta(days=366)
 
@@ -51,6 +54,7 @@ class DailyBarUpdate:
         self.read_watchlist_instruments = read_watchlist_instruments
         self.last_update_day: date | None = None
         self.waiting_day: date | None = None
+        self.stopped_day: date | None = None
 
     async def keep_updating(self) -> None:
         """Runs until the caller cancels it. An error is logged, and the update runs again on the next trading day."""
@@ -79,11 +83,16 @@ class DailyBarUpdate:
                 self.waiting_day = due_day
                 logger.warning("The daily bar update of %s waits for the first connection to IB Gateway.", due_day)
             return False
+        is_connected = self.gateway_connection.is_connected()
+        if not is_connected and due_day == self.stopped_day:
+            return False
         self.last_update_day = due_day
-        if not self.gateway_connection.is_connected():
+        if not is_connected:
             logger.warning("IB Gateway is not reachable. The daily bar update of %s does not run.", due_day)
             return False
-        await self.update(due_day)
+        if not await self.update(due_day):
+            self.stopped_day = due_day
+            self.last_update_day = None
         return True
 
     async def read_update_instruments(self, connection: psycopg.AsyncConnection) -> list[Instrument]:
@@ -127,7 +136,15 @@ class DailyBarUpdate:
         if stored_bars:
             await record_evidence(connection, instrument, stored_bars[-1], ibkr_bars, self.clock.read_now_utc())
 
-    async def update(self, day: date) -> None:
+    async def wait_for_connection(self) -> bool:
+        """After a timeout, requests fail at once until the IBKR link check gets an answer. False when it gets none."""
+        if not self.gateway_connection.is_connected():
+            await asyncio.sleep(IBKR_LINK_WAIT_SECONDS)
+        return self.gateway_connection.is_connected()
+
+    async def update(self, day: date) -> bool:
+        """Returns False when a lost connection stopped the update. The instruments before the stop stay updated."""
+        is_complete = True
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             instruments = await self.read_update_instruments(connection)
             updated_instruments: list[Instrument] = []
@@ -139,7 +156,11 @@ class DailyBarUpdate:
                     bars = await self.gateway_connection.read_historical_bars(instrument, BarPeriod.ONE_DAY, time_range)
                 except GatewayRequestError:
                     logger.exception("The daily bar update did not read the daily bars of %s.", instrument)
-                    continue
+                    if await self.wait_for_connection():
+                        continue
+                    logger.warning("IB Gateway is not reachable. The daily bar update of %s stops.", day)
+                    is_complete = False
+                    break
                 await self.record_evidence_a(connection, instrument, bars)
                 stored_form_bars = await to_stored_form(connection, instrument, bars)
                 await bar_store.save_bars_of_range(
@@ -148,3 +169,4 @@ class DailyBarUpdate:
                 updated_instruments.append(instrument)
             await update_daily_bar_summaries(connection, updated_instruments)
         logger.info("The daily bar update of %s saved the daily bars of %d instruments.", day, len(updated_instruments))
+        return is_complete

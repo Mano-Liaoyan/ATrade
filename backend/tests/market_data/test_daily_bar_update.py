@@ -10,10 +10,12 @@ import pytest
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
+from atrade.ibkr import GatewayRequestError
 from atrade.market_data import (
     BarRequest,
     BarSource,
     DailyBarUpdate,
+    daily_bar_update,
     read_daily_bar_summaries,
     read_saved_bars,
     read_stock_split_candidates,
@@ -34,6 +36,35 @@ DECEMBER_3_UTC = datetime(2025, 12, 3, tzinfo=UTC)
 DECEMBER_2_UTC = datetime(2025, 12, 2, tzinfo=UTC)
 # The first trading day of the fourth quarter of 2025.
 QUARTER_START_UTC = datetime(2025, 10, 1, tzinfo=UTC)
+
+
+class LinkLossGateway(FakeGatewayConnection):
+    """The first read times out and loses the IBKR link. Like the real connection, each read then fails at once."""
+
+    def __init__(self, *, link_returns_in_the_wait: bool) -> None:
+        super().__init__(managed_accounts=["DU1234567"])
+        self.connected = True
+        self.link_returns_in_the_wait = link_returns_in_the_wait
+        self.timeout_count = 0
+
+    def is_connected(self) -> bool:
+        connected = super().is_connected()
+        if not connected and self.link_returns_in_the_wait:
+            self.has_ibkr_connection = True
+        return connected
+
+    async def read_historical_bars(
+        self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
+    ) -> list[Bar]:
+        if self.timeout_count == 0:
+            self.timeout_count = 1
+            self.has_ibkr_connection = False
+            message = "IB Gateway did not answer the historical data request in time."
+            raise GatewayRequestError(message)
+        if not self.has_ibkr_connection:
+            message = "IB Gateway has no connection to IBKR."
+            raise GatewayRequestError(message)
+        return await super().read_historical_bars(instrument, bar_period, time_range)
 
 
 def save_update_instruments(database_url: str) -> None:
@@ -208,6 +239,40 @@ async def test_a_failed_read_of_one_instrument_does_not_stop_the_update(
 
     assert len(gateway_connection.historical_bar_requests) == 3
     assert await read_daily_bar_summaries(database_url=database_url, instruments=[APPLE, TENCENT, TESLA]) == []
+
+
+@pytest.mark.anyio
+async def test_a_lost_ibkr_link_stops_the_update_and_a_later_minute_runs_it_again(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(daily_bar_update, "IBKR_LINK_WAIT_SECONDS", 0)
+    save_update_instruments(database_url)
+    gateway_connection = LinkLossGateway(link_returns_in_the_wait=False)
+    update = create_update(database_url, gateway_connection, AFTER_CLOSE_UTC)
+
+    assert await update.update_if_due() is True
+    assert await update.update_if_due() is False
+
+    gateway_connection.has_ibkr_connection = True
+    assert await update.update_if_due() is True
+    assert await update.update_if_due() is False
+    summaries = await read_daily_bar_summaries(database_url=database_url, instruments=[APPLE, TENCENT, TESLA])
+    assert len(summaries) == 3
+
+
+@pytest.mark.anyio
+async def test_the_update_continues_when_the_ibkr_link_returns_in_the_wait(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(daily_bar_update, "IBKR_LINK_WAIT_SECONDS", 0)
+    save_update_instruments(database_url)
+    gateway_connection = LinkLossGateway(link_returns_in_the_wait=True)
+    update = create_update(database_url, gateway_connection, AFTER_CLOSE_UTC)
+
+    assert await update.update_if_due() is True
+
+    assert await update.update_if_due() is False
+    assert len(gateway_connection.historical_bar_requests) == 2
 
 
 @pytest.mark.anyio

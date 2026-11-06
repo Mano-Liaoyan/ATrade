@@ -982,6 +982,11 @@ Phase 3. Sources:
   screen page shows the last daily bar date, so the user sees old data.
   After a start of the `web` process, the update first waits for the first
   connection, because the process starts without IB Gateway.
+- After a failed read, the update checks the connection. When the connection
+  is lost, the update waits 75 seconds for the IBKR link check. When the
+  connection is still lost, the update stops, and the day stays due. The
+  check of each minute runs the update again after the connection returns,
+  until the end of the New York day.
 - Each read of bars from IBKR also reads 1 stored daily bar again (stock
   split evidence, section 8.13).
 
