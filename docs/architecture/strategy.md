@@ -520,6 +520,15 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
   The bar of the entry order is bar 0. The exit is true on bar N.
 - The percent of equity uses the account balance total in the account
   currency at the entry bar.
+- Generated code and the code templates M1 to M4 find the account with
+  `atrade.strategy.find_account`. A backtest has its account on the venue of
+  the instruments (ADR 0003). A forward test has 1 account on the venue
+  `ATRADE` (ADR 0007).
+- A saved strategy version keeps its code (ADR 0006). In a forward test, a
+  version with `self.portfolio.account(` in its code finds no account and
+  never buys. Such a version needs a new version. To make it, save the rules
+  again or start from the code template again. Code that a user wrote must
+  use `atrade.strategy.find_account`.
 
 ### 9.8.3 Code from the rules
 

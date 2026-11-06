@@ -62,10 +62,9 @@ from atrade.ibkr import Execution, GatewayRequestError, OpenOrder, OrderRequest
 from atrade.ibkr import OrderSide as IbkrOrderSide
 from atrade.ibkr import OrderType as IbkrOrderType
 from atrade.ibkr import TimeInForce as IbkrTimeInForce
+from atrade.strategy import FORWARD_TEST_VENUE
 
 OWNER_LEDGER_EXECUTION_CLIENT_NAME = "ATRADE_OWNER_LEDGER"
-# The client handles the orders of all venues (primary exchanges) of the forward test.
-EXECUTION_VENUE = Venue("ATRADE")
 ACCOUNT_CURRENCY = "USD"
 DEFAULT_FILL_CHECK_INTERVAL_SECONDS = 1.0
 NANOSECONDS_PER_SECOND = 1_000_000_000
@@ -137,7 +136,8 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             cache=cache,
             clock=clock,
             trader_id=trader_id,
-            venue=EXECUTION_VENUE,
+            # The client handles the orders of all venues (primary exchanges) of the forward test.
+            venue=FORWARD_TEST_VENUE,
             # The account of the strategy is the owner, not the IBKR account (section 12.18).
             account_id=AccountId(f"ATRADE-FT{ledger_input.forward_test_id}"),
             account_type=AccountType.CASH,

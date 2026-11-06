@@ -39,6 +39,8 @@ from nautilus_trader.config import StrategyConfig
 from nautilus_trader.model import Bar, BarType, DataType, InstrumentId, OrderSide, Quantity, Venue
 from nautilus_trader.trading import Strategy
 
+import atrade.strategy
+
 HOLD_COUNT = 50
 LOOK_BACK_BARS = 252
 SKIP_BARS = 21
@@ -147,7 +149,7 @@ class RankedUniverseStrategy(Strategy):
             self.highs[instrument].append(bar.high.as_double())
 
     def find_cash(self) -> float:
-        account = None if self.venue is None else self.portfolio.account(self.venue)
+        account = None if self.venue is None else atrade.strategy.find_account(self, self.venue)
         balance = None if account is None else account.balance_total()
         return 0.0 if balance is None else balance.as_double()
 
