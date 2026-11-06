@@ -37,6 +37,8 @@ async function findBacktestId(request: APIRequestContext, symbol: string): Promi
 
 test('starts a backtest with a changed source order and sees the bar count of each bar source', async ({ page, request }, currentTest) => {
   test.setTimeout(BACKTEST_TIMEOUT_MILLISECONDS * 2);
+  // settings.spec changes the global source order while this test runs, so the test gives the start value of the form.
+  await page.route('**/api/market-data/source-order', (route) => route.fulfill({ json: { source_order: ['ibkr', 'databento'] } }));
   await saveAppleBars(page, request);
   // The e2e database is not cleared between tests and browser projects, so the strategy name is unique.
   const strategyName = `Bar sources ${currentTest.project.name} ${String(Date.now())}`;
@@ -58,11 +60,13 @@ test('starts a backtest with a changed source order and sees the bar count of ea
   await page.getByRole('option', { name: 'AAPL / NASDAQ / USD', exact: true }).click();
   await dialog.getByLabel('Start date (UTC)').fill('2025-01-01');
   await dialog.getByLabel('End date (UTC)').fill('2025-01-11');
+  // The address has the newest backtest of the list until the page opens the started one, so the id comes from the answer.
+  const startResponse = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().endsWith('/api/backtests'));
   await dialog.getByRole('button', { name: 'Start backtest' }).click();
 
+  const backtestId = String(((await (await startResponse).json()) as { id: number }).id);
   await expect(page.getByRole('dialog', { name: 'New backtest' })).toHaveCount(0);
-  await expect(page).toHaveURL(/\/backtests\/\d+$/);
-  const backtestId = page.url().split('/').at(-1) ?? '';
+  await expect(page).toHaveURL(new RegExp(`/backtests/${backtestId}$`));
   const chartPanel = page.getByRole('region', { name: `Backtest #${backtestId}` });
   await expect(chartPanel.getByRole('status', { name: 'Backtest status' }).getByRole('img', { name: 'Finished' })).toBeVisible({
     timeout: BACKTEST_TIMEOUT_MILLISECONDS,

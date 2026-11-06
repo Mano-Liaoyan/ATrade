@@ -254,12 +254,13 @@ async def test_the_import_records_no_second_row_for_a_stock_split_that_is_applie
     )
     other_bars = create_bars("OTHR", TRADING_DAYS, [("10", "10", 500)] * len(TRADING_DAYS))
 
-    import_databento_files(
+    report = import_databento_files(
         database_url=database_url, file_paths=write_dbn_files(tmp_path, create_history_files([*gone_bars, *other_bars]))
     )
 
     new_rows = [row for row in read_table(database_url, STOCK_SPLIT_QUERY) if row[5] == "databento_import"]
     assert len(new_rows) == expected_new_rows
+    assert len(report.stock_splits) == expected_new_rows
 
 
 @pytest.mark.anyio

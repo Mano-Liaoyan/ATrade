@@ -82,7 +82,7 @@ def log_report(report: DatabentoImportReport) -> None:
     )
     waiting_count = sum(1 for split in report.stock_splits if split.confirmation is None)
     logger.info(
-        "Found %d stock splits. %d of them wait for the check. Found %d symbol links.",
+        "Recorded %d new stock splits. %d of them wait for the check. Found %d symbol links.",
         len(report.stock_splits),
         waiting_count,
         len(report.symbol_links),

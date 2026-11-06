@@ -154,7 +154,9 @@
 
   // A deleted open backtest: /backtests opens the newest backtest that is left.
   function removeDeletedBacktests(deletedIds: number[]): void {
-    workbench.items = workbench.items.filter((item) => !deletedIds.includes(item.id));
+    for (const id of deletedIds) {
+      workbench.removeItem(id);
+    }
     if (backtestId !== null && deletedIds.includes(backtestId)) {
       void goto(resolve('/backtests/[[backtestId]]', { backtestId: undefined }), { replace: true });
     }

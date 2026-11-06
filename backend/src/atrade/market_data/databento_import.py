@@ -75,7 +75,8 @@ class DatabentoImportReport:
     `statistics` of XNAS.ITCH or XNYS.PILLAR. The import saves no bar for them (#141).
     `symbols_without_listing_exchange`: EQUS.SUMMARY symbols without an earlier Databento daily bar. The import does
     not know their listing exchange and saves no bar for them.
-    `stock_splits` and `symbol_links`: what the import found (sections 8.8.3 and 8.8.4).
+    `stock_splits`: the stock splits that got a new row (section 8.8.3). A stock split with a row already is not here.
+    `symbol_links`: what the import found (section 8.8.4).
     `split_check_instrument_count`: the instruments that still trade. They wait for the IBKR stock split check.
     `symbols_without_daily_bar`: symbols with hourly bars of a universe quarter on a day without a Databento daily
     bar. The import does not know their official open and saves no hourly bar of that day.

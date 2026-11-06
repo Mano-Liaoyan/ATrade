@@ -6,7 +6,7 @@ in databento_bar.
 """
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from itertools import groupby
@@ -107,23 +107,25 @@ def detect_stock_splits(
     return FoundImportSplits(splits=splits, still_trading_instruments=still_trading_instruments)
 
 
-def record_stock_splits(connection: psycopg.Connection, splits: list[DetectedSplit]) -> None:
-    """A stock split that is in `stock_split` already keeps its row, also its confirmation by the user."""
-    with connection.cursor() as cursor:
-        cursor.executemany(
+def record_stock_splits(connection: psycopg.Connection, splits: list[DetectedSplit]) -> list[DetectedSplit]:
+    """Returns the stock splits that got a new row. A stock split that is in `stock_split` already keeps its row, also
+    its confirmation by the user."""
+    inserted_splits: list[DetectedSplit] = []
+    for split in splits:
+        inserted = connection.execute(
             databento_import_sql.INSERT_STOCK_SPLIT,
-            [
-                {
-                    "symbol": split.instrument.symbol,
-                    "exchange": split.instrument.exchange,
-                    "currency": split.instrument.currency,
-                    "ex_date_utc": to_utc_day(split.ex_date),
-                    "split_ratio": split.split_ratio,
-                    "confirmation": split.confirmation,
-                }
-                for split in splits
-            ],
+            {
+                "symbol": split.instrument.symbol,
+                "exchange": split.instrument.exchange,
+                "currency": split.instrument.currency,
+                "ex_date_utc": to_utc_day(split.ex_date),
+                "split_ratio": split.split_ratio,
+                "confirmation": split.confirmation,
+            },
         )
+        if inserted.rowcount == 1:
+            inserted_splits.append(split)
+    return inserted_splits
 
 
 def adjust_import_bars(connection: psycopg.Connection) -> None:
@@ -147,14 +149,15 @@ def link_and_detect_splits(
     connection: psycopg.Connection, still_trading_rule: StillTradingSplitRule
 ) -> tuple[list[SymbolLink], FoundImportSplits]:
     """Links the symbols, records the stock splits of the daily bars, and records the instruments for the IBKR stock
-    split check. `adjust_import_bars` then changes the bars with the confirmed stock splits."""
+    split check. `adjust_import_bars` then changes the bars with the confirmed stock splits. The result has only the
+    stock splits that got a new row."""
     links = link_symbols(connection)
     last_row = connection.execute(databento_import_sql.SELECT_LAST_IMPORT_DAY).fetchone()
     if last_row is None or last_row[0] is None:
         return links, FoundImportSplits(splits=[], still_trading_instruments=[])
     last_day: date = last_row[0].date()
     found_splits = detect_stock_splits(connection, still_trading_rule, last_day)
-    record_stock_splits(connection, found_splits.splits)
+    inserted_splits = record_stock_splits(connection, found_splits.splits)
     check_end_utc = to_utc_day(last_day + timedelta(days=1))
     record_split_checks(connection, found_splits.still_trading_instruments, check_end_utc)
-    return links, found_splits
+    return links, replace(found_splits, splits=inserted_splits)

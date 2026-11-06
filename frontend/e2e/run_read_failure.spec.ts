@@ -124,3 +124,40 @@ test('a list read from before the delete does not open the deleted parameter swe
   await expect(page.getByRole('main').getByText('No parameter sweeps', { exact: true })).toBeVisible();
   await expect(page).toHaveURL(/\/sweeps$/);
 });
+
+test('a list read from before the delete does not open the deleted backtest', async ({ page }) => {
+  let socket: WebSocketRoute | undefined;
+  let isListReadHeld = false;
+  let finishListRead = (): void => undefined;
+  const listRead = new Promise<void>((resolve) => {
+    finishListRead = resolve;
+  });
+  await page.routeWebSocket(/\/ws\/backtests$/, (route) => {
+    socket = route;
+  });
+  await page.route('**/api/backtests', async (route) => {
+    if (isListReadHeld) {
+      await listRead;
+    }
+    await route.fulfill({ json: [{ id: 9303, strategy_name: 'Fake', version_number: 1, status: 'finished', symbol: 'FAKE', metrics: null }] });
+  });
+  await page.route('**/api/backtests/9303', (route) =>
+    route.request().method() === 'DELETE' ? route.fulfill({ status: 204 }) : route.fulfill({ status: 500, json: { detail: 'Detail read failed' } }),
+  );
+  await page.goto('/backtests/9303');
+
+  const list = page.getByRole('complementary', { name: 'Backtests', exact: true });
+  await list.getByRole('checkbox', { name: 'Select backtest #9303', exact: true }).check();
+  await expect.poll(() => socket).toBeDefined();
+  isListReadHeld = true;
+  const heldListRead = page.waitForRequest('**/api/backtests');
+  socket?.send(JSON.stringify({ type: 'changed' }));
+  await heldListRead;
+  await list.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete backtest', exact: true }).click();
+  await expect(page).toHaveURL(/\/backtests$/);
+  finishListRead();
+
+  await expect(page.getByRole('main').getByText('No backtests', { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/backtests$/);
+});
