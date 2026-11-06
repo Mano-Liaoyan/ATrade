@@ -85,9 +85,11 @@ SELECT_SYMBOLS_WITHOUT_OFFICIAL_CLOSE: LiteralString = """
 """
 
 # The listing exchange of a symbol from 2024-07-01 is the exchange of its latest Databento daily bar before the
-# EQUS.SUMMARY range. The purchase has no statistics from that day (docs/architecture.md section 22).
+# EQUS.SUMMARY range. The purchase has no statistics from that day (docs/architecture.md section 22). A symbol without
+# such a bar that follows an old symbol by rules 1 and 2 of section 8.8.4 is a rename: it has the exchange of the old
+# symbol. A symbol with more than 1 candidate gets no exchange.
 SUMMARY_LISTING: LiteralString = """
-    WITH summary_listing AS (
+    WITH earlier_listing AS (
         SELECT DISTINCT ON (symbol) symbol, exchange
         FROM (
             SELECT symbol, exchange, currency, bar_period, start_utc FROM databento_bar
@@ -96,6 +98,32 @@ SUMMARY_LISTING: LiteralString = """
         ) AS earlier_bar
         WHERE currency = 'USD' AND bar_period = '1-DAY' AND start_utc < %(start_utc)s
         ORDER BY symbol, start_utc DESC
+    ), summary AS (
+        SELECT * FROM databento_daily_record
+        WHERE dataset = 'EQUS.SUMMARY'
+            AND trading_day::timestamp AT TIME ZONE 'UTC' >= %(start_utc)s
+            AND trading_day::timestamp AT TIME ZONE 'UTC' < %(end_utc)s
+    ), summary_day AS (
+        SELECT trading_day, lead(trading_day) OVER (ORDER BY trading_day) AS next_day
+        FROM (SELECT DISTINCT trading_day FROM summary) AS day
+    ), last_day AS (
+        SELECT DISTINCT ON (symbol) symbol, trading_day, close FROM summary ORDER BY symbol, trading_day DESC
+    ), first_day AS (
+        SELECT DISTINCT ON (symbol) symbol, trading_day, open FROM summary ORDER BY symbol, trading_day
+    ), renamed AS (
+        SELECT last_day.symbol AS old_symbol, first_day.symbol AS new_symbol, earlier_listing.exchange
+        FROM last_day
+            JOIN summary_day USING (trading_day)
+            JOIN first_day ON first_day.trading_day = summary_day.next_day
+            JOIN earlier_listing ON earlier_listing.symbol = last_day.symbol
+        WHERE first_day.symbol NOT IN (SELECT symbol FROM earlier_listing) AND last_day.close > 0
+            AND abs(first_day.open / last_day.close - 1) <= 0.01
+    ), summary_listing AS (
+        SELECT symbol, exchange FROM earlier_listing
+        UNION ALL
+        SELECT new_symbol, exchange FROM renamed
+        WHERE old_symbol NOT IN (SELECT old_symbol FROM renamed GROUP BY old_symbol HAVING count(*) > 1)
+            AND new_symbol NOT IN (SELECT new_symbol FROM renamed GROUP BY new_symbol HAVING count(*) > 1)
     )
 """
 
@@ -105,10 +133,7 @@ INSERT_SUMMARY_BARS: LiteralString = (
     INSERT INTO databento_import_bar (symbol, exchange, currency, bar_period, start_utc, open, high, low, close, volume)
     SELECT summary.symbol, summary_listing.exchange, 'USD', '1-DAY', summary.trading_day::timestamp AT TIME ZONE 'UTC',
         summary.open, summary.high, summary.low, summary.close, summary.volume
-    FROM databento_daily_record AS summary JOIN summary_listing USING (symbol)
-    WHERE summary.dataset = 'EQUS.SUMMARY'
-        AND summary.trading_day::timestamp AT TIME ZONE 'UTC' >= %(start_utc)s
-        AND summary.trading_day::timestamp AT TIME ZONE 'UTC' < %(end_utc)s
+    FROM summary JOIN summary_listing USING (symbol)
     """
     + UPSERT_BARS
 )
@@ -116,12 +141,10 @@ INSERT_SUMMARY_BARS: LiteralString = (
 SELECT_SYMBOLS_WITHOUT_LISTING_EXCHANGE: LiteralString = (
     SUMMARY_LISTING
     + """
-    SELECT DISTINCT summary.symbol FROM databento_daily_record AS summary
-    WHERE summary.dataset = 'EQUS.SUMMARY'
-        AND summary.trading_day::timestamp AT TIME ZONE 'UTC' >= %(start_utc)s
-        AND summary.trading_day::timestamp AT TIME ZONE 'UTC' < %(end_utc)s
-        AND summary.symbol NOT IN (SELECT symbol FROM summary_listing)
-    ORDER BY summary.symbol
+    SELECT DISTINCT symbol FROM summary
+    WHERE symbol NOT IN (SELECT symbol FROM summary_listing)
+        AND symbol NOT IN (SELECT old_symbol FROM databento_symbol_link)
+    ORDER BY symbol
     """
 )
 
@@ -180,6 +203,30 @@ MOVE_TO_NEW_SYMBOL: LiteralString = """
     UPDATE databento_import_bar SET symbol = %(new_symbol)s
     WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s AND start_utc < %(change_start_utc)s
 """
+
+# A link can follow an earlier import: the rows that this import did not read go to the new symbol too. A saved bar of
+# the new symbol on the same day stays. The daily bar summary of the new symbol comes from the save of the import.
+MOVE_SAVED_ROWS_TO_NEW_SYMBOL: tuple[LiteralString, ...] = (
+    """
+    UPDATE databento_bar AS old_bar SET symbol = %(new_symbol)s
+    WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s AND start_utc < %(change_start_utc)s
+        AND NOT EXISTS (
+            SELECT FROM databento_bar AS new_bar
+            WHERE new_bar.symbol = %(new_symbol)s AND new_bar.exchange = old_bar.exchange
+                AND new_bar.currency = old_bar.currency AND new_bar.bar_period = old_bar.bar_period
+                AND new_bar.start_utc = old_bar.start_utc
+        )
+    """,
+    """
+    UPDATE databento_bar_saved_range SET symbol = %(new_symbol)s
+    WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s
+    """,
+    """
+    UPDATE stock_split SET symbol = %(new_symbol)s
+    WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s AND ex_date_utc < %(change_start_utc)s
+    """,
+    "DELETE FROM daily_bar_summary WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s",
+)
 
 SELECT_LAST_IMPORT_DAY: LiteralString = "SELECT max(start_utc) FROM databento_import_bar"
 

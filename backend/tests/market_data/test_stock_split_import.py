@@ -124,9 +124,9 @@ async def run_import(
     return await import_and_check_splits(database_url, write_dbn_files(tmp_path, files), gateway)
 
 
-async def read_bars(database_url: str, symbol: str, exchange: str = "NASDAQ") -> list[Bar]:
+async def read_bars(database_url: str, symbol: str, exchange: str = "NASDAQ", end: date = PURCHASE_END) -> list[Bar]:
     instrument = Instrument(symbol=symbol, exchange=exchange, currency="USD")
-    time_range = TimeRange(utc_day(PURCHASE_START), utc_day(PURCHASE_END))
+    time_range = TimeRange(utc_day(PURCHASE_START), utc_day(end))
     saved_bars = await read_saved_bars(
         database_url=database_url,
         bar_request=BarRequest(instrument, BarPeriod.ONE_DAY, time_range),
@@ -339,6 +339,67 @@ async def test_the_import_links_an_old_symbol_to_a_new_symbol_and_saves_the_old_
     bars = await read_bars(database_url, "XYZ")
     assert [bar.start_utc.date() for bar in bars] == TRADING_DAYS
     assert await read_bars(database_url, "SQ") == []
+
+
+def create_summary_file(prices: list[tuple[str, date, str]]) -> DbnFile:
+    """An EQUS.SUMMARY file. `prices` holds (symbol, day, price): the open and the close of that day."""
+    records = [
+        DailyRecord(symbol, day, Decimal(price), Decimal(price), Decimal(price), Decimal(price), 1000)
+        for symbol, day, price in prices
+    ]
+    return DbnFile("EQUS.SUMMARY", DAILY_SCHEMA, PURCHASE_END, date(2025, 12, 31), daily_records=records)
+
+
+# Monday 2025-03-03 to Friday 2025-03-07.
+SUMMARY_DAYS = [date(2025, 3, 3) + timedelta(days=offset) for offset in range(5)]
+RENAME_IN_SUMMARY = create_summary_file(
+    [("SQ", SUMMARY_DAYS[0], "100"), ("SQ", SUMMARY_DAYS[1], "100")]
+    + [("XYZ", SUMMARY_DAYS[2], "100.5"), ("XYZ", SUMMARY_DAYS[3], "101")]
+)
+
+
+@pytest.mark.anyio
+async def test_a_symbol_renamed_in_the_equs_summary_period_gets_its_bars_and_the_saved_history(
+    database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
+) -> None:
+    history = create_history_files(create_bars("SQ", TRADING_DAYS[:2], [("100", "100", 1000)] * 2))
+    import_databento_files(database_url=database_url, file_paths=write_dbn_files(tmp_path / "history", history))
+
+    summary_path = write_dbn_files(tmp_path / "summary", [RENAME_IN_SUMMARY])
+    report = import_databento_files(database_url=database_url, file_paths=summary_path)
+    second_report = import_databento_files(database_url=database_url, file_paths=summary_path)
+
+    assert read_table(database_url, SYMBOL_LINK_QUERY) == [("SQ", "XYZ", "NASDAQ", SUMMARY_DAYS[2], None)]
+    assert report.symbols_without_listing_exchange == []
+    assert second_report.symbols_without_listing_exchange == []
+    assert [bar.start_utc.date() for bar in await read_bars(database_url, "XYZ", end=date(2025, 12, 31))] == [
+        *TRADING_DAYS[:2],
+        *SUMMARY_DAYS[:4],
+    ]
+    assert await read_bars(database_url, "SQ", end=date(2025, 12, 31)) == []
+    assert read_table(database_url, "SELECT DISTINCT symbol FROM databento_bar_saved_range") == [("XYZ",)]
+    assert read_table(database_url, "SELECT symbol FROM daily_bar_summary") == [("XYZ",)]
+
+
+def test_a_new_symbol_with_2_possible_old_symbols_stays_without_a_listing_exchange(
+    database_url: str, tmp_path: Path
+) -> None:
+    history = create_history_files(
+        [
+            *create_bars("SQ", TRADING_DAYS[:1], [("100", "100", 1000)]),
+            *create_bars("OLD", TRADING_DAYS[:1], [("100", "100", 1000)]),
+        ]
+    )
+    summary = create_summary_file(
+        [("SQ", SUMMARY_DAYS[0], "100"), ("OLD", SUMMARY_DAYS[0], "100"), ("XYZ", SUMMARY_DAYS[1], "100")]
+    )
+
+    report = import_databento_files(
+        database_url=database_url, file_paths=write_dbn_files(tmp_path, [*history, summary])
+    )
+
+    assert report.symbols_without_listing_exchange == ["XYZ"]
+    assert report.symbol_links == []
 
 
 @pytest.mark.anyio

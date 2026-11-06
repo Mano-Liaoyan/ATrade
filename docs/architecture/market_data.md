@@ -808,7 +808,12 @@ daily close of each instrument and day. Primary key `symbol`, `exchange`,
      differ by 1% or less.
   3. The listing exchange is the same.
 - The import saves all history of a linked old symbol under the new symbol,
-  the same as IBKR does.
+  the same as IBKR does. This includes the bars, saved ranges, and stock
+  splits that an earlier import saved. The old symbol loses its daily bar
+  summary.
+- In the EQUS.SUMMARY period, a new symbol has no earlier bar and thus no
+  listing exchange (section 8.14). When conditions 1 and 2 are true for one
+  old symbol that has a listing exchange, the new symbol gets that exchange.
 - The import writes each link to `databento_symbol_link`: `old_symbol`,
   `new_symbol`, `exchange`, `change_day`, `checked_at_utc` (empty until the
   user checks it). `(old_symbol, new_symbol, exchange, change_day)` is
@@ -883,7 +888,9 @@ Quarterly update in the `forward-test` worker:
 - One process makes at most 3 downloads that can bill for one quarter. A
   download that stops before Databento sends data does not count, so an
   outage does not use the limit. The update tries again each 15 minutes.
-  At the limit, the update of the quarter stops and logs this 1 time. A
+  The update logs the new stock splits, the symbol links, and the symbols
+  without a listing exchange of each import, for the user check (section
+  8.14). At the limit, the update of the quarter stops and logs this 1 time. A
   restart of the `forward-test` service clears the limit.
 - Limit: the count of downloads is in memory, and the file is on the `/tmp`
   tmpfs. A process that stops between the start of a download and the commit
@@ -1195,9 +1202,11 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   import in the `web` image with `docker compose run`. The downloaded files
   are in `data/databento/` of the repository (in `.gitignore`), one
   directory for each batch job (`docs/architecture.md` section 22).
-- Decided (#190): the listing exchange of an EQUS.SUMMARY bar is the
-  exchange of the latest earlier Databento daily bar of the same symbol. A
-  symbol without an earlier bar gets no bar, and the import names it.
+- Decided (#190, changed for renames): the listing exchange of an
+  EQUS.SUMMARY bar is the exchange of the latest earlier Databento daily bar
+  of the same symbol. A renamed symbol has the exchange of its old symbol
+  (section 8.8.4), because a rename without bars loses data. Another symbol
+  without an earlier bar gets no bar, and the import names it.
 - Decided (#190): the trading day of an official open or close is the New
   York date of its `ts_event`. The import uses the latest new value
   (`update_action` 1) of each day.

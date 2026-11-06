@@ -19,7 +19,7 @@ import psycopg
 
 from atrade.foundation.clock import Clock
 from atrade.market_data.databento_client import DatabentoClient, DatabentoDownloadNotStartedError
-from atrade.market_data.databento_import import import_databento_files
+from atrade.market_data.databento_import import DatabentoImportReport, import_databento_files
 from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, find_previous_trading_day
 from atrade.market_data.us_universe import (
     WINDOW_CALENDAR_DAYS,
@@ -108,6 +108,16 @@ class UsUniverseUpdate:
                 raise
         return self.downloaded_paths[last_ranking_day]
 
+    def log_import(self, report: DatabentoImportReport) -> None:
+        links = ", ".join(f"{link.old_symbol} to {link.new_symbol}" for link in report.symbol_links)
+        logger.info(
+            "The import found %d new stock splits and these symbol links: %s. Check them with: python -m"
+            " atrade.app.databento_check. These EQUS.SUMMARY symbols have no listing exchange and no bar: %s",
+            len(report.stock_splits),
+            links,
+            " ".join(report.symbols_without_listing_exchange),
+        )
+
     def update_if_due(self) -> None:
         now_utc = self.clock.read_now_utc()
         if not self.is_due(now_utc):
@@ -127,7 +137,7 @@ class UsUniverseUpdate:
             path = self.download(quarter_start_utc, last_ranking_day)
             if path is None:
                 return
-            import_databento_files(database_url=self.database_url, file_paths=[path])
+            self.log_import(import_databento_files(database_url=self.database_url, file_paths=[path]))
         save_us_universe(
             database_url=self.database_url, quarter_start_utc=quarter_start_utc, last_ranking_day=last_ranking_day
         )

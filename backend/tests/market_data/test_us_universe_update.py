@@ -4,6 +4,7 @@ download the EQUS.SUMMARY bars, import them, and save the members (docs/architec
 Real PostgreSQL, a fixed clock, and the Databento fake.
 """
 
+import logging
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -75,6 +76,24 @@ async def test_the_update_at_06_00_et_downloads_the_100_days_to_the_last_ranking
     assert client.summary_downloads == [(date(2024, 9, 22), date(2025, 1, 1))]
     last_day = datetime(2024, 12, 31, tzinfo=UTC)
     assert await read_ranked_symbols(database_url) == [(1, "IBM", last_day), (2, "AAPL", last_day)]
+
+
+@pytest.mark.anyio
+async def test_a_symbol_renamed_in_the_window_is_a_member_under_the_new_symbol_and_the_update_logs_the_link(
+    database_url: str, clock: FixedClock, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    insert_daily_bars(database_url, nasdaq("SQ"), [date(2024, 9, 13)], "1", 1)
+    middle = len(PREVIOUS_QUARTER_DAYS) // 2
+    records = summary_records("SQ", PREVIOUS_QUARTER_DAYS[:middle], "100", 1000)
+    records += summary_records("XYZ", PREVIOUS_QUARTER_DAYS[middle:], "100", 1000)
+    client = FakeDatabentoClient(summary_records=records, summary_end=date(2025, 1, 1))
+    clock.now_utc = at_new_york_time(date(2025, 1, 2), 6)
+
+    with caplog.at_level(logging.INFO):
+        create_update(database_url, clock, client, tmp_path).update_if_due()
+
+    assert [symbol for _, symbol, _ in await read_ranked_symbols(database_url)] == ["XYZ"]
+    assert "SQ to XYZ" in caplog.text
 
 
 @pytest.mark.anyio

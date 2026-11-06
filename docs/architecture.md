@@ -2202,10 +2202,12 @@ option and records it in this document.
   from the Databento portal. It reads DBN files (`*.dbn`, `*.dbn.zst`), the
   default encoding of a batch job
   (`docs/architecture/market_data.md` section 8.14).
-- Decided (#190): the listing exchange of an EQUS.SUMMARY daily bar (from
-  2024-07-01) is the exchange of the latest earlier Databento daily bar of
-  the same symbol. A symbol without an earlier bar, for example a new
-  listing after 2024-07-01, gets no bar. The import names these symbols in
+- Decided (#190, changed for renames): the listing exchange of an
+  EQUS.SUMMARY daily bar (from 2024-07-01) is the exchange of the latest
+  earlier Databento daily bar of the same symbol. A renamed symbol has the
+  exchange of its old symbol (`docs/architecture/market_data.md` section
+  8.8.4). Another symbol without an earlier bar, for example a new listing
+  after 2024-07-01, gets no bar. The import names these symbols in
   its log. `docs/architecture/forward_test.md` section 12.24 (how a
   Databento symbol maps to the IBKR primary exchange) is the same question
   and stays open for these symbols.

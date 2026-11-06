@@ -60,9 +60,8 @@ def link_symbols(connection: psycopg.Connection) -> list[SymbolLink]:
             "exchange": link.exchange,
             "change_day": link.change_day,
         }
-        connection.execute(
-            databento_import_sql.MOVE_TO_NEW_SYMBOL, {**parameters, "change_start_utc": change_start_utc}
-        )
+        for query in (databento_import_sql.MOVE_TO_NEW_SYMBOL, *databento_import_sql.MOVE_SAVED_ROWS_TO_NEW_SYMBOL):
+            connection.execute(query, {**parameters, "change_start_utc": change_start_utc})
         connection.execute(databento_import_sql.INSERT_SYMBOL_LINK, parameters)
         links.append(link)
     return links
