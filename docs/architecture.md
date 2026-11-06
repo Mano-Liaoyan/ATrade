@@ -199,8 +199,8 @@ indicator     -> (foundation only)
 screen        -> indicator, market_data, watchlist
 backtest      -> strategy, market_data, screen
 assistant     -> (foundation only)
-paper_trading -> ibkr
-forward_test  -> strategy, paper_trading, backtest, market_data, ibkr
+paper_trading -> ibkr, market_data
+forward_test  -> strategy, paper_trading, backtest, market_data, ibkr, watchlist
 all modules   -> foundation
 app           -> all modules
 ```
@@ -209,6 +209,13 @@ app           -> all modules
 - `strategy -> indicator` is for the rule builder (#172): the rules check
   reads `INDICATOR_CATALOG` and `check_indicator_reference()`, and the code
   from the rules names the `atrade.indicator` classes.
+- `paper_trading -> market_data` is for the stock split check of the owner
+  ledger: it reads the last daily bars and the candidates of evidence A, and
+  changes the stored bars in the transaction of the ledger change
+  (`apply_stock_split_in_transaction()`, section 11.11 of
+  `docs/architecture/paper_trading.md`).
+- `forward_test -> watchlist` is only for the start of a forward test with a
+  `list` universe: `read_watchlist_instruments()` gives its members.
 - `forward_test -> paper_trading` is for the paper account check
   (`require_paper_account()`, and `PaperAccountMonitor` for the balance at
   start). From phase 3 (section 20.1) it is also for the owner ledger
