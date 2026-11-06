@@ -131,7 +131,10 @@ class ManualOrderLedger:
                 for order in await manual_order_store.select_manual_orders(connection)
                 if order.account == account
             }
-            for execution in executions:
+            recorded_ids = {
+                fill.ibkr_execution_id for fill in await owner_ledger_store.select_owner_fills(connection, BY_HAND)
+            }
+            for execution in [item for item in executions if item.execution_id not in recorded_ids]:
                 order = orders.get(execution.order_id)
                 if (
                     order is None

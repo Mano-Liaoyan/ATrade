@@ -336,6 +336,45 @@ async def test_the_fill_recording_continues_after_a_database_error(
 
 
 @pytest.mark.anyio
+async def test_reads_the_exchange_rate_only_for_a_new_fill(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    gateway_connection = make_gateway()
+    gateway_connection.exchange_rates[("HKD", "USD")] = Decimal("0.13")
+    async with open_client(
+        database_url=database_url,
+        clock=clock,
+        frontend_build_dir=frontend_build_dir,
+        gateway_connection=gateway_connection,
+    ) as client:
+        await read_account(client)
+        response = await client.post(
+            ORDERS_PATH, json=make_order(symbol="700", side="SELL", quantity=10, limit_price="400")
+        )
+    gateway_connection.executions = [
+        make_execution(
+            ACCOUNT_ID,
+            order_id=response.json()["ibkr_order_id"],
+            quantity="10",
+            price="400",
+            side="SLD",
+            symbol="700",
+            currency="HKD",
+        )
+    ]
+    gateway_connection.exchange_rate_requests.clear()
+    settings = Settings(database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=ACCOUNT_ID)
+    monitor = PaperAccountMonitor(settings=settings, gateway_connection=gateway_connection)
+    ledger = ManualOrderLedger(paper_account_monitor=monitor, database_url=database_url, clock=clock)
+
+    await ledger.record_fills(ACCOUNT_ID)
+    await ledger.record_fills(ACCOUNT_ID)
+
+    assert gateway_connection.exchange_rate_requests == [("HKD", "USD")]
+    assert count_fills(database_url) == 1
+
+
+@pytest.mark.anyio
 async def test_records_a_fill_by_hand_without_a_report_at_the_limit(
     database_url: str, clock: FixedClock, frontend_build_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
