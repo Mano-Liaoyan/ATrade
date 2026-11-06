@@ -1408,7 +1408,7 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   and uvicorn with 1 worker. The test is
   `backend/tests/app/test_deploy_script.py`.
 - The deploy workflow runs one deployment at a time (concurrency group
-  `deploy`). `queue: max` keeps all waiting runs in order. Without it, GitHub
+  `deploy`). `queue: max` keeps up to 100 waiting runs. Without it, GitHub
   keeps 1 waiting run, and an older commit can cancel the run of a newer commit.
 - `.env` stays on the server (section 15). GitHub has no ATrade secrets.
 - A deployment recreates `web` and `forward-test` when their image changes.
