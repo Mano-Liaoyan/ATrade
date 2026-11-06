@@ -1,7 +1,7 @@
 <!-- Screen page (docs/architecture/screen.md section 24.10): a workbench. URL: /screens/<id>?result=<screen result id>;
      /screens opens the screen that the user opened last (browser storage), or the first screen of the list. Without
      ?result, the page shows the last run. Start side: the "Screens" side column (ScreenList) with "New screen". Main
-     region: the title row (the name, the US / HK switch, "Save as new screen", and "Save screen" for unsaved changes), the condition
+     region: the title row (the name, the US / HK switch, "Save as new screen", "Save screen" for unsaved changes, and "Run screen" for a screen without a run), the condition
      bar with its edit popover, the table toolbar (Result N / Excluded N, the daily bars date, "Add to
      watchlist", and "Run backtest on this screen result"; batch actions when rows are selected), and the result or the
      excluded table. Each change of a condition runs the changed screen at once (section 24.13). An HK screen shows the
@@ -12,10 +12,9 @@
   import Add16 from '@carbon/icons/es/add/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { navigating, page } from '$app/state';
+  import { page } from '$app/state';
   import { ContentSwitcher, IconButton, InlineNotification, Popover } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { SideColumn, Workbench } from '#lib/foundation/workbench';
   import { SurvivorshipBiasWarning } from '#lib/market_data';
@@ -54,6 +53,7 @@
   import type { Backtest, ScreenSource } from '#lib/backtest';
   import { addToWatchlist } from '#lib/watchlist';
   import StartBacktestDialog from '../../backtests/StartBacktestDialog.svelte';
+  import { RunWorkbench } from '../../run_workbench.svelte';
   import { readLastScreenId, writeLastScreenId } from '../last_screen';
   import ScreenList from '../ScreenList.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
@@ -68,11 +68,18 @@
   const screenId = $derived(routeScreenId !== undefined && /^\d+$/.test(routeScreenId) ? Number(routeScreenId) : null);
   const routeResultId = $derived(page.url.searchParams.get('result'));
 
-  let screens: ScreenListItem[] = $state([]);
-  let isListRead = $state(false);
-  let listMessage = $state('');
-  let screen = $state<Screen | null>(null);
-  let screenMessage = $state('');
+  // /ws/screens pushes each change of a screen or a screen result, also from the assistant and other tabs. The draft is
+  // separate state, so a push does not change unsaved edits.
+  const workbench = new RunWorkbench<ScreenListItem, Screen>({
+    socketPath: SCREENS_SOCKET_PATH,
+    list: () => listScreens(fetch),
+    readDetail: (id) => readScreen(fetch, id),
+    href: (id) => resolve('/screens/[[screenId]]', { screenId: String(id) }),
+    openId: () => screenId,
+    // /screens opens the screen that the user opened last, or the first screen of the list.
+    defaultId: (items) => (items.find((item) => item.id === readLastScreenId()) ?? items[0])?.id,
+    readsDetailOnChange: true,
+  });
   let screenResult = $state<ScreenResult | null>(null);
   let resultMessage = $state('');
   let shownTable: ShownTable = $state('result');
@@ -83,11 +90,12 @@
   let draft = $state<(Draft & { screenId: number }) | null>(null);
   // The save that runs now. The other save button stays disabled until it ends.
   let saving = $state<'save' | 'new' | null>(null);
+  let isRunning = $state(false);
   // Counts the draft runs. Only the answer of the last run changes the page.
   let runNumber = 0;
   // The screen result of the last draft run. The page shows it also while the URL changes to its ?result.
   let runResultId: number | null = null;
-  // The problems of the last 422 answer of a run or a save (section 24.6), by tag, for one screen.
+  // The problems of the last failed run or save (section 24.6), by tag, for one screen.
   let problems = $state<{ screenId: number; action: 'run' | 'save'; byTarget: Map<string, string[]>; other: string[] } | null>(
     null,
   );
@@ -99,7 +107,7 @@
   // The reason of the last failed "New screen".
   let createMessage = $state('');
 
-  const shownScreen = $derived(screen !== null && screen.id === screenId ? screen : null);
+  const shownScreen = $derived(workbench.detail?.id === screenId ? workbench.detail : null);
   const screenResultId = $derived.by(() => {
     if (routeResultId !== null) {
       return Number(routeResultId);
@@ -112,23 +120,6 @@
       : null,
   );
 
-  // /ws/screens pushes each change of a screen or a screen result, also from the assistant and other tabs.
-  $effect(() =>
-    readOnChange({
-      socketPath: SCREENS_SOCKET_PATH,
-      read: () => listScreens(fetch),
-      onResult: (result) => {
-        isListRead = true;
-        if (result.kind === 'failed') {
-          listMessage = result.message;
-          return;
-        }
-        listMessage = '';
-        screens = result.value;
-      },
-    }),
-  );
-
   $effect(() => {
     void listScreenIndicators(fetch).then((result) => {
       if (result.kind === 'ok') {
@@ -137,37 +128,10 @@
     });
   });
 
-  // /screens opens the screen that the user opened last, or the first screen of the list.
   $effect(() => {
-    if (navigating.to !== null || screenId !== null || screens.length === 0) {
-      return;
+    if (screenId !== null) {
+      writeLastScreenId(screenId);
     }
-    const lastId = readLastScreenId();
-    const target = screens.find((item) => item.id === lastId) ?? screens[0];
-    if (target !== undefined) {
-      void goto(resolve('/screens/[[screenId]]', { screenId: String(target.id) }), { replace: true });
-    }
-  });
-
-  $effect(() => {
-    if (screenId === null) {
-      return;
-    }
-    const id = screenId;
-    writeLastScreenId(id);
-    screenMessage = '';
-    void readScreen(fetch, id).then((result) => {
-      // A reply for a screen that is not open any more is stale.
-      if (id !== screenId) {
-        return;
-      }
-      if (result.kind === 'failed') {
-        screenMessage = result.message;
-        return;
-      }
-      screenMessage = '';
-      screen = result.value;
-    });
   });
 
   $effect(() => {
@@ -197,6 +161,12 @@
 
   const shownDraft = $derived(draft !== null && draft.screenId === screenId ? draft : null);
   const shownProblems = $derived(problems !== null && problems.screenId === screenId ? problems : null);
+  // Without a condition bar, no tag shows the problems of the tags.
+  const problemText = $derived(
+    shownProblems === null
+      ? ''
+      : [...(shownResult === null ? [...shownProblems.byTarget.values()].flat() : []), ...shownProblems.other].join(' '),
+  );
   // An HK draft of a US screen runs HK instruments, so the warning follows the market of the draft.
   const shownMarket = $derived(shownDraft?.market ?? shownScreen?.market ?? null);
   const isChanged = $derived(
@@ -208,7 +178,6 @@
   // Each change runs the draft at once. The run makes a screen result; the saved screen stays the same.
   async function changeDraft(current: Screen, market: ScreenMarket, definition: Definition): Promise<void> {
     draft = { screenId: current.id, market, definition };
-    resultMessage = '';
     problems = null;
     runNumber += 1;
     const thisRun = runNumber;
@@ -217,20 +186,31 @@
     if (thisRun !== runNumber) {
       return;
     }
-    if (result.kind === 'check_failed') {
-      problems = { screenId: current.id, action: 'run', ...groupProblems(result.problems) };
+    if (result.kind !== 'ok') {
+      showFailure(current.id, 'run', result);
       return;
     }
-    if (result.kind === 'failed') {
-      resultMessage = result.message;
-      return;
+    // A run of the saved definition leaves no unsaved edit, so a later live change does not show "Save screen".
+    if (!isDraftChanged({ market: current.market, definition: current.definition }, { market, definition })) {
+      draft = null;
     }
+    resultMessage = '';
     runResultId = result.value.id;
     selectedPositions = [];
     screenResult = result.value;
     const path = `${resolve('/screens/[[screenId]]', { screenId: String(current.id) })}?result=${String(result.value.id)}`;
     // eslint-disable-next-line svelte/no-navigation-without-resolve -- the path above is resolved.
     await goto(path, { replaceState: true });
+  }
+
+  // The first run of a screen. Its definition is the saved definition, so no unsaved edit stays.
+  async function runSavedScreen(current: Screen): Promise<void> {
+    isRunning = true;
+    await changeDraft(current, current.market, current.definition);
+    if (draft?.screenId === current.id) {
+      draft = null;
+    }
+    isRunning = false;
   }
 
   function currentDraft(result: ScreenResult): Draft {
@@ -278,15 +258,25 @@
       : { definition: base.definition, names: nameDefinitionIndicators(base.definition, catalog), counts: null };
   }
 
-  function showSaveFailure(
-    current: Screen,
+  function showFailure(
+    id: number,
+    action: 'run' | 'save',
     failure: { kind: 'failed'; message: string } | { kind: 'check_failed'; problems: ScreenProblem[] },
   ): void {
-    if (failure.kind === 'check_failed') {
-      problems = { screenId: current.id, action: 'save', ...groupProblems(failure.problems) };
-    } else {
-      resultMessage = failure.message;
+    const groups =
+      failure.kind === 'check_failed' ? groupProblems(failure.problems) : { byTarget: new Map<string, string[]>(), other: [failure.message] };
+    problems = { screenId: id, action, ...groups };
+  }
+
+  // Runs a screen that the page just made, and opens it. A failed run keeps its reason for the opened screen.
+  async function runAndOpen(id: number, body: { market: string; definition: unknown }): Promise<void> {
+    const run = await runScreenDraft(fetch, id, body);
+    const target = resolve('/screens/[[screenId]]', { screenId: String(id) });
+    if (run.kind !== 'ok') {
+      showFailure(id, 'run', run);
     }
+    // eslint-disable-next-line svelte/no-navigation-without-resolve -- the target is resolved.
+    await goto(run.kind === 'ok' ? `${target}?result=${String(run.value.id)}` : target);
   }
 
   async function saveDraft(current: Screen): Promise<void> {
@@ -294,18 +284,19 @@
       return;
     }
     saving = 'save';
+    problems = null;
     const saved = await saveScreen(fetch, current, shownDraft.definition);
     saving = null;
     if (saved.kind !== 'ok') {
-      showSaveFailure(current, saved);
+      showFailure(current.id, 'save', saved);
       return;
     }
-    screen = saved.value;
+    workbench.detail = saved.value;
     draft = null;
   }
 
   function newScreenName(name: string): string {
-    const names = new Set(screens.map((item) => item.name));
+    const names = new Set(workbench.items.map((item) => item.name));
     let candidate = `${name} copy`;
     for (let number = 2; names.has(candidate); number += 1) {
       candidate = `${name} copy ${String(number)}`;
@@ -323,26 +314,20 @@
       market: base.market,
       definition: base.definition,
     });
-    saving = null;
     if (created.kind !== 'ok') {
-      showSaveFailure(current, created);
+      saving = null;
+      showFailure(current.id, 'save', created);
       return;
-    }
-    const listed = await listScreens(fetch);
-    if (listed.kind === 'ok') {
-      screens = listed.value;
     }
     draft = null;
     problems = null;
-    const run = await runScreenDraft(fetch, created.value.id, base);
-    const target = resolve('/screens/[[screenId]]', { screenId: String(created.value.id) });
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- the target is resolved.
-    await goto(run.kind === 'ok' ? `${target}?result=${String(run.value.id)}` : target);
+    await runAndOpen(created.value.id, base);
+    saving = null;
   }
 
   // "New screen": creates the default screen (section 24.13), runs it, and opens its screen result.
   async function createNewScreen(): Promise<void> {
-    const body = newScreen(screens.map((item) => item.name));
+    const body = newScreen(workbench.items.map((item) => item.name));
     isCreating = true;
     createMessage = '';
     const created = await createScreen(fetch, body);
@@ -351,15 +336,8 @@
       createMessage = created.kind === 'failed' ? created.message : created.problems.map((problem) => problem.message).join(' ');
       return;
     }
-    const listed = await listScreens(fetch);
-    if (listed.kind === 'ok') {
-      screens = listed.value;
-    }
-    const run = await runScreenDraft(fetch, created.value.id, { market: body.market, definition: body.definition });
+    await runAndOpen(created.value.id, { market: body.market, definition: body.definition });
     isCreating = false;
-    const target = resolve('/screens/[[screenId]]', { screenId: String(created.value.id) });
-    // eslint-disable-next-line svelte/no-navigation-without-resolve -- the target is resolved.
-    await goto(run.kind === 'ok' ? `${target}?result=${String(run.value.id)}` : target);
   }
 
   // The watchlist add route checks each instrument with IBKR, so the page adds the instruments one after the other.
@@ -416,8 +394,8 @@
       />
     {/snippet}
     <ScreenList
-      {screens}
-      errorMessage={listMessage}
+      screens={workbench.items}
+      errorMessage={workbench.listMessage}
       {createMessage}
       onCreateMessageClose={() => {
         createMessage = '';
@@ -429,9 +407,9 @@
 
   <main class="screen-main">
     {#if shownScreen === null}
-      {#if screenMessage !== ''}
-        <InlineNotification kind="error" title="Screen not read" subtitle={screenMessage} lowContrast />
-      {:else if isListRead && screens.length === 0 && listMessage === ''}
+      {#if screenId !== null && workbench.detailMessage !== ''}
+        <InlineNotification kind="error" title="Screen not read" subtitle={workbench.detailMessage} lowContrast />
+      {:else if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === ''}
         <EmptyText text="No screens" />
       {/if}
     {:else}
@@ -470,10 +448,22 @@
               >
             {/if}
           </div>
+        {:else if current.recent_screen_results.length === 0}
+          <div class="title-actions">
+            <button
+              type="button"
+              class="cds--btn cds--btn--primary cds--btn--sm cds--layout--size-sm"
+              disabled={isRunning}
+              onclick={() => void runSavedScreen(current)}>{isRunning ? 'Running screen…' : 'Run screen'}</button
+            >
+          </div>
         {/if}
       </div>
       {#if shownMarket === 'HK'}
         <SurvivorshipBiasWarning />
+      {/if}
+      {#if shownProblems !== null && problemText !== ''}
+        <InlineNotification kind="error" title={shownProblems.action === 'run' ? 'Screen not run' : 'Screen not saved'} subtitle={problemText} lowContrast />
       {/if}
       {#if resultMessage !== ''}
         <InlineNotification kind="error" title="Screen result not read" subtitle={resultMessage} lowContrast />
@@ -503,9 +493,6 @@
             />
           </ScrollRegion>
         </div>
-        {#if shownProblems !== null && shownProblems.other.length > 0}
-          <InlineNotification kind="error" title={shownProblems.action === 'run' ? 'Screen not run' : 'Screen not saved'} subtitle={shownProblems.other.join(' ')} lowContrast />
-        {/if}
         <Popover
           open={editing !== null}
           onOpenChange={(open: boolean) => {

@@ -129,6 +129,21 @@ describe('RunWorkbench open newest', () => {
     expect(goto).toHaveBeenCalledExactlyOnceWith('/runs/9', { replace: true, reset: false });
   });
 
+  it('opens defaultId, and the newest run without it', async () => {
+    items = ok([
+      { id: 2, status: 'running' },
+      { id: 9, status: 'running' },
+    ]);
+    start({ defaultId: (runs) => runs[0]?.id });
+    await settle();
+    expect(goto).toHaveBeenCalledExactlyOnceWith('/runs/2', { replace: true, reset: false });
+
+    goto.mockClear();
+    start({ defaultId: () => undefined });
+    await settle();
+    expect(goto).toHaveBeenCalledExactlyOnceWith('/runs/9', { replace: true, reset: false });
+  });
+
   it('does not navigate from an address with an id', async () => {
     items = ok([{ id: 9, status: 'running' }]);
     openId = 2;

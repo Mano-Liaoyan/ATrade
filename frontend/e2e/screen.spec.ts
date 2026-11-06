@@ -441,3 +441,94 @@ test('"New screen" shows the reason of a failed create, then creates a screen an
   const openRow = page.getByRole('region', { name: 'Screen list' }).locator('a[aria-current="page"]');
   await expect(openRow.locator('.screen-name')).toHaveText(screen.name);
 });
+
+const WATCHLIST_DEFINITION = { start: 'watchlist', filters: [], indicator_conditions: [], order: { indicator: SMA_3, direction: 'descending' } };
+const RUNS_ROUTE = '**/api/screens/*/runs';
+
+test('"Run screen" runs a screen without a run, and a failed run shows its reason', async ({ page, request }, currentTest) => {
+  await saveAaplDailyBars(page, request);
+  const screenId = await createScreen(request, uniqueName(currentTest, 'First run'), 'US', WATCHLIST_DEFINITION);
+  await page.goto(`/screens/${String(screenId)}`);
+  await expect(page.getByText('No runs')).toBeVisible();
+
+  await page.route(RUNS_ROUTE, (route) => route.fulfill({ status: 500, json: { detail: 'The run stopped' } }));
+  const runButton = page.getByRole('button', { name: 'Run screen', exact: true });
+  await runButton.click();
+  const failure = page.getByRole('alert').filter({ hasText: 'Screen not run' });
+  await expect(failure).toBeVisible();
+  await page.unroute(RUNS_ROUTE);
+
+  await runButton.click();
+  await expectRunDone(page);
+  await expect(failure).toHaveCount(0);
+  await expect(page.getByRole('tablist', { name: 'Market' })).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Recent runs' }).getByRole('listitem')).toHaveCount(1);
+});
+
+test('a failed run keeps the condition bar, and a live change keeps the unsaved edits', async ({ page, request }, currentTest) => {
+  const name = uniqueName(currentTest, 'Live');
+  const definition = { ...WATCHLIST_DEFINITION, filters: [{ field: 'last_price', operator: '>', value: '0' }] };
+  const screenId = await openNewScreen(page, request, name, definition);
+  const bar = conditionBar(page);
+  const saveScreen = page.getByRole('button', { name: 'Save screen' });
+
+  await page.route(RUNS_ROUTE, (route) => route.fulfill({ status: 500, json: { detail: 'The run stopped' } }));
+  await page.getByRole('button', { name: 'Remove Close > 0', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Screen not run' })).toBeVisible();
+  await expect(bar).toBeVisible();
+  await page.unroute(RUNS_ROUTE);
+
+  // Another tab or the AI assistant changes the screen and runs it.
+  const renamed = `${name} renamed`;
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const changed = await request.put(`/api/screens/${String(screenId)}`, { data: { name: renamed, definition } });
+  expect(changed.status()).toBe(200);
+  await runScreen(request, screenId);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(renamed);
+  await expect(page.getByRole('list', { name: 'Recent runs' }).getByRole('listitem')).toHaveCount(2);
+  await expect(bar).not.toContainText('Close');
+
+  // "Save screen" keeps the new name and writes the unsaved edits.
+  const put = page.waitForResponse((response) => response.request().method() === 'PUT');
+  await saveScreen.click();
+  const saved = (await (await put).json()) as { name: string; definition: { filters: unknown[] } };
+  await expect(saveScreen).toHaveCount(0);
+  expect(saved.name).toBe(renamed);
+  expect(saved.definition.filters).toEqual([]);
+});
+
+test('a run without a change leaves no draft, so a live change shows no "Save screen"', async ({ page, request }, currentTest) => {
+  const name = uniqueName(currentTest, 'Rerun');
+  const filters = [{ field: 'last_price', operator: '>', value: '0' }];
+  const screenId = await openNewScreen(page, request, name, { ...WATCHLIST_DEFINITION, filters });
+
+  const popover = await editTag(page, 'Close > 0');
+  await popover.getByRole('button', { name: 'Apply' }).click();
+  await expect(page).toHaveURL(/\?result=\d+$/);
+
+  const renamed = `${name} renamed`;
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const changed = await request.put(`/api/screens/${String(screenId)}`, { data: { name: renamed, definition: WATCHLIST_DEFINITION } });
+  expect(changed.status()).toBe(200);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(renamed);
+  await expect(page.getByRole('button', { name: 'Save screen' })).toHaveCount(0);
+});
+
+test('"Save as new screen" stays disabled until the new screen opens', async ({ page, request }, currentTest) => {
+  const name = uniqueName(currentTest, 'Copy');
+  await openNewScreen(page, request, name, WATCHLIST_DEFINITION);
+  let finishRun = (): void => undefined;
+  const runMayFinish = new Promise<void>((resolve) => {
+    finishRun = resolve;
+  });
+  await page.route(RUNS_ROUTE, async (route) => {
+    await runMayFinish;
+    await route.fallback();
+  });
+
+  await page.getByRole('button', { name: 'Save as new screen' }).click();
+  await expect(page.getByRole('region', { name: 'Screen list' })).toContainText(`${name} copy`);
+  await expect(page.getByRole('button', { name: 'Saving screen…' })).toBeDisabled();
+  finishRun();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(`${name} copy`);
+});
