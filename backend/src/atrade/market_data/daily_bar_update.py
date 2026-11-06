@@ -33,6 +33,8 @@ UPDATE_TIME_ET = time(21, 0)
 CHECK_INTERVAL_SECONDS = 60.0
 # After a lost IBKR link, the link check runs within 70 seconds (ibkr/gateway_connection.py).
 IBKR_LINK_WAIT_SECONDS = 75.0
+# A timeout costs 135 seconds with its wait, so a run of timeouts must not take the rest of the day.
+MAX_CONSECUTIVE_TIMEOUTS = 3
 # An instrument without IBKR daily bars gets the daily bars of 1 year, the warm-up of section 8.12.
 FIRST_READ_LENGTH = timedelta(days=366)
 
@@ -91,6 +93,8 @@ class DailyBarUpdate:
             logger.warning("IB Gateway is not reachable. The daily bar update of %s does not run.", due_day)
             return False
         if not await self.update(due_day):
+            if due_day != self.stopped_day:
+                logger.warning("The daily bar update of %s stops. It runs again in a later minute.", due_day)
             self.stopped_day = due_day
             self.last_update_day = None
         return True
@@ -143,8 +147,10 @@ class DailyBarUpdate:
         return self.gateway_connection.is_connected()
 
     async def update(self, day: date) -> bool:
-        """Returns False when a lost connection stopped the update. The instruments before the stop stay updated."""
+        """Returns False when a lost connection or timeouts stopped the update. The instruments before the stop stay
+        updated."""
         is_complete = True
+        timeout_count = 0
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             instruments = await self.read_update_instruments(connection)
             updated_instruments: list[Instrument] = []
@@ -156,11 +162,13 @@ class DailyBarUpdate:
                     bars = await self.gateway_connection.read_historical_bars(instrument, BarPeriod.ONE_DAY, time_range)
                 except GatewayRequestError:
                     logger.exception("The daily bar update did not read the daily bars of %s.", instrument)
-                    if await self.wait_for_connection():
+                    # A timeout marks the IBKR link as lost. An answer with an error does not.
+                    timeout_count = 0 if self.gateway_connection.is_connected() else timeout_count + 1
+                    if timeout_count < MAX_CONSECUTIVE_TIMEOUTS and await self.wait_for_connection():
                         continue
-                    logger.warning("IB Gateway is not reachable. The daily bar update of %s stops.", day)
                     is_complete = False
                     break
+                timeout_count = 0
                 await self.record_evidence_a(connection, instrument, bars)
                 stored_form_bars = await to_stored_form(connection, instrument, bars)
                 await bar_store.save_bars_of_range(

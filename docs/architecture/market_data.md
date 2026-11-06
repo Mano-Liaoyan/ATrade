@@ -986,7 +986,8 @@ Phase 3. Sources:
   is lost, the update waits 75 seconds for the IBKR link check. When the
   connection is still lost, the update stops, and the day stays due. The
   check of each minute runs the update again after the connection returns,
-  until the end of the New York day.
+  until the end of the New York day. Also after 3 timeouts in a row, the
+  update stops, and the day stays due.
 - Each read of bars from IBKR also reads 1 stored daily bar again (stock
   split evidence, section 8.13).
 

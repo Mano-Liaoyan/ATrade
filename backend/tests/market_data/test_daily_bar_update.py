@@ -67,6 +67,21 @@ class LinkLossGateway(FakeGatewayConnection):
         return await super().read_historical_bars(instrument, bar_period, time_range)
 
 
+class TimeoutGateway(LinkLossGateway):
+    """Each stock read times out, and the IBKR link check finds the link good."""
+
+    def __init__(self) -> None:
+        super().__init__(link_returns_in_the_wait=True)
+
+    async def read_historical_bars(
+        self, instrument: Instrument, bar_period: BarPeriod, time_range: TimeRange
+    ) -> list[Bar]:
+        self.timeout_count += 1
+        self.has_ibkr_connection = False
+        message = "IB Gateway did not answer the historical data request in time."
+        raise GatewayRequestError(message)
+
+
 def save_update_instruments(database_url: str) -> None:
     """APPLE is a member of the current US universe, TENCENT is in the HK instrument list."""
     with psycopg.connect(database_url, autocommit=True) as connection:
@@ -273,6 +288,24 @@ async def test_the_update_continues_when_the_ibkr_link_returns_in_the_wait(
 
     assert await update.update_if_due() is False
     assert len(gateway_connection.historical_bar_requests) == 2
+
+
+@pytest.mark.anyio
+async def test_consecutive_timeouts_stop_the_update_and_keep_the_day_due(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(daily_bar_update, "IBKR_LINK_WAIT_SECONDS", 0)
+    monkeypatch.setattr(daily_bar_update, "MAX_CONSECUTIVE_TIMEOUTS", 2)
+    save_update_instruments(database_url)
+    gateway_connection = TimeoutGateway()
+    update = create_update(database_url, gateway_connection, AFTER_CLOSE_UTC)
+
+    assert await update.update_if_due() is True
+    assert gateway_connection.timeout_count == 2
+
+    assert await update.update_if_due() is True
+    assert gateway_connection.timeout_count == 4
+    assert len([record for record in caplog.records if "stops" in record.message]) == 1
 
 
 @pytest.mark.anyio
