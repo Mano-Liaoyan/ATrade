@@ -471,7 +471,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   least 12rem wide (9rem with `atrade-auto-grid--narrow`, 14rem with
   `atrade-auto-grid--wide`), with a `--cds-spacing-05` gap.
 - The global classes `atrade-run-*` of `carbon.scss` are the parts of the run
-  pages (backtest, forward test, parameter sweep, and the comparison pages):
+  pages (backtest, forward test, parameter sweep, comparison, and strategy pages):
   the empty main area, the title line, the status, the actions, and the log text.
 - `routes/run_workbench.svelte.ts` (`RunWorkbench`) holds the state of the
   backtest, forward test, and parameter sweep pages: the list, the navigation

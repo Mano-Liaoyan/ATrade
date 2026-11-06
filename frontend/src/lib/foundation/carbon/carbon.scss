@@ -88,8 +88,8 @@
   grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
 }
 
-// ATrade classes of the run pages (backtest, forward test, parameter sweep, and the comparison pages). Carbon has no
-// class for them.
+// ATrade classes of the run pages (backtest, forward test, parameter sweep, comparison, and strategy pages).
+// Carbon has no class for them.
 .atrade-run-empty {
   flex: 1;
   min-inline-size: 0;
