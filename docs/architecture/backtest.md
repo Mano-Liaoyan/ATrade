@@ -83,8 +83,11 @@ puts the new parts of this section in phases.
   selected bar period (section 10.6). It has no free-text symbol, exchange,
   or currency fields, so a request cannot name an instrument that has no
   bars by a typing error.
-- The isolation goal is to prevent accidents, not to stop hostile code. Only
-  one user writes strategies.
+- The isolation goal is to prevent accidents and to keep the secrets of the
+  parent process out of strategy code. It is not a full sandbox. The user and
+  the AI assistant both write strategy code, and ADR 0004 lets the AI
+  assistant save and backtest code without a user acceptance. So do not think
+  that all strategy code is safe. Section 10.1.1 lists the remaining gaps.
 
 | Control | Rule |
 |---|---|
@@ -94,6 +97,7 @@ puts the new parts of this section in phases.
 | Memory | Do not use `RLIMIT_AS`. The `web` container has a memory limit. The child sets `oom_score_adj` to 1000, so the kernel stops the backtest first when memory is low. |
 | CPU | The child runs with `nice 10`. |
 | Environment | Allow list: `PATH`, `HOME`, `TZ`, `DATABASE_URL`. IBKR and Cloudflare secrets are not passed. |
+| Parent process | At start, `web` and the forward-test worker call `prctl(PR_SET_DUMPABLE, 0)` (`foundation/process_protection.py`, Linux only). A child cannot read `/proc/<parent>/environ`, and the parent writes no core dump. |
 | Network | No network isolation. The child must connect to PostgreSQL. |
 | File system | The container root file system is read-only. Only `/tmp` is writable. |
 
@@ -118,6 +122,30 @@ Implementation of the controls:
   5 GB (estimate, section 10.10.3). The server has 16 GB. With concurrency 2,
   two such backtests can reach the 8 GB limit. Tests cannot check the
   out-of-memory order. Section 17.8 has the manual check.
+
+### 10.1.1 Remaining isolation gaps
+
+Strategy code can do these things. The results come from a real backtest in the
+`web` image, with no IB Gateway, unless the item says "by reading".
+
+- HTTP routes: a child calls `127.0.0.1:8000` and `127.0.0.1:8001` with no
+  credentials. `RefuseAssistantSubnet` refuses only the assistant subnet. The
+  child listed strategies, created a strategy, and changed the backtest limits.
+  `POST /api/paper-trading/orders` got to the route and stopped only because
+  IB Gateway was not connected.
+- Database: a child has the full `DATABASE_URL`. The role `atrade` is the
+  PostgreSQL superuser, so the child can read and change all tables.
+- Other processes: the prctl block ends at exec. By reading, the language
+  server and ruff get the full `web` environment. A run with a test value showed
+  that a child can read the environment of such a process. So a child can read
+  `DATABENTO_API_KEY` from `/proc/<language server>/environ` while the strategy
+  editor is open.
+- Forward test child: it gets the environment of the worker
+  (`docs/architecture/forward_test.md`). When `.env` has `DATABENTO_API_KEY`, the
+  `os.environ` of the child holds the key. The block on the worker does not
+  change this.
+- Other hosts, by reading: a child can connect to `ib-gateway:4004` and to the
+  internet.
 
 ## 10.2 Tables
 

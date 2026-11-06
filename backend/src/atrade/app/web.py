@@ -43,6 +43,7 @@ from atrade.forward_test import (
 )
 from atrade.foundation.clock import Clock, SystemClock
 from atrade.foundation.error_response import add_validation_error_handler
+from atrade.foundation.process_protection import block_process_reads
 from atrade.foundation.settings import Settings
 from atrade.foundation.table_changes import TableChangeFeed, create_change_socket_router
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
@@ -273,6 +274,7 @@ def main() -> None:
     clock = SystemClock()
     app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
     assistant_app = create_assistant_port_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+    block_process_reads()
     asyncio.run(serve_both(app, assistant_app))
 
 

@@ -26,6 +26,7 @@ from atrade.forward_test import (
     read_running_member_lists,
 )
 from atrade.foundation.clock import Clock, SystemClock
+from atrade.foundation.process_protection import block_process_reads
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection
 from atrade.market_data import DatabentoHistoricalClient, UsUniverseUpdate
@@ -122,6 +123,7 @@ def main() -> None:
     except ValidationError as error:
         logger.error("The forward-test worker does not start. The settings are not valid:\n%s", error)
         sys.exit(1)
+    block_process_reads()
     asyncio.run(run_worker(settings))
 
 

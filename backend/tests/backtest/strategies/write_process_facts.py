@@ -1,7 +1,8 @@
 """Test strategy: writes facts about its own process to a log file at start, and can loop forever in `on_bar`.
 
-The facts are the environment variables, `oom_score_adj`, the niceness, and the process ID. The isolation tests
-replace PROCESS_FACTS_FILE and LOOP_FOREVER_IN_ON_BAR before they save this file as a strategy version.
+The facts are the environment variables, `oom_score_adj`, the niceness, the process ID, and the result of a read of
+the parent environment. The isolation tests replace PROCESS_FACTS_FILE and LOOP_FOREVER_IN_ON_BAR before they save
+this file as a strategy version.
 """
 
 # The NautilusTrader 2.0 stubs type some parameters as a bare dict (docs/architecture.md section 16 G).
@@ -17,6 +18,15 @@ from nautilus_trader.trading import Strategy
 
 PROCESS_FACTS_FILE = "/tmp/process_facts.json"
 LOOP_FOREVER_IN_ON_BAR = False
+
+
+def read_parent_environment_result() -> str:
+    try:
+        Path(f"/proc/{os.getppid()}/environ").read_bytes()
+    except PermissionError:
+        # readability-exception: the file read reports a refused read only as an exception (G1).
+        return "refused"
+    return "read"
 
 
 class ProcessFactsConfig(StrategyConfig):
@@ -38,6 +48,7 @@ class ProcessFactsStrategy(Strategy):
             "oom_score_adj": int(Path("/proc/self/oom_score_adj").read_text()),
             "niceness": os.nice(0),
             "process_id": os.getpid(),
+            "parent_environment": read_parent_environment_result(),
         }
         Path(PROCESS_FACTS_FILE).write_text(json.dumps(process_facts))
         self.subscribe_bars(self.settings.bar_type)
