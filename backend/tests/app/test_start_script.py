@@ -9,6 +9,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 START_SCRIPT = Path(__file__).resolve().parents[3] / "start"
 VALID_ENV = "ATRADE_POSTGRES_PASSWORD=test-password\nATRADE_TRADING_MODE=paper\n"
 OLD_STACK_ENV = "ATRADE_API_HTTP_PORT=5181\nATRADE_IBKR_PAPER_ACCOUNT_ID=DU0000000\nATRADE_BROKER_ACCOUNT_MODE=Paper\n"
@@ -97,6 +99,15 @@ def test_stops_with_a_clear_message_in_live_trading_mode(tmp_path: Path) -> None
 
     assert result.returncode == 1
     assert "ATRADE_TRADING_MODE" in result.stderr
+    assert not docker_calls.exists()
+
+
+@pytest.mark.parametrize("value", ["live # comment", "LIVE", "lvie"])
+def test_a_trading_mode_other_than_paper_stops_the_start(tmp_path: Path, value: str) -> None:
+    result, docker_calls = run_start(tmp_path, f"ATRADE_POSTGRES_PASSWORD=test-password\nATRADE_TRADING_MODE={value}\n")
+
+    assert result.returncode == 1
+    assert "is not allowed" in result.stderr
     assert not docker_calls.exists()
 
 

@@ -154,13 +154,15 @@ def create_web_app(
         backtest_task = start_background_task(backtest_runner.keep_running())
         daily_bar_task = start_background_task(daily_bar_update.keep_updating())
         table_change_task = start_background_task(table_change_feed.keep_listening())
-        yield
-        for task in (table_change_task, daily_bar_task, backtest_task, check_task, connection_task):
-            task.cancel()
-            # `wait` does not raise the error of a dead task, so the disconnect always runs.
-            await asyncio.wait([task])
-        live_daily_bar_hub.stop()
-        gateway_connection.disconnect()
+        try:
+            yield
+        finally:
+            for task in (table_change_task, daily_bar_task, backtest_task, check_task, connection_task):
+                task.cancel()
+                # `wait` does not raise the error of a dead task, so the disconnect always runs.
+                await asyncio.wait([task])
+            live_daily_bar_hub.stop()
+            gateway_connection.disconnect()
 
     app = FastAPI(title="ATrade", lifespan=keep_gateway_connected)
     add_validation_error_handler(app)

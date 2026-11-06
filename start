@@ -73,8 +73,10 @@ refuse_live_trading_mode() {
   if [[ -z "$trading_mode" ]]; then
     trading_mode="$(read_env_value "$env_file" ATRADE_TRADING_MODE)"
   fi
-  if [[ "$trading_mode" == "live" ]]; then
-    printf 'ERROR: ATRADE_TRADING_MODE=live is not allowed. Set ATRADE_TRADING_MODE=paper.\n' >&2
+  # Compose removes a comment after the value. The value has no space.
+  trading_mode="${trading_mode%%[[:space:]]*}"
+  if [[ -n "$trading_mode" && "$trading_mode" != "paper" ]]; then
+    printf 'ERROR: ATRADE_TRADING_MODE=%s is not allowed. Set ATRADE_TRADING_MODE=paper.\n' "$trading_mode" >&2
     exit 1
   fi
 }

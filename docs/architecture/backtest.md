@@ -227,6 +227,9 @@ Limits of this stage:
 - `request_bars` gets only the look-back bars of the backtest bar type
   (section 10.3.1).
 - Cash dividends are not in the backtest (section 10.1).
+- If the database commits the start of a queued backtest and the connection
+  stops before the answer, the row stays `running` without a child until the
+  next `web` start.
 
 Phase 3 changes steps 1, 3, and 5 for a backtest with a universe (section
 10.10.4) and for the source order (section 10.12).
