@@ -164,7 +164,9 @@ async def test_with_concurrency_1_the_second_backtest_waits_in_the_queue(
     first_backtest_id = await start_backtest(web_client, endless_code)
     second_backtest_id = await start_backtest(web_client, TEST_STRATEGY_FILE.read_text(), strategy_name="Second")
 
-    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=3, concurrency=1):
+    async with run_backtest_runner(
+        web_client, database_url, clock, timeout_seconds=LOOPING_BACKTEST_TIMEOUT_SECONDS, concurrency=1
+    ):
         await wait_for_status(web_client, first_backtest_id, "running")
         await asyncio.sleep(1)
         second_backtest_while_first_runs = (await web_client.get(f"/api/backtests/{second_backtest_id}")).json()
