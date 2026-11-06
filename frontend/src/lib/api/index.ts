@@ -1529,16 +1529,6 @@ export interface components {
             paper_capital_usd: string;
             metrics: components["schemas"]["ComparedMetricsResponse"] | null;
         };
-        /** ComparedEquityPointResponse */
-        ComparedEquityPointResponse: {
-            /**
-             * Time Utc
-             * Format: date-time
-             */
-            time_utc: string;
-            /** Equity Usd */
-            equity_usd: string;
-        };
         /**
          * ComparedInterruptionResponse
          * @description A time without a running LiveNode (section 12.7). The chart marks it grey.
@@ -1563,8 +1553,6 @@ export interface components {
         ComparedMetricsResponse: {
             /** Final Equity Usd */
             final_equity_usd: string;
-            /** Net Profit Usd */
-            net_profit_usd: string;
             /** Total Return Percent */
             total_return_percent: string;
             /** Max Drawdown Percent */
@@ -1599,6 +1587,8 @@ export interface components {
             missing_reasons: {
                 [key: string]: string;
             };
+            /** Net Profit Usd */
+            net_profit_usd: string;
         };
         /** @enum {string} */
         Comparison: "above" | "below" | "at_or_above" | "at_or_below" | "crosses_above" | "crosses_below";
@@ -1847,9 +1837,9 @@ export interface components {
             backtest: components["schemas"]["ComparedBacktestSummaryResponse"];
             forward_test_metrics: components["schemas"]["ComparedMetricsResponse"] | null;
             /** Forward Test Equity Curve */
-            forward_test_equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
+            forward_test_equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Backtest Equity Curve */
-            backtest_equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
+            backtest_equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Fills */
             fills: components["schemas"]["FillComparisonResponse"][];
             /** Interruptions */
@@ -1864,7 +1854,7 @@ export interface components {
             forward_test: components["schemas"]["ForwardTestWithIndicatorsResponse"];
             metrics: components["schemas"]["ComparedMetricsResponse"] | null;
             /** Equity Curve */
-            equity_curve: components["schemas"]["ComparedEquityPointResponse"][];
+            equity_curve: components["schemas"]["EquityPointResponse"][];
             /** Fills */
             fills: components["schemas"]["ForwardTestFillResponse"][];
             /** Instruments */

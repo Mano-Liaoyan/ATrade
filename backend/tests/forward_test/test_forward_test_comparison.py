@@ -11,7 +11,7 @@ import httpx
 import psycopg
 import pytest
 
-from atrade.backtest import backtest_store
+from atrade.backtest import backtest_store, read_backtest_outcome, read_backtest_summaries
 from atrade.foundation.instrument import Instrument
 from tests.fakes.clock import FixedClock
 from tests.forward_test.test_forward_test_routes import (
@@ -421,6 +421,28 @@ async def test_the_forward_test_page_has_the_records_and_links_each_same_period_
         (second_backtest_id, "queued"),
         (first_backtest_id, "finished"),
     ]
+    assert detail["same_period_backtests"][0]["metrics"] is None
+    outcome = await read_backtest_outcome(database_url=database_url, backtest_id=first_backtest_id)
+    assert outcome is not None
+    assert outcome.metrics is not None
+    assert detail["same_period_backtests"][1]["metrics"]["trade_count"] == outcome.metrics.trade_count
+
+
+@pytest.mark.anyio
+async def test_the_backtest_summaries_are_the_newest_first_and_skip_an_unknown_id(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    write_forward_test_end(database_url, forward_test["id"])
+    first_backtest_id = (await start_same_period_backtest(web_client, forward_test["id"])).json()["backtest_id"]
+    second_backtest_id = (await start_same_period_backtest(web_client, forward_test["id"])).json()["backtest_id"]
+
+    summaries = await read_backtest_summaries(
+        database_url=database_url, backtest_ids=[first_backtest_id, 999_999, second_backtest_id]
+    )
+
+    assert [summary.id for summary in summaries] == [second_backtest_id, first_backtest_id]
+    assert await read_backtest_summaries(database_url=database_url, backtest_ids=[]) == []
 
 
 @pytest.mark.anyio

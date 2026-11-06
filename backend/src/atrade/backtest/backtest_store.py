@@ -1,6 +1,6 @@
 """SQL for the backtest, backtest_equity_point, and backtest_trade tables. Only the backtest capability uses them."""
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Final, Literal
@@ -203,24 +203,7 @@ def read_metrics(row: BacktestRow) -> BacktestMetrics | None:
         or row.trade_count is None
     ):
         return None
-    return BacktestMetrics(
-        final_equity_usd=row.final_equity_usd,
-        total_return_percent=row.total_return_percent,
-        max_drawdown_percent=row.max_drawdown_percent,
-        trade_count=row.trade_count,
-        cagr_percent=row.cagr_percent,
-        annual_volatility_percent=row.annual_volatility_percent,
-        sharpe_ratio=row.sharpe_ratio,
-        sortino_ratio=row.sortino_ratio,
-        calmar_ratio=row.calmar_ratio,
-        profit_factor=row.profit_factor,
-        average_win_usd=row.average_win_usd,
-        average_win_percent=row.average_win_percent,
-        average_loss_usd=row.average_loss_usd,
-        exposure_percent=row.exposure_percent,
-        turnover_per_year=row.turnover_per_year,
-        win_rate_percent=row.win_rate_percent,
-    )
+    return BacktestMetrics(**{field.name: getattr(row, field.name) for field in fields(BacktestMetrics)})
 
 
 async def insert_backtest(  # noqa: PLR0913 readability-exception: the keywords of a backtest or a sweep run.
@@ -368,6 +351,16 @@ async def select_backtest(connection: psycopg.AsyncConnection, backtest_id: int)
             {"backtest_id": backtest_id},
         )
         return await cursor.fetchone()
+
+
+async def select_backtests_by_id(connection: psycopg.AsyncConnection, backtest_ids: list[int]) -> list[BacktestRow]:
+    """Returns the backtests with these IDs, the newest first."""
+    async with connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
+        await cursor.execute(
+            f"SELECT {BACKTEST_COLUMNS} FROM backtest WHERE id = ANY(%(backtest_ids)s) ORDER BY id DESC",
+            {"backtest_ids": backtest_ids},
+        )
+        return await cursor.fetchall()
 
 
 async def delete_backtest(connection: psycopg.AsyncConnection, backtest_id: int) -> str | None:

@@ -335,7 +335,11 @@ reason why the request cannot run, or `None`: an empty time range;
 request, created_at_utc)` (returns the ID of a queued backtest), and
 `read_backtest_outcome(*, database_url, backtest_id)` (`BacktestOutcome`:
 the request, status, error message, metrics, equity curve, and trades, or
-`None`). They are in `backtest_access.py`.
+`None`), and `read_backtest_summaries(*, database_url, backtest_ids)`
+(`BacktestSummary` without the equity curve and trades, newest first, with
+one query). They are in `backtest_access.py`. The public entry also exports
+`BacktestMetricsResponse` and `EquityPointResponse`. The forward test
+comparison uses them in its responses.
 
 The public entry also exports `create_backtest_router(*, database_url,
 clock, exchange_rate_reader)`, `BacktestRunner(*, database_url, clock, process_command)` with
