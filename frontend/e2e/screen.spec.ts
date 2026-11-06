@@ -465,30 +465,32 @@ test('"Run screen" runs a screen without a run, and a failed run shows its reaso
   await expect(page.getByRole('list', { name: 'Recent runs' }).getByRole('listitem')).toHaveCount(1);
 });
 
-test('a run that ends after the user leaves does not pull the user back', async ({ page, request }, currentTest) => {
-  await saveAaplDailyBars(page, request);
-  const screenId = await createScreen(request, uniqueName(currentTest, 'Left'), 'US', WATCHLIST_DEFINITION);
-  await page.goto(`/screens/${String(screenId)}`);
-  let finishRun = (): void => undefined;
-  const runMayFinish = new Promise<void>((resolve) => {
-    finishRun = resolve;
-  });
-  await page.route(RUNS_ROUTE, async (route) => {
-    await runMayFinish;
-    await route.fallback();
-  });
+for (const button of ['Run screen', 'New screen']) {
+  test(`a "${button}" run that ends after the user leaves does not pull the user back`, async ({ page, request }, currentTest) => {
+    await saveAaplDailyBars(page, request);
+    const screenId = await createScreen(request, uniqueName(currentTest, 'Left'), 'US', WATCHLIST_DEFINITION);
+    await page.goto(`/screens/${String(screenId)}`);
+    let finishRun = (): void => undefined;
+    const runMayFinish = new Promise<void>((resolve) => {
+      finishRun = resolve;
+    });
+    await page.route(RUNS_ROUTE, async (route) => {
+      await runMayFinish;
+      await route.fallback();
+    });
 
-  await page.getByRole('button', { name: 'Run screen', exact: true }).click();
-  await page.getByRole('link', { name: 'Backtests', exact: true }).click();
-  await expect(page).toHaveURL(/\/backtests/);
-  const runAnswer = page.waitForResponse(RUNS_ROUTE);
-  finishRun();
-  await runAnswer;
-  // The stale run could change the URL only after its answer.
-  await page.waitForTimeout(500);
+    await page.getByRole('button', { name: button, exact: true }).click();
+    await page.getByRole('link', { name: 'Backtests', exact: true }).click();
+    await expect(page).toHaveURL(/\/backtests/);
+    const runAnswer = page.waitForResponse(RUNS_ROUTE);
+    finishRun();
+    await runAnswer;
+    // The stale run could change the URL only after its answer.
+    await page.waitForTimeout(500);
 
-  await expect(page).toHaveURL(/\/backtests/);
-});
+    await expect(page).toHaveURL(/\/backtests/);
+  });
+}
 
 test('a failed run keeps the condition bar, and a live change keeps the unsaved edits', async ({ page, request }, currentTest) => {
   const name = uniqueName(currentTest, 'Live');

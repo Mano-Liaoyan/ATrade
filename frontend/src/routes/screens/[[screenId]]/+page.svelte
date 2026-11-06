@@ -273,8 +273,12 @@
   }
 
   // Runs a screen that the page just made, and opens it. A failed run keeps its reason for the opened screen.
-  async function runAndOpen(id: number, body: { market: string; definition: unknown }): Promise<void> {
+  async function runAndOpen(id: number, body: { market: string; definition: unknown }, thisRun: number): Promise<void> {
     const run = await runScreenDraft(fetch, id, body);
+    // Stale, unless the list push already moved /screens to this new screen.
+    if (thisRun !== runNumber && screenId !== id) {
+      return;
+    }
     const target = resolve('/screens/[[screenId]]', { screenId: String(id) });
     if (run.kind !== 'ok') {
       showFailure(id, 'run', run);
@@ -312,6 +316,7 @@
     const base = currentDraft(result);
     // The page goes to the new screen: the answer of a draft run of this screen is stale.
     runNumber += 1;
+    const thisRun = runNumber;
     saving = 'new';
     const created = await createScreen(fetch, {
       name: newScreenName(current.name),
@@ -325,13 +330,15 @@
     }
     draft = null;
     problems = null;
-    await runAndOpen(created.value.id, base);
+    await runAndOpen(created.value.id, base, thisRun);
     saving = null;
   }
 
   // "New screen": creates the default screen (section 24.13), runs it, and opens its screen result.
   async function createNewScreen(): Promise<void> {
     const body = newScreen(workbench.items.map((item) => item.name));
+    runNumber += 1;
+    const thisRun = runNumber;
     isCreating = true;
     createMessage = '';
     const created = await createScreen(fetch, body);
@@ -340,7 +347,7 @@
       createMessage = created.kind === 'failed' ? created.message : created.problems.map((problem) => problem.message).join(' ');
       return;
     }
-    await runAndOpen(created.value.id, { market: body.market, definition: body.definition });
+    await runAndOpen(created.value.id, { market: body.market, definition: body.definition }, thisRun);
     isCreating = false;
   }
 
