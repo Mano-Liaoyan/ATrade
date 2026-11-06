@@ -20,11 +20,16 @@ from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayConnection, GatewayRequestError
 from atrade.market_data.bar_source import BarSource, bar_table
 from atrade.market_data.daily_bar_summary import select_last_daily_bars
-from atrade.market_data.stock_split_detection import RATIO_STEP_TOLERANCE, find_split_ratio, to_decimal
+from atrade.market_data.stock_split_detection import find_split_ratio, to_decimal
 
 logger = logging.getLogger(__name__)
 
 ONE_DAY = timedelta(days=1)
+# A close ratio this near to 1 is no evidence: the closes of a thin stock can differ this much on one day. Evidence A
+# alone can confirm a stock split, and the change of the stored bars has no undo.
+MIN_EVIDENCE_STEP = Decimal("0.08")
+# A stored close further than this from the IBKR bars can have another price, so it does not show a stock split.
+MAX_CLOSE_DISTANCE = timedelta(days=10)
 
 INSERT_CANDIDATE: LiteralString = """
     INSERT INTO stock_split (
@@ -52,6 +57,8 @@ STORED_CLOSES_TEMPLATE = sql.SQL("""
     SELECT start_utc, close FROM {bar_table}
     WHERE symbol = %(symbol)s AND exchange = %(exchange)s AND currency = %(currency)s AND bar_period = '1-DAY'
         AND close > 0 AND start_utc < %(ex_date_utc)s
+        AND start_utc BETWEEN %(near_utc)s::timestamptz - %(max_distance)s
+            AND %(near_utc)s::timestamptz + %(max_distance)s
 """)
 SELECT_NEAREST_OLD_FORM_CLOSE = sql.SQL("""
     SELECT close FROM ({stored_closes}) AS stored_close
@@ -75,11 +82,11 @@ class StockSplitCandidate:
 
 def find_evidence_ratio(stored_close: Decimal, ibkr_close: Decimal) -> Decimal | None:
     """The split ratio of the 2 closes of 1 day, or None when the ratio is 1. The IBKR close and the official close of
-    the Databento import can differ by about 1%, so a ratio within `RATIO_STEP_TOLERANCE` of 1 is 1."""
+    the Databento import can differ, so a ratio within `MIN_EVIDENCE_STEP` of 1 is 1."""
     if stored_close <= 0 or ibkr_close <= 0:
         return None
     raw_ratio = stored_close / ibkr_close
-    if abs(raw_ratio - 1) <= RATIO_STEP_TOLERANCE:
+    if abs(raw_ratio - 1) <= MIN_EVIDENCE_STEP:
         return None
     return to_decimal(find_split_ratio(raw_ratio))
 
@@ -169,7 +176,8 @@ async def shows_split(
 ) -> bool:
     """The detection rule of the Databento import also finds a real crash. IBKR does not adjust the bars of a crash, so
     these bars need no change. True when the last bar before the ex-date and the nearest stored close before the
-    ex-date differ by a ratio nearer to the split ratio than to 1 (in log)."""
+    ex-date differ by a ratio nearer to the split ratio than to 1 (in log). A stored close further than
+    `MAX_CLOSE_DISTANCE` does not count."""
     ex_date_utc, split_ratio = split
     last_bar = next((bar for bar in reversed(bars) if bar.start_utc < ex_date_utc), None)
     if last_bar is None or last_bar.close <= 0:
@@ -182,6 +190,7 @@ async def shows_split(
             "currency": instrument.currency,
             "ex_date_utc": ex_date_utc,
             "near_utc": last_bar.start_utc,
+            "max_distance": MAX_CLOSE_DISTANCE,
         },
     )
     row = await cursor.fetchone()

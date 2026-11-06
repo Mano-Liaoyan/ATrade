@@ -1145,7 +1145,9 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 
 - Evidence A: each read of bars from IBKR also reads the daily bar of 1
   stored day again. The ratio of the stored close to the new IBKR close is
-  the split ratio. A ratio of 1 means no stock split.
+  the split ratio. A ratio within 8% of 1 means no stock split: evidence A
+  alone can confirm a stock split, and a thin stock can have such a close
+  gap on one day.
 - Evidence B is the paper account position divided by the sum of the owner
   positions. Evidence B is part of the owner ledger.
 - The owner ledger runs the check before the market opens: 08:00 ET for US
@@ -1263,8 +1265,9 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   IBKR does not adjust the bars of a crash. Thus the old form applies only
   when the IBKR bars show the stock split: the last IBKR bar before the
   ex-date and the nearest stored daily close before the ex-date differ by a
-  ratio that is nearer to the split ratio than to 1 (in log). Else the IBKR
-  bars stay as IBKR sent them, so a rejected detection leaves real prices.
+  ratio that is nearer to the split ratio than to 1 (in log). The stored close
+  must be within 10 days of that IBKR bar. Else the IBKR bars stay as IBKR
+  sent them, so a rejected detection leaves real prices.
 - Decided (#196): when a stock split with an ex-date after the stored day
   waits already, evidence A records no second candidate. `apply_stock_split()`
   does not confirm a Databento import split; the import check does. A failed

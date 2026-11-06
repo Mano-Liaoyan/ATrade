@@ -35,6 +35,7 @@ from atrade.market_data import (
     save_received_bars,
 )
 from atrade.market_data.daily_bar_summary import DailyBarSummary, calculate_daily_bar_summary
+from atrade.market_data.stock_split_evidence import find_evidence_ratio
 from tests.backtest.real_runner import (
     TEST_STRATEGY_FILE,
     run_backtest_runner,
@@ -140,6 +141,22 @@ async def test_a_ratio_of_1_gives_no_candidate(
     await read_missing_daily_bars(client)
 
     assert await read_stock_split_candidates(database_url=database_url) == []
+
+
+@pytest.mark.parametrize(
+    ("stored_close", "ibkr_close", "split_ratio"),
+    [
+        pytest.param("10.00", "9.60", None, id="a thin close gap of 4%"),
+        pytest.param("10.70", "10.00", None, id="a gap of 7%"),
+        pytest.param("10.00", "10.70", None, id="a gap of 7% down"),
+        pytest.param("110", "100", Decimal(10) / Decimal(9), id="a gap of 10%"),
+        pytest.param("100", "50", Decimal(2), id="a stock split"),
+    ],
+)
+def test_a_close_gap_of_8_percent_or_less_is_not_a_stock_split(
+    stored_close: str, ibkr_close: str, split_ratio: Decimal | None
+) -> None:
+    assert find_evidence_ratio(Decimal(stored_close), Decimal(ibkr_close)) == split_ratio
 
 
 def store_bars(database_url: str, bar_source: BarSource, bar_period: BarPeriod, close: str) -> None:
@@ -409,6 +426,21 @@ async def test_a_crash_that_waits_as_an_import_split_keeps_the_real_ibkr_prices(
 
     all_days = TimeRange(STORED_DAY_UTC - ONE_DAY * 3, STORED_DAY_UTC + ONE_DAY * 2)
     assert await read_daily_closes(client, all_days) == [100.0, 100.0, 100.0, 100.0, 48.0]
+
+
+@pytest.mark.anyio
+async def test_a_stored_close_far_from_the_ibkr_bars_does_not_show_a_waiting_split(
+    client: httpx.AsyncClient, database_url: str, gateway_connection: FakeGatewayConnection
+) -> None:
+    stored_range = TimeRange(STORED_DAY_UTC, STORED_DAY_UTC + ONE_DAY * 2)
+    save_source_bars(database_url, "databento", APPLE, stored_range, [29], Decimal(100))
+    write_waiting_import_split(database_url, STORED_DAY_UTC + ONE_DAY)
+    older_range = TimeRange(STORED_DAY_UTC - ONE_DAY * 40, STORED_DAY_UTC - ONE_DAY * 37)
+    gateway_connection.historical_bars[APPLE] = [
+        create_bar(older_range.start_utc + ONE_DAY * offset, "50") for offset in range(3)
+    ]
+
+    assert await read_daily_closes(client, older_range) == [50.0, 50.0, 50.0]
 
 
 @pytest.mark.anyio
