@@ -11,7 +11,7 @@ from typing import cast
 
 from atrade.indicator.formula_indicator import FormulaIndicator, check_expression, count_formula_bars
 from atrade.indicator.indicator_catalog import VALUE, ChartPlacement, IndicatorDefinition, ScreenLookBack
-from atrade.indicator.indicator_problems import IndicatorProblem
+from atrade.indicator.indicator_problems import IndicatorProblem, to_location_text
 
 CUSTOM_KEY_PREFIX = "custom_"
 CUSTOM_KEY_FORM = re.compile(rf"{CUSTOM_KEY_PREFIX}[0-9]+")
@@ -37,7 +37,7 @@ def check_formula(formula: object) -> list[IndicatorProblem]:
     fields = cast("Mapping[object, object]", formula)
     problems = [
         IndicatorProblem(
-            ("formula", str(field)), f"Unknown field {field!r}. Known fields: {', '.join(FORMULA_FIELDS)}."
+            ("formula", to_location_text(field)), f"Unknown field {field!r}. Known fields: {', '.join(FORMULA_FIELDS)}."
         )
         for field in fields
         if field not in FORMULA_FIELDS

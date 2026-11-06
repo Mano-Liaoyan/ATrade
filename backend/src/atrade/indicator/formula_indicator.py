@@ -12,6 +12,7 @@ import operator
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Protocol, cast
 
 from nautilus_trader.model import Bar as NautilusBar
@@ -32,8 +33,8 @@ MAX_DEPTH = 20
 MAX_EXPONENT = 10
 # The largest look-back of a catalog indicator is 8 x (1000 + 1000): MACD. A formula must not read more.
 MAX_LOOK_BACK_BARS = 20_000
-# The window bars of all nodes x the bars of the look-back. 10 windows of 1000 bars reach it, so a screen of many
-# instruments or a long chart stays a short calculation.
+# The window bars of all nodes x the bars of the look-back. 10 windows of 1000 bars reach it. The limit stops the
+# longest formulas only. A formula near it can run for minutes on many instruments, in a thread (section 23.10.3).
 MAX_CALCULATION_BARS = 10_000_000
 MIN_STD_WINDOW = 2
 BAR_FIELDS = ("open", "high", "low", "close", "volume")
@@ -540,6 +541,8 @@ def check_expression(expression: str) -> list[IndicatorProblem]:
     return []
 
 
+# A screen run reads the name of each indicator for each instrument and condition, on the event loop.
+@lru_cache(maxsize=1024)
 def count_formula_bars(expression: str) -> int:
     """The bars that a correct expression needs for its value. The parser calculates it (section 23.10.3)."""
     return parse_expression(expression).look_back

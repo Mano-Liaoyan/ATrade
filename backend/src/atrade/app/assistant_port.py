@@ -14,6 +14,7 @@ from atrade.assistant import conversation_exists
 from atrade.backtest import create_backtest_assistant_router
 from atrade.foundation.assistant_conversation import CONVERSATION_HEADER
 from atrade.foundation.clock import Clock
+from atrade.foundation.error_response import add_validation_error_handler
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection
 from atrade.market_data import ExchangeRateReader
@@ -41,6 +42,7 @@ def create_assistant_port_app(*, settings: Settings, clock: Clock, gateway_conne
         return await conversation_exists(database_url=settings.database_url, conversation_id=conversation_id)
 
     app = FastAPI(title="ATrade assistant port", openapi_url=None, docs_url=None, redoc_url=None)
+    add_validation_error_handler(app)
     app.include_router(
         create_strategy_assistant_router(
             database_url=settings.database_url, clock=clock, conversation_exists=check_conversation

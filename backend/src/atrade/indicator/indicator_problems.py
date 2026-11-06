@@ -18,6 +18,11 @@ class IndicatorProblem:
     message: str
 
 
+def to_location_text(field: object) -> str:
+    """A field name from a request can hold a lone surrogate. The response must be able to encode the location."""
+    return str(field).encode("utf-8", "backslashreplace").decode("utf-8")
+
+
 def check_parameters(definition: IndicatorDefinition, parameters: object) -> list[IndicatorProblem]:
     if not isinstance(parameters, Mapping):
         return [IndicatorProblem(("parameters",), "The parameters must be an object.")]
@@ -28,7 +33,7 @@ def check_parameters(definition: IndicatorDefinition, parameters: object) -> lis
         parameter = known.get(name) if isinstance(name, str) else None
         if parameter is None:
             message = f"Unknown parameter {name!r} of {definition.name}. Known parameters: {', '.join(known)}."
-            problems.append(IndicatorProblem(("parameters", str(name)), message))
+            problems.append(IndicatorProblem(("parameters", to_location_text(name)), message))
             continue
         message = check_parameter_value(parameter, value)
         if message is not None:

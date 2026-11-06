@@ -102,6 +102,7 @@
 <style>
   .rule-operand {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--cds-spacing-02);
   }

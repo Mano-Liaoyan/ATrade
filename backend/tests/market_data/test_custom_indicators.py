@@ -1,10 +1,13 @@
 """The custom indicator routes and the catalog routes (docs/architecture/indicator.md section 23.10)."""
 
 import json
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import httpx
 import pytest
+
+from atrade.indicator import IndicatorProblem, check_formula, check_indicator_reference
 
 BASE_PATH = "/api/custom-indicators"
 JSON_HEADERS = {"content-type": "application/json"}
@@ -177,6 +180,29 @@ async def test_the_chart_set_refuses_a_custom_indicator_in_the_wrong_pane(web_cl
     response = await web_client.put("/api/market-data/chart-indicators", json=chart_set)
     assert response.status_code == 422
     assert "chart placement" in response.json()["problems"][0]["message"]
+
+
+@pytest.mark.anyio
+async def test_a_validation_error_of_a_text_with_a_lone_surrogate_is_a_422_without_the_input(
+    web_client: httpx.AsyncClient,
+) -> None:
+    content = json.dumps({"name": "A\ud800B", "market": "US"})
+    response = await web_client.post("/api/screens", content=content, headers=JSON_HEADERS)
+    assert response.status_code == 422, response.text
+    assert [(error["type"], error["loc"]) for error in response.json()["detail"]] == [
+        ("missing", ["body", "definition"])
+    ]
+    assert "input" not in response.json()["detail"][0]
+
+
+@pytest.mark.parametrize("check", [check_formula, check_indicator_reference])
+def test_a_field_name_with_a_lone_surrogate_can_be_sent_in_a_location(
+    check: Callable[[object], Sequence[IndicatorProblem]],
+) -> None:
+    problems = check({"\ud800": 1})
+    assert problems
+    for problem in problems:
+        json.dumps(problem.location, ensure_ascii=False).encode("utf-8")
 
 
 @pytest.mark.parametrize("text", ["A\x00B", "A\ud800B"])

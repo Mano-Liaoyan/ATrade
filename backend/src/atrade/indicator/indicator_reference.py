@@ -16,7 +16,7 @@ from atrade.indicator.indicator_catalog import (
     IndicatorDefinition,
     ParameterValue,
 )
-from atrade.indicator.indicator_problems import IndicatorProblem, check_output, check_parameters
+from atrade.indicator.indicator_problems import IndicatorProblem, check_output, check_parameters, to_location_text
 
 REFERENCE_FIELDS = ("indicator", "parameters", "output")
 CHART_REFERENCE_FIELDS = ("indicator", "parameters")
@@ -35,7 +35,9 @@ def check_indicator_reference(reference: object, *, has_output: bool = True) -> 
     is_custom = is_custom_key(key)
     known_fields = (*(REFERENCE_FIELDS if has_output else CHART_REFERENCE_FIELDS), *(("formula",) if is_custom else ()))
     problems = [
-        IndicatorProblem((str(field),), f"Unknown field {field!r}. Known fields: {', '.join(known_fields)}.")
+        IndicatorProblem(
+            (to_location_text(field),), f"Unknown field {field!r}. Known fields: {', '.join(known_fields)}."
+        )
         for field in fields
         if field not in known_fields
     ]
