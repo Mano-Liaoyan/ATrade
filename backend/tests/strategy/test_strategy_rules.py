@@ -6,17 +6,19 @@ import pytest
 from pydantic import ValidationError
 
 from atrade.strategy.code_checks import check_strategy_code
-from atrade.strategy.rules_code import make_rules_code
+from atrade.strategy.rules_code import find_warm_up_bar_count, make_rules_code
 from atrade.strategy.strategy_rules import StrategyRules
 from tests.strategy.rules_examples import (
     COMPARISONS,
     PRICES,
     Json,
     condition,
+    custom_indicator,
     group,
     indicator,
     make_full_rules,
     make_rules,
+    make_universe_rules,
     number,
     price,
 )
@@ -167,3 +169,57 @@ def test_operands_with_the_same_indicator_and_parameters_share_one_indicator() -
     code = make_rules_code(check(rules))
 
     assert code.count("atrade.indicator.SMA(") == 2
+
+
+def custom_rules(left: Json | None = None, right: Json | None = None) -> Json:
+    return make_rules(group("all_of", condition(left or custom_indicator(), "above", right or number(1))))
+
+
+def test_the_saved_json_of_rules_without_a_custom_indicator_has_no_formula_field() -> None:
+    assert (
+        "formula"
+        not in check(make_rules(group("all_of", condition(indicator("rsi"), "above", number(1))))).model_dump_json()
+    )
+
+
+def test_a_custom_indicator_keeps_its_formula_in_the_saved_json() -> None:
+    dumped = check(custom_rules()).model_dump(mode="json")
+    assert dumped["entry"]["items"][0]["left"]["formula"]["expression"] == "close / sma(5)"
+
+
+@pytest.mark.anyio
+async def test_the_code_holds_the_expression_and_needs_no_database_read() -> None:
+    code = make_rules_code(check(custom_rules()))
+    assert "atrade.indicator.FormulaIndicator('close / sma(5)')" in code
+    assert await check_strategy_code(code) == []
+
+
+@pytest.mark.anyio
+async def test_the_universe_code_holds_the_expression() -> None:
+    rules = make_universe_rules(rank_indicator=custom_indicator())
+    code = make_rules_code(check(rules))
+    assert "atrade.indicator.FormulaIndicator('close / sma(5)')" in code
+    assert await check_strategy_code(code) == []
+
+
+def test_the_warm_up_is_the_look_back_of_the_expression() -> None:
+    assert find_warm_up_bar_count(check(custom_rules(custom_indicator("mean(rsi(14), 5)")))) == 116
+
+
+def test_a_text_in_the_expression_cannot_break_the_code() -> None:
+    expression = 'macd(output="signal") + 1'
+    code = make_rules_code(check(custom_rules(custom_indicator(expression))))
+    assert ast.parse(code) is not None
+    assert repr(expression) in code
+
+
+def test_2_expressions_of_one_key_are_2_indicators() -> None:
+    rules = custom_rules(custom_indicator("close"), custom_indicator("open"))
+    code = make_rules_code(check(rules))
+    assert "FormulaIndicator('close')" in code
+    assert "FormulaIndicator('open')" in code
+
+
+def test_a_wrong_formula_is_refused() -> None:
+    with pytest.raises(ValidationError, match="Unknown function"):
+        check(custom_rules(custom_indicator("__import__('os')")))

@@ -9,7 +9,7 @@ literals. A parameter value is an `int` or `float` literal, or the name of a con
 import ast
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import TypedDict
+from typing import NotRequired, TypedDict, cast
 
 from atrade.indicator import check_indicator_reference
 from atrade.strategy.code_syntax import CodeProblem
@@ -24,11 +24,19 @@ LIST_MESSAGE = f"{CHART_INDICATORS_NAME} must be a list literal of dict literals
 type ParameterNumber = int | float
 
 
+class ChartIndicatorFormula(TypedDict):
+    name: str
+    expression: str
+    chart_placement: str
+
+
 class ChartIndicator(TypedDict):
-    """A whole indicator of the chart with its parameter values, as `{"indicator", "parameters"}` JSON."""
+    """A whole indicator of the chart with its parameter values, as `{"indicator", "parameters"}` JSON. A custom
+    indicator also has `formula` (indicator.md section 23.10)."""
 
     indicator: str
     parameters: dict[str, ParameterNumber]
+    formula: NotRequired[ChartIndicatorFormula]
 
 
 @dataclass(frozen=True)
@@ -87,7 +95,14 @@ def list_chart_indicators(code: str, parameters: Mapping[str, object]) -> list[C
         if check_item(item, field_values):
             continue
         resolved = resolve_parameters(item, field_values)
-        chart_indicators.append({"indicator": str(item.fields["indicator"]), "parameters": cast_numbers(resolved)})
+        chart_indicator: ChartIndicator = {
+            "indicator": str(item.fields["indicator"]),
+            "parameters": cast_numbers(resolved),
+        }
+        formula = item.fields.get("formula")
+        if isinstance(formula, dict):
+            chart_indicator["formula"] = cast("ChartIndicatorFormula", formula)
+        chart_indicators.append(chart_indicator)
     return chart_indicators
 
 
@@ -147,9 +162,20 @@ def read_item(number: int, element: ast.expr) -> ChartItem | CodeProblem:
             if problem is not None:
                 return problem
             item.fields[key] = item.parameters
+        elif key == "formula":
+            item.fields[key] = read_formula(key_value)
         else:
             item.fields[key] = None
     return item
+
+
+def read_formula(value: ast.expr) -> dict[str, object] | None:
+    """The `formula` of a custom indicator: a dict literal of string literals. None makes a problem of the check."""
+    keys = read_string_keys(value)
+    if not isinstance(value, ast.Dict) or keys is None:
+        return None
+    texts = [item.value if isinstance(item, ast.Constant) else None for item in value.values]
+    return dict(zip(keys, texts, strict=True))
 
 
 def read_string_keys(element: ast.expr) -> list[str] | None:

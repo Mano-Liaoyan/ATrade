@@ -3,6 +3,7 @@
 Each problem gives the location of the condition in the request body and the reason.
 """
 
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -142,7 +143,7 @@ CASES = [
         [
             problem(
                 [*CONDITIONS, 1, "indicator"],
-                "The line must be one of: sma value, ema value, donchian_channel upper. Not 'rsi' 'value'.",
+                "The line must be one of: sma value, ema value, donchian_channel upper, a custom indicator with the chart placement price. Not 'rsi' 'value'.",
             )
         ],
     ),
@@ -223,3 +224,80 @@ async def test_a_screen_with_the_largest_values_and_keep_first_is_correct(web_cl
     response = await web_client.post("/api/screens", json={"name": "x" * 100, "market": "US", "definition": definition})
 
     assert response.status_code == httpx.codes.CREATED
+
+
+def custom_reference(expression: str = "close", placement: str = "own") -> dict[str, Any]:
+    formula = {"name": "Custom", "expression": expression, "chart_placement": placement}
+    return {"indicator": "custom_1", "parameters": {}, "output": "value", "formula": formula}
+
+
+def add_condition(body: Body, reference: dict[str, Any]) -> None:
+    condition = {"kind": "compare", "indicator": reference, "operator": ">", "value": "0"}
+    body["definition"]["indicator_conditions"].append(condition)
+
+
+def make_body() -> Body:
+    return {"name": "Momentum leaders", "market": "US", "definition": momentum_definition()}
+
+
+@pytest.mark.anyio
+async def test_a_custom_indicator_in_a_condition_is_correct(web_client: httpx.AsyncClient) -> None:
+    body = make_body()
+    add_condition(body, custom_reference())
+    response = await web_client.post("/api/screens", json=body)
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.anyio
+async def test_a_wrong_expression_has_its_location(web_client: httpx.AsyncClient) -> None:
+    body = make_body()
+    add_condition(body, custom_reference("__import__('os')"))
+    response = await web_client.post("/api/screens", json=body)
+    assert response.status_code == 422
+    index = len(body["definition"]["indicator_conditions"]) - 1
+    assert response.json()["problems"][0]["location"] == [
+        "definition",
+        "indicator_conditions",
+        index,
+        "indicator",
+        "formula",
+        "expression",
+    ]
+
+
+@pytest.mark.anyio
+async def test_one_name_with_2_expressions_is_refused(web_client: httpx.AsyncClient) -> None:
+    body = make_body()
+    add_condition(body, custom_reference("close"))
+    add_condition(body, custom_reference("open"))
+    response = await web_client.post("/api/screens", json=body)
+    assert response.status_code == 422
+    assert "has 2 expressions" in response.json()["problems"][0]["message"]
+    assert "Use current expression" in response.json()["problems"][0]["message"]
+
+
+@pytest.mark.parametrize("name", ["A\x00B", "A\ud800B"])
+@pytest.mark.anyio
+async def test_a_formula_name_that_postgresql_cannot_store_is_a_problem_of_the_name(
+    web_client: httpx.AsyncClient, name: str
+) -> None:
+    body = make_body()
+    reference = custom_reference()
+    reference["formula"]["name"] = name
+    add_condition(body, reference)
+    response = await web_client.post(
+        "/api/screens", content=json.dumps(body), headers={"content-type": "application/json"}
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["problems"][0]["location"][-2:] == ["formula", "name"]
+
+
+@pytest.mark.parametrize(("placement", "status_code"), [("price", 201), ("own", 422)])
+@pytest.mark.anyio
+async def test_a_custom_indicator_on_the_price_scale_is_a_line(
+    web_client: httpx.AsyncClient, placement: str, status_code: int
+) -> None:
+    body = make_body()
+    condition = {"kind": "close_versus_line", "indicator": custom_reference(placement=placement), "side": "above"}
+    body["definition"]["indicator_conditions"].append(condition)
+    assert (await web_client.post("/api/screens", json=body)).status_code == status_code

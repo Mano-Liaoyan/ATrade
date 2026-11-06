@@ -91,6 +91,8 @@ class IndicatorDefinition:
     # The meaning, the range, and the unit of the value. The AI assistant reads it to write a condition (#373).
     value_description: str
     orders: tuple[ParameterOrder, ...] = ()
+    # The formula expression of a custom indicator (section 23.10). None for a built-in indicator.
+    expression: str | None = None
 
     def with_defaults(self, parameters: ParameterValues) -> dict[str, ParameterValue]:
         return {parameter.name: parameters.get(parameter.name, parameter.default) for parameter in self.parameters}
@@ -99,7 +101,7 @@ class IndicatorDefinition:
         """The name that the UI shows, for example `RSI(14)`. Missing parameters show their defaults."""
         values = self.with_defaults(parameters)
         shown = [format_parameter(values[parameter.name]) for parameter in self.parameters if parameter.is_in_name]
-        return f"{self.name}({', '.join(shown)})"
+        return f"{self.name}({', '.join(shown)})" if shown else self.name
 
     def screen_look_back_bars(self, parameters: ParameterValues) -> int:
         """The number of daily bars that a screen reads for this indicator (section 23.4)."""

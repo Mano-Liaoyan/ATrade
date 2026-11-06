@@ -1,16 +1,18 @@
 <!-- One side of a rule condition: a price, an indicator with its parameters (and its line for a multi-line
      indicator), or a number (right side only). -->
 <script lang="ts">
-  import { Select } from '#lib/foundation/carbon';
+  import { Button, Select } from '#lib/foundation/carbon';
   import {
     createOperand,
     findIndicatorChoice,
     listOperandChoices,
+    readCurrentOperand,
     readOperandChoice,
     type OperandChoice,
     type RightOperand,
   } from '#lib/strategy';
   import RuleNumberInput from './RuleNumberInput.svelte';
+  import { readCustomIndicators } from './custom_indicator_context';
 
   interface Props {
     label: string;
@@ -21,8 +23,10 @@
 
   const { label, side, operand, onOperandChange }: Props = $props();
 
-  const choices = $derived(listOperandChoices(side));
+  const customIndicators = readCustomIndicators();
+  const choices = $derived(listOperandChoices(side, customIndicators(), operand));
   const indicator = $derived(operand.type === 'indicator' ? findIndicatorChoice(operand.indicator) : undefined);
+  const currentOperand = $derived(readCurrentOperand(operand, customIndicators()));
 </script>
 
 <span class="rule-operand">
@@ -34,10 +38,23 @@
       items={choices}
       value={readOperandChoice(operand)}
       onValueChange={(choice: OperandChoice) => {
-        onOperandChange(createOperand(choice));
+        onOperandChange(createOperand(choice, customIndicators()));
       }}
     />
   </span>
+  {#if currentOperand !== null}
+    {@const newOperand = currentOperand}
+    <Button
+      kind="ghost"
+      size="sm"
+      aria-label="Use current expression in {label}"
+      onclick={() => {
+        onOperandChange(newOperand);
+      }}
+    >
+      Use current expression
+    </Button>
+  {/if}
   {#if operand.type === 'indicator' && indicator !== undefined}
     {@const indicatorOperand = operand}
     <span class="rule-operand__paren" aria-hidden="true">(</span>
@@ -85,6 +102,7 @@
 <style>
   .rule-operand {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: var(--cds-spacing-02);
   }

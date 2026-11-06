@@ -6,6 +6,7 @@
 <script lang="ts">
   import { untrack } from 'svelte';
   import { Checkbox, ContentSwitcher, InlineNotification, Select } from '#lib/foundation/carbon';
+  import { listChartIndicatorCatalog } from '#lib/market_data';
   import { CodeEditor } from '#lib/foundation/code_editor';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
@@ -18,9 +19,11 @@
     type RightOperand,
     type RuleExits,
     type RuleGroup,
+    type CustomIndicatorChoice,
     type StrategyRules,
     type UniverseSettings,
   } from '#lib/strategy';
+  import { provideCustomIndicators } from './custom_indicator_context';
   import RuleGroupEditor from './RuleGroupEditor.svelte';
   import RuleNumberInput from './RuleNumberInput.svelte';
   import RuleOperand from './RuleOperand.svelte';
@@ -33,6 +36,17 @@
   }
 
   const { rules, onRulesChange, warning = null }: Props = $props();
+
+  let customIndicators = $state<CustomIndicatorChoice[]>([]);
+  provideCustomIndicators(() => customIndicators);
+
+  $effect(() => {
+    void listChartIndicatorCatalog(fetch).then((result) => {
+      if (result.kind === 'ok') {
+        customIndicators = result.value.filter((item) => item.formula !== undefined && item.formula !== null);
+      }
+    });
+  });
 
   type PositionKind = 'fixed_shares' | 'percent_of_equity';
   const POSITION_ITEMS: { value: PositionKind; label: string }[] = [

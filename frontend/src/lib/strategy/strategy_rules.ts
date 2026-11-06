@@ -12,6 +12,8 @@ export type RuleCondition = Schemas['RuleCondition'];
 export type LeftOperand = Schemas['LeftOperand'];
 export type RightOperand = Schemas['RightOperand'];
 export type IndicatorOperand = Schemas['IndicatorOperand'];
+/** A custom indicator of the catalog: the rule builder has the built-in choices below and reads these from the backend. */
+export type CustomIndicatorChoice = Pick<Schemas['IndicatorResponse'], 'key' | 'name' | 'formula'>;
 export type Comparison = Schemas['Comparison'];
 export type PriceName = Schemas['PriceName'];
 export type GroupMatch = Schemas['GroupMatch'];
@@ -129,11 +131,27 @@ export const COMPARISON_CHOICES: { value: Comparison; label: string }[] = [
 export type OperandChoice = `price:${PriceName}` | `indicator:${string}` | 'number';
 
 // The rank of the universe mode takes an indicator only.
-export function listOperandChoices(side: 'left' | 'right' | 'rank'): { value: OperandChoice; label: string }[] {
+// A deleted custom indicator stays in the list of its operand: the operand holds the expression (indicator.md section 23.10).
+function listDeletedIndicator(customIndicators: readonly CustomIndicatorChoice[], operand: RightOperand | undefined): CustomIndicatorChoice[] {
+  if (operand?.type !== 'indicator' || customIndicators.some((choice) => choice.key === operand.indicator)) {
+    return [];
+  }
+  return operand.formula ? [{ key: operand.indicator, name: operand.formula.name, formula: operand.formula }] : [];
+}
+
+export function listOperandChoices(
+  side: 'left' | 'right' | 'rank',
+  customIndicators: readonly CustomIndicatorChoice[] = [],
+  operand?: RightOperand,
+): { value: OperandChoice; label: string }[] {
   const prices = side === 'rank' ? [] : PRICE_CHOICES.map(([name, label]) => ({ value: `price:${name}` as const, label }));
   const indicators = INDICATOR_CHOICES.map((choice) => ({ value: `indicator:${choice.key}` as const, label: choice.label }));
+  const custom = [...customIndicators, ...listDeletedIndicator(customIndicators, operand)].map((choice) => ({
+    value: `indicator:${choice.key}` as const,
+    label: choice.name,
+  }));
   const numbers = side === 'right' ? [{ value: 'number' as const, label: 'Number' }] : [];
-  return [...prices, ...indicators, ...numbers];
+  return [...prices, ...indicators, ...custom, ...numbers];
 }
 
 export function findIndicatorChoice(key: string): IndicatorChoice | undefined {
@@ -150,7 +168,7 @@ export function readOperandChoice(operand: RightOperand): OperandChoice {
   return 'number';
 }
 
-export function createOperand(choice: OperandChoice): RightOperand {
+export function createOperand(choice: OperandChoice, customIndicators: readonly CustomIndicatorChoice[] = []): RightOperand {
   if (choice === 'number') {
     return { type: 'number', value: 0 };
   }
@@ -158,11 +176,30 @@ export function createOperand(choice: OperandChoice): RightOperand {
   if (kind === 'price') {
     return { type: 'price', price: name as PriceName };
   }
+  const formula = customIndicators.find((item) => item.key === name)?.formula;
+  if (formula) {
+    return { type: 'indicator', indicator: name, parameters: {}, formula };
+  }
   const indicator = findIndicatorChoice(name);
   const parameters = Object.fromEntries((indicator?.parameters ?? []).map((parameter) => [parameter.name, parameter.default]));
   const operand: IndicatorOperand = { type: 'indicator', indicator: name, parameters };
   const firstLine = indicator?.lines[0];
   return firstLine === undefined ? operand : { ...operand, output: firstLine[0] };
+}
+
+/**
+ * The operand with the formula of the catalog. Null when the operand already has it or the indicator is deleted. The
+ * Select cannot do this: a click on the selected item changes nothing.
+ */
+export function readCurrentOperand(operand: RightOperand, customIndicators: readonly CustomIndicatorChoice[]): IndicatorOperand | null {
+  const formula = operand.type === 'indicator' ? operand.formula : null;
+  const current = operand.type === 'indicator' ? customIndicators.find((item) => item.key === operand.indicator)?.formula : null;
+  if (operand.type !== 'indicator' || !formula || !current) {
+    return null;
+  }
+  const isSame =
+    formula.name === current.name && formula.expression === current.expression && formula.chart_placement === current.chart_placement;
+  return isSame ? null : { ...operand, formula: current };
 }
 
 export function createCondition(): RuleCondition {

@@ -24,6 +24,11 @@ def indicator(key: str, output: str | None = None, **parameters: float) -> Json:
     return operand
 
 
+def custom_indicator(expression: str = "close / sma(5)", key: str = "custom_3") -> Json:
+    formula = {"name": "Ratio", "expression": expression, "chart_placement": "own"}
+    return {"type": "indicator", "indicator": key, "parameters": {}, "formula": formula}
+
+
 def condition(left: Json, comparison: str, right: Json) -> Json:
     return {"type": "condition", "left": left, "comparison": comparison, "right": right}
 

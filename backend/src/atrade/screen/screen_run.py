@@ -5,6 +5,7 @@ keeps in one read, gives each indicator only its look-back bars (section 23.4), 
 conditions. A check with `check_screen` comes first, so the definition here is correct.
 """
 
+import asyncio
 import bisect
 import math
 import operator
@@ -16,7 +17,7 @@ from typing import Any, cast
 
 from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
-from atrade.indicator import INDICATOR_CATALOG, create_indicator
+from atrade.indicator import create_indicator, find_indicator_definition
 from atrade.market_data import DailyBarSummary
 
 type DailyBarsReader = Callable[[list[Instrument], datetime, int], Awaitable[dict[Instrument, list[Bar]]]]
@@ -81,14 +82,14 @@ class IndicatorColumn:
 
 def name_indicator(reference: Mapping[str, object]) -> str:
     """For example "RSI(14)", or "Donchian channel(20) upper" for an output that is not `value`."""
-    definition = INDICATOR_CATALOG[cast("str", reference["indicator"])]
+    definition = find_indicator_definition(reference)
     name = definition.display_name(cast("Mapping[str, int | float]", reference.get("parameters", {})))
     output = cast("str", reference.get("output", "value"))
     return name if output == "value" else f"{name} {output}"
 
 
 def make_column(reference: Mapping[str, object]) -> IndicatorColumn:
-    definition = INDICATOR_CATALOG[cast("str", reference["indicator"])]
+    definition = find_indicator_definition(reference)
     parameters = cast("Mapping[str, int | float]", reference.get("parameters", {}))
     return IndicatorColumn(
         name=name_indicator(reference),
@@ -162,6 +163,10 @@ def calculate_value(column: IndicatorColumn, bars: list[Bar]) -> float | None:
     return value if value is not None and math.isfinite(value) else None
 
 
+def calculate_values(columns: list[IndicatorColumn], bars: list[Bar]) -> dict[str, float | None]:
+    return {column.name: calculate_value(column, bars) for column in columns}
+
+
 def calculate_percentiles(values: list[float]) -> tuple[list[float], list[float]]:
     """For each value: 100 x the share of the values that are lower or equal (the "Percentile" column), and 100 x the
     share of the values that are lower. Equal values get the same percentiles."""
@@ -230,7 +235,8 @@ async def calculate_candidates(
     exclusions: list[ScreenExclusion] = []
     for summary in kept:
         bars = bars_by_instrument.get(summary.instrument, [])
-        values = {column.name: calculate_value(column, bars) for column in columns}
+        # In a thread, so the event loop serves other requests during a long calculation.
+        values = await asyncio.to_thread(calculate_values, columns, bars)
         missing = next((name for name, value in values.items() if value is None), None)
         if missing is not None or not bars:
             exclusions.append(ScreenExclusion(summary.instrument, f"No value: {missing}"))

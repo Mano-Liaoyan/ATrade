@@ -308,7 +308,7 @@ prompt does not list the tools.
 
 | Tool | Does | Result to the model |
 |---|---|---|
-| `list_indicators` | Lists the indicator catalog (#373). | The body of `GET /api/screen-indicators` without a change: key, name, parameters with default, minimum, and maximum, outputs, and `value_description` for each indicator. |
+| `list_indicators` | Lists the indicator catalog (#373). | The body of `GET /api/screen-indicators` without a change: key, name, parameters with default, minimum, and maximum, outputs, and `value_description` for each indicator, and `formula` for a custom indicator (indicator.md section 23.10). |
 | `list_screens` | Lists the screens. | The screen list. |
 | `read_screen` | Reads one screen. | The conditions of the screen. |
 | `create_screen` | Saves a new screen (25.6). The optional `source_screen_id` names the screen that the new screen changes (#210). | The new screen. On `422`, the problem list. |

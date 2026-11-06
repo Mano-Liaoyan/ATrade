@@ -165,7 +165,7 @@ The definition is JSON. The indicator reference is the reference of section
   | Filter `last_price`, `average_trading_value_20` | `field`, `operator`, `value` | `operator`: `<`, `<=`, `>`, `>=`. `value`: a decimal string. |
   | Filter `exchange` | `field`, `values` | A list of 1 or more exchanges. |
   | Condition `compare` | `kind`, `indicator`, `operator`, `value` | As the number filters. |
-  | Condition `close_versus_line` | `kind`, `indicator`, `side` | `indicator`: `sma` or `ema` with the output `value`, or `donchian_channel` with the output `upper`. `side`: `above` or `below`. |
+  | Condition `close_versus_line` | `kind`, `indicator`, `side` | `indicator`: `sma` or `ema` with the output `value`, `donchian_channel` with the output `upper`, or a custom indicator with the chart placement `price` (indicator.md section 23.10). `side`: `above` or `below`. |
   | Condition `rank` | `kind`, `indicator`, `end`, `percent` | `end`: `top` or `bottom`. `percent`: an integer from 1 to 100. |
   | `order` | `indicator`, `direction`, optional `keep_first` | `direction`: `ascending` or `descending`. `keep_first`: an integer from 1 to 500. |
 
@@ -272,6 +272,10 @@ before their own location. A name that another screen has gives the
 problem `["name"]` with the reason "A screen with the name '<name>' exists.".
 The market is a problem `["market"]` when it is not `US` or `HK`.
 
+A condition or the order can hold a reference to a custom indicator
+(indicator.md section 23.10). One name with 2 expressions in one definition is
+a problem at the second reference.
+
 ## 24.7 HTTP routes
 
 Source: [How the AI assistant uses screens](https://github.com/Mano-Liaoyan/ATrade/issues/150) A8 and B3.
@@ -287,7 +291,7 @@ Decided (#205): the paths and the field names of this table are final.
 | `DELETE /api/screens/{screen_id}` | `204`. Also deletes the screen results of the screen. `404` when the screen does not exist. Not on the AI assistant port. Discard of the condition card uses it (#210). |
 | `POST /api/screens/{screen_id}/keep` | Keep of the condition card (#210). `200` with the screen, as `GET /api/screens/{screen_id}` gives it, with `kept` true. A screen that is kept already also gets `200`. `updated_at_utc` does not change. `404` when the screen does not exist. Not on the AI assistant port. |
 | `POST /api/screens/{screen_id}/runs` | Runs the saved screen. With the optional body `{market, definition}`, runs that market and definition in place of the saved ones and does not change the saved screen (#212). `201` with the screen result (as `GET /api/screen-results/{id}` gives it). `422` with the problem list. `404` when the screen does not exist. |
-| `GET /api/screen-indicators` | `200` with the indicator catalog of section 23.3, in its order: `[{"key", "name", "short_name", "chart_placement", "parameters": [{"name", "value_type" ("int" or "float"), "default", "minimum", "maximum", "is_in_name"}], "outputs", "value_description"}]`. `value_description` gives the meaning, the range, and the unit of the value (section 23.3, #373). It is the same body as `GET /api/market-data/indicators` (indicator.md section 23.9.6, #327). The edit popover of the screen page reads it (#212). The AI assistant port has the route too (section 24.8). |
+| `GET /api/screen-indicators` | `200` with the indicator catalog of section 23.3, in its order, then the custom indicators by name: `[{"key", "name", "short_name", "chart_placement", "parameters": [{"name", "value_type" ("int" or "float"), "default", "minimum", "maximum", "is_in_name"}], "outputs", "value_description", "formula"}]`. Only a custom indicator has `formula` (indicator.md section 23.10). `value_description` gives the meaning, the range, and the unit of the value (section 23.3, #373). It is the same body as `GET /api/market-data/indicators` (indicator.md section 23.9.6, #327). The edit popover of the screen page reads it (#212). The AI assistant port has the route too (section 24.8). |
 | `GET /api/screen-results/{screen_result_id}?offset=&limit=` | `200` with the summary and one page of rows. Default `limit` 50. `404` when the screen result does not exist. |
 
 The screen result answer:

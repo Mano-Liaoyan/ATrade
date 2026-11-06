@@ -49,6 +49,7 @@
     findLegendIndex,
     findMaximizedStretchFactors,
     listPaneActions,
+    findChartDefinition,
     moveOwnPane,
     removeChartIndicator,
     removeOwnPane,
@@ -607,7 +608,7 @@
   }
 
   const settingsIndicator = $derived(settings === null ? undefined : indicatorPanes[settings.paneIndex]?.indicators[settings.indicatorIndex]);
-  const settingsDefinition = $derived(catalog.find((definition) => definition.key === settingsIndicator?.indicator));
+  const settingsDefinition = $derived(settingsIndicator === undefined ? undefined : findChartDefinition(catalog, settingsIndicator));
 
   const legendIndex = $derived(findLegendIndex(indicatorSeries?.times ?? [], crosshairTime));
   // The label of each series shows its value at the legend bar; a bar without a value shows no label.

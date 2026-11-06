@@ -213,23 +213,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/market-data/indicators": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Indicators */
-        get: operations["list_indicators_api_market_data_indicators_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/market-data/indicator-series": {
         parameters: {
             query?: never;
@@ -245,6 +228,83 @@ export interface paths {
          */
         post: operations["read_indicator_series_api_market_data_indicator_series_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/market-data/indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Catalog */
+        get: operations["list_catalog_api_market_data_indicators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/custom-indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List All */
+        get: operations["list_all_api_custom_indicators_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_api_custom_indicators_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/custom-indicators/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check Body */
+        post: operations["check_body_api_custom_indicators_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/custom-indicators/{custom_indicator_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read */
+        get: operations["read_api_custom_indicators__custom_indicator_id__get"];
+        /**
+         * Change
+         * @description Stored references keep their own expression (ADR 0009). Only new references get the changed one.
+         */
+        put: operations["change_api_custom_indicators__custom_indicator_id__put"];
+        post?: never;
+        /**
+         * Delete
+         * @description Stored references keep working: each one holds its expression (ADR 0009).
+         */
+        delete: operations["delete_api_custom_indicators__custom_indicator_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -825,11 +885,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /**
-         * List Indicator Catalog
-         * @description The indicator catalog in its own order. The screen page and the bar charts read it.
-         */
-        get: operations["list_indicator_catalog_api_screen_indicators_get"];
+        /** List Indicators */
+        get: operations["list_indicators_api_screen_indicators_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1307,7 +1364,8 @@ export interface components {
         };
         /**
          * ChartIndicator
-         * @description A whole indicator of the chart with its parameter values, as `{"indicator", "parameters"}` JSON.
+         * @description A whole indicator of the chart with its parameter values, as `{"indicator", "parameters"}` JSON. A custom
+         *     indicator also has `formula` (indicator.md section 23.10).
          */
         ChartIndicator: {
             /** Indicator */
@@ -1316,6 +1374,16 @@ export interface components {
             parameters: {
                 [key: string]: components["schemas"]["ParameterNumber"];
             };
+            formula?: components["schemas"]["ChartIndicatorFormula"];
+        };
+        /** ChartIndicatorFormula */
+        ChartIndicatorFormula: {
+            /** Name */
+            name: string;
+            /** Expression */
+            expression: string;
+            /** Chart Placement */
+            chart_placement: string;
         };
         /**
          * ChartIndicatorSet
@@ -1638,6 +1706,42 @@ export interface components {
             state: "ready" | "failed";
             /** State Message */
             state_message: string | null;
+        };
+        /**
+         * CustomIndicatorBody
+         * @description The route checks the values, so each problem has its location.
+         */
+        CustomIndicatorBody: {
+            /** Name */
+            name: string;
+            /** Expression */
+            expression: string;
+            /** Chart Placement */
+            chart_placement: string;
+            /** Value Description */
+            value_description: string;
+        };
+        /** CustomIndicatorCheckResponse */
+        CustomIndicatorCheckResponse: {
+            /** Problems */
+            problems: components["schemas"]["IndicatorProblemResponse"][];
+            /** Look Back Bars */
+            look_back_bars: number | null;
+        };
+        /** CustomIndicatorResponse */
+        CustomIndicatorResponse: {
+            /** Name */
+            name: string;
+            /** Expression */
+            expression: string;
+            /** Chart Placement */
+            chart_placement: string;
+            /** Value Description */
+            value_description: string;
+            /** Custom Indicator Id */
+            custom_indicator_id: number;
+            /** Key */
+            key: string;
         };
         /** @enum {string} */
         DesiredState: "running" | "stopped";
@@ -1983,6 +2087,31 @@ export interface components {
             problems: components["schemas"]["IndicatorProblemResponse"][];
         };
         /**
+         * IndicatorFormula
+         * @description The `formula` of a reference to a custom indicator (indicator.md section 23.10).
+         */
+        IndicatorFormula: {
+            /** Name */
+            name: string;
+            /** Expression */
+            expression: string;
+            /** Chart Placement */
+            chart_placement: string;
+        };
+        /**
+         * IndicatorFormulaBody
+         * @description The `formula` of a reference to a custom indicator (indicator.md section 23.10). A stored reference holds it, so
+         *     the reference keeps working after a change or a delete of the custom indicator (ADR 0009).
+         */
+        IndicatorFormulaBody: {
+            /** Name */
+            name: string;
+            /** Expression */
+            expression: string;
+            /** Chart Placement */
+            chart_placement: string;
+        };
+        /**
          * IndicatorOperand
          * @description A stored indicator reference. A single-line indicator without `output` uses `value`.
          */
@@ -2000,6 +2129,7 @@ export interface components {
             };
             /** Output */
             output?: string | null;
+            formula?: components["schemas"]["IndicatorFormula"] | null;
         };
         /** IndicatorParameterResponse */
         IndicatorParameterResponse: {
@@ -2028,7 +2158,7 @@ export interface components {
         };
         /**
          * IndicatorResponse
-         * @description One indicator of the catalog (indicator.md sections 23.3 and 23.9.2).
+         * @description One indicator of the catalog (indicator.md sections 23.3 and 23.9.2), built-in or custom.
          */
         IndicatorResponse: {
             /** Key */
@@ -2048,6 +2178,7 @@ export interface components {
             outputs: string[];
             /** Value Description */
             value_description: string;
+            formula?: components["schemas"]["IndicatorFormulaBody"] | null;
         };
         /** IndicatorSeries */
         IndicatorSeries: {
@@ -2057,6 +2188,7 @@ export interface components {
             parameters: {
                 [key: string]: number;
             };
+            formula?: components["schemas"]["IndicatorFormulaBody"] | null;
             /** Outputs */
             outputs: {
                 [key: string]: (number | null)[];
@@ -2548,6 +2680,7 @@ export interface components {
             hidden: boolean;
             /** Lines */
             lines: components["schemas"]["SavedChartLine"][];
+            formula?: components["schemas"]["IndicatorFormulaBody"] | null;
         };
         /** SavedChartLine */
         SavedChartLine: {
@@ -4293,26 +4426,6 @@ export interface operations {
             };
         };
     };
-    list_indicators_api_market_data_indicators_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["IndicatorResponse"][];
-                };
-            };
-        };
-    };
     read_indicator_series_api_market_data_indicator_series_post: {
         parameters: {
             query?: never;
@@ -4342,6 +4455,234 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["IndicatorCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    list_catalog_api_market_data_indicators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorResponse"][];
+                };
+            };
+        };
+    };
+    list_all_api_custom_indicators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomIndicatorResponse"][];
+                };
+            };
+        };
+    };
+    create_api_custom_indicators_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomIndicatorBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomIndicatorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    check_body_api_custom_indicators_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomIndicatorBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomIndicatorCheckResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_api_custom_indicators__custom_indicator_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                custom_indicator_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomIndicatorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_api_custom_indicators__custom_indicator_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                custom_indicator_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomIndicatorBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomIndicatorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Unprocessable Content */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorCheckFailedResponse"];
+                };
+            };
+        };
+    };
+    delete_api_custom_indicators__custom_indicator_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                custom_indicator_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5790,7 +6131,7 @@ export interface operations {
             };
         };
     };
-    list_indicator_catalog_api_screen_indicators_get: {
+    list_indicators_api_screen_indicators_get: {
         parameters: {
             query?: never;
             header?: never;

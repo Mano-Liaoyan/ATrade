@@ -3,6 +3,8 @@
 Each instrument has daily bars with one constant close, so SMA(n) is the close when the instrument has n bars.
 """
 
+import asyncio
+import time
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -270,3 +272,62 @@ async def test_still_trading_keeps_the_instruments_with_a_daily_bar_in_the_last_
 
     assert symbols(outcome) == ["WEEK", "NOW"]
     assert reasons(outcome) == {"GONE": "filters[0]: Still trading", "NONE": "No daily bars"}
+
+
+def custom(expression: str, name: str = "Custom") -> dict[str, Any]:
+    formula = {"name": name, "expression": expression, "chart_placement": "own"}
+    return {"indicator": "custom_1", "parameters": {}, "output": "value", "formula": formula}
+
+
+@pytest.mark.anyio
+async def test_a_custom_indicator_runs_from_the_expression_of_the_reference_and_a_no_value_excludes_one_instrument() -> (
+    None
+):
+    reference = custom("1 / (close - 10) + mean(close, 3) - mean(close, 3)")
+    good, zero = stock("GOOD"), stock("ZERO")
+    definition = make_definition(
+        conditions=[compare(reference, ">", "0")], order={"indicator": reference, "direction": "descending"}
+    )
+
+    outcome = await run(definition, {good: make_bars("11", 3), zero: make_bars("10", 3)})
+
+    assert symbols(outcome) == ["GOOD"]
+    assert outcome.rows[0].indicator_values == {"Custom": 1.0}
+    assert reasons(outcome) == {"ZERO": "No value: Custom"}
+
+
+@pytest.mark.anyio
+async def test_a_custom_indicator_reads_the_bars_of_its_look_back() -> None:
+    reference = custom("lag(mean(close, 4), 2)")
+    too_short, long_enough = stock("SHORT"), stock("LONG")
+    definition = make_definition(order={"indicator": reference, "direction": "descending"})
+
+    outcome = await run(definition, {too_short: make_bars("5", 5), long_enough: make_bars("5", 6)})
+
+    assert symbols(outcome) == ["LONG"]
+    assert reasons(outcome) == {"SHORT": "No value: Custom"}
+
+
+@pytest.mark.anyio
+async def test_the_event_loop_keeps_running_while_a_screen_run_calculates(monkeypatch: pytest.MonkeyPatch) -> None:
+    def calculate_slowly(_column: object, _bars: object) -> float:
+        time.sleep(0.05)
+        return 1.0
+
+    monkeypatch.setattr("atrade.screen.screen_run.calculate_value", calculate_slowly)
+    instruments = [stock(f"S{index}") for index in range(3)]
+    definition = make_definition(order={"indicator": sma(2), "direction": "descending"})
+    ticks = 0
+
+    async def count_ticks() -> None:
+        nonlocal ticks
+        while True:
+            await asyncio.sleep(0.001)
+            ticks += 1
+
+    counter = asyncio.create_task(count_ticks())
+    outcome = await run(definition, {instrument: make_bars("5", 2) for instrument in instruments})
+    counter.cancel()
+
+    assert symbols(outcome) == ["S0", "S1", "S2"]
+    assert ticks >= 10

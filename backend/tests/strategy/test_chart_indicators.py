@@ -16,7 +16,16 @@ from atrade.strategy.rules_code import make_rules_code
 from atrade.strategy.strategy_rules import StrategyRules
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from atrade.strategy.strategy_templates import STRATEGY_TEMPLATES
-from tests.strategy.rules_examples import condition, group, indicator, make_rules, make_universe_rules, price
+from tests.strategy.rules_examples import (
+    condition,
+    custom_indicator,
+    group,
+    indicator,
+    make_rules,
+    make_universe_rules,
+    number,
+    price,
+)
 
 CODE_HEAD = """from nautilus_trader.config import StrategyConfig
 from nautilus_trader.trading import Strategy
@@ -295,3 +304,25 @@ async def test_the_universe_code_has_chart_indicators_that_pass_the_checks() -> 
     assert list_chart_indicators(code, {}) == [
         {"indicator": "momentum_12_1", "parameters": {"look_back": 252, "skip": 21}},
     ]
+
+
+def test_the_code_of_a_custom_indicator_lists_its_formula_for_the_chart() -> None:
+    rules = make_rules(group("all_of", condition(custom_indicator(), "above", number(1))))
+    code = make_rules_code(StrategyRules.model_validate(rules))
+
+    assert list_chart_indicators(code, {}) == [
+        {
+            "indicator": "custom_3",
+            "parameters": {},
+            "formula": {"name": "Ratio", "expression": "close / sma(5)", "chart_placement": "own"},
+        }
+    ]
+
+
+@pytest.mark.anyio
+async def test_a_wrong_formula_in_chart_indicators_blocks_the_save() -> None:
+    code = STRATEGY_TEMPLATE + (
+        'CHART_INDICATORS = [{"indicator": "custom_1", "parameters": {}, '
+        '"formula": {"name": "X", "expression": "foo", "chart_placement": "own"}}]\n'
+    )
+    assert any("Unknown name 'foo'" in problem.message for problem in await check_strategy_code(code))

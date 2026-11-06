@@ -10,11 +10,20 @@ import psycopg
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 from psycopg.types.json import Jsonb
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from atrade.foundation.clock import Clock
-from atrade.indicator import INDICATOR_CATALOG, check_indicator_reference
-from atrade.market_data.indicator_series import IndicatorCheckFailedResponse, IndicatorProblemResponse
+from atrade.indicator import (
+    INDICATOR_CATALOG,
+    check_indicator_reference,
+    find_indicator_definition,
+    is_custom_key,
+)
+from atrade.market_data.indicator_series import (
+    IndicatorCheckFailedResponse,
+    IndicatorFormulaBody,
+    IndicatorProblemResponse,
+)
 
 MAX_PANES = 4
 PALETTE_SIZE = 14
@@ -41,6 +50,8 @@ class SavedChartIndicator(BaseModel):
     hidden: bool
     # One line for each output of the indicator.
     lines: list[SavedChartLine]
+    # A custom indicator only (section 23.10). The chart keeps it after a change or a delete (ADR 0009).
+    formula: IndicatorFormulaBody | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class SavedChartPane(BaseModel):
@@ -80,12 +91,15 @@ def check_chart_indicator_set(chart_set: ChartIndicatorSet) -> list[IndicatorPro
 def check_chart_indicator(
     indicator: SavedChartIndicator, *, is_price_pane: bool, location: Location
 ) -> list[IndicatorProblemResponse]:
-    reference = {"indicator": indicator.indicator, "parameters": indicator.parameters}
+    reference = indicator.model_dump(include={"indicator", "parameters", "formula"}, exclude_none=True)
     problems = [
         IndicatorProblemResponse(location=[*location, *problem.location], message=problem.message)
         for problem in check_indicator_reference(reference, has_output=False)
     ]
-    definition = INDICATOR_CATALOG.get(indicator.indicator)
+    is_custom = is_custom_key(indicator.indicator)
+    if is_custom and problems:
+        return problems
+    definition = find_indicator_definition(reference) if is_custom else INDICATOR_CATALOG.get(indicator.indicator)
     if definition is None:
         return problems
     expected_placement = "price" if is_price_pane else "own"
@@ -139,7 +153,8 @@ def check_favorites(favorites: list[str]) -> list[IndicatorProblemResponse]:
     counts: Counter[str] = Counter()
     for index, key in enumerate(favorites):
         counts[key] += 1
-        if key not in INDICATOR_CATALOG:
+        # A deleted custom indicator can stay here: "Add indicator" shows only the catalog (section 23.10).
+        if key not in INDICATOR_CATALOG and not is_custom_key(key):
             message = f"Unknown indicator {key!r}. Known indicators: {', '.join(INDICATOR_CATALOG)}."
             problems.append(IndicatorProblemResponse(location=["favorites", index], message=message))
         elif counts[key] > 1:

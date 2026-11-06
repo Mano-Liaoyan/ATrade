@@ -14,6 +14,20 @@ from atrade.indicator.atrade_indicators import (
 )
 from atrade.indicator.bar_close import BarClose
 from atrade.indicator.channels import BollingerBands, DonchianChannel
+from atrade.indicator.formula_indicator import (
+    MAX_EXPRESSION_LENGTH,
+    FormulaIndicator,
+    check_expression,
+    count_formula_bars,
+)
+from atrade.indicator.formula_reference import (
+    CUSTOM_KEY_PREFIX,
+    check_chart_placement,
+    check_formula,
+    check_name,
+    has_unstorable_character,
+    is_custom_key,
+)
 from atrade.indicator.indicator_catalog import (
     INDICATOR_CATALOG,
     CatalogIndicator,
@@ -22,15 +36,22 @@ from atrade.indicator.indicator_catalog import (
     ParameterOrder,
     ScreenLookBack,
 )
-from atrade.indicator.indicator_reference import IndicatorProblem, check_indicator_reference, create_indicator
+from atrade.indicator.indicator_problems import IndicatorProblem
+from atrade.indicator.indicator_reference import (
+    check_indicator_reference,
+    create_indicator,
+    find_indicator_definition,
+)
 from atrade.indicator.moving_averages import EMA, MACD, SMA
 from atrade.indicator.wilder_averages import ATR, RSI
 
 __all__ = [
     "ATR",
+    "CUSTOM_KEY_PREFIX",
     "EMA",
     "INDICATOR_CATALOG",
     "MACD",
+    "MAX_EXPRESSION_LENGTH",
     "RSI",
     "SMA",
     "ADRPercent",
@@ -40,6 +61,7 @@ __all__ = [
     "CatalogIndicator",
     "DistanceTo52WeekHigh",
     "DonchianChannel",
+    "FormulaIndicator",
     "IndicatorDefinition",
     "IndicatorParameter",
     "IndicatorProblem",
@@ -47,6 +69,14 @@ __all__ = [
     "ParameterOrder",
     "RealizedVolatility",
     "ScreenLookBack",
+    "check_chart_placement",
+    "check_expression",
+    "check_formula",
     "check_indicator_reference",
+    "check_name",
+    "count_formula_bars",
     "create_indicator",
+    "find_indicator_definition",
+    "has_unstorable_character",
+    "is_custom_key",
 ]

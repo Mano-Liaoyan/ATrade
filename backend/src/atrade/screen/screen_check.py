@@ -64,6 +64,29 @@ def check_definition(market: str, definition: object, location: Location) -> lis
         problems += check_list(fields["indicator_conditions"], (*location, "indicator_conditions"), check_condition)
     if "order" in fields:
         problems += check_order(fields["order"], (*location, "order"))
+    return problems or check_formula_names(fields, location)
+
+
+def check_formula_names(fields: Mapping[str, object], location: Location) -> list[ScreenProblem]:
+    """A result names its columns by the indicator name, so one name cannot have 2 expressions (ADR 0009)."""
+    places: list[tuple[Location, object]] = [
+        ((*location, "indicator_conditions", index, "indicator"), read_key(condition, "indicator"))
+        for index, condition in enumerate(cast("Sequence[object]", fields.get("indicator_conditions", [])))
+    ]
+    places.append(((*location, "order", "indicator"), read_key(fields.get("order"), "indicator")))
+    expressions: dict[object, object] = {}
+    problems: list[ScreenProblem] = []
+    for place, reference in places:
+        formula = read_key(reference, "formula")
+        if formula is None:
+            continue
+        name, expression = read_key(formula, "name"), read_key(formula, "expression")
+        if expressions.setdefault(name, expression) != expression:
+            message = (
+                f"The indicator name {name!r} has 2 expressions. "
+                'Click "Use current expression" in each place, or select another indicator.'
+            )
+            problems.append(ScreenProblem(place, message))
     return problems
 
 
@@ -150,7 +173,10 @@ def check_line(fields: Mapping[str, object] | None, location: Location) -> list[
     # check_indicator gives the problem of a reference that is not an object or has no indicator.
     if key is None or (isinstance(key, str) and output == LINE_INDICATORS.get(key)):
         return []
-    lines = "sma value, ema value, donchian_channel upper"
+    # A custom indicator on the price scale is a line too (section 23.10). check_indicator checks its formula.
+    if read_key(read_key(reference, "formula"), "chart_placement") == "price":
+        return []
+    lines = "sma value, ema value, donchian_channel upper, a custom indicator with the chart placement price"
     message = f"The line must be one of: {lines}. Not {key!r} {output!r}."
     return [ScreenProblem((*location, "indicator"), message)]
 

@@ -4,6 +4,7 @@ import {
   findFreeColors,
   buildLegendRows,
   createChartIndicator,
+  findChartDefinition,
   findIndicatorSeries,
   findLegendIndex,
   formatLegendName,
@@ -258,5 +259,33 @@ describe('chart indicators', () => {
     expect(buildLegendRows([{ ...sma, hidden: true }], [SMA], result, 0, false)).toEqual([
       { name: 'SMA 50', indicatorIndex: 0, hidden: true, values: [] },
     ]);
+  });
+});
+
+describe('custom indicators', () => {
+  const FORMULA = { name: 'Ratio', expression: 'close / sma(5)', chart_placement: 'own' };
+  const CUSTOM: ChartIndicatorDefinition = { ...SMA, key: 'custom_1', name: 'Ratio', short_name: 'Ratio', chart_placement: 'own', parameters: [], formula: FORMULA };
+
+  it('a new chart indicator holds the formula of the catalog item', () => {
+    expect(createChartIndicator(CUSTOM, []).formula).toEqual(FORMULA);
+    expect(createChartIndicator(SMA, [])).not.toHaveProperty('formula');
+  });
+
+  it('the formula of a deleted custom indicator gives its definition', () => {
+    expect(findChartDefinition([SMA], { indicator: 'custom_1', formula: FORMULA })).toMatchObject({ name: 'Ratio', outputs: ['value'], parameters: [] });
+    expect(findChartDefinition([SMA], { indicator: 'custom_1' })).toBeUndefined();
+    expect(findChartDefinition([SMA], { indicator: 'sma' })).toBe(SMA);
+  });
+
+  it('a series belongs to the expression of the reference', () => {
+    const series = (expression: string) => ({
+      indicator: 'custom_1',
+      parameters: {},
+      formula: { ...FORMULA, expression },
+      outputs: { value: [] },
+    });
+    const result: IndicatorSeriesResult = { times: [], series: [series('close'), series('close / sma(5)')] };
+
+    expect(findIndicatorSeries(result, { indicator: 'custom_1', parameters: {}, formula: FORMULA })).toBe(result.series[1]);
   });
 });

@@ -42,6 +42,7 @@ from atrade.forward_test import (
     create_forward_test_router,
 )
 from atrade.foundation.clock import Clock, SystemClock
+from atrade.foundation.error_response import add_validation_error_handler
 from atrade.foundation.settings import Settings
 from atrade.foundation.table_changes import TableChangeFeed, create_change_socket_router
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection, create_ibkr_router
@@ -148,6 +149,7 @@ def create_web_app(
         gateway_connection.disconnect()
 
     app = FastAPI(title="ATrade", lifespan=keep_gateway_connected)
+    add_validation_error_handler(app)
     # The assistant service can call only port 8001 (docs/architecture/assistant.md 25.3.2).
     app.add_middleware(RefuseAssistantSubnet)
     app.include_router(create_health_router(database_url=settings.database_url, clock=clock))

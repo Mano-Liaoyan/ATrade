@@ -3,12 +3,14 @@
      their own ScrollRegion; the buttons stay below them. The parameter ranges come from the indicator catalog
      (GET /api/screen-indicators). The backend checks the values: a 422 problem shows at the tag. -->
 <script lang="ts">
-  import { Checkbox, Select, TextInput } from '#lib/foundation/carbon';
+  import { Button, Checkbox, Select, TextInput } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
     LINE_OUTPUTS,
     MARKET_EXCHANGES,
     START_CHOICES,
+    nameIndicator,
+    readCurrentReference,
     referenceOf,
     type IndicatorConditionKind,
     type ScreenIndicator,
@@ -65,10 +67,20 @@
   );
   const reference = $derived((item['indicator'] ?? {}) as Item);
   const indicator = $derived(catalog.find((candidate) => candidate.key === reference['indicator']));
+  const catalogItems = $derived(
+    (kind === 'close_versus_line'
+      ? catalog.filter((candidate) => candidate.key in LINE_OUTPUTS || candidate.formula?.chart_placement === 'price')
+      : catalog
+    ).map((candidate) => ({ value: candidate.key, label: candidate.name })),
+  );
+  // A custom indicator that is deleted, or that is no longer a line, stays selectable: the reference holds its expression.
   const indicatorItems = $derived(
-    (kind === 'close_versus_line' ? catalog.filter((candidate) => candidate.key in LINE_OUTPUTS) : catalog).map(
-      (candidate) => ({ value: candidate.key, label: candidate.name }),
-    ),
+    reference['formula'] !== undefined && !catalogItems.some((candidate) => candidate.value === reference['indicator'])
+      ? [...catalogItems, { value: text(reference['indicator']), label: nameIndicator(catalog, reference) }]
+      : catalogItems,
+  );
+  const currentReference = $derived(
+    kind === 'start' ? null : readCurrentReference(catalog, reference, kind === 'order' ? 'order' : (kind as IndicatorConditionKind)),
   );
 
   function text(value: unknown): string {
@@ -145,6 +157,17 @@
     value={text(reference['indicator'])}
     onValueChange={selectIndicator}
   />
+  {#if currentReference !== null}
+    <Button
+      kind="ghost"
+      size="sm"
+      onclick={() => {
+        item['indicator'] = currentReference;
+      }}
+    >
+      Use current expression
+    </Button>
+  {/if}
   {#if indicator !== undefined}
     <div class="field-row">
       {#each indicator.parameters.filter((parameter) => parameter.is_in_name) as parameter (parameter.name)}

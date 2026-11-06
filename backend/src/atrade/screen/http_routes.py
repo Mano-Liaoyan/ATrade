@@ -15,7 +15,7 @@ from atrade.foundation.assistant_conversation import ConversationCheck, create_c
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.foundation.table_changes import ChangeSocket
-from atrade.market_data import list_indicator_catalog
+from atrade.market_data import IndicatorResponse, list_indicator_catalog
 from atrade.screen import screen_store
 from atrade.screen.screen_check import MAX_NAME_LENGTH, ScreenProblem, check_screen
 from atrade.screen.screen_run import name_indicator
@@ -276,6 +276,9 @@ class ScreenRoutes:
         self.database_url = database_url
         self.clock = clock
 
+    async def list_indicators(self) -> list[IndicatorResponse]:
+        return await list_indicator_catalog(self.database_url)
+
     async def list_screens(self) -> list[ScreenListItemResponse]:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             screens = await screen_store.select_screens(connection)
@@ -466,7 +469,7 @@ def create_screen_assistant_router(
     router = APIRouter()
     add_read_routes(router, routes)
     # The body of GET /api/screen-indicators on the Web port. The tool list_indicators reads it.
-    router.add_api_route("/api/screen-indicators", list_indicator_catalog, methods=["GET"])
+    router.add_api_route("/api/screen-indicators", routes.list_indicators, methods=["GET"])
     router.add_api_route(
         "/api/screens",
         create_screen,
@@ -535,5 +538,5 @@ def create_screen_router(*, database_url: str, clock: Clock) -> APIRouter:
         "/api/screen-results/{screen_result_id}", routes.read_screen_result, methods=["GET"], responses=not_found
     )
     # The same body as GET /api/market-data/indicators (indicator.md section 23.9.6).
-    router.add_api_route("/api/screen-indicators", list_indicator_catalog, methods=["GET"])
+    router.add_api_route("/api/screen-indicators", routes.list_indicators, methods=["GET"])
     return router

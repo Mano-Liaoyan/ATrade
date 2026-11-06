@@ -696,28 +696,6 @@
         }
       }
     },
-    "/api/market-data/indicators": {
-      "get": {
-        "summary": "List Indicators",
-        "operationId": "list_indicators_api_market_data_indicators_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/IndicatorResponse"
-                  },
-                  "type": "array",
-                  "title": "Response List Indicators Api Market Data Indicators Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/market-data/indicator-series": {
       "post": {
         "summary": "Read Indicator Series",
@@ -750,6 +728,272 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/IndicatorCheckFailedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market-data/indicators": {
+      "get": {
+        "summary": "List Catalog",
+        "operationId": "list_catalog_api_market_data_indicators_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/IndicatorResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Catalog Api Market Data Indicators Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/custom-indicators": {
+      "get": {
+        "summary": "List All",
+        "operationId": "list_all_api_custom_indicators_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomIndicatorResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List All Api Custom Indicators Get"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create",
+        "operationId": "create_api_custom_indicators_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomIndicatorBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomIndicatorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorCheckFailedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/custom-indicators/check": {
+      "post": {
+        "summary": "Check Body",
+        "operationId": "check_body_api_custom_indicators_check_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomIndicatorBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomIndicatorCheckResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/custom-indicators/{custom_indicator_id}": {
+      "get": {
+        "summary": "Read",
+        "operationId": "read_api_custom_indicators__custom_indicator_id__get",
+        "parameters": [
+          {
+            "name": "custom_indicator_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Custom Indicator Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomIndicatorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Change",
+        "description": "Stored references keep their own expression (ADR 0009). Only new references get the changed one.",
+        "operationId": "change_api_custom_indicators__custom_indicator_id__put",
+        "parameters": [
+          {
+            "name": "custom_indicator_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Custom Indicator Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomIndicatorBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomIndicatorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IndicatorCheckFailedResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete",
+        "description": "Stored references keep working: each one holds its expression (ADR 0009).",
+        "operationId": "delete_api_custom_indicators__custom_indicator_id__delete",
+        "parameters": [
+          {
+            "name": "custom_indicator_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Custom Indicator Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2497,9 +2741,8 @@
     },
     "/api/screen-indicators": {
       "get": {
-        "summary": "List Indicator Catalog",
-        "description": "The indicator catalog in its own order. The screen page and the bar charts read it.",
-        "operationId": "list_indicator_catalog_api_screen_indicators_get",
+        "summary": "List Indicators",
+        "operationId": "list_indicators_api_screen_indicators_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2510,7 +2753,7 @@
                     "$ref": "#/components/schemas/IndicatorResponse"
                   },
                   "type": "array",
-                  "title": "Response List Indicator Catalog Api Screen Indicators Get"
+                  "title": "Response List Indicators Api Screen Indicators Get"
                 }
               }
             }
@@ -4226,6 +4469,9 @@
             },
             "type": "object",
             "title": "Parameters"
+          },
+          "formula": {
+            "$ref": "#/components/schemas/ChartIndicatorFormula"
           }
         },
         "type": "object",
@@ -4234,7 +4480,30 @@
           "parameters"
         ],
         "title": "ChartIndicator",
-        "description": "A whole indicator of the chart with its parameter values, as `{\"indicator\", \"parameters\"}` JSON."
+        "description": "A whole indicator of the chart with its parameter values, as `{\"indicator\", \"parameters\"}` JSON. A custom\nindicator also has `formula` (indicator.md section 23.10)."
+      },
+      "ChartIndicatorFormula": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "expression": {
+            "type": "string",
+            "title": "Expression"
+          },
+          "chart_placement": {
+            "type": "string",
+            "title": "Chart Placement"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "expression",
+          "chart_placement"
+        ],
+        "title": "ChartIndicatorFormula"
       },
       "ChartIndicatorSet": {
         "properties": {
@@ -5341,6 +5610,101 @@
         "title": "CredentialResponse",
         "type": "object"
       },
+      "CustomIndicatorBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "expression": {
+            "type": "string",
+            "title": "Expression"
+          },
+          "chart_placement": {
+            "type": "string",
+            "title": "Chart Placement"
+          },
+          "value_description": {
+            "type": "string",
+            "title": "Value Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "expression",
+          "chart_placement",
+          "value_description"
+        ],
+        "title": "CustomIndicatorBody",
+        "description": "The route checks the values, so each problem has its location."
+      },
+      "CustomIndicatorCheckResponse": {
+        "properties": {
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/IndicatorProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          },
+          "look_back_bars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Look Back Bars"
+          }
+        },
+        "type": "object",
+        "required": [
+          "problems",
+          "look_back_bars"
+        ],
+        "title": "CustomIndicatorCheckResponse"
+      },
+      "CustomIndicatorResponse": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "expression": {
+            "type": "string",
+            "title": "Expression"
+          },
+          "chart_placement": {
+            "type": "string",
+            "title": "Chart Placement"
+          },
+          "value_description": {
+            "type": "string",
+            "title": "Value Description"
+          },
+          "custom_indicator_id": {
+            "type": "integer",
+            "title": "Custom Indicator Id"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "expression",
+          "chart_placement",
+          "value_description",
+          "custom_indicator_id",
+          "key"
+        ],
+        "title": "CustomIndicatorResponse"
+      },
       "DesiredState": {
         "type": "string",
         "enum": [
@@ -6435,6 +6799,55 @@
         ],
         "title": "IndicatorCheckFailedResponse"
       },
+      "IndicatorFormula": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "expression": {
+            "type": "string",
+            "title": "Expression"
+          },
+          "chart_placement": {
+            "type": "string",
+            "title": "Chart Placement"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "expression",
+          "chart_placement"
+        ],
+        "title": "IndicatorFormula",
+        "description": "The `formula` of a reference to a custom indicator (indicator.md section 23.10)."
+      },
+      "IndicatorFormulaBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "expression": {
+            "type": "string",
+            "title": "Expression"
+          },
+          "chart_placement": {
+            "type": "string",
+            "title": "Chart Placement"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "expression",
+          "chart_placement"
+        ],
+        "title": "IndicatorFormulaBody",
+        "description": "The `formula` of a reference to a custom indicator (indicator.md section 23.10). A stored reference holds it, so\nthe reference keeps working after a change or a delete of the custom indicator (ADR 0009)."
+      },
       "IndicatorOperand": {
         "properties": {
           "type": {
@@ -6463,6 +6876,16 @@
               }
             ],
             "title": "Output"
+          },
+          "formula": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndicatorFormula"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -6604,6 +7027,16 @@
           "value_description": {
             "type": "string",
             "title": "Value Description"
+          },
+          "formula": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndicatorFormulaBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -6617,7 +7050,7 @@
           "value_description"
         ],
         "title": "IndicatorResponse",
-        "description": "One indicator of the catalog (indicator.md sections 23.3 and 23.9.2)."
+        "description": "One indicator of the catalog (indicator.md sections 23.3 and 23.9.2), built-in or custom."
       },
       "IndicatorSeries": {
         "properties": {
@@ -6638,6 +7071,16 @@
             },
             "type": "object",
             "title": "Parameters"
+          },
+          "formula": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndicatorFormulaBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "outputs": {
             "additionalProperties": {
@@ -8080,6 +8523,16 @@
             },
             "type": "array",
             "title": "Lines"
+          },
+          "formula": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndicatorFormulaBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",

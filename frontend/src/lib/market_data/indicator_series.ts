@@ -3,7 +3,7 @@
 import type { components } from '#lib/api';
 import { BACKEND_NOT_REACHABLE, readErrorMessage, readJsonBody, requestJson, sendRequest, type RequestResult } from '#lib/foundation/http_request';
 import type { BarPeriod } from './bars';
-import type { ChartIndicatorDefinition, ChartPane } from './chart_indicators';
+import type { ChartIndicatorDefinition, ChartPane, IndicatorFormula } from './chart_indicators';
 import type { Instrument } from './instrument_search';
 import type { BarSource } from './source_order';
 
@@ -12,7 +12,7 @@ type IndicatorProblem = components['schemas']['IndicatorProblemResponse'];
 
 const FAILED_ACTION = 'Reading the indicator values';
 
-/** The indicator catalog in its own order, with the short name and the chart placement. */
+/** The built-in and the custom indicators, with the short name and the chart placement. */
 export function listChartIndicatorCatalog(fetchFunction: typeof fetch): Promise<RequestResult<ChartIndicatorDefinition[]>> {
   return requestJson(fetchFunction, 'Reading the indicator list', '/api/market-data/indicators');
 }
@@ -24,12 +24,18 @@ export interface IndicatorSeriesRequest {
   firstBarTime: number;
   lastBarTime: number;
   sourceOrder?: BarSource[];
-  indicators: { indicator: string; parameters: Record<string, number> }[];
+  indicators: { indicator: string; parameters: Record<string, number>; formula?: IndicatorFormula }[];
 }
 
 /** All indicators of the panes, in pane order. The series answer has one series for each, in the same order. */
 export function listSeriesIndicators(panes: readonly ChartPane[]): IndicatorSeriesRequest['indicators'] {
-  return panes.flatMap((pane) => pane.indicators.map(({ indicator, parameters }) => ({ indicator, parameters })));
+  return panes.flatMap((pane) =>
+    pane.indicators.map(({ indicator, parameters, formula }) => ({
+      indicator,
+      parameters,
+      ...(formula === undefined || formula === null ? {} : { formula }),
+    })),
+  );
 }
 
 const MILLISECONDS_PER_SECOND = 1000;

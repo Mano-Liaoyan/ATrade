@@ -150,7 +150,8 @@ of #130 (A is the strongest, D is practitioner use only).
 - `indicator` reads no database and calls no IBKR. The caller reads the bars
   and gives them to the class.
 - `indicator` has no table, no HTTP route, and no WebSocket path. The
-  chart routes of section 23.9 are in `market_data`.
+  chart routes of section 23.9 and the custom indicator routes of section
+  23.10 are in `market_data`.
 - Callers:
   - `screen` (section 24) gives saved daily bars (`foundation/bar.py` `Bar`)
     to the classes.
@@ -296,6 +297,8 @@ indicator reference in JSON:
     `look_back`, MACD `fast_period` less than `slow_period`,
   - a multi-line indicator without `output`, or an unknown `output`.
 - A single-line indicator without `output` uses `value`.
+- A reference to a custom indicator also has `formula`, and its key has the
+  form `custom_<id>` (section 23.10.2).
 - `check_indicator_reference(reference, has_output=False)` and
   `create_indicator(reference, has_output=False)` check a reference of a
   whole indicator, as a bar chart uses it (section 23.9): `output` is then an
@@ -562,8 +565,8 @@ section 6.2).
 
 | Route | Behavior |
 |---|---|
-| `GET /api/market-data/indicators` | `200` with the catalog in its order: the body of `GET /api/screen-indicators` (screen.md section 24.7), and `short_name` and `chart_placement` for each indicator. `GET /api/screen-indicators` gets the 2 fields too. Both routes also give `value_description` (section 23.3). |
-| `POST /api/market-data/indicator-series` | Body `{"symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "source_order", "indicators": [{"indicator", "parameters"}, ...]}`. `source_order` is optional: without it, the route uses the global source order. The route reads only, and changes no data. `200` with `{"times": [...], "series": [{"indicator", "parameters", "outputs": {"<output>": [...]}}, ...]}`. |
+| `GET /api/market-data/indicators` | `200` with the catalog in its order, then the custom indicators by name (section 23.10.4): the body of `GET /api/screen-indicators` (screen.md section 24.7), and `short_name` and `chart_placement` for each indicator. `GET /api/screen-indicators` gets the 2 fields too. Both routes also give `value_description` (section 23.3). |
+| `POST /api/market-data/indicator-series` | Body `{"symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "source_order", "indicators": [{"indicator", "parameters", "formula"}, ...]}`. `formula` is only for a custom indicator. `source_order` is optional: without it, the route uses the global source order. The route reads only, and changes no data. `200` with `{"times": [...], "series": [{"indicator", "parameters", "formula", "outputs": {"<output>": [...]}}, ...]}`. `formula` is only in the series of a custom indicator. |
 | | `times` holds the start (UNIX seconds) of each saved bar of the range, oldest first, the same as `GET /api/market-data/bars` gives for the range. Each output list has one value for each time: a number, or `null` for "no value". `parameters` holds all parameters, with the defaults. |
 | | `422` for the time and range problems of the bars route and for an unknown bar period. `422` for a source order that `PUT /api/market-data/source-order` refuses. `422` for each problem of `check_indicator_reference`. Its location starts with `indicators` and the index. |
 | `GET /api/market-data/chart-indicators` | `200` with the chart indicator set (section 23.9.7). |
@@ -637,7 +640,9 @@ section 6.2).
   - `lines` that do not have each output of the indicator exactly 1 time,
   - a `color` that is not 1 to 14, a `style` that is not `solid`,
     `dashed`, or `dotted`, a `width` that is not 1 to 4,
-  - a `favorites` value that is not a catalog key, or a key 2 times.
+  - a `favorites` value that is not a catalog key or the key of a custom
+    indicator, or a key 2 times. A deleted custom indicator can stay in
+    `favorites`: "Add indicator" shows only the catalog.
 - The last `PUT` wins. Two browser tabs do not merge their changes.
 - Decided (#330):
   - The `422` answer has `{"problems": [{"location", "message"}]}`, as the
@@ -825,9 +830,10 @@ section 6.2).
   `foundation/carbon` gets `NumberInput`. `foundation` gets the `Command`
   dialog.
 - Done in #327:
-  - `market_data/indicator_series.py`: `list_indicator_catalog()` (also the
-    body of `GET /api/screen-indicators`), the series route, and the
-    warm-up.
+  - `market_data/indicator_series.py`: the series route and the warm-up.
+    `market_data/custom_indicators.py`: the async
+    `list_indicator_catalog(database_url)` (also the body of
+    `GET /api/screen-indicators`).
   - `foundation/command_dialog`: `CommandDialog` (Carbon modal, Bits UI
     Command, one list, an optional action button on each item).
   - `#lib/market_data`: `AddIndicatorButton` (the header button, the `/`
@@ -884,3 +890,143 @@ section 6.2).
 ### 23.9.11 Left to the implementation
 
 Nothing now. The height 0 check is in section 23.9.4 (#328).
+
+## 23.10 Custom indicators
+
+Source: [用户自定义指标](https://github.com/Mano-Liaoyan/ATrade/issues/372),
+ADR [0009](../adr/0009-custom-indicators-are-formulas-held-by-each-reference.md).
+
+The user adds indicators on the Settings page. Screens, the rule builder,
+strategies, and bar charts use them as the built-in indicators of the catalog.
+
+### 23.10.1 Formula expressions
+
+`indicator/formula_indicator.py` parses a formula expression with Python `ast`
+and an allow-list. Nothing runs the text: there is no `eval` and no `exec`.
+
+| Part | Allowed |
+|---|---|
+| Numbers | Finite `int` and `float` literals. |
+| Operators | `+ - * /`, unary `-` and `+`, and `**`. The exponent of `**` must be a number from -10 to 10. |
+| Bar fields | `open`, `high`, `low`, `close`, `volume`. |
+| Rolling functions | `mean(x, n)`, `max(x, n)`, `min(x, n)`, `sum(x, n)`, `std(x, n)` (sample standard deviation, `n` at least 2), `lag(x, n)`. `n` is an integer literal from 1 to 1000. |
+| Other functions | `abs(x)`, `log(x)` (natural logarithm). |
+| Built-in indicators | The catalog key as a function: `rsi(14)`, `sma(period=50)`, `macd(output="signal")`. Arguments are in the order of the catalog or by name. The value of each is a number literal. The check of section 23.6 checks them. A multi-line indicator needs `output`. |
+
+All other syntax is a problem of the check, for example an attribute, a name
+that is not in the table, a comparison, a list, or a text outside `output`.
+An expression has at most 500 characters and 20 levels, and reads at most 20000
+bars. `check_expression(expression)` returns the problem with its column.
+
+The window bars x the bars read of an expression must be at most 10000000. The
+window bars are the sum of each `n` of a rolling function and of `lag`, and the
+look-back of each built-in indicator without a look-back factor. An exponential
+average has a look-back factor and keeps one number, so it counts 0. The bars
+read are the look-back of section 23.10.3. So `std(close, 1000) / ema(1000)`
+passes, and 11 windows of 1000 bars are refused.
+
+An expression cannot call a custom indicator. A custom indicator has no
+parameters and has one output, `value`.
+
+### 23.10.2 Stored references
+
+The key of a custom indicator is `custom_<id>`. `custom_indicator_id` never
+comes again after a delete, and no built-in key starts with `custom_`. A change
+keeps the key.
+
+A stored reference holds a copy of the expression (ADR 0009):
+
+```json
+{
+  "indicator": "custom_3",
+  "parameters": {},
+  "output": "value",
+  "formula": {"name": "Distance to SMA", "expression": "close / sma(50) - 1", "chart_placement": "own"}
+}
+```
+
+- A reference gets `formula` from the catalog when the user selects the
+  indicator. The catalog gives it for each custom indicator.
+- `check_indicator_reference` checks `formula`. Its locations start with
+  `formula`. No database read is necessary, so a saved reference works after
+  a change or a delete of the custom indicator.
+- A change does not reach saved references, also not the chart indicator set.
+  A screen condition and a rule builder operand with a formula that is not
+  equal to the catalog show the button "Use current expression". It copies
+  `formula` of the catalog into the reference. The Select cannot do this: a
+  click on the selected item changes nothing. A `close_versus_line` condition
+  does not show the button when the catalog chart placement is not `price`. On
+  a chart, the user removes the indicator and adds it again.
+- Strategy code has `FormulaIndicator(<expression>)`. `CHART_INDICATORS` has
+  `formula` as a dict literal of string literals.
+  A backtest child and a forward test child read no custom indicator row.
+- A screen with 1 name and 2 expressions is refused (`check_screen`), because
+  a result names its columns by the indicator name. The problem tells the user
+  to click "Use current expression" in each place or to select another
+  indicator. A name has no parentheses, so it cannot be equal to the UI name of
+  a built-in indicator.
+
+### 23.10.3 Values
+
+`FormulaIndicator(expression)` has the parts of section 23.3. Each node of the
+expression gets each bar. `initialized` is `True` while `value` is a number.
+
+- Look-back: the parser calculates it. A bar field or a number is 1 bar. A rolling
+  function adds `n - 1` to the bars of `x`. `lag` adds `n`. A built-in indicator
+  has the count of section 23.4. An operator takes the largest count. A screen
+  reads this count, and a rule builder version uses it for the warm-up.
+- No value: a window that is not full, a divide by zero, a math domain problem,
+  NaN, and infinity give "no value" at that bar. A rolling function has "no value"
+  while a value of its window has none. The class raises no exception for a bar,
+  so one instrument cannot stop a screen run.
+- Rolling calculation: each bar adds one value and removes one value. `mean`,
+  `sum`, and `std` keep integer totals, so they keep no rounding error of a value
+  that left the window. `max` and `min` keep the values that can become the
+  extreme.
+- Thread: a screen run and the series route calculate in a thread
+  (`asyncio.to_thread`), so the event loop serves other requests. A screen run
+  keeps the order of the instruments.
+
+### 23.10.4 Table and routes
+
+Table `custom_indicator`: `custom_indicator_id`, `name` (unique, without case),
+`expression`, `chart_placement` (`price` or `own`), `value_description`,
+`created_at_utc`, `changed_at_utc`.
+
+| Route | Behavior |
+|---|---|
+| `GET /api/custom-indicators` | `200` with the list by name: `[{"custom_indicator_id", "key", "name", "expression", "chart_placement", "value_description"}]`. |
+| `POST /api/custom-indicators` | Body `{"name", "expression", "chart_placement", "value_description"}`. `201` with the row. `422` with `{"problems": [{"location", "message"}]}`. |
+| `POST /api/custom-indicators/check` | The same body. `200` with `{"problems": [...], "look_back_bars"}`. `look_back_bars` is null when the expression has a problem. It saves nothing. |
+| `GET /api/custom-indicators/{id}` | `200` with the row. `404` for an unknown id. |
+| `PUT /api/custom-indicators/{id}` | The body of `POST`. `200` with the row. `404` or `422`. |
+| `DELETE /api/custom-indicators/{id}` | `204`. `404` for an unknown id. A delete is always allowed. |
+
+The problems are: a name with less than 1 or more than 60 characters, a name
+with parentheses, a name that another custom indicator has, a problem of the
+expression, an unknown chart placement, a value description with less than 1 or
+more than 1000 characters, and a NUL or a lone surrogate character in a name or
+a value description.
+
+`GET /api/market-data/indicators` and `GET /api/screen-indicators` give the
+built-in indicators, then the custom indicators by name. A custom indicator has
+`formula`, no parameters, the outputs `["value"]`, its `name` as `short_name`,
+and the text of the user as `value_description`. A built-in indicator has no
+`formula`.
+
+The routes are methods of `CustomIndicatorRoutes` in
+`market_data/custom_indicators.py`. They are not on port 8001 yet (#374).
+
+### 23.10.5 User interface
+
+- The section "Custom indicators" of the Settings page has a table with the
+  name and the expression. "New custom indicator" and the row buttons open a
+  dialog. A problem of the backend shows at its field. A delete asks for a
+  confirmation.
+- "Add indicator", the Indicator select of a screen condition, and the operand
+  select of the rule builder show the custom indicators after the built-in
+  indicators. A custom indicator with the chart placement `price` is also a
+  line of a `close_versus_line` condition.
+- A reference to a deleted custom indicator, or to a line that is no longer on
+  the price scale, shows its name from `formula`, and stays selected.
+- A chart shows a custom indicator with the price number format.
