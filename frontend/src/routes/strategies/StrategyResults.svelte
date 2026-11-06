@@ -97,7 +97,7 @@
       <EmptyText text="No logs" />
     {:else}
       <ScrollRegion label="Logs" fill>
-        <pre class="log-text">{run.error_message}</pre>
+        <pre class="atrade-run-log">{run.error_message}</pre>
       </ScrollRegion>
     {/if}
   {:else}
@@ -162,7 +162,7 @@
           </div>
           <div class="failure-log">
             <ScrollRegion label="Log" fill>
-              <pre class="log-text">{run.error_message}</pre>
+              <pre class="atrade-run-log">{run.error_message}</pre>
             </ScrollRegion>
           </div>
         {/if}
@@ -236,15 +236,5 @@
     flex: 1;
     min-block-size: 0;
     border: 1px solid var(--cds-border-subtle-01);
-  }
-
-  .log-text {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    color: var(--cds-text-error);
-    font-family: var(--cds-code-01-font-family);
-    font-size: var(--cds-code-01-font-size);
-    line-height: var(--cds-code-01-line-height);
-    white-space: pre-wrap;
   }
 </style>

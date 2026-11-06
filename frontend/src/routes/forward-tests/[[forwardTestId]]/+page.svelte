@@ -18,7 +18,7 @@
   import StopFilledAlt16 from '@carbon/icons/es/stop--filled--alt/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { navigating, page } from '$app/state';
+  import { page } from '$app/state';
   import {
     ChartViewSwitcher,
     formatChartViewSearch,
@@ -40,7 +40,7 @@
     type TableColumn,
   } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
-  import { LiveUpdatesNotification, readOnChange } from '#lib/foundation/live_socket';
+  import { LiveUpdatesNotification } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import { formatUtcTime } from '#lib/foundation/time_format';
   import { ChangeText, formatAmount, formatBarPeriod } from '#lib/foundation/value_format';
@@ -55,8 +55,8 @@
     readStartCapital,
     findForwardTestStatusKind,
     ForwardTestFillTable,
-    ForwardTestsOnInstrumentsFeed,
     listForwardTestEvents,
+    listForwardTests,
     readForwardTestDetail,
     showsCrashCount,
     startSamePeriodBacktest,
@@ -73,11 +73,10 @@
   import { formatVersionLabel } from '#lib/strategy';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_FORWARD_TEST_FORM_ID } from '../../palette_commands';
+  import { RunWorkbench } from '../../run_workbench.svelte';
   import ForwardTestList from '../ForwardTestList.svelte';
   import StartForwardTestDialog from '../StartForwardTestDialog.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
-
-  const START_FORWARD_TEST_HASH = `#${START_FORWARD_TEST_FORM_ID}`;
 
   // The same panels and sizes as the backtest page.
   const PANELS: PanelSpec[] = [
@@ -102,18 +101,26 @@
   const routeForwardTestId = $derived(page.params['forwardTestId']);
   const forwardTestId = $derived(routeForwardTestId === undefined ? null : Number(routeForwardTestId));
 
-  // The one /ws/forward-tests socket of the page: the list.
-  const feed = new ForwardTestsOnInstrumentsFeed();
-  let detail = $state<ForwardTestDetail | null>(null);
-  let detailMessage = $state('');
+  // The list and the open forward test read again after each forward test change that /ws/forward-tests pushes: a running
+  // forward test gets new records.
+  const workbench = new RunWorkbench<ForwardTest, ForwardTestDetail>({
+    socketPath: FORWARD_TESTS_SOCKET_PATH,
+    list: () => listForwardTests(fetch),
+    readDetail: (id) => readForwardTestDetail(fetch, id),
+    href: (id) => resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(id) }),
+    openId: () => forwardTestId,
+    readsDetailOnChange: true,
+    startHash: `#${START_FORWARD_TEST_FORM_ID}`,
+  });
   let selectedTable: ForwardTestTable = $state('fills');
-  let isStartDialogOpen = $state(false);
   // The failed header action and the reason from the backend.
   let actionFailure = $state<{ title: string; message: string } | null>(null);
   let stoppingId = $state<number | null>(null);
   let isStartingBacktest = $state(false);
 
-  const shownDetail = $derived(detail !== null && detail.forward_test.id === forwardTestId ? detail : null);
+  const shownDetail = $derived(
+    workbench.detail !== null && workbench.detail.forward_test.id === forwardTestId ? workbench.detail : null,
+  );
   // An interruption that still lasts ends at the stop, or now (docs/architecture/forward_test.md 12.10).
   const chartInterruptions = $derived<TimeInterval[]>(
     (shownDetail?.forward_test.interruptions ?? []).map((interruption) => ({
@@ -121,8 +128,6 @@
       end_utc: interruption.ended_at_utc ?? shownDetail?.forward_test.stopped_at_utc ?? new Date().toISOString(),
     })),
   );
-
-  $effect(() => feed.start(fetch, window.location));
 
   const chartView = $derived(readChartView(page.url.searchParams));
   // The bar chart: the run indicators, the favorite indicators, and the link with the Fills rows (section 23.9.9).
@@ -146,71 +151,16 @@
     void goto(page.url.pathname + formatChartViewSearch(page.url.searchParams, view), { replace: true, reset: false });
   }
 
-  // /forward-tests opens the newest forward test. The same page component stays, so an open dialog stays open. A
-  // navigation that runs (for example a click on a header link) wins.
+  // A new open forward test has no failed action and no running stop.
   $effect(() => {
-    if (navigating.to !== null) {
-      return;
-    }
-    const newest = feed.forwardTests.reduce<ForwardTest | undefined>(
-      (found, item) => (found === undefined || item.id > found.id ? item : found),
-      undefined,
-    );
-    if (forwardTestId === null && newest !== undefined) {
-      void goto(resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(newest.id) }), {
-        replace: true,
-        reset: false,
-      });
+    if (forwardTestId !== null) {
+      actionFailure = null;
+      stoppingId = null;
     }
   });
-
-  // The open forward test reads again after each forward test change that /ws/forward-tests pushes: a running forward
-  // test gets new records.
-  $effect(() => {
-    if (forwardTestId === null) {
-      return;
-    }
-    // A new value only after a change: then the chart keeps its zoom while nothing changes.
-    let lastDetailText = '';
-    const id = forwardTestId;
-    actionFailure = null;
-    stoppingId = null;
-    return readOnChange({
-      socketPath: FORWARD_TESTS_SOCKET_PATH,
-      read: () => readForwardTestDetail(fetch, id),
-      onResult: (result) => {
-        if (result.kind === 'failed') {
-          detailMessage = result.message;
-          return;
-        }
-        detailMessage = '';
-        const detailText = JSON.stringify(result.value);
-        if (detailText !== lastDetailText) {
-          lastDetailText = detailText;
-          detail = result.value;
-        }
-      },
-    });
-  });
-
-  // The command palette goes to #start-forward-test.
-  $effect(() => {
-    if (page.url.hash === START_FORWARD_TEST_HASH) {
-      isStartDialogOpen = true;
-    }
-  });
-
-  function changeStartDialog(open: boolean): void {
-    isStartDialogOpen = open;
-    if (!open && page.url.hash === START_FORWARD_TEST_HASH) {
-      // Without the hash, the palette can open the dialog again.
-      // eslint-disable-next-line svelte/no-navigation-without-resolve -- the current path, without its hash.
-      void goto(page.url.pathname + page.url.search, { replace: true, reset: false });
-    }
-  }
 
   function openStartedForwardTest(started: ForwardTest): void {
-    feed.forwardTests = [started, ...feed.forwardTests.filter((item) => item.id !== started.id)];
+    workbench.items = [started, ...workbench.items.filter((item) => item.id !== started.id)];
     void goto(resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: String(started.id) }));
   }
 
@@ -280,23 +230,23 @@
         label="New forward test"
         icon={Add16}
         onclick={() => {
-          isStartDialogOpen = true;
+          workbench.isStartDialogOpen = true;
         }}
       />
     {/snippet}
-    <LiveUpdatesNotification isConnected={feed.isConnected} />
+    <LiveUpdatesNotification isConnected={workbench.isConnected} />
     <ForwardTestList
-      forwardTests={feed.forwardTests}
+      forwardTests={workbench.items}
       openForwardTestId={forwardTestId}
       onStop={(forwardTest: ForwardTest) => void stop(forwardTest)}
     />
   </SideColumn>
 
   {#if shownDetail === null}
-    <div class="empty-main">
-      {#if detailMessage !== ''}
-        <InlineNotification kind="error" title="Forward test not read" subtitle={detailMessage} lowContrast />
-      {:else if feed.isConnected && feed.forwardTests.length === 0}
+    <div class="atrade-run-empty">
+      {#if workbench.detailMessage !== ''}
+        <InlineNotification kind="error" title="Forward test not read" subtitle={workbench.detailMessage} lowContrast />
+      {:else if workbench.isConnected && workbench.items.length === 0}
         <EmptyText text="No forward tests" />
       {/if}
     </div>
@@ -310,7 +260,7 @@
         {#if id === 'chart'}
           <Panel {...state} label={`Forward test #${String(forwardTest.id)}`}>
             {#snippet header()}
-              <span class="run-status" role="status" aria-label="Forward test status">
+              <span class="atrade-run-status" role="status" aria-label="Forward test status">
                 <StatusIndicator
                   label={describeForwardTestStatus(forwardTest.status)}
                   kind={findForwardTestStatusKind(forwardTest.status)}
@@ -325,20 +275,20 @@
                   />
                 {/if}
               </span>
-              <h1 class="run-title">
-                <span class="run-number">#{forwardTest.id}</span>
+              <h1 class="atrade-run-title">
+                <span class="atrade-run-number">#{forwardTest.id}</span>
                 <a
                   class="cds--link"
                   href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(forwardTest.strategy_id), versionNumber: String(forwardTest.version_number) })}
                   >{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</a
                 >
                 {@render instrumentOrUniverse(forwardTest, records.instruments.length)}
-                <span class="run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
+                <span class="atrade-run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
               </h1>
               {#if forwardTest.allocated_capital_usd !== null}
                 <span class="run-note run-capital">Capital {formatAmount(forwardTest.allocated_capital_usd)} USD</span>
               {/if}
-              <span class="run-actions">
+              <span class="atrade-run-actions">
                 {#if chartInstrument !== null}
                   <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
                 {/if}
@@ -475,7 +425,7 @@
             {:else}
               <ScrollRegion label="Logs" fill>
                 {#if forwardTest.error_message !== null}
-                  <pre class="log-text">{forwardTest.error_message}</pre>
+                  <pre class="atrade-run-log">{forwardTest.error_message}</pre>
                 {/if}
                 <DataTable columns={EVENT_COLUMNS} size="sm">
                   {#snippet rows()}
@@ -498,40 +448,13 @@
   <AssistantColumn />
 </Workbench>
 
-<StartForwardTestDialog open={isStartDialogOpen} onOpenChange={changeStartDialog} onStarted={openStartedForwardTest} />
+<StartForwardTestDialog
+  open={workbench.isStartDialogOpen}
+  onOpenChange={workbench.changeStartDialog}
+  onStarted={openStartedForwardTest}
+/>
 
 <style>
-  .empty-main {
-    flex: 1;
-    min-inline-size: 0;
-  }
-
-  .run-title {
-    display: flex;
-    align-items: baseline;
-    gap: var(--cds-spacing-04);
-  }
-
-  /* One type size in the heading: Carbon links set their own size. */
-  .run-title > :global(*) {
-    font: inherit;
-    letter-spacing: inherit;
-  }
-
-  .run-number {
-    font-variant-numeric: tabular-nums;
-    color: var(--cds-text-secondary);
-  }
-
-  .run-period {
-    color: var(--cds-text-secondary);
-  }
-
-  .run-status {
-    display: flex;
-    flex: none;
-  }
-
   .run-note {
     flex: none;
     font-size: var(--cds-body-compact-01-font-size);
@@ -544,29 +467,11 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .run-actions {
-    display: flex;
-    flex: none;
-    gap: var(--cds-spacing-02);
-    align-items: center;
-    margin-inline-start: auto;
-  }
-
   /* The chart fills the rest of the panel body and follows its size (EquityDrawdownChart fill). */
   .chart {
     position: relative;
     flex: 1;
     min-block-size: 0;
     padding: var(--cds-spacing-03) var(--cds-spacing-05);
-  }
-
-  .log-text {
-    margin: 0;
-    padding: var(--cds-spacing-05);
-    color: var(--cds-text-error);
-    font-family: var(--cds-code-01-font-family);
-    font-size: var(--cds-code-01-font-size);
-    line-height: var(--cds-code-01-line-height);
-    white-space: pre-wrap;
   }
 </style>
