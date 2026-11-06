@@ -4,10 +4,13 @@ and writes the actual state (docs/architecture.md sections 12.3, 12.4, 12.6, 12.
 Real PostgreSQL. The function that starts a child process is a fake (section 17.4).
 """
 
+import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+import anyio
 import httpx
 import psycopg
 import pytest
@@ -15,6 +18,8 @@ import pytest
 from atrade.forward_test import (
     GATEWAY_UNREACHABLE_EXIT_CODE,
     PAPER_CHECK_FAILED_EXIT_CODE,
+    ChildMode,
+    ForwardTestChild,
     ForwardTestWorker,
     read_running_member_lists,
 )
@@ -318,6 +323,39 @@ async def test_a_new_worker_starts_the_running_forward_tests_again(
     assert restarted["interruptions"] == [
         {"reason": "worker_restart", "started_at_utc": "2026-01-02T03:04:05Z", "ended_at_utc": None}
     ]
+
+
+@pytest.mark.anyio
+async def test_an_error_in_a_comparison_writes_a_log_and_does_not_end_the_comparison_loop(
+    web_client: httpx.AsyncClient,
+    database_url: str,
+    clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    monkeypatch.setattr("atrade.forward_test.forward_test_worker.COMPARE_INTERVAL_SECONDS", 0.01)
+    forward_test = await start_forward_test(web_client)
+    child_starter = FakeChildStarter()
+    errors = [ValueError("unexpected")]
+
+    async def start_child_after_one_error(forward_test_id: int, mode: ChildMode) -> ForwardTestChild:
+        if errors:
+            raise errors.pop()
+        return await child_starter.start_child(forward_test_id, mode)
+
+    worker = ForwardTestWorker(database_url=database_url, clock=clock, start_child=start_child_after_one_error)
+    with caplog.at_level(logging.ERROR):
+        comparison_task = asyncio.create_task(worker.keep_comparing())
+        with anyio.fail_after(10):
+            while not child_starter.children and not comparison_task.done():
+                await asyncio.sleep(0.01)
+
+    assert not comparison_task.done()
+    assert child_starter.read_started() == [(forward_test["id"], "run")]
+    assert "The forward-test comparison failed" in caplog.text
+    comparison_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await comparison_task
 
 
 def read_owner_sums(database_url: str) -> list[tuple[object, ...]]:

@@ -5,6 +5,7 @@ The function that starts a child comes in as an argument, so that tests and the 
 """
 
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -28,6 +29,8 @@ GATEWAY_UNREACHABLE_EXIT_CODE = 4
 CRASH_LIMIT = 3
 # A run child that ran this long before its crash starts a new count: the crashes are not "in a row".
 CRASH_COUNT_RESET_AFTER = timedelta(minutes=10)
+
+logger = logging.getLogger("atrade.forward_test_worker")
 
 # "run": check the paper account, run the LiveNode until the stop request, then cancel the open orders.
 # "cancel_orders": only cancel the open orders of the client ID, for a stop without a running child.
@@ -97,9 +100,13 @@ class ForwardTestWorker:
             running_child.is_restart_requested = True
 
     async def keep_comparing(self) -> None:
-        """Runs until the caller cancels it."""
+        """Runs until the caller cancels it. An error is logged, and the next comparison tries again. An error that
+        leaves this loop ends the worker process, and that stops all children without their stop steps."""
         while True:
-            await self.compare_states()
+            try:
+                await self.compare_states()
+            except Exception:
+                logger.exception("The forward-test comparison failed. The next comparison tries again.")
             await asyncio.sleep(COMPARE_INTERVAL_SECONDS)
 
     async def compare_states(self) -> None:

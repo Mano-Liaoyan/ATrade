@@ -3,21 +3,26 @@ IBKR link: IB Gateway accepts the API connection, but it has no connection to th
 
 import logging
 import socket
+from contextlib import aclosing
 from datetime import UTC, datetime
 
 import anyio
 import pytest
+from ib_async import BarData, BarDataList
 
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
 from atrade.ibkr import GatewayRequestError, IbAsyncGatewayConnection, OrderRequest
 from atrade.ibkr import gateway_connection as gateway_connection_module
+from atrade.market_data import LiveDailyBarHub
 
 LOCAL_HOST = "127.0.0.1"
 AAPL = Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")
 ONE_DAY_RANGE = TimeRange(datetime(2026, 3, 2, tzinfo=UTC), datetime(2026, 3, 3, tzinfo=UTC))
 # The tests make each historical data timeout this short.
 SHORT_TIMEOUT_SECONDS = 0.05
+SHORT_CHECK_SECONDS = 0.01
+STREAM_END_WAIT_SECONDS = 2
 
 
 def find_closed_local_port() -> int:
@@ -171,6 +176,97 @@ async def test_fails_at_once_after_a_historical_data_timeout(monkeypatch: pytest
     with pytest.raises(GatewayRequestError, match="no connection to IBKR"):
         await connection.read_historical_bars(AAPL, BarPeriod.ONE_DAY, ONE_DAY_RANGE)
     assert historical_data_gateway.request_count == 1
+
+
+class LiveBarGateway:
+    """Replaces the keepUpToDate request. `answers` false: the request waits for its timeout. Then ib_async cancels it,
+    keeps its subscriber, and returns an empty list."""
+
+    def __init__(self) -> None:
+        self.answers = True
+        self.bars_data = BarDataList()
+        self.cancel_count = 0
+
+    async def request(self, *_args: object, timeout: float, **_kwargs: object) -> BarDataList:
+        if self.answers:
+            self.bars_data.append(BarData(date=ONE_DAY_RANGE.start_utc, open=1.0, high=2.0, low=1.0, close=2.0))
+        else:
+            await anyio.sleep(timeout)
+        return self.bars_data
+
+    def cancel(self, _bars_data: BarDataList) -> None:
+        self.cancel_count += 1
+
+
+def make_live_bar_connection(monkeypatch: pytest.MonkeyPatch) -> tuple[IbAsyncGatewayConnection, LiveBarGateway]:
+    connection, _historical_data_gateway = make_connected_connection(monkeypatch)
+    monkeypatch.setattr(gateway_connection_module, "LIVE_BAR_CONNECTION_CHECK_SECONDS", SHORT_CHECK_SECONDS)
+    live_bar_gateway = LiveBarGateway()
+    monkeypatch.setattr(connection.ib, "reqHistoricalDataAsync", live_bar_gateway.request)
+    monkeypatch.setattr(connection.ib, "cancelHistoricalData", live_bar_gateway.cancel)
+    return connection, live_bar_gateway
+
+
+async def read_live_bars_until_end(connection: IbAsyncGatewayConnection, *, is_losing_the_link: bool = False) -> None:
+    with anyio.fail_after(STREAM_END_WAIT_SECONDS):
+        async with aclosing(connection.stream_live_bars(AAPL, BarPeriod.ONE_DAY)) as live_bars:
+            async for _bar in live_bars:
+                if is_losing_the_link:
+                    connection.mark_ibkr_link_lost("test")
+
+
+@pytest.mark.anyio
+async def test_a_timed_out_live_bar_subscription_raises_and_marks_the_link_lost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection, live_bar_gateway = make_live_bar_connection(monkeypatch)
+    live_bar_gateway.answers = False
+
+    with pytest.raises(GatewayRequestError, match="in time"):
+        await read_live_bars_until_end(connection)
+
+    assert connection.read_status() == "no_ibkr_connection"
+    assert live_bar_gateway.cancel_count == 1
+
+
+@pytest.mark.anyio
+async def test_a_lost_ibkr_link_ends_the_live_bar_stream_and_its_subscription(monkeypatch: pytest.MonkeyPatch) -> None:
+    connection, live_bar_gateway = make_live_bar_connection(monkeypatch)
+
+    with pytest.raises(GatewayRequestError, match="no connection to IBKR"):
+        await read_live_bars_until_end(connection, is_losing_the_link=True)
+
+    assert live_bar_gateway.cancel_count == 1
+
+
+@pytest.mark.anyio
+async def test_the_hub_gets_a_live_bar_again_after_a_silent_subscription_and_a_lost_link(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection, live_bar_gateway = make_live_bar_connection(monkeypatch)
+    live_bar_gateway.answers = False
+    hub = LiveDailyBarHub(connection, retry_delay_seconds=SHORT_CHECK_SECONDS)
+
+    async def wait_for_live_bar(*, is_there: bool) -> None:
+        with anyio.fail_after(STREAM_END_WAIT_SECONDS):
+            while (hub.read_bar(AAPL) is not None) != is_there:
+                await anyio.sleep(SHORT_CHECK_SECONDS)
+
+    with hub.listen() as listener:
+        listener.follow([AAPL])
+        await anyio.sleep(SHORT_TIMEOUT_SECONDS * 2)
+        assert hub.read_bar(AAPL) is None
+
+        live_bar_gateway.answers = True
+        connection.mark_ibkr_link_restored()
+        await wait_for_live_bar(is_there=True)
+
+        connection.mark_ibkr_link_lost("test")
+        await wait_for_live_bar(is_there=False)
+
+        connection.mark_ibkr_link_restored()
+        await wait_for_live_bar(is_there=True)
+        hub.stop()
 
 
 @pytest.mark.anyio

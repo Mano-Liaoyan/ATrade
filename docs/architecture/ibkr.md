@@ -71,7 +71,7 @@ The public entry `atrade.ibkr` exports:
   (section 7.4). Each request then waits for its timeout. The connection
   thus keeps an IBKR link state:
   - Lost: IB Gateway sends code `1100` or `2110`, or a historical data
-    request gets no answer before its timeout.
+    request or a live bar subscription gets no answer before its timeout.
   - Restored: IB Gateway sends code `1101` or `1102`, or a historical data
     request gets an answer. An IBKR API error is also an answer.
   - A new API connection starts with the link restored.
@@ -82,7 +82,8 @@ The public entry `atrade.ibkr` exports:
 - While the link is lost, `read_status()` returns `no_ibkr_connection` and
   `is_connected()` is false. So the routes return `503` at once. The order
   functions, the historical data requests, and the live bar subscription
-  raise `GatewayRequestError` at once. Each 60 seconds, 1 request can try
+  raise `GatewayRequestError` at once. An open live bar stream raises it
+  within 1 second. Each 60 seconds, 1 request can try
   again. So a connection without `keep_connected()` (a forward test child)
   also finds a link that came back.
 - `read_connection_number()` counts the successful connections. A new

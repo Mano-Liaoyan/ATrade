@@ -290,7 +290,10 @@ Source: [Live bars on the chart](https://github.com/Mano-Liaoyan/ATrade/issues/6
   of the list. IBKR sends an update about every 5 seconds. Updates that come
   at the same time are one update.
 - The generator raises `GatewayRequestError` when the request fails or when
-  the connection is lost (checked each second while no update comes). When
+  the connection or the IBKR link is lost (checked each second while no
+  update comes). A subscription without an answer before the historical data
+  timeout (60 seconds) also fails and marks the IBKR link as lost, because
+  ib_async then cancels the request and no update comes. When
   the generator closes, it cancels the IBKR subscription
   (`cancelHistoricalData`). Use `contextlib.aclosing`.
 - The live bars of `/ws/market-data` are not saved in PostgreSQL. The bars
@@ -352,8 +355,9 @@ Source: [Live last price in each watchlist row](https://github.com/Mano-Liaoyan/
   the generator, which cancels the IBKR subscription), so a page change
   (home page to instrument page) does not request the bars again. A stream
   in its release delay gives its place to a new instrument.
-- A failed stream (no connection, no market data permission, a lost
-  connection) gives "no live bar" and starts again after the retry delay.
+- A failed stream gives "no live bar" and starts again after the retry
+  delay. The reasons are: no connection, no market data permission, a lost
+  connection, a lost IBKR link, or a subscription without an answer.
   The lifespan of port 8000 calls `hub.stop()`.
 - `/ws/watchlist-live-bars` is in `watchlist/live_bar_socket.py`. The socket
   reads the watchlist at the start and after each change of
