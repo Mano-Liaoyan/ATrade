@@ -76,7 +76,7 @@ test('the watchlist rows and the position rows are 32px high', async ({ page, re
   await page.goto('/');
   const watchlistRow = page.getByRole('region', { name: 'Watchlist table' }).getByRole('row', { name: /^AAPL/ });
   // The change column has an arrow icon after the daily bars load. The row also has the Delete button.
-  await expect(watchlistRow.getByText(/%$/).locator('svg')).toBeVisible();
+  await expect(watchlistRow.locator('[data-direction] svg')).toBeVisible();
   await expect(watchlistRow.getByRole('button', { name: /^Delete AAPL/ })).toBeVisible();
 
   await expect.poll(async () => Math.round((await watchlistRow.boundingBox())?.height ?? 0)).toBe(32);
