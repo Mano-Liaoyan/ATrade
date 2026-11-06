@@ -94,6 +94,9 @@ class RankedUniverseStrategy(Strategy):
         self.venue: Venue | None = None
 
     def on_start(self) -> None:
+        # A forward test restart restores the positions, and the new strategy object must know them.
+        for position in self.cache.positions_open(strategy_id=self.strategy_id):
+            self.shares[str(position.instrument_id)] = int(position.quantity.as_double())
         self.subscribe_data(DataType("UniverseUpdate"))
 
     def on_data(self, data: object) -> None:

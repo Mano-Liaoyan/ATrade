@@ -57,6 +57,9 @@ class MovingAverageStrategy(Strategy):
         self.is_long = False
 
     def on_start(self) -> None:
+        # A forward test restart restores the position, and the new strategy object must know it.
+        positions = self.cache.positions_open(instrument_id=self.settings.instrument_id, strategy_id=self.strategy_id)
+        self.is_long = bool(positions)
         self.register_indicator_for_bars(self.settings.bar_type, self.average)
         # Warm up the indicator with historical bars before live bars arrive.
         warm_up_length = find_warm_up_length(self.settings.bar_type, self.settings.average_period)

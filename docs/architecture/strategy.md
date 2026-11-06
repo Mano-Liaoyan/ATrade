@@ -845,6 +845,9 @@ Decided (#202):
   values, the total position is 100%.
 - The buys keep 2% of the equity as cash, because a market order fills at
   the open of the next bar.
+- `on_start` sets `shares` from `cache.positions_open`, because a forward
+  test restart restores the positions in a new strategy object. A saved
+  version keeps its code, so it must be saved again to get this.
 
 Decided (#175):
 
