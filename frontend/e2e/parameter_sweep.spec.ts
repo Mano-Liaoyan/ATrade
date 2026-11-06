@@ -2,6 +2,7 @@
 // dialog, see the heatmap and the "Metric" select, sort the Runs table, scroll to its last row, and open the backtest
 // of a run, which links back to its sweep. The bar chart saves the AAPL bars first, and the watchlist has AAPL.
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
+import { expectHeaderButtonsClickable } from './header_buttons';
 
 // A real child process runs each run. The browser projects share one queue with concurrency 1.
 const RUN_TIMEOUT_MILLISECONDS = 90_000;
@@ -142,6 +143,7 @@ test('starts a parameter sweep, sorts its runs, opens the backtest of a run, and
   await expect(page).toHaveURL(new RegExp(`/sweeps/${sweepId}$`));
   try {
     await checkHeatmap(page, sweepId);
+    await expectHeaderButtonsClickable(page, page.getByRole('region', { name: `Parameter sweep #${sweepId}` }));
     await checkRuns(page, sweepId);
   } finally {
     // The other specs share the backtest queue: the queued runs of this sweep must not wait in it.

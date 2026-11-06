@@ -3,6 +3,7 @@
 // "E2E stopped forward tests", so the list overflows. The client ID range 10-13 allows 4 forward tests at a time, and
 // the browser projects run at the same time, so each test starts only 1 forward test and stops it.
 import { expect, test, type Locator, type Page, type WebSocketRoute } from '@playwright/test';
+import { expectHeaderButtonsClickable } from './header_buttons';
 import { waitForStartedRunId } from './started_run';
 
 // A status change takes worker comparisons and socket reads, each every 2 seconds: "Running" takes 1 comparison and
@@ -139,6 +140,7 @@ test('starts a forward test in the New forward test dialog, sees it running, and
   await expect(heading.getByRole('link', { name: symbol, exact: true })).toBeVisible();
   await expect(heading).toContainText('1 min');
   await expect(chartPanel.getByText('Capital 1,000.00 USD', { exact: true })).toBeVisible();
+  await expectHeaderButtonsClickable(page, chartPanel);
   // The worker compares the states every 2 seconds, and the page reads the forward test every 2 seconds.
   const status = chartPanel.getByRole('status', { name: 'Forward test status' });
   await expect(status.getByRole('img', { name: 'Running', exact: true })).toBeVisible({ timeout: STATUS_TIMEOUT_MILLISECONDS });

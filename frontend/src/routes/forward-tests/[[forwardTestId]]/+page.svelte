@@ -294,7 +294,8 @@
                   <span class="atrade-run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
                 </h1>
                 {#if forwardTest.allocated_capital_usd !== null}
-                  <span class="run-note run-capital">Capital {formatAmount(forwardTest.allocated_capital_usd)} USD</span>
+                  {@const capitalNote = `Capital ${formatAmount(forwardTest.allocated_capital_usd)} USD`}
+                  <span class="run-note run-capital" title={capitalNote}>{capitalNote}</span>
                 {/if}
                 <span class="atrade-run-actions">
                   {#if chartInstrument !== null}
@@ -464,10 +465,14 @@
 />
 
 <style>
+  /* The actions keep their place: a narrow header line clips the note, and its title gives the full text. */
   .run-note {
-    flex: none;
+    flex: 0 1 auto;
+    min-inline-size: 0;
+    overflow: hidden;
     font-size: var(--cds-body-compact-01-font-size);
     line-height: var(--cds-body-compact-01-line-height);
+    text-overflow: ellipsis;
     white-space: nowrap;
     color: var(--cds-text-secondary);
   }
