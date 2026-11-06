@@ -64,9 +64,11 @@ class MemberData:
 
 
 def make_universe_updates(run: UniverseRun) -> list[CustomData]:
+    """A symbol is one bar type on the simulated venue, also with 2 listings in a period."""
     return [
         make_universe_update(
-            period.start_utc, [find_bar_type_name(member, run.bar_period) for member in period.members]
+            period.start_utc,
+            list(dict.fromkeys(find_bar_type_name(member, run.bar_period) for member in period.members)),
         )
         for period in run.periods
     ]

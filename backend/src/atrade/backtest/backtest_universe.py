@@ -214,6 +214,35 @@ class UniverseBars:
     bar_count_by_source: dict[BarSource, int]
 
 
+def merge_bars(bar_lists: list[list[Bar]]) -> list[Bar]:
+    bars_by_start = {bar.start_utc: bar for bars in bar_lists for bar in bars}
+    return [bars_by_start[start_utc] for start_utc in sorted(bars_by_start)]
+
+
+def merge_listings(listings: list[MemberBars]) -> MemberBars:
+    """One member with the bars of all listings of a symbol, on the exchange of the last bar."""
+    last_listing = max(
+        (listing for listing in listings if listing.open_bars),
+        key=lambda listing: listing.open_bars[-1].start_utc,
+        default=listings[0],
+    )
+    return MemberBars(
+        instrument=last_listing.instrument,
+        bars=merge_bars([listing.bars for listing in listings]),
+        look_back_bars=merge_bars([listing.look_back_bars for listing in listings]),
+        open_bars=merge_bars([listing.open_bars for listing in listings]),
+    )
+
+
+def merge_symbol_members(members: list[MemberBars]) -> list[MemberBars]:
+    """A listing move saves one symbol on 2 exchanges, and each listing can be a member. The simulated venue has one
+    instrument for each symbol (ADR 0003), so a symbol is one member with all its bars (section 10.10.1)."""
+    listings_by_symbol: dict[str, list[MemberBars]] = {}
+    for member in members:
+        listings_by_symbol.setdefault(member.instrument.symbol, []).append(member)
+    return [merge_listings(listings) for listings in listings_by_symbol.values()]
+
+
 async def read_universe_bars(
     *,
     database_url: str,
@@ -261,4 +290,4 @@ async def read_universe_bars(
                 open_bars=bars if ranges == [request.time_range] else next(saved_bars_of_requests).bars,
             )
         )
-    return UniverseBars(members=members, bar_count_by_source=bar_count_by_source)
+    return UniverseBars(members=merge_symbol_members(members), bar_count_by_source=bar_count_by_source)

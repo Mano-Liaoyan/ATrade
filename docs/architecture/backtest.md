@@ -934,6 +934,11 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 - The bar period is 1 day or 1 hour. One backtest uses one bar period.
 - The child reads the bars of each instrument only for the universe periods
   in which it is a member, plus its look-back bars.
+- A listing move saves one symbol on 2 exchanges, and each listing can be a
+  member. After the bar read, the child merges the listings of one symbol
+  into one member with all bars, on the exchange of the last bar. The trade
+  table records that exchange. The rank of the listings does not change, so
+  the symbol can fill 2 ranks of a top-N universe.
 - The look-back length of a multi-instrument backtest on 1-day bars is
   1 year ([#146](https://github.com/Mano-Liaoyan/ATrade/issues/146)).
 
