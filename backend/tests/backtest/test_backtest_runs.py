@@ -123,7 +123,9 @@ async def test_a_backtest_shows_the_fill_warning_when_the_cash_does_not_pay_for_
 
     assert backtest["status"] == "finished", backtest["error_message"]
     assert backtest["trades"][0]["quantity_shares"] == "96"
-    assert backtest["fill_warning"].startswith("Changed orders: 2. First: 2026-03-05 00:00 UTC: BUY 1000 BTEST reduced")
+    assert backtest["fill_warning"].startswith(
+        "Changed orders: 2. Earliest: 2026-03-05 00:00 UTC: BUY 1000 BTEST reduced"
+    )
 
 
 @pytest.mark.anyio

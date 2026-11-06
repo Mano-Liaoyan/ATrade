@@ -910,12 +910,21 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
   close 120, next open 150, next close 200, fill 200. So ATrade adds these
   2 parts to the engine run, in `backtest/strategy_engine_run.py`:
   - `make_open_ticks` adds 1 trade tick at the open of each bar, 1
-    microsecond after the bar start. A strategy that does not subscribe to
-    trade ticks does not see them.
-  - `NextOpenOrders` holds each market order of `submit_order` and each
-    `close_position` until the next open tick of the instrument. All
-    instruments of one rebalance thus fill on one price basis, and the
-    `add_data` order has no effect.
+    microsecond after the bar start. A bar without volume also gets a tick,
+    with a size of 1 share, because `on_bar` runs on such a bar.
+  - `NextOpenOrders` holds each market order of `submit_order`, each
+    `close_position`, and each `submit_order_list` until the next open tick
+    of the instrument. All instruments of one rebalance thus fill on one
+    price basis, and the `add_data` order has no effect.
+- Limit: a strategy can see the open ticks. At `on_bar`, the last price of an
+  instrument is the open of that bar, not its close. This changes the
+  values that use the last price: `portfolio.net_exposure`,
+  `portfolio.unrealized_pnl`, and `cache.price` with `PriceType.LAST`. For
+  example, at a bar with open 120 and close 130, 10 shares give a net
+  exposure of 1200, not 1300. A strategy that subscribes to trades also
+  gets the ticks in `on_trade`. A strategy reads the close from the bar.
+  The first-party templates and the rule builder code read cash, position
+  quantity, and `bar.close`, so this limit does not change them.
 - The time of such a fill is the bar start plus 1 microsecond. It is later
   than the end of the bar before. So the fill counts in the equity point at
   the end of its bar, with the close of that bar. The trade tables show the
@@ -929,20 +938,32 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
 - Cash: the engine ends a run with `RuntimeError` when a fill makes the cash
   negative. The check before each held order uses the open price. A buy
   that the free cash pays only in part becomes a smaller order of the whole
-  shares that the cash pays. A buy without the cash for 1 share goes to the
-  engine, and the engine refuses it with `OrderDenied`. The run finishes.
-  `backtest.fill_warning` gives the count of these orders and the first of
-  them. The count also has each other order that the engine refused. IBKR
+  shares that the cash pays. An open tick holds 1/4 of the bar volume, and
+  the engine fills the rest of an order 1 price step higher. So the check
+  adds this step for an order above the tick size. A buy without the cash
+  for 1 share goes to the engine, and the engine refuses it with
+  `OrderDenied`. These held market orders do not end the run.
+  `backtest.fill_warning` gives the count of the changed orders and the
+  oldest of them. The count also has each other order that the engine
+  refused, and each order that was still held when the run ended. IBKR
   refuses such an order and does not reduce it. The backtest reduces it,
   because a strategy that buys with all its cash would else lose each entry
   on a gap up.
 - An order without a next open fills at once at the last close. This
   applies to an order on the last bar of the run, and to a sell of a member
   without later saved bars.
-- Not held: `close_all_positions`, `submit_order_list`, and limit and stop
-  orders. A market order from these calls fills at the close of the
-  current bar. A buy stop order over a gap can still end the run with the
-  `RuntimeError`.
+- A held order can stay unsent when its open tick is the last data of the
+  run. The time alert after that tick does not run. The order then counts
+  in `fill_warning`.
+- `submit_order_list` holds the list with each entry type, and the cash
+  check does not reduce it. The engine refuses a list that the cash cannot
+  pay at the open.
+- Not held: `close_all_positions`, and limit and stop orders of
+  `submit_order`. A market order of `close_all_positions` fills at the close
+  of the current bar.
+- 2 cases can still end the run with the `RuntimeError`. One is a buy stop
+  order over a gap. The other is an order list above the tick size whose
+  rest goes over the cash.
 - Backtest results from before this rule are not directly comparable with
   new results.
 - One fill uses at most 1/4 of the bar volume. The engine fills the rest of

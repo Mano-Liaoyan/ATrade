@@ -17,9 +17,13 @@ from atrade.backtest.strategy_engine_run import StrategyRun, make_fill_warning, 
 from atrade.backtest.universe_engine_run import UniverseRun, run_universe_strategy
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
+from atrade.strategy.rules_code import make_rules_code
+from atrade.strategy.strategy_rules import StrategyRules
+from tests.strategy.rules_examples import condition, group, make_rules, number, price
 
 STRATEGIES_DIRECTORY = Path(__file__).parent / "strategies"
 BAR_COUNT_CODE = (STRATEGIES_DIRECTORY / "buy_and_sell_by_bar_count.py").read_text()
+BRACKET_CODE = (STRATEGIES_DIRECTORY / "bracket_with_all_cash.py").read_text()
 CLOSE_TWICE_CODE = (STRATEGIES_DIRECTORY / "close_position_twice.py").read_text()
 FOLLOW_UNIVERSE_CODE = (STRATEGIES_DIRECTORY / "follow_universe.py").read_text()
 REBALANCE_CODE = (STRATEGIES_DIRECTORY / "rebalance_in_one_bar.py").read_text()
@@ -31,14 +35,14 @@ BBB = Instrument(symbol="BBB", exchange="NYSE", currency="USD")
 LOOK_BACK_BAR_COUNT = 30
 
 
-def make_bar(day: int, open_price: int, close: int) -> Bar:
+def make_bar(day: int, open_price: int, close: int, volume: int = 1000000) -> Bar:
     return Bar(
         start_utc=START_UTC + timedelta(days=day),
         open=Decimal(open_price),
         high=Decimal(max(open_price, close) + 1),
         low=Decimal(min(open_price, close) - 1),
         close=Decimal(close),
-        volume=Decimal(1000000),
+        volume=Decimal(volume),
     )
 
 
@@ -98,8 +102,28 @@ def test_a_buy_that_gaps_over_the_cash_is_reduced_and_the_run_has_a_warning(tmp_
     assert read_fills(trades) == [(find_open_time(3), "BUY", Decimal("130.00"), Decimal(76))]
     assert changed_orders == ["2026-03-05 00:00 UTC: BUY 100 WAVE reduced to 76 at 130.00"]
     assert make_fill_warning(changed_orders) == (
-        "Changed orders: 1. First: 2026-03-05 00:00 UTC: BUY 100 WAVE reduced to 76 at 130.00."
+        "Changed orders: 1. Earliest: 2026-03-05 00:00 UTC: BUY 100 WAVE reduced to 76 at 130.00."
     )
+
+
+def test_the_fill_warning_names_the_oldest_order() -> None:
+    changed_orders = [
+        "2026-03-06 00:00 UTC: BUY 5 AAA reduced to 4 at 10.00",
+        "2026-03-05 00:00 UTC: BUY 7 BBB refused",
+    ]
+
+    assert make_fill_warning(changed_orders) == "Changed orders: 2. Earliest: 2026-03-05 00:00 UTC: BUY 7 BBB refused."
+
+
+def test_a_reduced_order_above_the_open_tick_volume_does_not_end_the_run(tmp_path: Path) -> None:
+    # The open tick holds 1000 shares. The engine fills the rest 1 cent higher, so the check adds 1 cent.
+    bars = [*make_flat_bars(3), make_bar(3, 2, 2, volume=4000), make_bar(4, 2, 2, volume=4000)]
+
+    trades, changed_orders = run_single(bars, tmp_path, cash=10000, shares=9000)
+
+    assert sum(trade.quantity_shares for trade in trades) == Decimal(4975)
+    assert sum(trade.price_usd * trade.quantity_shares for trade in trades) <= Decimal(10000)
+    assert changed_orders == ["2026-03-05 00:00 UTC: BUY 9000 WAVE reduced to 4975 at 2.00"]
 
 
 def test_a_buy_refused_because_the_cash_pays_for_no_share_does_not_fail_the_run(tmp_path: Path) -> None:
@@ -120,6 +144,31 @@ def test_a_full_position_buy_on_a_day_that_closes_below_its_open_is_not_refused(
 
     assert read_fills(trades) == [(find_open_time(3), "BUY", Decimal("95.00"), Decimal(100))]
     assert changed_orders == []
+
+
+def test_a_full_cash_bracket_order_fills_at_the_next_open_after_a_day_that_closes_below_its_open(
+    tmp_path: Path,
+) -> None:
+    bars = [make_bar(0, 130, 100), make_bar(1, 95, 96), make_bar(2, 96, 96)]
+
+    trades, changed_orders = run_single(bars, tmp_path, code=BRACKET_CODE, cash=10000)
+
+    assert read_fills(trades) == [(find_open_time(1), "BUY", Decimal("95.00"), Decimal(100))]
+    assert changed_orders == []
+
+
+def test_rule_code_does_not_buy_two_times_when_the_next_bar_has_no_volume(tmp_path: Path) -> None:
+    code = make_rules_code(
+        StrategyRules.model_validate(make_rules(group("all_of", condition(price(), "above", number(100)))))
+    )
+    bars = [make_bar(0, 100, 110), make_bar(1, 102, 102, volume=0), make_bar(2, 103, 104), make_bar(3, 104, 105)]
+
+    trades, _ = run_single(bars, tmp_path, code=code)
+
+    # The bar without volume has an open tick. The order fills before `on_bar` of that bar.
+    assert {trade.side for trade in trades} == {"BUY"}
+    assert sum(trade.quantity_shares for trade in trades) == Decimal(10)
+    assert {trade.time_utc for trade in trades} == {find_open_time(1)}
 
 
 def test_a_position_closed_two_times_sells_one_time_at_the_next_open(tmp_path: Path) -> None:
@@ -154,7 +203,11 @@ def make_member(member: Member, *, has_later_bars: bool = True) -> MemberBars:
 
 
 def run_universe(
-    members: list[MemberBars], periods: list[UniversePeriod], work_directory: Path, code: str = FOLLOW_UNIVERSE_CODE
+    members: list[MemberBars],
+    periods: list[UniversePeriod],
+    work_directory: Path,
+    code: str = FOLLOW_UNIVERSE_CODE,
+    changed_orders: list[str] | None = None,
 ) -> list[BacktestTrade]:
     run = UniverseRun(
         code=code,
@@ -164,7 +217,7 @@ def run_universe(
         members=members,
         periods=periods,
     )
-    return run_universe_strategy(run, work_directory)
+    return run_universe_strategy(run, work_directory, changed_orders)
 
 
 def read_symbol_fills(trades: list[BacktestTrade]) -> set[tuple[str | None, str, Decimal, datetime]]:
@@ -188,6 +241,19 @@ def test_all_members_of_one_rebalance_fill_at_their_next_open_in_each_member_ord
         ("AAA", "BUY", Decimal("150.00"), find_open_time(1)),
         ("BBB", "BUY", Decimal("70.00"), find_open_time(1)),
     }
+
+
+def test_an_order_held_at_the_end_of_the_data_gives_a_warning(tmp_path: Path) -> None:
+    # The open tick of day 1 is the last data of the run. The bars of day 1 are outside the member periods.
+    held = Member(AAA, [(100, 120), (150, 200)], 1)
+    other = Member(BBB, [(50, 60)], 1)
+    changed_orders: list[str] = []
+    periods = [UniversePeriod(start_utc=START_UTC, members=[AAA, BBB])]
+
+    trades = run_universe([make_member(held), make_member(other)], periods, tmp_path, REBALANCE_CODE, changed_orders)
+
+    assert [trade.symbol for trade in trades] == ["BBB"]
+    assert changed_orders == ["2026-03-03 00:00 UTC: BUY 10 AAA not sent (the run ended at its next open)"]
 
 
 def make_exit_periods() -> list[UniversePeriod]:

@@ -228,7 +228,9 @@ async def read_universe_bars(
                 bars=bars,
                 look_back_bars=[look_back_by_start[start_utc] for start_utc in sorted(look_back_by_start)],
                 # A member that leaves still sells at its next open, also outside its periods.
-                open_bars=(
+                open_bars=bars
+                if ranges == [request.time_range]
+                else (
                     await read_saved_bars(
                         database_url=database_url,
                         bar_request=BarRequest(
