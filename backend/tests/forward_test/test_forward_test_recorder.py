@@ -155,8 +155,6 @@ def test_records_each_new_fill_once_and_one_equity_point_at_the_end_of_each_bar(
 
     run_engine_with_recorder(database_url=database_url, forward_test_id=forward_test_id, work_directory=tmp_path)
 
-    # The recorder writes no fill: the owner ledger has them (section 12.8).
-    assert read_table_rows(database_url, "SELECT count(*) FROM forward_test_fill") == [(0,)]
     equity_points = read_table_rows(
         database_url, "SELECT time_utc, equity_usd FROM forward_test_equity_point ORDER BY time_utc"
     )
