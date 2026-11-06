@@ -11,7 +11,7 @@ from datetime import timedelta
 
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.indicators import SimpleMovingAverage
-from nautilus_trader.model import Bar, BarType, ClientOrderId, InstrumentId, OrderCanceled, OrderSide, Position, Quantity
+from nautilus_trader.model import Bar, BarType, InstrumentId, OrderCanceled, OrderSide, Position, Quantity
 from nautilus_trader.trading import Strategy
 
 # The warm-up asks for 3 average periods of bars, and for 1 week at least, so that nights, weekends,
@@ -59,7 +59,7 @@ class MovingAverageStrategy(Strategy):
         self.average = SimpleMovingAverage(config.average_period)
         self.order_is_lost = False
         self.last_retry_ns = -1
-        self.own_cancels: set[ClientOrderId] = set()
+        self.own_cancels: set[object] = set()
 
     def on_start(self) -> None:
         self.register_indicator_for_bars(self.settings.bar_type, self.average)
