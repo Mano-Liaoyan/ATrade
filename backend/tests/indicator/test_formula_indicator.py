@@ -248,6 +248,10 @@ def test_refuses_the_expression(expression: str, message: str) -> None:
     assert re.search(message, problems[0].message), problems[0].message
 
 
+def test_a_syntax_error_at_the_end_of_the_text_names_the_column_after_the_text() -> None:
+    assert "Column 8:" in check_expression("close +")[0].message
+
+
 def test_refuses_an_expression_that_reads_too_many_bars() -> None:
     long_macd = "macd(999, 1000, 1000, output='value')"
     problems = check_expression(

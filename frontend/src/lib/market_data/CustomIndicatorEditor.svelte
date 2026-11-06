@@ -1,14 +1,20 @@
 <!-- The custom indicators of the Settings page (docs/architecture/indicator.md section 23.10): a table, and dialogs that
-     create, change, and delete. The backend checks each save: a problem shows at its field. The table scrolls in its own
-     ScrollRegion. -->
+     create, change, and delete. The backend checks each save: a problem shows at its field. A custom indicator of the AI
+     assistant has a Keep button until the user keeps it, then a "Kept" status icon. /ws/custom-indicators pushes each
+     change, also from the AI assistant. The table scrolls in its own ScrollRegion. -->
 <script lang="ts">
+  import Checkmark16 from '@carbon/icons/es/checkmark/16.js';
   import Edit16 from '@carbon/icons/es/edit/16.js';
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
-  import { Button, DataTable, Dialog, IconButton, InlineNotification, Select, TextInput, type TableColumn } from '#lib/foundation/carbon';
+  import { Button, DataTable, Dialog, IconButton, InlineNotification, Select, StatusIndicator, TextInput, type TableColumn } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
+  import type { RequestResult } from '#lib/foundation/http_request';
+  import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
+    CUSTOM_INDICATORS_SOCKET_PATH,
     deleteCustomIndicator,
+    keepCustomIndicator,
     listCustomIndicators,
     saveCustomIndicator,
     type CustomIndicator,
@@ -16,7 +22,13 @@
     type CustomIndicatorProblems,
   } from './custom_indicators';
 
-  const COLUMNS: TableColumn[] = [{ header: 'Name' }, { header: 'Expression' }, { header: 'Change', isMenu: true }, { header: 'Delete', isMenu: true }];
+  const COLUMNS: TableColumn[] = [
+    { header: 'Name' },
+    { header: 'Expression' },
+    { header: 'Keep', isMenu: true },
+    { header: 'Change', isMenu: true },
+    { header: 'Delete', isMenu: true },
+  ];
   const PLACEMENT_ITEMS = [
     { value: 'own', label: 'Own pane' },
     { value: 'price', label: 'Price pane' },
@@ -36,10 +48,10 @@
   let toDelete = $state<CustomIndicator | null>(null);
   let deleteMessage = $state<string | null>(null);
   let isDeleting = $state(false);
+  let keepMessage = $state<string | null>(null);
   let form = $state<HTMLFormElement>();
 
-  async function readIndicators(): Promise<void> {
-    const result = await listCustomIndicators(fetch);
+  function showIndicators(result: RequestResult<CustomIndicator[]>): void {
     if (result.kind === 'failed') {
       readFailedMessage = result.message;
       return;
@@ -48,9 +60,17 @@
     indicators = result.value;
   }
 
-  $effect(() => {
-    void readIndicators();
-  });
+  async function readIndicators(): Promise<void> {
+    showIndicators(await listCustomIndicators(fetch));
+  }
+
+  $effect(() =>
+    readOnChange({
+      socketPath: CUSTOM_INDICATORS_SOCKET_PATH,
+      read: () => listCustomIndicators(fetch),
+      onResult: showIndicators,
+    }),
+  );
 
   function openDialog(indicator: CustomIndicator | null): void {
     editedId = indicator?.custom_indicator_id ?? null;
@@ -78,6 +98,12 @@
     await readIndicators();
   }
 
+  async function keepIndicator(indicator: CustomIndicator): Promise<void> {
+    const result = await keepCustomIndicator(fetch, indicator.custom_indicator_id);
+    keepMessage = result.kind === 'failed' ? result.message : null;
+    await readIndicators();
+  }
+
   async function deleteIndicator(indicator: CustomIndicator): Promise<void> {
     isDeleting = true;
     const result = await deleteCustomIndicator(fetch, indicator.custom_indicator_id);
@@ -101,6 +127,9 @@
       }}>New custom indicator</Button
     >
   </div>
+  {#if keepMessage !== null}
+    <InlineNotification kind="error" title="Custom indicator not kept" subtitle={keepMessage} lowContrast />
+  {/if}
   {#if readFailedMessage !== null}
     <InlineNotification kind="error" title="Custom indicators not read" subtitle={readFailedMessage} lowContrast />
   {:else if indicators === null}
@@ -114,8 +143,25 @@
         {#snippet rows()}
           {#each listedIndicators as indicator (indicator.custom_indicator_id)}
             <tr>
-              <th scope="row">{indicator.name}</th>
+              <th scope="row">
+                {#if indicator.kept && indicator.assistant_conversation_id !== null}
+                  <StatusIndicator label="Kept" kind="success" />
+                {/if}
+                {indicator.name}
+              </th>
               <td class="expression">{indicator.expression}</td>
+              <td class="cds--table-column-menu">
+                {#if !indicator.kept}
+                  <IconButton
+                    label={`Keep ${indicator.name}`}
+                    icon={Checkmark16}
+                    align="left"
+                    onclick={() => {
+                      void keepIndicator(indicator);
+                    }}
+                  />
+                {/if}
+              </td>
               <td class="cds--table-column-menu">
                 <IconButton
                   label={`Change ${indicator.name}`}

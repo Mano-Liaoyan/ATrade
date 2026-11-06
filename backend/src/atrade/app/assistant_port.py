@@ -17,7 +17,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import add_validation_error_handler
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection
-from atrade.market_data import ExchangeRateReader
+from atrade.market_data import ExchangeRateReader, create_custom_indicator_assistant_router
 from atrade.screen import create_screen_assistant_router
 from atrade.strategy import create_strategy_assistant_router
 
@@ -61,6 +61,11 @@ def create_assistant_port_app(*, settings: Settings, clock: Clock, gateway_conne
     )
     app.include_router(
         create_screen_assistant_router(
+            database_url=settings.database_url, clock=clock, conversation_exists=check_conversation
+        )
+    )
+    app.include_router(
+        create_custom_indicator_assistant_router(
             database_url=settings.database_url, clock=clock, conversation_exists=check_conversation
         )
     )

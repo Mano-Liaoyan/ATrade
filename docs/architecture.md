@@ -253,13 +253,13 @@ app           -> all modules
   `indicator`, so `assistant` can import only `foundation` (#179). A
   contract keeps the internal files of `assistant` private.
 - `assistant` does not import other capabilities. `app/` builds the port 8001
-  app from the routers of `strategy`, `backtest`, and `screen`
+  app from the routers of `strategy`, `backtest`, `screen`, and `market_data`
   (`docs/architecture/assistant.md`). `app/` also gives `assistant` the
   start context of a conversation (`strategy.read_strategy_outline()`,
   `backtest.read_last_backtest_ids()`) and the strategy template for the
   default system prompt (#184). The `conversation_id` foreign keys of
-  `strategy_version`, `backtest`, and the screen tables point at
-  `assistant_conversation` (section 6.3 allows a foreign key).
+  `strategy_version`, `backtest`, `custom_indicator`, and the screen tables
+  point at `assistant_conversation` (section 6.3 allows a foreign key).
 - `paper_trading` does not import `forward_test`. Since #215 the owner
   ledger replaces the refusal of paper orders by hand on the instrument of a
   running forward test (section 12.2), and `app/web.py` gives
@@ -701,6 +701,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     | `/ws/sweeps` | `parameter_sweep`, `backtest` | `backtest` (`SWEEP_CHANGE_SOCKET`) |
     | `/ws/strategies` | `strategy`, `strategy_version` | `strategy` |
     | `/ws/screens` | `screen`, `screen_result` | `screen` |
+    | `/ws/custom-indicators` | `custom_indicator` | `market_data` (`CUSTOM_INDICATOR_CHANGE_SOCKET`) |
     | `/ws/watchlist` | `watchlist_instrument` | `watchlist` |
     | `/ws/forward-tests` | `forward_test`, `forward_test_interruption`, `forward_test_equity_point`, `forward_test_fill`, `forward_test_same_period_backtest` | `forward_test` |
 

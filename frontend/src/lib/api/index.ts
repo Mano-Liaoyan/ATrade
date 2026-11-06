@@ -277,8 +277,8 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Check Body */
-        post: operations["check_body_api_custom_indicators_check_post"];
+        /** Check */
+        post: operations["check_api_custom_indicators_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -305,6 +305,26 @@ export interface paths {
          * @description Stored references keep working: each one holds its expression (ADR 0009).
          */
         delete: operations["delete_api_custom_indicators__custom_indicator_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/custom-indicators/{custom_indicator_id}/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep
+         * @description Sets `kept`, so port 8001 cannot change the indicator. The change time stays: the formula does not change.
+         */
+        post: operations["keep_api_custom_indicators__custom_indicator_id__keep_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1742,6 +1762,10 @@ export interface components {
             custom_indicator_id: number;
             /** Key */
             key: string;
+            /** Kept */
+            kept: boolean;
+            /** Assistant Conversation Id */
+            assistant_conversation_id: number | null;
         };
         /** @enum {string} */
         DesiredState: "running" | "stopped";
@@ -4532,9 +4556,11 @@ export interface operations {
             };
         };
     };
-    check_body_api_custom_indicators_check_post: {
+    check_api_custom_indicators_check_post: {
         parameters: {
-            query?: never;
+            query?: {
+                custom_indicator_id?: number | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4666,6 +4692,46 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    keep_api_custom_indicators__custom_indicator_id__keep_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                custom_indicator_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomIndicatorResponse"];
+                };
             };
             /** @description Not Found */
             404: {

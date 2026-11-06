@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vite-plus/test';
-import { createAssistantTools } from '../src/assistant_tools.ts';
+import { ASSISTANT_TOOL_NAMES, createAssistantTools } from '../src/assistant_tools.ts';
 import { runBacktest, summarizeBacktest, SURVIVORSHIP_BIAS_WARNING, type BacktestWait } from '../src/backtest_tools.ts';
 import { Conversations, type RunEvent } from '../src/conversations.ts';
 import { WebPortClient } from '../src/web_port_client.ts';
@@ -13,6 +13,8 @@ import { startFakeModelServer, type ChatMessage, type FakeModelServer, type Mode
 import {
   backtestBody,
   COMPARISON,
+  CUSTOM_INDICATOR,
+  CUSTOM_INDICATOR_CHECK,
   INDICATOR_CATALOG,
   NO_SAVED_BARS,
   SCREEN,
@@ -568,5 +570,79 @@ describe('the screen tools', () => {
     await runOnce(conversations);
 
     expect(readToolResults()).toEqual([`Port 8001 answered 403: ${JSON.stringify(refused)}`]);
+  });
+});
+
+describe('the custom indicator tools (25.4.4)', () => {
+  const FIELDS = {
+    name: CUSTOM_INDICATOR.name,
+    expression: CUSTOM_INDICATOR.expression,
+    chart_placement: CUSTOM_INDICATOR.chart_placement,
+    value_description: CUSTOM_INDICATOR.value_description,
+  };
+
+  test('each tool calls port 8001 with the conversation', async () => {
+    const conversations = await openConversations([
+      call('list_custom_indicators'),
+      call('read_custom_indicator', { custom_indicator_id: 3 }),
+      call('check_custom_indicator', FIELDS),
+      call('check_custom_indicator', { ...FIELDS, custom_indicator_id: 3 }),
+      call('create_custom_indicator', FIELDS),
+      call('update_custom_indicator', { ...FIELDS, custom_indicator_id: 3 }),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    expect(web.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+      'GET /api/custom-indicators',
+      'GET /api/custom-indicators/3',
+      'POST /api/custom-indicators/check',
+      'POST /api/custom-indicators/check?custom_indicator_id=3',
+      'POST /api/custom-indicators',
+      'PUT /api/custom-indicators/3',
+    ]);
+    expect(web.requests.map((request) => request.conversationId)).toEqual(Array(6).fill(CONVERSATION_ID));
+    for (const request of web.requests.slice(2)) {
+      expect(request.body).toEqual(FIELDS);
+    }
+    expect(readToolResults()).toEqual([
+      [CUSTOM_INDICATOR],
+      CUSTOM_INDICATOR,
+      CUSTOM_INDICATOR_CHECK,
+      CUSTOM_INDICATOR_CHECK,
+      CUSTOM_INDICATOR,
+      CUSTOM_INDICATOR,
+    ]);
+  });
+
+  test('the problem list of a create goes to the model, and the 403 of an update too', async () => {
+    const problems = { problems: [{ location: ['expression'], message: "Column 9: Unknown name 'foo'." }] };
+    const refused = { detail: 'The AI assistant cannot change custom indicator 3.' };
+    web.customIndicatorAnswers.push({ status: 422, body: problems }, { status: 403, body: refused });
+    const conversations = await openConversations([
+      call('create_custom_indicator', FIELDS),
+      call('update_custom_indicator', { ...FIELDS, custom_indicator_id: 3 }),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    expect(readToolResults()).toEqual([
+      `Port 8001 answered 422: ${JSON.stringify(problems)}`,
+      `Port 8001 answered 403: ${JSON.stringify(refused)}`,
+    ]);
+  });
+
+  test('pi may run each tool, the AI assistant has no delete tool, and each save tool shows the expression syntax', () => {
+    const client = new WebPortClient(web.baseUrl, CONVERSATION_ID);
+    const tools = createAssistantTools({ client, budget: { startedBacktests: 0 }, wait: QUICK_WAIT });
+
+    expect(tools.map((tool) => tool.name)).toEqual(ASSISTANT_TOOL_NAMES);
+    expect(tools.filter((tool) => tool.name.startsWith('delete'))).toEqual([]);
+    for (const name of ['check_custom_indicator', 'create_custom_indicator', 'update_custom_indicator']) {
+      const parameters = tools.find((tool) => tool.name === name)?.parameters as { properties: { expression: { description: string } } };
+      expect(parameters.properties.expression.description).toContain('calculation limit');
+    }
   });
 });

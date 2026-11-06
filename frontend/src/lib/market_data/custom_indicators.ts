@@ -10,6 +10,7 @@ type IndicatorProblem = components['schemas']['IndicatorProblemResponse'];
 export type CustomIndicatorProblems = Record<string, string>;
 export type SaveResult = { kind: 'ok' } | { kind: 'refused'; problems: CustomIndicatorProblems } | { kind: 'failed'; message: string };
 
+export const CUSTOM_INDICATORS_SOCKET_PATH = '/ws/custom-indicators';
 const BASE_PATH = '/api/custom-indicators';
 const FAILED_ACTION = 'The custom indicator request';
 
@@ -46,8 +47,17 @@ export async function saveCustomIndicator(fetchFunction: typeof fetch, customInd
   return { kind: 'failed', message: await readErrorMessage(response, FAILED_ACTION) };
 }
 
-export async function deleteCustomIndicator(fetchFunction: typeof fetch, customIndicatorId: number): Promise<RequestResult<undefined>> {
-  const response = await sendRequest(fetchFunction, `${BASE_PATH}/${String(customIndicatorId)}`, { method: 'DELETE' });
+/** Keep: the AI assistant cannot change the custom indicator after it (section 23.10.6). */
+export function keepCustomIndicator(fetchFunction: typeof fetch, customIndicatorId: number): Promise<RequestResult<undefined>> {
+  return sendAction(fetchFunction, `${BASE_PATH}/${String(customIndicatorId)}/keep`, 'POST');
+}
+
+export function deleteCustomIndicator(fetchFunction: typeof fetch, customIndicatorId: number): Promise<RequestResult<undefined>> {
+  return sendAction(fetchFunction, `${BASE_PATH}/${String(customIndicatorId)}`, 'DELETE');
+}
+
+async function sendAction(fetchFunction: typeof fetch, path: string, method: 'POST' | 'DELETE'): Promise<RequestResult<undefined>> {
+  const response = await sendRequest(fetchFunction, path, { method });
   if (response === null) {
     return { kind: 'failed', message: BACKEND_NOT_REACHABLE };
   }

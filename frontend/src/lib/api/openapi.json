@@ -817,17 +817,35 @@
     },
     "/api/custom-indicators/check": {
       "post": {
-        "summary": "Check Body",
-        "operationId": "check_body_api_custom_indicators_check_post",
+        "summary": "Check",
+        "operationId": "check_api_custom_indicators_check_post",
+        "parameters": [
+          {
+            "name": "custom_indicator_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Custom Indicator Id"
+            }
+          }
+        ],
         "requestBody": {
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CustomIndicatorBody"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -977,6 +995,56 @@
         "responses": {
           "204": {
             "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/custom-indicators/{custom_indicator_id}/keep": {
+      "post": {
+        "summary": "Keep",
+        "description": "Sets `kept`, so port 8001 cannot change the indicator. The change time stays: the formula does not change.",
+        "operationId": "keep_api_custom_indicators__custom_indicator_id__keep_post",
+        "parameters": [
+          {
+            "name": "custom_indicator_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Custom Indicator Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomIndicatorResponse"
+                }
+              }
+            }
           },
           "404": {
             "content": {
@@ -5692,6 +5760,21 @@
           "key": {
             "type": "string",
             "title": "Key"
+          },
+          "kept": {
+            "type": "boolean",
+            "title": "Kept"
+          },
+          "assistant_conversation_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assistant Conversation Id"
           }
         },
         "type": "object",
@@ -5701,7 +5784,9 @@
           "chart_placement",
           "value_description",
           "custom_indicator_id",
-          "key"
+          "key",
+          "kept",
+          "assistant_conversation_id"
         ],
         "title": "CustomIndicatorResponse"
       },

@@ -73,7 +73,8 @@ An indicator that the user adds as a formula expression, for example
 `close / sma(50) - 1`. It has a name, an expression, a chart placement, and a
 value description. Screens, strategies, and bar charts use it as a built-in
 indicator of the catalog. Each stored reference holds a copy of its expression.
-In Chinese, write 自定义指标.
+The AI assistant can also add one. It stays not kept until the user clicks
+Keep. In Chinese, write 自定义指标.
 _Avoid_: user indicator, script indicator, formula indicator
 
 **Formula expression**:
@@ -355,8 +356,9 @@ _Avoid_: fallback capital, ledger
 **AI assistant**:
 The language model that discusses strategies and screens with the user, writes
 strategy versions and new screens, runs screens, and runs and compares
-backtests. It changes only a screen that it made in the same conversation and
-that the user has not kept. It never deletes a screen, never changes the
+backtests. It also writes custom indicators. It changes only a screen or a
+custom indicator that it made in the same conversation and that the user has
+not kept. It never deletes a screen or a custom indicator, never changes the
 watchlist, never sends a paper order, and never starts a forward test. In
 Chinese, write AI 助手.
 _Avoid_: agent, bot, copilot

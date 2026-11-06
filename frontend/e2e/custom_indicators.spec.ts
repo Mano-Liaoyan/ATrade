@@ -24,6 +24,8 @@ interface Row {
   expression: string;
   chart_placement: string;
   value_description: string;
+  kept: boolean;
+  assistant_conversation_id: number | null;
 }
 
 async function createScreenWithRun(request: APIRequestContext, name: string, definition: Record<string, unknown>): Promise<number> {
@@ -40,8 +42,8 @@ async function readVersionCode(request: APIRequestContext, strategyId: string, v
   return ((await response.json()) as { code: string }).code;
 }
 
-async function useLocalCustomIndicators(context: BrowserContext): Promise<void> {
-  let rows: Row[] = [];
+async function useLocalCustomIndicators(context: BrowserContext, firstRows: Row[] = []): Promise<void> {
+  let rows = firstRows;
   let nextId = 1;
 
   async function answerRequest(route: Route): Promise<void> {
@@ -51,25 +53,50 @@ async function useLocalCustomIndicators(context: BrowserContext): Promise<void> 
       await route.fulfill({ json: rows });
       return;
     }
+    const keptId = /\/(\d+)\/keep$/.exec(new URL(request.url()).pathname)?.[1];
+    if (keptId !== undefined) {
+      rows = rows.map((row) => (String(row.custom_indicator_id) === keptId ? { ...row, kept: true } : row));
+      await route.fulfill({ json: rows[0] });
+      return;
+    }
     if (request.method() === 'DELETE') {
       rows = rows.filter((row) => String(row.custom_indicator_id) !== id);
       await route.fulfill({ status: 204 });
       return;
     }
-    const fields = request.postDataJSON() as Omit<Row, 'custom_indicator_id' | 'key'>;
+    const fields = request.postDataJSON() as Omit<Row, 'custom_indicator_id' | 'key' | 'kept' | 'assistant_conversation_id'>;
     if (fields.expression === 'foo') {
       const problem = { location: ['expression'], message: "Column 1: Unknown name 'foo'." };
       await route.fulfill({ status: 422, json: { problems: [problem] } });
       return;
     }
-    const row = { ...fields, custom_indicator_id: id === undefined ? nextId : Number(id), key: `custom_${id ?? String(nextId)}` };
+    const row = { ...fields, custom_indicator_id: id === undefined ? nextId : Number(id), key: `custom_${id ?? String(nextId)}`, kept: true, assistant_conversation_id: null };
     nextId += 1;
     rows = [...rows.filter((item) => item.custom_indicator_id !== row.custom_indicator_id), row];
     await route.fulfill({ status: id === undefined ? 201 : 200, json: row });
   }
 
-  await context.route(/\/api\/custom-indicators(\/\d+)?$/, answerRequest);
+  await context.route(/\/api\/custom-indicators(\/\d+(\/keep)?)?$/, answerRequest);
 }
+
+test('the Settings page keeps a custom indicator of the AI assistant', async ({ page, context }) => {
+  const aiRow = { custom_indicator_id: 7, key: 'custom_7', expression: FORMULA.expression, chart_placement: 'own', value_description: 'The ratio.', assistant_conversation_id: 3 };
+  await useLocalCustomIndicators(context, [
+    { ...aiRow, name: 'Of the AI', kept: false },
+    { ...aiRow, custom_indicator_id: 8, key: 'custom_8', name: 'Of the user', kept: true, assistant_conversation_id: null },
+  ]);
+  await page.goto('/settings');
+
+  const aiIndicator = page.getByRole('row', { name: /Of the AI/ });
+  await expect(page.getByRole('button', { name: 'Keep Of the user' })).toHaveCount(0);
+  await expect(page.getByRole('img', { name: 'Kept' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Keep Of the AI' }).click();
+
+  await expect(page.getByRole('button', { name: 'Keep Of the AI' })).toHaveCount(0);
+  await expect(aiIndicator.getByRole('img', { name: 'Kept' })).toBeVisible();
+  await expect(page.getByRole('row', { name: /Of the user/ }).getByRole('img', { name: 'Kept' })).toHaveCount(0);
+});
 
 test('the Settings page creates, changes, and deletes a custom indicator, and a problem shows at its field', async ({ page, context }) => {
   await useLocalCustomIndicators(context);

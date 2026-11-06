@@ -16,7 +16,11 @@ from atrade.market_data.bar_reading import (
 )
 from atrade.market_data.bar_source import BarSource, check_source_order, read_source_order
 from atrade.market_data.bar_store import SavedBarCoverage
-from atrade.market_data.custom_indicators import list_indicator_catalog
+from atrade.market_data.custom_indicators import (
+    CUSTOM_INDICATOR_CHANGE_SOCKET,
+    create_custom_indicator_assistant_router,
+    list_indicator_catalog,
+)
 from atrade.market_data.daily_bar_summary import (
     DailyBarSummary,
     read_daily_bar_summaries,
@@ -91,6 +95,7 @@ from atrade.market_data.us_universe import (
 from atrade.market_data.us_universe_update import UsUniverseUpdate
 
 __all__ = [
+    "CUSTOM_INDICATOR_CHANGE_SOCKET",
     "MARKET_DATA_SOCKET_MESSAGE_MODELS",
     "BarRequest",
     "BarResponse",
@@ -138,6 +143,7 @@ __all__ = [
     "calculate_us_universe_history",
     "check_import_detections",
     "check_source_order",
+    "create_custom_indicator_assistant_router",
     "create_market_data_router",
     "find_first_trading_day_of_quarter",
     "find_previous_trading_day",

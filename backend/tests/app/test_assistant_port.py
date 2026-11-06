@@ -41,6 +41,11 @@ ALLOWED_ROUTES = {
     ("POST", "/api/screens/{screen_id}/runs"),
     ("GET", "/api/screen-results/{screen_result_id}"),
     ("GET", "/api/screen-indicators"),
+    ("GET", "/api/custom-indicators"),
+    ("GET", "/api/custom-indicators/{custom_indicator_id}"),
+    ("POST", "/api/custom-indicators"),
+    ("POST", "/api/custom-indicators/check"),
+    ("PUT", "/api/custom-indicators/{custom_indicator_id}"),
 }
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -116,6 +121,8 @@ async def test_the_port_8001_app_has_no_frontend_files_and_no_socket_routes(
         ("GET", "/api/assistant/conversations"),
         ("POST", "/api/assistant/conversations"),
         ("DELETE", "/api/screens/1"),
+        ("DELETE", "/api/custom-indicators/1"),
+        ("POST", "/api/custom-indicators/1/keep"),
         ("POST", "/api/market-data/hk-instrument-list"),
         ("DELETE", "/api/market-data/hk-instrument-list/1"),
         ("POST", "/api/market-data/daily-bars/update"),

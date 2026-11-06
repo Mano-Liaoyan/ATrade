@@ -30,6 +30,8 @@ export interface FakeWebPort {
   screenAnswers: FakeAnswer[];
   /** The answer of GET /api/screen-indicators. */
   indicatorCatalog: unknown[];
+  /** The answers of the custom indicator creates and changes, in order. After the last: the success answer. */
+  customIndicatorAnswers: FakeAnswer[];
   close: () => Promise<void>;
 }
 
@@ -51,6 +53,18 @@ export const SCREEN = {
 export const SOURCE_SCREEN = { ...SCREEN, id: 4, name: 'Momentum leaders', definition: { start: 'watchlist' }, kept: true };
 export const SCREEN_LIST = [{ id: 5, name: 'Momentum leaders (AI)', market: 'US', kept: false }];
 /** Two indicators of GET /api/screen-indicators. */
+export const CUSTOM_INDICATOR = {
+  custom_indicator_id: 3,
+  key: 'custom_3',
+  name: 'Distance to SMA',
+  expression: 'close / sma(50) - 1',
+  chart_placement: 'own',
+  value_description: 'The close over SMA(50), minus 1, as a fraction.',
+  kept: false,
+  assistant_conversation_id: 7,
+};
+export const CUSTOM_INDICATOR_CHECK = { problems: [], look_back_bars: 50 };
+
 export const INDICATOR_CATALOG = [
   {
     key: 'distance_to_52_week_high',
@@ -182,6 +196,9 @@ class FakeRoutes {
     if (backtestMatch !== null) {
       return this.readBacktest(Number(backtestMatch[1]));
     }
+    if (/^POST \/api\/custom-indicators\/check(\?custom_indicator_id=3)?$/u.test(route)) {
+      return { status: 200, body: CUSTOM_INDICATOR_CHECK };
+    }
     const fixed: Record<string, () => FakeAnswer> = {
       'GET /api/strategies': () => ({ status: 200, body: STRATEGY_LIST }),
       'GET /api/strategies/3': () => ({ status: 200, body: STRATEGY }),
@@ -197,8 +214,16 @@ class FakeRoutes {
       'POST /api/screens': () => this.screenAnswer({ status: 201, body: SCREEN }),
       'PUT /api/screens/5': () => this.screenAnswer({ status: 200, body: SCREEN }),
       'POST /api/screens/5/runs': () => this.screenAnswer({ status: 201, body: screenResultBody(0, 50) }),
+      'GET /api/custom-indicators': () => ({ status: 200, body: [CUSTOM_INDICATOR] }),
+      'GET /api/custom-indicators/3': () => ({ status: 200, body: CUSTOM_INDICATOR }),
+      'POST /api/custom-indicators': () => this.customIndicatorAnswer({ status: 201, body: CUSTOM_INDICATOR }),
+      'PUT /api/custom-indicators/3': () => this.customIndicatorAnswer({ status: 200, body: CUSTOM_INDICATOR }),
     };
     return fixed[route]?.() ?? { status: 404, body: { detail: 'Not Found' } };
+  }
+
+  private customIndicatorAnswer(success: FakeAnswer): FakeAnswer {
+    return this.port.customIndicatorAnswers.shift() ?? success;
   }
 
   private screenAnswer(success: FakeAnswer): FakeAnswer {
@@ -241,6 +266,7 @@ export async function startFakeWebPort(): Promise<FakeWebPort> {
     backtestList: [backtestBody(11, 'finished')],
     screenAnswers: [] as FakeAnswer[],
     indicatorCatalog: INDICATOR_CATALOG as unknown[],
+    customIndicatorAnswers: [] as FakeAnswer[],
   };
   const routes = new FakeRoutes(state);
   const server: Server = createServer((request, response) => {
