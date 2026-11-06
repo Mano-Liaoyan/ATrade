@@ -5,6 +5,7 @@ The closes of the test bars go up by 1 each day. The screen keeps the instrument
 close before 2026-02-02 is 499, before 2026-03-01 it is 527. So the first period has no member.
 """
 
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -61,9 +62,12 @@ async def test_a_quarterly_screen_backtest_runs_the_screen_at_each_quarter_start
 
 @pytest.mark.anyio
 async def test_a_monthly_screen_backtest_runs_the_screen_at_each_month_start(
-    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock, capfd: pytest.CaptureFixture[str]
 ) -> None:
     backtest = await run_screen_backtest(web_client, database_url, clock, "month")
+
+    # Only the standard output of the child reaches the log of the web container.
+    assert re.search(r"Screen period 2026-03-01: 3 candidates, \d+\.\d seconds\.", capfd.readouterr().out)
 
     assert read_universe_members(database_url, backtest["id"]) == [
         *all_members(MARCH_START_UTC),
