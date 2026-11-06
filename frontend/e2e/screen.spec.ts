@@ -497,6 +497,23 @@ test('a failed run keeps the condition bar, and a live change keeps the unsaved 
   expect(saved.definition.filters).toEqual([]);
 });
 
+test('a run without a change leaves no draft, so a live change shows no "Save screen"', async ({ page, request }, currentTest) => {
+  const name = uniqueName(currentTest, 'Rerun');
+  const filters = [{ field: 'last_price', operator: '>', value: '0' }];
+  const screenId = await openNewScreen(page, request, name, { ...WATCHLIST_DEFINITION, filters });
+
+  const popover = await editTag(page, 'Close > 0');
+  await popover.getByRole('button', { name: 'Apply' }).click();
+  await expect(page).toHaveURL(/\?result=\d+$/);
+
+  const renamed = `${name} renamed`;
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- `data` is the request body option of Playwright.
+  const changed = await request.put(`/api/screens/${String(screenId)}`, { data: { name: renamed, definition: WATCHLIST_DEFINITION } });
+  expect(changed.status()).toBe(200);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(renamed);
+  await expect(page.getByRole('button', { name: 'Save screen' })).toHaveCount(0);
+});
+
 test('"Save as new screen" stays disabled until the new screen opens', async ({ page, request }, currentTest) => {
   const name = uniqueName(currentTest, 'Copy');
   await openNewScreen(page, request, name, WATCHLIST_DEFINITION);

@@ -190,6 +190,11 @@
       showFailure(current.id, 'run', result);
       return;
     }
+    // A run of the saved definition leaves no unsaved edit, so a later live change does not show "Save screen".
+    if (!isDraftChanged({ market: current.market, definition: current.definition }, { market, definition })) {
+      draft = null;
+    }
+    resultMessage = '';
     runResultId = result.value.id;
     selectedPositions = [];
     screenResult = result.value;
@@ -202,7 +207,9 @@
   async function runSavedScreen(current: Screen): Promise<void> {
     isRunning = true;
     await changeDraft(current, current.market, current.definition);
-    draft = null;
+    if (draft?.screenId === current.id) {
+      draft = null;
+    }
     isRunning = false;
   }
 
