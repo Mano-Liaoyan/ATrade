@@ -645,12 +645,13 @@ Source: [Rule builder prototype](https://github.com/Mano-Liaoyan/ATrade/issues/1
 - Decided (#173): the components are `RulesTab.svelte`,
   `RuleGroupEditor.svelte`, `RuleOperand.svelte`, and
   `RuleNumberInput.svelte` in `frontend/src/routes/strategies/`. The
-  operand choices and the indicator parameters are in
-  `frontend/src/lib/strategy/strategy_rules.ts`. They copy the catalog of
-  `atrade.indicator` (section 23.3 of [`indicator.md`](indicator.md)): no
-  route gives the catalog yet. A parameter that the catalog keeps out of the
-  name (`bars_per_year` of realized volatility) is not shown and keeps its
-  default.
+  operand choices and the indicator parameters come from the response of
+  `GET /api/market-data/indicators` (section 23.3 of
+  [`indicator.md`](indicator.md)), through
+  `frontend/src/lib/strategy/strategy_rules.ts`. `RulesTab.svelte` reads it
+  once and shows a failed read. A parameter that the catalog keeps out of
+  the name (`bars_per_year` of realized volatility) is not shown and keeps
+  its default.
 - Decided (#173): the tab opens the rules of the open version when it has
   rules. Else it opens the rules of vM. A strategy without a version with
   rules opens the blank rules: no conditions, no exit items, and 10 fixed

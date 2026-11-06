@@ -20,11 +20,11 @@
     type RightOperand,
     type RuleExits,
     type RuleGroup,
-    type CustomIndicatorChoice,
+    type CatalogIndicator,
     type StrategyRules,
     type UniverseSettings,
   } from '#lib/strategy';
-  import { provideCustomIndicators } from './custom_indicator_context';
+  import { provideIndicatorCatalog } from './indicator_catalog_context';
   import RuleGroupEditor from './RuleGroupEditor.svelte';
   import RuleNumberInput from './RuleNumberInput.svelte';
   import RuleOperand from './RuleOperand.svelte';
@@ -38,13 +38,16 @@
 
   const { rules, onRulesChange, warning = null }: Props = $props();
 
-  let customIndicators = $state<CustomIndicatorChoice[]>([]);
-  provideCustomIndicators(() => customIndicators);
+  let indicatorCatalog = $state<CatalogIndicator[]>([]);
+  let catalogMessage = $state('');
+  provideIndicatorCatalog(() => indicatorCatalog);
 
   $effect(() => {
     void listChartIndicatorCatalog(fetch).then((result) => {
       if (result.kind === 'ok') {
-        customIndicators = result.value.filter((item) => item.formula !== undefined && item.formula !== null);
+        indicatorCatalog = result.value;
+      } else {
+        catalogMessage = result.message;
       }
     });
   });
@@ -128,6 +131,9 @@
   <div class="rules-tab__builder">
     <ScrollRegion label="Rule builder" fill>
       <div class="rules-tab__blocks">
+        {#if catalogMessage !== ''}
+          <InlineNotification kind="error" lowContrast title="Indicators not read" subtitle={catalogMessage} />
+        {/if}
         {#if warning !== null}
           <InlineNotification kind="warning" lowContrast title={warning} />
         {/if}

@@ -12,7 +12,7 @@
     type RightOperand,
   } from '#lib/strategy';
   import RuleNumberInput from './RuleNumberInput.svelte';
-  import { readCustomIndicators } from './custom_indicator_context';
+  import { readIndicatorCatalog } from './indicator_catalog_context';
 
   interface Props {
     label: string;
@@ -23,10 +23,10 @@
 
   const { label, side, operand, onOperandChange }: Props = $props();
 
-  const customIndicators = readCustomIndicators();
-  const choices = $derived(listOperandChoices(side, customIndicators(), operand));
-  const indicator = $derived(operand.type === 'indicator' ? findIndicatorChoice(operand.indicator) : undefined);
-  const currentOperand = $derived(readCurrentOperand(operand, customIndicators()));
+  const catalog = readIndicatorCatalog();
+  const choices = $derived(listOperandChoices(side, catalog(), operand));
+  const indicator = $derived(operand.type === 'indicator' ? findIndicatorChoice(operand.indicator, catalog()) : undefined);
+  const currentOperand = $derived(readCurrentOperand(operand, catalog()));
 </script>
 
 <span class="rule-operand">
@@ -38,7 +38,7 @@
       items={choices}
       value={readOperandChoice(operand)}
       onValueChange={(choice: OperandChoice) => {
-        onOperandChange(createOperand(choice, customIndicators()));
+        onOperandChange(createOperand(choice, catalog()));
       }}
     />
   </span>

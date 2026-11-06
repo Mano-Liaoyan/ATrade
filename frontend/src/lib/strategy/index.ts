@@ -51,7 +51,7 @@ export {
   type Comparison,
   type GroupMatch,
   type IndicatorChoice,
-  type CustomIndicatorChoice,
+  type CatalogIndicator,
   type IndicatorOperand,
   type InnerRuleGroup,
   type LeftOperand,

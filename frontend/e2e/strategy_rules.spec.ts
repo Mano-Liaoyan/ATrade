@@ -81,6 +81,15 @@ async function readVersions(page: Page, strategyId: number): Promise<StrategyBod
   return strategy.versions;
 }
 
+test('the Rules tab shows a failed read of the indicator catalog', async ({ page }, currentTest) => {
+  await page.route('**/api/market-data/indicators', (route) => route.fulfill({ status: 500, json: { detail: 'Catalog read failed' } }));
+  await createStrategy(page, createUniqueName(currentTest, 'Catalog'));
+
+  await page.getByRole('tablist', { name: 'Files' }).getByRole('tab', { name: 'Rules' }).click();
+
+  await expect(page.getByRole('alert').filter({ hasText: 'Indicators not read' })).toBeVisible();
+});
+
 test('the Rules tab warns when the code changed after the rules and shows the diff before the save', async ({
   page,
 }, currentTest) => {
