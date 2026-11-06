@@ -332,6 +332,10 @@ class FormulaProblem(Exception):
         self.column = column
         self.message = message
 
+    def __reduce__(self) -> tuple[type[FormulaProblem], tuple[int, str]]:
+        """A process pool sends an exception back with pickle. The default repeats only the `Exception` arguments."""
+        return FormulaProblem, (self.column, self.message)
+
 
 def refuse(node: ast.AST, message: str) -> FormulaProblem:
     return FormulaProblem(getattr(node, "col_offset", 0) + 1, message)
