@@ -16,7 +16,7 @@ const SMA_3 = { indicator: 'sma', parameters: { period: 3 }, output: 'value' };
 
 function uniqueName(currentTest: TestInfo, name: string): string {
   // The e2e database is not cleared between tests and browser projects.
-  return `${name} ${currentTest.project.name} ${String(Date.now())}`;
+  return `${name} ${currentTest.project.name} ${String(currentTest.workerIndex)} ${String(Date.now())}`;
 }
 
 async function createScreen(
@@ -29,6 +29,16 @@ async function createScreen(
   const response = await request.post('/api/screens', { data: { name, market, definition } });
   expect(response.status()).toBe(201);
   return ((await response.json()) as { id: number }).id;
+}
+
+// The default name of "New screen" comes from the list, and tests of other workers add screens to the same database.
+async function nameCreatedScreens(page: Page, name: string): Promise<void> {
+  await page.route('**/api/screens', async (route) => {
+    const request = route.request();
+    const body = request.postDataJSON() as Record<string, unknown>;
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- `postData` is a route option of Playwright.
+    await route.fallback(request.method() === 'POST' ? { postData: { ...body, name } } : {});
+  });
 }
 
 async function runScreen(request: APIRequestContext, screenId: number): Promise<ScreenResultSummary> {
@@ -407,7 +417,7 @@ test('adds Close, changes Avg trading value (20) and Exchange, removes each othe
 });
 
 // The "New screen" button of the "Screens" side column creates a US screen of the quarter universe and opens its run.
-test('"New screen" shows the reason of a failed create, then creates a screen and opens its run', async ({ page }) => {
+test('"New screen" shows the reason of a failed create, then creates a screen and opens its run', async ({ page }, currentTest) => {
   await page.goto('/screens');
   const newScreenButton = page.getByRole('button', { name: 'New screen', exact: true });
 
@@ -422,6 +432,7 @@ test('"New screen" shows the reason of a failed create, then creates a screen an
   const failure = page.getByRole('alert').filter({ hasText: 'Screen not created' });
   await expect(failure).toContainText('The name is in use.');
   await page.unroute('**/api/screens');
+  await nameCreatedScreens(page, `New screen ${String(currentTest.workerIndex)}${String(Date.now())}`);
 
   const created = page.waitForResponse(
     (response) => response.url().endsWith('/api/screens') && response.request().method() === 'POST',
@@ -478,8 +489,11 @@ for (const button of ['Run screen', 'New screen']) {
       await runMayFinish;
       await route.fallback();
     });
+    await nameCreatedScreens(page, uniqueName(currentTest, 'Left new'));
 
+    const runRequest = page.waitForRequest(RUNS_ROUTE);
     await page.getByRole('button', { name: button, exact: true }).click();
+    await runRequest;
     await page.getByRole('link', { name: 'Backtests', exact: true }).click();
     await expect(page).toHaveURL(/\/backtests/);
     const runAnswer = page.waitForResponse(RUNS_ROUTE);
