@@ -23,6 +23,7 @@ from atrade.forward_test.forward_test_store import ForwardTestRow
 from atrade.forward_test.forward_test_universe import read_running_member_lists
 from atrade.forward_test.forward_test_worker import (
     GATEWAY_UNREACHABLE_EXIT_CODE,
+    HELD_FILL_EXIT_CODE,
     PAPER_CHECK_FAILED_EXIT_CODE,
     ChildMode,
     ForwardTestChild,
@@ -55,6 +56,7 @@ __all__ = [
     "BAR_STORE_DATA_CLIENT_NAME",
     "FORWARD_TEST_CHANGE_SOCKET",
     "GATEWAY_UNREACHABLE_EXIT_CODE",
+    "HELD_FILL_EXIT_CODE",
     "MARKETS",
     "OWNER_LEDGER_EXECUTION_CLIENT_NAME",
     "PAPER_CHECK_FAILED_EXIT_CODE",

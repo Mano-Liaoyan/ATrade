@@ -129,7 +129,7 @@ The public entry `atrade.ibkr` exports:
   more needs no cancel.
 - `read_executions()` calls `reqExecutions` and returns `Execution` values
   (`execution_id`, `order_id`, `client_id`, `account`, `time_utc`, `side`,
-  `quantity`, `price`, `commission`, `is_commission_reported`, `order_ref`,
+  `quantity`, `price`, `commission`, `is_held`, `order_ref`,
   `symbol`, `currency`).
   `paper_trading` uses it for the fills of orders by hand. `forward_test`
   uses it for the fills of a forward test. `symbol` and `currency` come from
@@ -137,12 +137,23 @@ The public entry `atrade.ibkr` exports:
   `ib_async` stores for the execId, because the `reqExecutions` answer holds
   an empty report for an execId that the connection already knows. A fill
   without its commission report is a held fill. It stays out of the list
-  until its report arrives. `include_held=True` adds it with
-  `is_commission_reported` False and commission 0. The function waits up to 2
-  seconds for a missing report, because a report can come after the end of
-  the answer. It waits only one time for each fill on a connection and then
-  logs a warning with the execId, so a fill without a report does not slow
-  each later read.
+  until its report arrives. `include_held=True` adds it with `is_held` True.
+  The function waits up to 2 seconds for a missing report, because a report
+  can come after the end of the answer. It waits only one time for each fill
+  on a connection and then logs a warning with the execId, so a fill without
+  a report does not slow each later read.
+- A hold ends at 5 minutes (`COMMISSION_REPORT_LIMIT`): `read_executions()`
+  then returns the fill with commission 0 and logs one warning with the
+  execId. All callers get this limit, because a lost fill gives a wrong
+  owner position, and a wrong commission costs less. The owner ledger does
+  not repair the commission when the report comes later.
+- The age is the older of 2 values: the time since the execution, and the
+  time since the first wait of this connection. `ib_async` reads a time
+  without a zone as local time, because ATrade does not set `TimezoneTWS`,
+  and gives it a zone, so ATrade cannot see this case. The wait of the
+  connection limits a time that is too late. A time that is too early ends
+  the hold after the 2 second wait. A new child process has a new connection,
+  so only the execution time ends a hold across its retries.
 - The order functions raise `GatewayRequestError` when the connection is
   not there.
 - `read_exchange_rate(currency, quote_currency)` returns the IBKR forex

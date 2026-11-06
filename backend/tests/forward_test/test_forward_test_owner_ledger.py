@@ -2,12 +2,13 @@
 (docs/architecture/forward_test.md sections 12.18 and 12.19, paper_trading.md section 11.10).
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import psycopg
 import pytest
 
+from atrade.ibkr import gateway_connection as gateway_connection_module
 from atrade.paper_trading import write_capital_allocation
 from tests.fakes.ibkr import make_execution
 from tests.forward_test.atrade_clients_node import (
@@ -22,6 +23,7 @@ from tests.forward_test.atrade_clients_node import (
     send_today_bar,
     wait_until,
 )
+from tests.ibkr.test_read_executions import GatewayMessages, make_ib_execution
 
 FILL_PRICE = "20.5"
 
@@ -114,3 +116,26 @@ async def test_the_fill_goes_into_the_owner_ledger_once_and_the_restart_gets_the
     assert count_fill_rows(database_url) == 1
     [position] = await world.ledger.read_positions(FORWARD_TEST_ID)
     assert (position.instrument, position.quantity, position.average_price) == (APPLE, 10, Decimal(FILL_PRICE))
+
+
+@pytest.mark.anyio
+async def test_a_fill_without_a_report_reaches_the_strategy_and_the_ledger_at_the_limit(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(gateway_connection_module, "COMMISSION_REPORT_WAIT_SECONDS", 0.05)
+    world = make_world_with_owner_ledger(database_url)
+    await allocate_capital(database_url, "10000")
+    messages = GatewayMessages(monkeypatch)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        open_order = world.gateway.open_orders.pop()
+        messages.execution = make_ib_execution(
+            order_id=open_order.order_id, client_id=CLIENT_ID, age=timedelta(minutes=5)
+        )
+        world.gateway.read_executions = messages.connection.read_executions  # pyright: ignore[reportAttributeAccessIssue]
+        await wait_until(lambda: bool(strategy.own_positions()))
+
+    assert count_fill_rows(database_url) == 1
