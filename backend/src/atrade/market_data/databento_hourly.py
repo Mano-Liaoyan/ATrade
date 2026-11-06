@@ -27,7 +27,7 @@ COPY_HOURLY_RECORDS: LiteralString = """
 """
 
 SELECT_SYMBOL_LINKS: LiteralString = """
-    SELECT old_symbol, new_symbol, change_day FROM databento_symbol_link ORDER BY change_day, id
+    SELECT old_symbol, new_symbol, change_day FROM databento_symbol_link WHERE state = 'moved' ORDER BY change_day, id
 """
 
 # Section 8.8.4: the history of an old symbol is under its new symbol.
@@ -122,10 +122,11 @@ SELECT_PURCHASE_SYMBOLS: LiteralString = """
         SELECT quarter_start_utc, symbol FROM us_universe_member WHERE currency = 'USD'
     ), old_symbol AS (
         SELECT member.quarter_start_utc, link.old_symbol AS symbol, link.change_day
-        FROM member JOIN databento_symbol_link AS link ON link.new_symbol = member.symbol
+        FROM member JOIN databento_symbol_link AS link ON link.new_symbol = member.symbol AND link.state = 'moved'
         UNION
         SELECT old_symbol.quarter_start_utc, link.old_symbol, link.change_day
         FROM old_symbol JOIN databento_symbol_link AS link ON link.new_symbol = old_symbol.symbol
+            AND link.state = 'moved'
     )
     SELECT quarter_start_utc, symbol FROM member
     UNION

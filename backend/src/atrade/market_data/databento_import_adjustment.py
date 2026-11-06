@@ -45,23 +45,28 @@ class SymbolLink:
     new_symbol: str
     exchange: str
     change_day: date
+    is_moved: bool
 
 
 def link_symbols(connection: psycopg.Connection) -> list[SymbolLink]:
-    """Finds the symbol changes, saves the history of each old symbol under its new symbol, and records the links.
-    The links go in the order of their change day, so a chain of 2 changes ends at the last symbol."""
+    """Finds the symbol changes, saves the history of each old symbol with proof under its new symbol, and records the
+    links. A link without proof moves no bar: it waits for the user check. The links go in the order of their change
+    day, so a chain of 2 changes ends at the last symbol."""
     rows = connection.execute(databento_import_sql.SELECT_SYMBOL_LINKS).fetchall()
     links: list[SymbolLink] = []
-    for old_symbol, new_symbol, exchange, change_start_utc in rows:
-        link = SymbolLink(str(old_symbol), str(new_symbol), str(exchange), change_start_utc.date())
+    for old_symbol, new_symbol, exchange, change_start_utc, is_proved, recorded_state in rows:
+        state = recorded_state or ("moved" if is_proved else "waiting")
+        link = SymbolLink(str(old_symbol), str(new_symbol), str(exchange), change_start_utc.date(), state == "moved")
         parameters = {
             "old_symbol": link.old_symbol,
             "new_symbol": link.new_symbol,
             "exchange": link.exchange,
             "change_day": link.change_day,
+            "state": state,
         }
-        for query in (databento_import_sql.MOVE_TO_NEW_SYMBOL, *databento_import_sql.MOVE_SAVED_ROWS_TO_NEW_SYMBOL):
-            connection.execute(query, {**parameters, "change_start_utc": change_start_utc})
+        if link.is_moved:
+            for query in (databento_import_sql.MOVE_TO_NEW_SYMBOL, *databento_import_sql.MOVE_SAVED_ROWS_TO_NEW_SYMBOL):
+                connection.execute(query, {**parameters, "change_start_utc": change_start_utc})
         connection.execute(databento_import_sql.INSERT_SYMBOL_LINK, parameters)
         links.append(link)
     return links

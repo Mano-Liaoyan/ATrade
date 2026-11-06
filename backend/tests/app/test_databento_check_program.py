@@ -50,4 +50,20 @@ def test_the_program_does_not_reject_without_accept(detections: str, caplog: pyt
         main(["--reject-split", "1"])
 
     assert stop.value.code == 1
-    assert "--reject-split needs --accept" in caplog.text
+    assert "--reject-split and --reject-link need --accept" in caplog.text
+
+
+def test_the_program_lists_the_id_of_a_waiting_link_and_rejects_it(
+    detections: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    caplog.set_level(logging.INFO)
+    with psycopg.connect(detections) as connection:
+        connection.execute("UPDATE databento_symbol_link SET state = 'waiting'")
+
+    main([])
+    main(["--accept", "--reject-link", "1"])
+
+    assert "SQ to XYZ on NYSE, from 2025-01-21. ID 1 waits: its bars did not move." in caplog.text
+    with psycopg.connect(detections) as connection:
+        row = connection.execute("SELECT state FROM databento_symbol_link").fetchone()
+    assert row == ("rejected",)

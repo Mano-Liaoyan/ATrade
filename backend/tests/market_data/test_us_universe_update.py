@@ -79,7 +79,7 @@ async def test_the_update_at_06_00_et_downloads_the_100_days_to_the_last_ranking
 
 
 @pytest.mark.anyio
-async def test_a_symbol_renamed_in_the_window_is_a_member_under_the_new_symbol_and_the_update_logs_the_link(
+async def test_a_rename_in_the_window_moves_no_bar_in_the_update_and_the_update_logs_the_waiting_link(
     database_url: str, clock: FixedClock, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     insert_daily_bars(database_url, nasdaq("SQ"), [date(2024, 9, 13)], "1", 1)
@@ -92,8 +92,8 @@ async def test_a_symbol_renamed_in_the_window_is_a_member_under_the_new_symbol_a
     with caplog.at_level(logging.INFO):
         create_update(database_url, clock, client, tmp_path).update_if_due()
 
-    assert [symbol for _, symbol, _ in await read_ranked_symbols(database_url)] == ["XYZ"]
-    assert "SQ to XYZ" in caplog.text
+    assert [symbol for _, symbol, _ in await read_ranked_symbols(database_url)] == ["XYZ", "SQ"]
+    assert "SQ to XYZ (waits: its bars did not move)" in caplog.text
 
 
 @pytest.mark.anyio

@@ -109,7 +109,10 @@ class UsUniverseUpdate:
         return self.downloaded_paths[last_ranking_day]
 
     def log_import(self, report: DatabentoImportReport) -> None:
-        links = ", ".join(f"{link.old_symbol} to {link.new_symbol}" for link in report.symbol_links)
+        links = ", ".join(
+            f"{link.old_symbol} to {link.new_symbol}{'' if link.is_moved else ' (waits: its bars did not move)'}"
+            for link in report.symbol_links
+        )
         logger.info(
             "The import found %d new stock splits and these symbol links: %s. Check them with: python -m"
             " atrade.app.databento_check. These EQUS.SUMMARY symbols have no listing exchange and no bar: %s",

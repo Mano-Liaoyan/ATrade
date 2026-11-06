@@ -33,6 +33,9 @@ def read_arguments(arguments: Sequence[str] | None) -> argparse.Namespace:
     parser.add_argument(
         "--reject-split", action="append", type=int, default=[], dest="rejected_split_ids", help="A wrong stock split."
     )
+    parser.add_argument(
+        "--reject-link", action="append", type=int, default=[], dest="rejected_link_ids", help="A wrong symbol link."
+    )
     return parser.parse_args(arguments)
 
 
@@ -52,7 +55,12 @@ def log_detections(detections: ImportDetections) -> None:
     logger.info("%d symbol links are not checked:", len(detections.symbol_links))
     for link in detections.symbol_links:
         logger.info(
-            "  %s to %s on %s, from %s", link.old_symbol, link.new_symbol, link.exchange, link.change_day.isoformat()
+            "  %s to %s on %s, from %s%s",
+            link.old_symbol,
+            link.new_symbol,
+            link.exchange,
+            link.change_day.isoformat(),
+            f". ID {link.id} waits: its bars did not move." if link.is_waiting else "",
         )
 
 
@@ -60,8 +68,9 @@ def main(arguments: Sequence[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO)
     options = read_arguments(arguments)
     rejected_split_ids: list[int] = options.rejected_split_ids
-    if rejected_split_ids and not options.accept:
-        logger.error("--reject-split needs --accept. The check changed nothing.")
+    rejected_link_ids: list[int] = options.rejected_link_ids
+    if (rejected_split_ids or rejected_link_ids) and not options.accept:
+        logger.error("--reject-split and --reject-link need --accept. The check changed nothing.")
         sys.exit(1)
     try:
         settings = Settings()  # pyright: ignore[reportCallIssue] readability-exception: pydantic-settings fills required fields from the environment.
@@ -75,6 +84,7 @@ def main(arguments: Sequence[str] | None = None) -> None:
         detections = check_import_detections(
             database_url=settings.database_url,
             rejected_split_ids=set(rejected_split_ids),
+            rejected_link_ids=set(rejected_link_ids),
             checked_at_utc=datetime.now(UTC),
         )
     except ImportCheckError as error:
