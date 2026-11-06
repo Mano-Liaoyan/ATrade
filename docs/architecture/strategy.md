@@ -165,10 +165,12 @@ New columns of `strategy_version`:
   cross strategy: buy 10 shares when the close goes above SMA(20), sell the
   whole position when it goes below. Each bar reads the position and the
   order counts, so a denied, rejected, or canceled order gets a new order on
-  the next bar. A lost order gets at most 1 retry each day (UTC day of the
-  bar), so a permanent refusal on 1-minute bars does not send an order each
-  minute. A cancel that IBKR refuses has the same limit. A partly filled order
-  gets no new order, because a position exists.
+  the next bar. A lost entry gets at most 1 retry each UTC day of the bar. A
+  lost exit gets at most 1 retry in each 5-minute period, because a day is too
+  long for an exit. So a permanent refusal on 1-minute bars does not send an
+  order each minute. A cancel that IBKR refuses has the exit limit. The cancel
+  of an exit is no lost order. A partly filled order gets no new order,
+  because a position exists.
   An exit cancels the open buy orders of the instrument
   and uses `close_position`, so a backtest exit fills at the next open, as a
   forward test does. A saved version keeps its code (ADR 0006), so a version
@@ -589,8 +591,9 @@ Decided (#172): the rules format. `backend/src/atrade/strategy/strategy_rules.py
 - Decided (#172): at each bar close, the code reads the prices and the
   indicator outputs of the rules. When an output has no value, or an order
   of the strategy is open or in flight, no rule runs on that bar. A denied,
-  rejected, or canceled order gets at most 1 retry each day (UTC day of the
-  bar), so a permanent refusal does not repeat on each bar. A cross
+  rejected, or canceled entry gets at most 1 retry each UTC day of the bar,
+  and such an exit gets at most 1 retry in each 5-minute period, so a
+  permanent refusal does not repeat on each bar. A cross
   compares with the values of the previous bar. The previous bar of the first
   bar is the last look-back bar (`on_historical_bars`). A cross is false when
   the previous bar had no value. A saved version keeps its code (ADR 0006), so
@@ -726,9 +729,9 @@ Decided (#201):
 - A denied, rejected, or canceled order adds its instrument to
   `lost_instruments`. At the next bar time the strategy sends the sell or the
   buy of this instrument again, also when the next rebalance is months away.
-  Each instrument gets at most 1 retry each day (UTC day of the bar), also for
-  the sell of an exit item, so a permanent refusal does not repeat on each
-  bar. A target that an exit item sold leaves the targets, so the retry does
+  Each instrument gets at most 1 buy retry each UTC day of the bar and at most
+  1 sell retry in each 5-minute period, also for the sell of an exit item, so
+  a permanent refusal does not repeat on each bar. A target that an exit item sold leaves the targets, so the retry does
   not buy it again.
 - A restored position sets the period of `on_start` to the current period, so
   a restart does not rebalance a second time in a period. A restart between

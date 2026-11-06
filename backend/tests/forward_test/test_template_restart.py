@@ -41,6 +41,7 @@ from tests.strategy.rules_examples import condition, group, make_rules, number, 
 RESTORED_SHARES = 40
 REFUSAL_WAIT_SECONDS = 0.2
 ONE_DAY_NS = 86_400_000_000_000
+EXIT_RETRY_NS = 300_000_000_000
 
 
 async def make_world_with_position(database_url: str) -> ClientsWorld:
@@ -102,11 +103,12 @@ def replace_close(bar: NautilusBar, close: float) -> NautilusBar:
     return NautilusBar(bar.bar_type, price, price, price, price, bar.volume, bar.ts_event, bar.ts_init)
 
 
-def send_next_day_bar(strategy: Any) -> None:
-    """A bar of the next day with the same close. The data client does not send a bar of a future day."""
+def send_later_bar(strategy: Any, later_ns: int, close: float | None = None) -> None:
+    """A bar after the last bar of the cache. The data client does not send a bar of a future time."""
     bar = strategy.cache.bar(DAY_BAR_TYPE)
-    ts_event = bar.ts_event + ONE_DAY_NS
-    strategy.on_bar(NautilusBar(bar.bar_type, bar.open, bar.high, bar.low, bar.close, bar.volume, ts_event, ts_event))
+    ts_event = bar.ts_event + later_ns
+    price = bar.close if close is None else Price(close, bar.close.precision)
+    strategy.on_bar(NautilusBar(bar.bar_type, price, price, price, price, bar.volume, ts_event, ts_event))
 
 
 def repeat_last_bar(strategy: Any) -> None:
@@ -189,13 +191,13 @@ async def test_a_single_instrument_strategy_retries_a_refused_buy_once_a_day(
             repeat_last_bar(strategy)
         await asyncio.sleep(REFUSAL_WAIT_SECONDS)
         assert len(world.ledger.checked_orders) == 2
-        send_next_day_bar(strategy)
+        send_later_bar(strategy, ONE_DAY_NS)
         await wait_until(lambda: len(world.ledger.checked_orders) == 3)
 
 
 @pytest.mark.anyio
 @pytest.mark.parametrize("code", [STRATEGY_TEMPLATE, make_rules_strategy_code()], ids=["template", "rule_builder"])
-async def test_a_single_instrument_strategy_retries_a_refused_sell_once_a_day(
+async def test_a_single_instrument_strategy_retries_a_refused_sell_every_5_minutes(
     database_url: str, tmp_path: Path, code: str
 ) -> None:
     world = await make_world_with_position(database_url)
@@ -212,12 +214,60 @@ async def test_a_single_instrument_strategy_retries_a_refused_sell_once_a_day(
             repeat_last_bar(strategy)
         await asyncio.sleep(REFUSAL_WAIT_SECONDS)
         assert len(world.ledger.checked_orders) == 2
-        send_next_day_bar(strategy)
+        send_later_bar(strategy, EXIT_RETRY_NS)
         await wait_until(lambda: len(world.ledger.checked_orders) == 3)
 
 
 @pytest.mark.anyio
-async def test_the_default_template_retries_a_refused_cancel_once_a_day(database_url: str, tmp_path: Path) -> None:
+async def test_the_retry_of_a_buy_leaves_a_retry_for_a_later_exit_of_the_same_day(
+    database_url: str, tmp_path: Path
+) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_for_refusal(world)
+        world.ledger.split_check_needed.clear()
+        repeat_last_bar(strategy)
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        order_id = world.gateway.open_orders[0].order_id
+        world.gateway.executions.append(
+            make_execution(ACCOUNT_ID, order_id=order_id, quantity="10", price="200", client_id=CLIENT_ID)
+        )
+        await wait_until(lambda: bool(strategy.cache.positions_open(strategy_id=strategy.strategy_id)))
+        world.ledger.split_check_needed.add(APPLE)
+        send_later_bar(strategy, 1 * EXIT_RETRY_NS, close=50)
+        await wait_until(lambda: len(world.ledger.checked_orders) == 3)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        send_later_bar(strategy, 2 * EXIT_RETRY_NS, close=50)
+        await wait_until(lambda: len(world.ledger.checked_orders) == 4)
+
+
+@pytest.mark.anyio
+async def test_the_cancel_of_an_exit_is_no_lost_order(database_url: str, tmp_path: Path) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_for_refusal(world)
+        world.ledger.split_check_needed.clear()
+        repeat_last_bar(strategy)
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        send_later_bar(strategy, EXIT_RETRY_NS, close=50)
+        await wait_until(lambda: not world.gateway.open_orders)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        send_later_bar(strategy, 2 * EXIT_RETRY_NS, close=200)
+        await wait_until(lambda: bool(world.gateway.open_orders))
+
+
+@pytest.mark.anyio
+async def test_the_default_template_retries_a_refused_cancel_every_5_minutes(database_url: str, tmp_path: Path) -> None:
     world = make_world(database_url)
     await save_warm_up_bars(database_url)
     strategy = make_template_strategy(tmp_path)
@@ -236,8 +286,9 @@ async def test_the_default_template_retries_a_refused_cancel_once_a_day(database
         for _ in range(5):
             strategy.on_bar(low_bar)
             await asyncio.sleep(REFUSAL_WAIT_SECONDS)
-
-    assert len(cancel_requests) == 2
+        assert len(cancel_requests) == 2
+        send_later_bar(strategy, EXIT_RETRY_NS, close=50)
+        await wait_until(lambda: len(cancel_requests) == 3)
 
 
 @pytest.mark.anyio

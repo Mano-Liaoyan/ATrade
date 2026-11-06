@@ -53,6 +53,7 @@ HELD_SHARES = 10
 NVIDIA_BAR_TYPE = "NVDA.NASDAQ-1-DAY-LAST-EXTERNAL"
 WAIT_FOR_DENIAL_SECONDS = POLL_SECONDS * 10
 ONE_DAY_NS = 86_400_000_000_000
+EXIT_RETRY_NS = 300_000_000_000
 
 
 class RestartChildRun(UniverseChildRun):
@@ -285,7 +286,7 @@ async def test_the_rule_builder_retries_a_refused_buy_once_a_day(
 
 
 @pytest.mark.anyio
-async def test_the_rule_builder_retries_a_refused_exit_once_a_day(
+async def test_the_rule_builder_retries_a_refused_exit_every_5_minutes(
     web_client: httpx.AsyncClient,
     database_url: str,
     frontend_build_dir: Path,
@@ -309,6 +310,8 @@ async def test_the_rule_builder_retries_a_refused_exit_once_a_day(
             send_next_bar_time(strategy, NVIDIA_BAR_TYPE, time_ns=next_day_ns + later_bar)
         await asyncio.sleep(WAIT_FOR_DENIAL_SECONDS)
         assert len(child.ledger.checked_orders) == 2
+        send_next_bar_time(strategy, NVIDIA_BAR_TYPE, time_ns=next_day_ns + EXIT_RETRY_NS)
+        await wait_until(lambda: len(child.ledger.checked_orders) == 3)
     finally:
         await child.stop()
 
