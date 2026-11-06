@@ -459,6 +459,26 @@ test('"New screen" shows the reason of a failed create, then creates a screen an
 const WATCHLIST_DEFINITION = { start: 'watchlist', filters: [], indicator_conditions: [], order: { indicator: SMA_3, direction: 'descending' } };
 const RUNS_ROUTE = '**/api/screens/*/runs';
 
+test('"Delete screen" on the open screen leaves the page on another screen', async ({ page, request }, currentTest) => {
+  await saveAaplDailyBars(page, request);
+  const deletedName = uniqueName(currentTest, 'Deleted screen');
+  await createScreen(request, uniqueName(currentTest, 'Kept screen'), 'US', WATCHLIST_DEFINITION);
+  const deletedId = await createScreen(request, deletedName, 'US', WATCHLIST_DEFINITION);
+  await runScreen(request, deletedId);
+
+  await page.goto(`/screens/${String(deletedId)}`);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText(deletedName);
+  const list = page.getByRole('region', { name: 'Screen list' });
+  await list.getByRole('link', { name: deletedName }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Delete screen' }).click();
+  await page.getByRole('dialog', { name: `Delete ${deletedName}` }).getByRole('button', { name: 'Delete screen' }).click();
+
+  await expect(page).not.toHaveURL(new RegExp(`/screens/${String(deletedId)}$`));
+  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(deletedName);
+  await expect(list.getByRole('link', { name: deletedName })).toHaveCount(0);
+  await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
+});
+
 test('"Run screen" runs a screen without a run, and a failed run shows its reason', async ({ page, request }, currentTest) => {
   await saveAaplDailyBars(page, request);
   const screenId = await createScreen(request, uniqueName(currentTest, 'First run'), 'US', WATCHLIST_DEFINITION);

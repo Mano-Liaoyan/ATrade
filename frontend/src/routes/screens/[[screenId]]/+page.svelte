@@ -413,6 +413,9 @@
       }}
       openScreen={shownScreen}
       openScreenResultId={shownResult?.id ?? null}
+      onDeleted={(id) => {
+        workbench.removeItem(id);
+      }}
     />
   </SideColumn>
 

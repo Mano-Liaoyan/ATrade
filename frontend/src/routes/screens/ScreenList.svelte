@@ -18,9 +18,11 @@
     /** The reason of the last failed "New screen". Empty: no failure. */
     createMessage: string;
     onCreateMessageClose: () => void;
+    /** Runs before the page leaves a deleted open screen, so the list no longer holds the screen. */
+    onDeleted: (screenId: number) => void;
   }
 
-  const { screens, errorMessage, openScreen, openScreenResultId, createMessage, onCreateMessageClose }: Props = $props();
+  const { screens, errorMessage, openScreen, openScreenResultId, createMessage, onCreateMessageClose, onDeleted }: Props = $props();
 
   let deleteTarget = $state<ScreenListItem | null>(null);
   let isDeleting = $state(false);
@@ -53,15 +55,19 @@
     ];
   }
 
-  // The list reads again after the change that /ws/screens pushes. Only the open screen leaves the page.
+  // Only the open screen leaves the page.
   async function removeScreen(screen: ScreenListItem): Promise<void> {
     isDeleting = true;
     const error = await deleteScreen(fetch, screen.id);
     isDeleting = false;
     deleteTarget = null;
     deleteMessage = error ?? '';
-    if (error === null && openScreen?.id === screen.id) {
-      await goto(resolve('/screens/[[screenId]]', { screenId: undefined }));
+    if (error !== null) {
+      return;
+    }
+    onDeleted(screen.id);
+    if (openScreen?.id === screen.id) {
+      await goto(resolve('/screens/[[screenId]]', { screenId: undefined }), { replace: true });
     }
   }
 
