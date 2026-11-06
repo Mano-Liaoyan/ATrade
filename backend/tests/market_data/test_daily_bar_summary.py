@@ -28,6 +28,7 @@ from atrade.market_data import (
     save_received_bars,
     save_received_bars_blocking,
 )
+from atrade.market_data.daily_bar_summary import LAST_DAILY_BARS_QUERY, create_last_daily_bars_parameters
 from tests.fakes.clock import FixedClock
 from tests.fakes.databento import (
     CLOSE_PRICE,
@@ -138,6 +139,29 @@ async def test_reads_the_last_daily_bars_of_many_instruments_in_one_query_throug
         MICROSOFT: [(2, DATABENTO_CLOSE), (3, DATABENTO_CLOSE), (4, DATABENTO_CLOSE)],
         TENCENT: [],
     }
+
+
+def find_table_scan_rows(plan: dict[str, Any]) -> int:
+    """The rows that the plan node and its child nodes read from the bar tables."""
+    rows = plan["Actual Rows"] * plan["Actual Loops"] if plan.get("Relation Name", "").endswith("_bar") else 0
+    return int(rows) + sum(find_table_scan_rows(child) for child in plan.get("Plans", []))
+
+
+def test_the_read_stops_at_the_bar_count_in_each_bar_source(database_url: str) -> None:
+    all_days = list(range(1, 29))
+    save_source_bars(database_url, "ibkr", APPLE, TimeRange(day(1), day(15)), all_days[:14], IBKR_CLOSE)
+    save_source_bars(database_url, "databento", APPLE, TimeRange(day(1), day(29)), all_days, DATABENTO_CLOSE)
+    with psycopg.connect(database_url) as connection:
+        # A small test table has no plan with the primary key without this.
+        connection.execute("SET LOCAL enable_seqscan = off")
+        connection.execute("SET LOCAL enable_bitmapscan = off")
+        row = connection.execute(
+            sql.SQL("EXPLAIN (ANALYZE, FORMAT JSON) ") + LAST_DAILY_BARS_QUERY,
+            create_last_daily_bars_parameters([APPLE], None, 3),
+        ).fetchone()
+
+    assert row is not None
+    assert find_table_scan_rows(row[0][0]["Plan"]) <= 3 + 3
 
 
 @pytest.mark.anyio

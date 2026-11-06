@@ -57,7 +57,7 @@ def create_range_contains_bar(bar_source: BarSource) -> sql.Composed:
 
 def create_source_bars_query(bar_source: BarSource) -> sql.Composed:
     """The bars of one bar source that the merge rule keeps: inside a saved range of the bar source, and not inside a
-    saved range of a bar source that is earlier in the source order."""
+    saved range of a bar source that is earlier in the source order. Only the last `bar_count` bars."""
     earlier_source_conditions = [
         sql.SQL(
             "NOT (array_position(global_order.bar_sources, {other}) < array_position(global_order.bar_sources, {own})"
@@ -71,13 +71,15 @@ def create_source_bars_query(bar_source: BarSource) -> sql.Composed:
         if other_source != bar_source
     ]
     return sql.SQL("""
-        SELECT {source_name} AS bar_source, bar.start_utc, bar.open, bar.high, bar.low, bar.close, bar.volume
+        (SELECT {source_name} AS bar_source, bar.start_utc, bar.open, bar.high, bar.low, bar.close, bar.volume
         FROM {bar_table} AS bar
         WHERE bar.symbol = instrument.symbol AND bar.exchange = instrument.exchange
             AND bar.currency = instrument.currency AND bar.bar_period = %(bar_period)s
             AND (%(before_utc)s::timestamptz IS NULL OR bar.start_utc < %(before_utc)s::timestamptz)
             AND {own_range}
             {earlier_sources}
+        ORDER BY bar.start_utc DESC
+        LIMIT %(bar_count)s)
     """).format(
         source_name=sql.Literal(bar_source.value),
         bar_table=bar_table(bar_source),
@@ -86,7 +88,8 @@ def create_source_bars_query(bar_source: BarSource) -> sql.Composed:
     )
 
 
-# For each instrument, the last `bar_count` daily bars of the merge. LIMIT in a LATERAL read uses the primary key.
+# For each instrument, the last `bar_count` daily bars of the merge. PostgreSQL does not move a LIMIT above UNION ALL
+# into the branches, so each branch has its own LIMIT: it stops the backward read of the primary key.
 LAST_DAILY_BARS_QUERY = sql.SQL("""
     WITH global_order AS (
         SELECT coalesce((SELECT bar_sources FROM source_order), %(default_source_order)s::text[]) AS bar_sources
