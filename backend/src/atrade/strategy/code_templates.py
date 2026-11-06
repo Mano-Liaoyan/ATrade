@@ -91,6 +91,7 @@ class RankedUniverseStrategy(Strategy):
         self.position_scale = 1.0
         self.rank_again = False
         self.buy_after_sells = False
+        self.order_is_lost = False
         self.venue: Venue | None = None
 
     def on_start(self) -> None:
@@ -136,7 +137,7 @@ class RankedUniverseStrategy(Strategy):
         if day != self.last_day:
             self.last_day = day
             self.equity_values.append(self.find_equity())
-            self.retry_lost_sells()
+            self.retry_lost_orders()
         self.add_bar(bar)
         if self.buy_after_sells:
             self.buy_after_sells = False
@@ -148,12 +149,22 @@ class RankedUniverseStrategy(Strategy):
             self.rank_again = False
             self.rebalance()
 
-    def retry_lost_sells(self) -> None:
-        """A denied, rejected, or ended sell gives no fill, and the sell count stops the rebalance. The check runs
-        once a day, so that a sell that fails again does not repeat on each bar of the day."""
+    def on_order_denied(self, event: object) -> None:
+        self.order_is_lost = True
+
+    def on_order_rejected(self, event: object) -> None:
+        self.order_is_lost = True
+
+    def on_order_canceled(self, event: object) -> None:
+        self.order_is_lost = True
+
+    def retry_lost_orders(self) -> None:
+        """A denied, rejected, or ended order gives no fill, and a sell stops the rebalance through the sell count. The
+        check runs once a day, so that an order that fails again does not repeat on each bar of the day."""
         inflight_count = self.cache.orders_inflight_count(strategy_id=self.strategy_id)
         open_count = self.cache.orders_open_count(strategy_id=self.strategy_id)
-        if self.open_sell_count > 0 and inflight_count == 0 and open_count == 0:
+        if (self.open_sell_count > 0 or self.order_is_lost) and inflight_count == 0 and open_count == 0:
+            self.order_is_lost = False
             self.open_sell_count = 0
             self.rank_again = True
 
