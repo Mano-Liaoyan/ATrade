@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import LiteralString
 
+import psycopg
 import pytest
 
 from atrade.market_data import ImportCheckError, check_import_detections, import_databento_files
@@ -140,3 +141,32 @@ def test_the_user_check_refuses_an_id_that_is_not_a_waiting_link(database_url: s
             rejected_link_ids={int(str(link_id))},
             checked_at_utc=CHECKED_AT_UTC,
         )
+
+
+def insert_member(database_url: str, quarter_start_utc: datetime, rank: int, symbol: str) -> None:
+    with psycopg.connect(database_url) as connection:
+        connection.execute(
+            """
+            INSERT INTO us_universe_member (
+                quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+            )
+            VALUES (%(quarter_start_utc)s, %(rank)s, %(symbol)s, 'NASDAQ', 'USD', 1000, %(quarter_start_utc)s)
+            """,
+            {"quarter_start_utc": quarter_start_utc, "rank": rank, "symbol": symbol},
+        )
+
+
+def test_a_move_changes_the_old_symbol_in_the_saved_quarters(database_url: str, tmp_path: Path) -> None:
+    first_quarter = datetime(2019, 10, 1, tzinfo=UTC)
+    second_quarter = datetime(2020, 1, 2, tzinfo=UTC)
+    insert_member(database_url, first_quarter, 1, "OLDX")
+    insert_member(database_url, second_quarter, 1, "OLDX")
+    insert_member(database_url, second_quarter, 2, "NEWX")
+
+    import_files(database_url, tmp_path, create_change("50", "50.2"))
+
+    assert read_table(database_url, "SELECT rank, symbol FROM us_universe_member ORDER BY quarter_start_utc, rank") == [
+        (1, "NEWX"),
+        (1, "OLDX"),
+        (2, "NEWX"),
+    ]

@@ -217,7 +217,8 @@ MOVE_TO_NEW_SYMBOL: LiteralString = """
 """
 
 # A link can follow an earlier import: the rows that this import did not read go to the new symbol too. A saved bar of
-# the new symbol on the same day stays. The daily bar summary of the new symbol comes from the save of the import.
+# the new symbol on the same day stays. The daily bar summary of the new symbol comes from the save of the import. A
+# saved quarter gets the new symbol, so its member keeps its bars. A quarter that has both symbols keeps both rows.
 MOVE_SAVED_ROWS_TO_NEW_SYMBOL: tuple[LiteralString, ...] = (
     """
     UPDATE databento_bar AS old_bar SET symbol = %(new_symbol)s
@@ -238,6 +239,15 @@ MOVE_SAVED_ROWS_TO_NEW_SYMBOL: tuple[LiteralString, ...] = (
     WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s AND ex_date_utc < %(change_start_utc)s
     """,
     "DELETE FROM daily_bar_summary WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s",
+    """
+    UPDATE us_universe_member AS old_member SET symbol = %(new_symbol)s
+    WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s
+        AND NOT EXISTS (
+            SELECT FROM us_universe_member AS new_member
+            WHERE new_member.quarter_start_utc = old_member.quarter_start_utc AND new_member.symbol = %(new_symbol)s
+                AND new_member.exchange = old_member.exchange AND new_member.currency = old_member.currency
+        )
+    """,
 )
 
 SELECT_LAST_IMPORT_DAY: LiteralString = "SELECT max(start_utc) FROM databento_import_bar"

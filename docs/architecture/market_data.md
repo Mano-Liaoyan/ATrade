@@ -817,8 +817,9 @@ daily close of each instrument and day. Primary key `symbol`, `exchange`,
     of the old symbol.
 - A link with proof has the state `moved`. The import saves all history of a
   linked old symbol under the new symbol, the same as IBKR does. This
-  includes the bars, saved ranges, and stock splits that an earlier import
-  saved. The old symbol loses its daily bar summary.
+  includes the bars, saved ranges, stock splits, and universe members that
+  an earlier import or update saved. A quarter that has both symbols keeps
+  both rows. The old symbol loses its daily bar summary.
 - A link without proof has the state `waiting`. It moves no bar. The 2 symbols
   stay 2 instruments until the user check. `--accept` of
   `app/databento_check.py` moves the saved rows of all waiting links.
@@ -938,9 +939,10 @@ Quarterly update in the `forward-test` worker:
   window used. The calculation refuses a window with less than 63 days, or
   a window that starts more than 100 calendar days before the last ranking
   day (a gap in `databento_bar`), and saves nothing.
-- A saved quarter does not change. The history calculation adds only the
-  quarters without members, so a quarter that the update calculated with the
-  earlier window keeps it.
+- The members and the ranks of a saved quarter do not change. The history
+  calculation adds only the quarters without members, so a quarter that the
+  update calculated with the earlier window keeps it. Only a symbol link
+  changes a saved symbol (section 8.8.4).
 
 ## 8.10 HK instrument list
 
