@@ -35,6 +35,21 @@ async function replaceCode(page: Page, code: string): Promise<void> {
   await page.keyboard.insertText(code);
 }
 
+// Holds the POST of a save until the returned function runs.
+async function holdSave(page: Page): Promise<() => void> {
+  let finishSave = (): void => undefined;
+  const saveMayFinish = new Promise<void>((resolve) => {
+    finishSave = resolve;
+  });
+  await page.route('**/api/strategies/*/versions', async (route) => {
+    if (route.request().method() === 'POST') {
+      await saveMayFinish;
+    }
+    await route.fallback();
+  });
+  return finishSave;
+}
+
 // Before each screenshot, Playwright waits for document.fonts.ready. In WebKit, on this page, that promise can stay
 // pending for many seconds after all font files have loaded (the CI trace shows no font request after the page load).
 // Then the screenshot does not finish. This environment variable of Playwright stops that wait. The test loads the font
@@ -200,6 +215,19 @@ test('shows the line and the reason when the checks refuse the code', async ({ p
   await expect(page.getByRole('option')).toHaveText(['v1']);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Save version, unsaved changes' })).toBeVisible();
+});
+
+test('disables the version list during a save', async ({ page }, currentTest) => {
+  await createStrategy(page, createUniqueName(currentTest, 'Busy'));
+  await replaceCode(page, VALID_CODE);
+  const finishSave = await holdSave(page);
+
+  await page.getByRole('button', { name: 'Save version' }).click();
+  await expect(page.getByRole('combobox', { name: 'Version' })).toBeDisabled();
+  finishSave();
+
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v2');
+  await expect(page.getByRole('combobox', { name: 'Version' })).toBeEnabled();
 });
 
 test('keeps unsaved edits in the browser after a reload', async ({ page }, currentTest) => {

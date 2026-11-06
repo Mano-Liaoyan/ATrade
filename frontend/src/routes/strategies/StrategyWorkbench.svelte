@@ -560,6 +560,8 @@
             size="sm"
             items={versionItems}
             value={String(openVersion?.version_number ?? '')}
+            disabled={isSaving}
+            disabledReason="Saving version…"
             onValueChange={(versionNumber: string) => {
               void openStrategy.openVersion(fetch, Number(versionNumber));
             }}
