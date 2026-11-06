@@ -1,7 +1,7 @@
 <!-- One metric as a Carbon tile in a MetricRow: the name and the value. With `change`, the value is a ChangeText: its
      sign gives the direction, shown with an arrow icon and the Carbon support color, so the color is never the only
-     sign (AGENTS.md, State). The value is right-aligned with tabular numbers. A value that does not fit ends with an
-     ellipsis, and its title gives the full value. -->
+     sign (AGENTS.md, State). The value is right-aligned with tabular numbers. MetricRow wraps its tiles, so a usual
+     value fits. A longer value ends with an ellipsis, and its title gives the full value. -->
 <script lang="ts">
   import { ChangeText } from '#lib/foundation/value_format';
 
@@ -31,7 +31,9 @@
   .metric-tile {
     min-block-size: 0;
     min-inline-size: 0;
-    padding: var(--cds-spacing-03) var(--cds-spacing-05);
+    padding: var(--cds-spacing-03);
+    /* The dividers. An empty cell of the last line of a wrapped row stays the panel background. */
+    box-shadow: 0 0 0 1px var(--cds-border-subtle-01);
   }
 
   dt {
@@ -44,7 +46,7 @@
     white-space: nowrap;
   }
 
-  /* A narrow tile clips the value with an ellipsis; the title gives the full value. */
+  /* A value longer than the wrapped tile ends with an ellipsis; the title gives the full value. */
   dd {
     overflow: hidden;
     text-align: end;
