@@ -1,10 +1,12 @@
-"""Start of the Web process: settings that are not valid stop the start before any connection."""
+"""Start of the Web process: settings that are not valid stop the start before any connection. A valid start blocks
+reads of the process before the servers start."""
 
 import logging
 from urllib.parse import urlsplit, urlunsplit
 
 import pytest
 
+from atrade.app import web
 from atrade.app.web import main
 
 
@@ -38,3 +40,21 @@ def test_does_not_start_with_a_wrong_database_password_and_names_the_volume(
     assert stop.value.code == 1
     assert "PostgreSQL refused the password" in caplog.text
     assert "atrade-postgres18-data" in caplog.text
+
+
+def test_blocks_reads_of_the_process_before_the_servers_start(
+    migrated_database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    steps: list[str] = []
+
+    async def record_serve_both(*_: object) -> None:
+        steps.append("serve")
+
+    monkeypatch.setenv("DATABASE_URL", migrated_database_url)
+    monkeypatch.setenv("ATRADE_TRADING_MODE", "paper")
+    monkeypatch.setattr(web, "block_process_reads", lambda: steps.append("block"))
+    monkeypatch.setattr(web, "serve_both", record_serve_both)
+
+    main()
+
+    assert steps == ["block", "serve"]

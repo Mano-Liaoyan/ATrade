@@ -10,6 +10,7 @@ import sys
 
 from pydantic import BaseModel, TypeAdapter
 
+from atrade.foundation.process_protection import create_child_environment
 from atrade.strategy.chart_indicators import find_chart_indicator_problems
 from atrade.strategy.code_syntax import CodeProblem, has_base_class
 
@@ -78,6 +79,7 @@ async def find_ruff_problems(code: str) -> list[CodeProblem]:
         "-m",
         "ruff",
         *RUFF_ARGUMENTS,
+        env=create_child_environment(),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,

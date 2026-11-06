@@ -7,7 +7,6 @@ applies to the next backtest that starts.
 
 import asyncio
 import logging
-import os
 from collections.abc import Awaitable, Callable
 from contextlib import suppress
 
@@ -16,21 +15,14 @@ import psycopg
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_limits import read_backtest_limits
 from atrade.foundation.clock import Clock
+from atrade.foundation.process_protection import create_child_environment
 
 QUEUE_CHECK_INTERVAL_SECONDS = 0.5
-# The child gets only these variables. IBKR and Cloudflare secrets stay in the Web process (section 10).
-CHILD_ENVIRONMENT_ALLOW_LIST = ("PATH", "HOME", "TZ")
 # A failed child shows the end of its error output. The start of a long traceback is less useful.
 MAX_ERROR_OUTPUT_CHARACTERS = 4000
 RESTART_ERROR_MESSAGE = "The Web process stopped during the backtest. Start the backtest again."
 
 logger = logging.getLogger(__name__)
-
-
-def create_child_environment(database_url: str) -> dict[str, str]:
-    child_environment = {name: os.environ[name] for name in CHILD_ENVIRONMENT_ALLOW_LIST if name in os.environ}
-    child_environment["DATABASE_URL"] = database_url
-    return child_environment
 
 
 def describe_child_failure(return_code: int, error_output: bytes) -> str:
@@ -103,7 +95,7 @@ class BacktestRunner:
         process = await asyncio.create_subprocess_exec(
             *self.process_command,
             str(backtest_id),
-            env=create_child_environment(self.database_url),
+            env={**create_child_environment(), "DATABASE_URL": self.database_url},
             stderr=asyncio.subprocess.PIPE,
         )
         try:
