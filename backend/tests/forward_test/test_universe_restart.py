@@ -96,14 +96,15 @@ async def start_restart(  # noqa: PLR0913 - the fixtures of the run
     *,
     code: str,
     holds_position: bool = True,
+    held_instrument: Instrument = MICROSOFT,
 ) -> RestartChildRun:
     forward_test_id = await start_top_2_forward_test(web_client, database_url, {"code": code})
     save_us_universe(database_url, NEXT_QUARTER_UTC, [NVIDIA, APPLE])
     clock.now_utc = NEXT_QUARTER_UTC.replace(hour=12)
     child = RestartChildRun(database_url, frontend_build_dir, clock, tmp_path)
     if holds_position:
-        child.ledger.positions[(forward_test_id, MICROSOFT)] = ForwardTestPosition(
-            MICROSOFT, Decimal(HELD_SHARES), Decimal(100)
+        child.ledger.positions[(forward_test_id, held_instrument)] = ForwardTestPosition(
+            held_instrument, Decimal(HELD_SHARES), Decimal(100)
         )
     child.start(forward_test_id)
     await wait_until(lambda: child.strategy_of_version is not None)
@@ -123,8 +124,8 @@ def send_next_bar_time(strategy: Any, bar_type_name: str, *, time_ns: int | None
     strategy.on_bar(Bar(bar.bar_type, bar.open, bar.high, bar.low, bar.close, bar.volume, ts_event, ts_event))
 
 
-def make_rank_code() -> str:
-    rules = make_universe_rules(rank_indicator=indicator("sma", period=3), hold_count=1)
+def make_rank_code(exits: dict[str, Any] | None = None) -> str:
+    rules = make_universe_rules(rank_indicator=indicator("sma", period=3), hold_count=1, exits=exits)
     return make_rules_code(StrategyRules.model_validate(rules))
 
 
@@ -149,7 +150,7 @@ async def test_the_m1_template_sells_a_restored_position_outside_the_universe(
 
 
 @pytest.mark.anyio
-async def test_the_m1_template_rebalances_on_the_next_day_after_a_denied_sell(
+async def test_the_m1_template_sells_again_on_the_next_day_after_a_denied_sell(
     web_client: httpx.AsyncClient,
     database_url: str,
     frontend_build_dir: Path,
@@ -217,7 +218,7 @@ async def test_the_rule_builder_buys_again_at_the_next_bar_time_after_a_denied_b
         await save_daily_bars(database_url, NVIDIA, TODAY_UTC, 1)
         await wait_until(lambda: strategy.values)
         strategy.rebalance()
-        await wait_until(lambda: strategy.order_is_lost)
+        await wait_until(lambda: strategy.lost_instruments)
         assert child.read_orders() == []
         child.ledger.split_check_needed.clear()
         send_next_bar_time(strategy, NVIDIA_BAR_TYPE)
@@ -242,10 +243,72 @@ async def test_the_rule_builder_sells_again_at_the_next_bar_time_after_a_denied_
         await save_daily_bars(database_url, NVIDIA, TODAY_UTC, 1)
         await wait_until(lambda: strategy.values)
         strategy.rebalance()
-        await wait_until(lambda: strategy.order_is_lost)
+        await wait_until(lambda: strategy.lost_instruments)
         child.ledger.split_check_needed.clear()
         send_next_bar_time(strategy, NVIDIA_BAR_TYPE)
         await wait_until(lambda: child.has_order(MICROSOFT, "SELL"))
+    finally:
+        await child.stop()
+
+
+@pytest.mark.anyio
+async def test_the_rule_builder_retries_a_refused_buy_once_a_day(
+    web_client: httpx.AsyncClient,
+    database_url: str,
+    frontend_build_dir: Path,
+    clock: FixedClock,  # noqa: F811
+    tmp_path: Path,
+) -> None:
+    child = await start_restart(
+        web_client, database_url, frontend_build_dir, clock, tmp_path, code=make_rank_code(), holds_position=False
+    )
+    strategy = child.strategy_of_version
+    child.ledger.split_check_needed.add(NVIDIA)
+    try:
+        await wait_until(lambda: len(strategy.members) == 2)
+        await save_daily_bars(database_url, NVIDIA, TODAY_UTC, 1)
+        await wait_until(lambda: strategy.values)
+        strategy.rebalance_is_due = False
+        strategy.rebalance()
+        await wait_until(lambda: strategy.lost_instruments)
+        next_day_ns = strategy.cache.bar(BarType.from_str(NVIDIA_BAR_TYPE)).ts_event + ONE_DAY_NS
+        send_next_bar_time(strategy, NVIDIA_BAR_TYPE, time_ns=next_day_ns)
+        await wait_until(lambda: strategy.lost_instruments)
+        for later_bar in range(1, 4):
+            send_next_bar_time(strategy, NVIDIA_BAR_TYPE, time_ns=next_day_ns + later_bar)
+        await asyncio.sleep(WAIT_FOR_DENIAL_SECONDS)
+        assert len(child.ledger.checked_orders) == 2
+        send_next_bar_time(strategy, NVIDIA_BAR_TYPE, time_ns=next_day_ns + ONE_DAY_NS)
+        await wait_until(lambda: len(child.ledger.checked_orders) == 3)
+    finally:
+        await child.stop()
+
+
+@pytest.mark.anyio
+async def test_the_rule_builder_retries_a_refused_exit_once_a_day(
+    web_client: httpx.AsyncClient,
+    database_url: str,
+    frontend_build_dir: Path,
+    clock: FixedClock,  # noqa: F811
+    tmp_path: Path,
+) -> None:
+    code = make_rank_code({"exit_after_bars": 1})
+    child = await start_restart(
+        web_client, database_url, frontend_build_dir, clock, tmp_path, code=code, held_instrument=NVIDIA
+    )
+    strategy = child.strategy_of_version
+    child.ledger.split_check_needed.add(NVIDIA)
+    try:
+        await wait_until(lambda: len(strategy.members) == 2)
+        await save_daily_bars(database_url, NVIDIA, TODAY_UTC, 1)
+        await wait_until(lambda: strategy.lost_instruments)
+        next_day_ns = strategy.cache.bar(BarType.from_str(NVIDIA_BAR_TYPE)).ts_event + ONE_DAY_NS
+        send_next_bar_time(strategy, NVIDIA_BAR_TYPE, time_ns=next_day_ns)
+        await wait_until(lambda: strategy.lost_instruments)
+        for later_bar in range(1, 4):
+            send_next_bar_time(strategy, NVIDIA_BAR_TYPE, time_ns=next_day_ns + later_bar)
+        await asyncio.sleep(WAIT_FOR_DENIAL_SECONDS)
+        assert len(child.ledger.checked_orders) == 2
     finally:
         await child.stop()
 
@@ -265,7 +328,7 @@ async def test_a_lost_order_after_a_restart_does_not_sell_the_positions_without_
         await save_daily_bars(database_url, NVIDIA, TODAY_UTC, 1)
         await wait_until(lambda: strategy.values)
         strategy.rebalance_is_due = False
-        strategy.order_is_lost = True
+        strategy.lost_instruments.add(MSFT_ID)
         send_next_bar_time(strategy, NVIDIA_BAR_TYPE, time_ns=strategy.clock.timestamp_ns())
         await asyncio.sleep(WAIT_FOR_DENIAL_SECONDS)
     finally:
@@ -336,7 +399,7 @@ async def test_a_flat_universe_restart_ranks_at_its_first_bar_time(
 
 
 @pytest.mark.anyio
-async def test_the_m1_template_ranks_again_on_the_next_day_after_a_denied_buy(
+async def test_the_m1_template_sends_only_the_lost_buy_on_the_next_day(
     web_client: httpx.AsyncClient,
     database_url: str,
     frontend_build_dir: Path,
@@ -352,10 +415,39 @@ async def test_the_m1_template_ranks_again_on_the_next_day_after_a_denied_buy(
         await wait_until(lambda: len(strategy.members) == 2)
         strategy.rank_again = False
         strategy.send_order("NVDA.NASDAQ", OrderSide.BUY, 1)
-        await wait_until(lambda: strategy.order_is_lost)
-        strategy.retry_lost_orders()
+        await wait_until(lambda: strategy.lost_orders)
+        child.ledger.split_check_needed.clear()
+        strategy.retry_lost_orders(False)
+        await wait_until(lambda: child.has_side(NVIDIA, "BUY"))
         rank_again = strategy.rank_again
     finally:
         await child.stop()
 
-    assert rank_again is True
+    assert rank_again is False
+
+
+@pytest.mark.anyio
+async def test_a_new_month_ranks_again_after_a_sell_that_stays_lost(
+    web_client: httpx.AsyncClient,
+    database_url: str,
+    frontend_build_dir: Path,
+    clock: FixedClock,  # noqa: F811
+    tmp_path: Path,
+) -> None:
+    child = await start_restart(web_client, database_url, frontend_build_dir, clock, tmp_path, code=make_m1_code())
+    strategy = child.strategy_of_version
+    child.ledger.split_check_needed.add(MICROSOFT)
+    try:
+        await wait_until(lambda: len(strategy.members) == 2)
+        strategy.rank_again = False
+        strategy.open_sell_count = 1
+        strategy.send_order(MSFT_ID, OrderSide.SELL, HELD_SHARES)
+        await wait_until(lambda: strategy.lost_orders)
+        strategy.retry_lost_orders(True)
+        sell_count = strategy.open_sell_count
+        rank_again = strategy.rank_again
+        lost_orders = strategy.lost_orders
+    finally:
+        await child.stop()
+
+    assert (sell_count, rank_again, lost_orders) == (0, True, {})

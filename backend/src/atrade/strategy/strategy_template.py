@@ -18,6 +18,7 @@ from nautilus_trader.trading import Strategy
 # and holidays do not leave the indicator without bars. A long warm-up of short bars means many IBKR requests.
 WARM_UP_AVERAGE_PERIODS = 3
 MIN_WARM_UP_LENGTH = timedelta(days=7)
+ONE_DAY_NS = 86_400_000_000_000
 
 # The bar chart of a backtest or a forward test shows these indicators. It has no effect on the run.
 # A parameter is a number or the name of a configuration field with an int or float default.
@@ -54,6 +55,8 @@ class MovingAverageStrategy(Strategy):
         super().__init__(config)
         self.settings = config
         self.average = SimpleMovingAverage(config.average_period)
+        self.order_is_lost = False
+        self.last_retry_day: int | None = None
 
     def on_start(self) -> None:
         self.register_indicator_for_bars(self.settings.bar_type, self.average)
@@ -66,24 +69,45 @@ class MovingAverageStrategy(Strategy):
     def on_bar(self, bar: Bar) -> None:
         if not self.average.initialized:
             return
-        # Each bar reads the position and the orders, because an order can be denied, rejected, or fill in parts.
+        # Each bar reads the position and the orders, because an order can be lost or fill in parts.
         close_price = bar.close.as_double()
         positions = self.cache.positions_open(instrument_id=self.settings.instrument_id, strategy_id=self.strategy_id)
         if close_price > self.average.value and not positions and not self.has_orders():
-            self.send_buy_order()
+            if self.can_send_order(bar):
+                self.send_buy_order()
         elif close_price < self.average.value:
-            self.send_exit_orders(positions)
+            self.send_exit_orders(positions, bar)
+
+    def on_order_denied(self, event: object) -> None:
+        self.order_is_lost = True
+
+    def on_order_rejected(self, event: object) -> None:
+        self.order_is_lost = True
+
+    def on_order_canceled(self, event: object) -> None:
+        self.order_is_lost = True
+
+    def can_send_order(self, bar: Bar) -> bool:
+        """A lost order gets at most 1 retry each day, so that a permanent refusal does not repeat on each bar."""
+        if not self.order_is_lost:
+            return True
+        day = bar.ts_event // ONE_DAY_NS
+        if day == self.last_retry_day:
+            return False
+        self.order_is_lost = False
+        self.last_retry_day = day
+        return True
 
     def has_orders(self, side: OrderSide | None = None) -> bool:
         filters = {"instrument_id": self.settings.instrument_id, "strategy_id": self.strategy_id, "side": side}
         return self.cache.orders_inflight_count(**filters) + self.cache.orders_open_count(**filters) > 0
 
-    def send_exit_orders(self, positions: list[Position]) -> None:
+    def send_exit_orders(self, positions: list[Position], bar: Bar) -> None:
         open_orders = self.cache.orders_open(instrument_id=self.settings.instrument_id, strategy_id=self.strategy_id)
         for order in open_orders:
             if order.side == OrderSide.BUY:
                 self.cancel_order(order.client_order_id)
-        if not self.has_orders(OrderSide.SELL):
+        if positions and not self.has_orders(OrderSide.SELL) and self.can_send_order(bar):
             for position in positions:
                 self.close_position(position)
 

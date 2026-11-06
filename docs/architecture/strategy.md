@@ -164,8 +164,10 @@ New columns of `strategy_version`:
   `backend/src/atrade/strategy/strategy_template.py`. It is a moving average
   cross strategy: buy 10 shares when the close goes above SMA(20), sell the
   whole position when it goes below. Each bar reads the position and the
-  order counts, so a denied, rejected, or partly filled order gets a new
-  order on the next bar. An exit cancels the open buy orders of the instrument
+  order counts, so a denied, rejected, or canceled order gets a new order on
+  the next bar. A lost order gets at most 1 retry each day (UTC day of the
+  bar), so a permanent refusal on 1-minute bars does not send an order each
+  minute. An exit cancels the open buy orders of the instrument
   and uses `close_position`, so a backtest exit fills at the next open, as a
   forward test does. A saved version keeps its code (ADR 0006), so a version
   from before these rules must be saved again to get them. It shows only the
@@ -717,16 +719,19 @@ Decided (#201):
   test restart restored in a new quarter. A position with an open order
   keeps that order. It buys only when no order of the strategy is open and no
   position outside the targets is open.
-- A denied, rejected, or canceled order sets `order_is_lost`. At the next bar
-  time the strategy sends the sells and the buys of its targets again, also
-  when the next rebalance is months away. A target that an exit item sold
-  leaves the targets, so the retry does not buy it again.
+- A denied, rejected, or canceled order adds its instrument to
+  `lost_instruments`. At the next bar time the strategy sends the sell or the
+  buy of this instrument again, also when the next rebalance is months away.
+  Each instrument gets at most 1 retry each day (UTC day of the bar), also for
+  the sell of an exit item, so a permanent refusal does not repeat on each
+  bar. A target that an exit item sold leaves the targets, so the retry does
+  not buy it again.
 - A restored position sets the period of `on_start` to the current period, so
   a restart does not rebalance a second time in a period. A restart between
   a period start and its rebalance thus skips that rebalance. The exception
   is a restored position outside the first member list: it marks a rebalance.
-  A restart loses the targets, so `order_is_lost` has no effect until the next
-  rebalance. A flat restart has no period and ranks at its first bar time.
+  A restart loses the targets, so `lost_instruments` starts no retry until the
+  next rebalance. A flat restart has no period and ranks at its first bar time.
 - Universe code has no `on_historical_bars`, so it has no look-back previous
   value. A cross on the first bar of a new member is false, also when the
   last look-back bar and that bar show a cross. A saved version keeps its

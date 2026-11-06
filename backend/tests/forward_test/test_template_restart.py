@@ -36,6 +36,7 @@ from tests.forward_test.atrade_clients_node import (
 
 RESTORED_SHARES = 40
 REFUSAL_WAIT_SECONDS = 0.2
+ONE_DAY_NS = 86_400_000_000_000
 
 
 async def make_world_with_position(database_url: str) -> ClientsWorld:
@@ -90,6 +91,13 @@ async def wait_for_refusal(world: ClientsWorld) -> None:
 def replace_close(bar: NautilusBar, close: float) -> NautilusBar:
     price = Price(close, bar.close.precision)
     return NautilusBar(bar.bar_type, price, price, price, price, bar.volume, bar.ts_event, bar.ts_init)
+
+
+def send_next_day_bar(strategy: Any) -> None:
+    """A bar of the next day with the same close. The data client does not send a bar of a future day."""
+    bar = strategy.cache.bar(DAY_BAR_TYPE)
+    ts_event = bar.ts_event + ONE_DAY_NS
+    strategy.on_bar(NautilusBar(bar.bar_type, bar.open, bar.high, bar.low, bar.close, bar.volume, ts_event, ts_event))
 
 
 def repeat_last_bar(strategy: Any) -> None:
@@ -151,6 +159,46 @@ async def test_the_default_template_buys_again_on_the_next_bar_after_a_rejected_
         await wait_until(lambda: bool(world.gateway.open_orders))
 
         assert read_orders(world) == [("BUY", Decimal(10))]
+
+
+@pytest.mark.anyio
+async def test_the_default_template_retries_a_refused_buy_once_a_day(database_url: str, tmp_path: Path) -> None:
+    world = make_world(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "200")
+        await wait_for_refusal(world)
+        repeat_last_bar(strategy)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        for _ in range(3):
+            repeat_last_bar(strategy)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        assert len(world.ledger.checked_orders) == 2
+        send_next_day_bar(strategy)
+        await wait_until(lambda: len(world.ledger.checked_orders) == 3)
+
+
+@pytest.mark.anyio
+async def test_the_default_template_retries_a_refused_sell_once_a_day(database_url: str, tmp_path: Path) -> None:
+    world = await make_world_with_position(database_url)
+    await save_warm_up_bars(database_url)
+    strategy = make_template_strategy(tmp_path)
+    world.ledger.split_check_needed.add(APPLE)
+
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "50")
+        await wait_for_refusal(world)
+        repeat_last_bar(strategy)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        for _ in range(3):
+            repeat_last_bar(strategy)
+        await asyncio.sleep(REFUSAL_WAIT_SECONDS)
+        assert len(world.ledger.checked_orders) == 2
+        send_next_day_bar(strategy)
+        await wait_until(lambda: len(world.ledger.checked_orders) == 3)
 
 
 @pytest.mark.anyio
