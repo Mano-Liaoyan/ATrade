@@ -76,6 +76,20 @@ describe('the conversation log', () => {
     expect(log.items.at(-1)).toMatchObject({ role: 'assistant', text: 'Hel', streaming: false });
   });
 
+  it('ends each running tool step with the run, also the state of a backtest step', () => {
+    let log = addServerMessage(EMPTY_LOG, toolStep({ backtest_id: 42, backtest_status: 'running' }), NOW);
+    log = addServerMessage(log, { ...toolStep({ tool_name: 'read_strategy', status: 'running' }), tool_call_id: 'call-2' }, NOW);
+    log = addServerMessage(log, { ...toolStep({ tool_name: 'list_screens', status: 'succeeded' }), tool_call_id: 'call-3' }, NOW);
+
+    const steps = endRun(log).items.flatMap((item) => (item.kind === 'tool_step' ? [describeToolStep(item)] : []));
+
+    expect(steps).toEqual([
+      { title: 'Backtest #42', status: 'Interrupted', kind: 'error' },
+      { title: 'Read strategy', status: 'Failed', kind: 'error' },
+      { title: 'List screens', status: 'Succeeded', kind: 'success' },
+    ]);
+  });
+
   it('keeps one line for each tool call and updates it', () => {
     let log = addServerMessage(EMPTY_LOG, toolStep({ backtest_id: 42, backtest_status: 'queued' }), NOW);
     log = addServerMessage(log, toolStep({ backtest_id: 42, backtest_status: 'running' }), NOW);

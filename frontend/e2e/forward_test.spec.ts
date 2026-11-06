@@ -254,15 +254,6 @@ async function fakeRunningForwardTests(page: Page, ids: number[]): Promise<() =>
   };
 }
 
-test('a failed read of the list shows the reason and not "No forward tests"', async ({ page }) => {
-  await page.route('**/api/forward-tests', (route) => route.fulfill({ status: 500, json: { detail: 'List read failed' } }));
-  await page.goto('/forward-tests');
-
-  const list = page.getByRole('complementary', { name: 'Forward tests' });
-  await expect(list.getByText('Forward tests not read')).toBeVisible();
-  await expect(page.getByText('No forward tests', { exact: true })).toHaveCount(0);
-});
-
 test('a failed read of the open forward test shows the reason above the shown numbers', async ({ page }) => {
   const sendChanged = await fakeRunningForwardTests(page, [9101]);
   await page.goto('/forward-tests/9101');
@@ -272,7 +263,7 @@ test('a failed read of the open forward test shows the reason above the shown nu
   await page.route('**/api/forward-tests/9101', (route) => route.fulfill({ status: 500, json: { detail: 'Detail read failed' } }));
   sendChanged();
 
-  await expect(chartPanel.getByText('Forward test not read')).toBeVisible();
+  await expect(page.getByRole('main').getByText('Forward test not read')).toBeVisible();
   await expect(chartPanel.getByRole('heading', { level: 1 })).toContainText('#9101');
 });
 
@@ -285,12 +276,15 @@ test('after a stop of the open forward test, the list menu stops another forward
   });
   await page.goto('/forward-tests/9201');
 
-  await page.getByRole('region', { name: 'Forward test #9201' }).getByRole('button', { name: 'Stop forward test', exact: true }).click();
+  const stopButton = page.getByRole('region', { name: 'Forward test #9201' }).getByRole('button', { name: 'Stop forward test', exact: true });
+  await stopButton.click();
   await expect.poll(() => stopRequests).toEqual(['9201']);
 
   await page.getByRole('complementary', { name: 'Forward tests' }).getByRole('link', { name: '#9202', exact: true }).click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Stop forward test' }).click();
   await expect.poll(() => stopRequests).toEqual(['9201', '9202']);
+  // The socket pushed nothing: the button shows the accepted stop.
+  await expect(stopButton).toHaveCount(0);
 });
 
 test('the forward test list has a visible scroll track', async ({ page }) => {

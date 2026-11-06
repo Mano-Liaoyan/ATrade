@@ -853,10 +853,7 @@ than the worker clock.
   act). A refused start shows the `detail` text. A started
   forward test opens at once.
 - The page reads `GET /api/forward-tests/{id}` again after each change that
-  `/ws/forward-tests` pushes. When a read fails, the panel keeps the shown
-  numbers and shows "Forward test not read" with the reason. When the list
-  read fails, the side column shows "Forward tests not read" with the reason.
-  The header
+  `/ws/forward-tests` pushes. The header
   line shows the number, the strategy version (link to that version on the strategy page),
   the symbol (link to the instrument page), the bar period, the status, the
   crash count when it is not 0 and the status is not `stopped`, the red

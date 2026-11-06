@@ -68,6 +68,7 @@
   import { START_BACKTEST_FORM_ID } from '../../palette_commands';
   import { RunWorkbench } from '../../run_workbench.svelte';
   import BacktestList from '../BacktestList.svelte';
+  import RunCenter from '../../RunCenter.svelte';
   import BarSourceTable from '../BarSourceTable.svelte';
   import StartBacktestDialog from '../StartBacktestDialog.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
@@ -215,184 +216,184 @@
         }}
       />
     {/snippet}
-    <BacktestList backtests={workbench.items} errorMessage={workbench.listMessage} openBacktestId={backtestId} onDeleted={removeDeletedBacktests} />
+    <BacktestList backtests={workbench.items} openBacktestId={backtestId} onDeleted={removeDeletedBacktests} />
   </SideColumn>
 
-  {#if shownBacktest === null}
-    <div class="atrade-run-empty">
-      {#if workbench.detailMessage !== ''}
-        <InlineNotification kind="error" title="Backtest not read" subtitle={workbench.detailMessage} lowContrast />
-      {:else if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === ''}
-        <EmptyText text="No backtests" />
-      {/if}
-    </div>
-  {:else}
-    {@const detail = shownBacktest}
-    {@const instrument = readBacktestInstrument(detail)}
-    {@const universeLabel = formatUniverseLabel(detail, detail.instruments.length)}
-    {@const chartKey = String(detail.id)}
-    {@const chartInstruments = listChartInstruments(detail)}
-    {@const chartInstrument = runChart.findInstrument(chartKey, chartInstruments)}
-    <PanelSplit storageKey="atrade.backtest-page.panel-split" panels={PANELS}>
-      {#snippet panel(id, state)}
-        {#if id === 'chart'}
-          <Panel {...state} label={`Backtest #${String(detail.id)}`}>
-            {#snippet header()}
-              <span class="atrade-run-status" role="status" aria-label="Backtest status">
-                <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
-              </span>
-              <h1 class="atrade-run-title">
-                <span class="atrade-run-number">#{detail.id}</span>
-                <a class="cds--link" href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(detail.strategy_id), versionNumber: String(detail.version_number) })}
-                  >{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
-                >
-                {#if instrument !== undefined}
-                  <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
-                  <a class="cds--link" href={createInstrumentHref(instrument)}>{instrument.symbol}</a>
-                {:else if universeLabel !== undefined}
-                  <span>{universeLabel}</span>
-                {/if}
-                <span class="atrade-run-period">{formatBarPeriod(detail.bar_period)}</span>
-                {#if detail.sweep_id !== null}
-                  <a class="cds--link" href={resolve('/sweeps/[[sweepId]]', { sweepId: String(detail.sweep_id) })}
-                    >Parameter sweep #{detail.sweep_id}</a
-                  >
-                {/if}
-              </h1>
-              <span class="atrade-run-actions">
-                {#if chartInstrument !== undefined}
-                  <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
-                {/if}
-                {#if chartView === 'bars' && chartInstrument !== undefined}
-                  {#if instrument === undefined}
-                    <ChartInstrumentSelect
-                      instruments={chartInstruments}
-                      value={chartInstrument}
-                      onValueChange={(selected: BacktestInstrument) => {
-                        runChart.selectInstrument(chartKey, selected);
-                      }}
-                    />
-                  {/if}
-                  <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={detail.strategy_indicators} />
-                {/if}
-                <IconButton
-                  label={describeForwardTestButton(detail, instrument)}
-                  icon={ConnectionSignal16}
-                  tone="interactive"
-                  disabled={instrument === undefined || !hasLiveBarPeriod || isStartingForwardTest}
-                  onclick={() => {
-                    if (instrument !== undefined) {
-                      void startForwardTestFromBacktest(detail, instrument);
-                    }
-                  }}
-                />
-              </span>
-            {/snippet}
-            {#if forwardTestMessage !== ''}
-              <InlineNotification
-                kind="error"
-                title="Forward test not started"
-                subtitle={forwardTestMessage}
-                lowContrast
-                onClose={() => {
-                  forwardTestMessage = '';
-                }}
-              />
-            {/if}
-            {#if detail.survivorship_bias}
-              <SurvivorshipBiasWarning />
-            {/if}
-            {#if detail.has_split_check_pending}
-              <SplitCheckWarning />
-            {/if}
-            {#if detail.metrics !== null}
-              <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} />
-            {/if}
-            {#if chartView === 'bars' && chartInstrument !== undefined}
-              <div class="chart">
-                <RunBarChart
-                  instrument={chartInstrument}
-                  isUniverseMember={instrument === undefined}
-                  barPeriod={detail.bar_period}
-                  range={{ startUtc: detail.start_utc, endUtc: detail.end_utc, sourceOrder: detail.source_order }}
-                  label="Bar chart of {formatInstrument(chartInstrument)}, {detail.bar_period} bars"
-                  chart={runChart}
-                  runKey={chartKey}
-                  strategyIndicators={detail.strategy_indicators}
-                  records={detail.trades}
-                />
-              </div>
-            {:else if detail.metrics !== null}
-              <div class="chart">
-                <EquityDrawdownChart
-                  curves={[{ name: 'Equity', points: detail.equity_curve, startCapitalUsd: detail.paper_capital_usd }]}
-                  label="Equity and drawdown"
-                  fill
-                />
-              </div>
-            {/if}
-          </Panel>
-        {:else}
-          <Panel
-            {...state}
-            label="Backtest tables"
-            tabs={{
-              label: 'Backtest tables',
-              items: TABLE_TABS,
-              value: selectedTable,
-              onValueChange: (value: string) => {
-                selectedTable = value as BacktestTable;
-              },
-            }}
-          >
-            {#if selectedTable === 'trades'}
-              {#if chartInstrument === undefined}
-                <BacktestTradeTable trades={detail.trades} />
-              {:else}
-                <BacktestTradeTable
-                  trades={detail.trades}
-                  selectedIndex={runChart.readSelectedRow(chartKey)}
-                  onRowPoint={(row: number | null) => {
-                    runChart.pointedRow = row;
-                  }}
-                  onRowSelect={(row: number) => {
-                    selectTradeRow(detail, row);
-                  }}
-                />
-              {/if}
-            {:else if selectedTable === 'instruments'}
-              <UniverseInstrumentTable
-                instruments={detail.instruments}
-                periodHeader={formatPeriodCountHeader(detail)}
-                selectedIndex={chartView === 'bars' && instrument === undefined && chartInstrument !== undefined
-                  ? detail.instruments.findIndex((member) => member.symbol === chartInstrument.symbol && member.exchange === chartInstrument.exchange)
-                  : null}
-                onRowSelect={(row: number) => {
-                  selectInstrumentRow(detail, row);
-                }}
-              />
-            {:else if selectedTable === 'orders'}
-              <EmptyText text="No orders" />
-            {:else if selectedTable === 'metrics'}
-              {#if detail.metrics === null}
-                <EmptyText text="No metrics" />
-              {:else}
-                <BacktestMetricTable metrics={detail.metrics} />
-              {/if}
-            {:else if selectedTable === 'bar-sources'}
-              <BarSourceTable sourceOrder={detail.source_order} barCountBySource={detail.bar_count_by_source} />
-            {:else if detail.error_message === null}
-              <EmptyText text="No logs" />
-            {:else}
-              <ScrollRegion label="Logs" fill>
-                <pre class="atrade-run-log">{detail.error_message}</pre>
-              </ScrollRegion>
-            {/if}
-          </Panel>
+  <RunCenter {workbench} listTitle="Backtests not read" detailTitle="Backtest not read">
+    {#if shownBacktest === null}
+      <div class="atrade-run-empty">
+        {#if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === '' && workbench.detailMessage === ''}
+          <EmptyText text="No backtests" />
         {/if}
-      {/snippet}
-    </PanelSplit>
-  {/if}
+      </div>
+    {:else}
+      {@const detail = shownBacktest}
+      {@const instrument = readBacktestInstrument(detail)}
+      {@const universeLabel = formatUniverseLabel(detail, detail.instruments.length)}
+      {@const chartKey = String(detail.id)}
+      {@const chartInstruments = listChartInstruments(detail)}
+      {@const chartInstrument = runChart.findInstrument(chartKey, chartInstruments)}
+      <PanelSplit storageKey="atrade.backtest-page.panel-split" panels={PANELS}>
+        {#snippet panel(id, state)}
+          {#if id === 'chart'}
+            <Panel {...state} label={`Backtest #${String(detail.id)}`}>
+              {#snippet header()}
+                <span class="atrade-run-status" role="status" aria-label="Backtest status">
+                  <StatusIndicator label={describeBacktestStatus(detail.status)} kind={findBacktestStatusKind(detail.status)} />
+                </span>
+                <h1 class="atrade-run-title">
+                  <span class="atrade-run-number">#{detail.id}</span>
+                  <a class="cds--link" href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(detail.strategy_id), versionNumber: String(detail.version_number) })}
+                    >{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
+                  >
+                  {#if instrument !== undefined}
+                    <!-- eslint-disable-next-line svelte/no-navigation-without-resolve -- createInstrumentHref resolves the path. -->
+                    <a class="cds--link" href={createInstrumentHref(instrument)}>{instrument.symbol}</a>
+                  {:else if universeLabel !== undefined}
+                    <span>{universeLabel}</span>
+                  {/if}
+                  <span class="atrade-run-period">{formatBarPeriod(detail.bar_period)}</span>
+                  {#if detail.sweep_id !== null}
+                    <a class="cds--link" href={resolve('/sweeps/[[sweepId]]', { sweepId: String(detail.sweep_id) })}
+                      >Parameter sweep #{detail.sweep_id}</a
+                    >
+                  {/if}
+                </h1>
+                <span class="atrade-run-actions">
+                  {#if chartInstrument !== undefined}
+                    <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
+                  {/if}
+                  {#if chartView === 'bars' && chartInstrument !== undefined}
+                    {#if instrument === undefined}
+                      <ChartInstrumentSelect
+                        instruments={chartInstruments}
+                        value={chartInstrument}
+                        onValueChange={(selected: BacktestInstrument) => {
+                          runChart.selectInstrument(chartKey, selected);
+                        }}
+                      />
+                    {/if}
+                    <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={detail.strategy_indicators} />
+                  {/if}
+                  <IconButton
+                    label={describeForwardTestButton(detail, instrument)}
+                    icon={ConnectionSignal16}
+                    tone="interactive"
+                    disabled={instrument === undefined || !hasLiveBarPeriod || isStartingForwardTest}
+                    onclick={() => {
+                      if (instrument !== undefined) {
+                        void startForwardTestFromBacktest(detail, instrument);
+                      }
+                    }}
+                  />
+                </span>
+              {/snippet}
+              {#if forwardTestMessage !== ''}
+                <InlineNotification
+                  kind="error"
+                  title="Forward test not started"
+                  subtitle={forwardTestMessage}
+                  lowContrast
+                  onClose={() => {
+                    forwardTestMessage = '';
+                  }}
+                />
+              {/if}
+              {#if detail.survivorship_bias}
+                <SurvivorshipBiasWarning />
+              {/if}
+              {#if detail.has_split_check_pending}
+                <SplitCheckWarning />
+              {/if}
+              {#if detail.metrics !== null}
+                <KeyMetricRow metrics={detail.metrics} startCapitalUsd={detail.paper_capital_usd} />
+              {/if}
+              {#if chartView === 'bars' && chartInstrument !== undefined}
+                <div class="chart">
+                  <RunBarChart
+                    instrument={chartInstrument}
+                    isUniverseMember={instrument === undefined}
+                    barPeriod={detail.bar_period}
+                    range={{ startUtc: detail.start_utc, endUtc: detail.end_utc, sourceOrder: detail.source_order }}
+                    label="Bar chart of {formatInstrument(chartInstrument)}, {detail.bar_period} bars"
+                    chart={runChart}
+                    runKey={chartKey}
+                    strategyIndicators={detail.strategy_indicators}
+                    records={detail.trades}
+                  />
+                </div>
+              {:else if detail.metrics !== null}
+                <div class="chart">
+                  <EquityDrawdownChart
+                    curves={[{ name: 'Equity', points: detail.equity_curve, startCapitalUsd: detail.paper_capital_usd }]}
+                    label="Equity and drawdown"
+                    fill
+                  />
+                </div>
+              {/if}
+            </Panel>
+          {:else}
+            <Panel
+              {...state}
+              label="Backtest tables"
+              tabs={{
+                label: 'Backtest tables',
+                items: TABLE_TABS,
+                value: selectedTable,
+                onValueChange: (value: string) => {
+                  selectedTable = value as BacktestTable;
+                },
+              }}
+            >
+              {#if selectedTable === 'trades'}
+                {#if chartInstrument === undefined}
+                  <BacktestTradeTable trades={detail.trades} />
+                {:else}
+                  <BacktestTradeTable
+                    trades={detail.trades}
+                    selectedIndex={runChart.readSelectedRow(chartKey)}
+                    onRowPoint={(row: number | null) => {
+                      runChart.pointedRow = row;
+                    }}
+                    onRowSelect={(row: number) => {
+                      selectTradeRow(detail, row);
+                    }}
+                  />
+                {/if}
+              {:else if selectedTable === 'instruments'}
+                <UniverseInstrumentTable
+                  instruments={detail.instruments}
+                  periodHeader={formatPeriodCountHeader(detail)}
+                  selectedIndex={chartView === 'bars' && instrument === undefined && chartInstrument !== undefined
+                    ? detail.instruments.findIndex((member) => member.symbol === chartInstrument.symbol && member.exchange === chartInstrument.exchange)
+                    : null}
+                  onRowSelect={(row: number) => {
+                    selectInstrumentRow(detail, row);
+                  }}
+                />
+              {:else if selectedTable === 'orders'}
+                <EmptyText text="No orders" />
+              {:else if selectedTable === 'metrics'}
+                {#if detail.metrics === null}
+                  <EmptyText text="No metrics" />
+                {:else}
+                  <BacktestMetricTable metrics={detail.metrics} />
+                {/if}
+              {:else if selectedTable === 'bar-sources'}
+                <BarSourceTable sourceOrder={detail.source_order} barCountBySource={detail.bar_count_by_source} />
+              {:else if detail.error_message === null}
+                <EmptyText text="No logs" />
+              {:else}
+                <ScrollRegion label="Logs" fill>
+                  <pre class="atrade-run-log">{detail.error_message}</pre>
+                </ScrollRegion>
+              {/if}
+            </Panel>
+          {/if}
+        {/snippet}
+      </PanelSplit>
+    {/if}
+  </RunCenter>
 
   <AssistantColumn />
 </Workbench>

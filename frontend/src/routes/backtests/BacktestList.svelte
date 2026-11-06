@@ -37,7 +37,8 @@
   interface Props {
     backtests: Backtest[];
     /** The read error of the list, or an empty text. */
-    errorMessage: string;
+    /** A list that the page does not show with RunCenter: the reason replaces the rows. */
+    errorMessage?: string;
     openBacktestId: number | null;
     /** The compared backtests of a comparison page: their rows have the open row color too. */
     comparedBacktestIds?: readonly number[];
@@ -45,7 +46,7 @@
     onDeleted?: (backtestIds: number[]) => void;
   }
 
-  const { backtests, errorMessage, openBacktestId, comparedBacktestIds = [], onDeleted }: Props = $props();
+  const { backtests, errorMessage = '', openBacktestId, comparedBacktestIds = [], onDeleted }: Props = $props();
 
   const COMPARED_BACKTEST_COUNT = 2;
   const COLUMNS: TableColumn[] = [

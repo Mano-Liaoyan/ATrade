@@ -476,6 +476,9 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
 - `routes/run_workbench.svelte.ts` (`RunWorkbench`) holds the state of the
   backtest, forward test, and parameter sweep pages: the list, the navigation
   to the newest run, the read of the open run, and the New dialog.
+- `routes/RunCenter.svelte` is the center area of these 3 pages. When a read
+  of the list or of the open run fails, it shows the reason above the content.
+  The rows and the numbers of the last read stay.
 - While a button action runs, the button is disabled and its text says why,
   for example "Saving…", "Creating…", or "Starting…".
 - UI rule: a status icon stands alone, with no word next to it, before the

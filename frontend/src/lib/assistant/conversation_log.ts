@@ -164,7 +164,16 @@ function endStreaming(log: ConversationLog): ConversationLog {
 
 /** Ends the run. A closed socket sends no `settled` message, and `web` stops the run on the close (25.10). */
 export function endRun(log: ConversationLog): ConversationLog {
-  return { ...endStreaming(log), isRunning: false };
+  const ended = endStreaming(log);
+  return { ...ended, items: ended.items.map(endToolStep), isRunning: false };
+}
+
+/** describeToolStep reads `backtestStatus` first. The backtest can go on, so its state is not "failed". */
+function endToolStep(item: LogItem): LogItem {
+  if (item.kind !== 'tool_step' || item.status !== 'running') {
+    return item;
+  }
+  return { ...item, status: 'failed', backtestStatus: item.backtestStatus === null ? null : 'interrupted' };
 }
 
 function addToolStep(log: ConversationLog, message: Schemas['ToolStepMessage'], sentAtUtc: string): ConversationLog {
