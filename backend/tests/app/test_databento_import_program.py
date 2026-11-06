@@ -188,17 +188,17 @@ def test_the_program_prints_the_cost_of_the_hourly_bars_of_each_universe_quarter
     assert "The hourly bars of 2 quarters cost 0.04 USD." in caplog.text
 
 
-def test_a_symbol_link_that_waits_adds_no_old_symbol_to_the_hourly_purchase(database_url: str) -> None:
-    insert_member(database_url, date(2020, 1, 2), 1, nasdaq("META"))
+def test_a_rename_from_2024_07_01_adds_no_old_symbol_to_the_hourly_purchase(database_url: str) -> None:
+    insert_member(database_url, date(2024, 7, 1), 1, nasdaq("XYZ"))
     with psycopg.connect(database_url, autocommit=True) as connection:
         connection.execute(
             """
-            INSERT INTO databento_symbol_link (old_symbol, new_symbol, exchange, change_day, state)
-            VALUES ('FB', 'META', 'NASDAQ', '2020-03-02', 'waiting')
+            INSERT INTO databento_symbol_link (old_symbol, new_symbol, exchange, change_day)
+            VALUES ('SQ', 'XYZ', 'NASDAQ', '2024-08-01')
             """
         )
     client = FakeDatabentoClient()
 
-    log_hourly_costs(database_url=database_url, client=client, end_day=date(2020, 5, 15))
+    log_hourly_costs(database_url=database_url, client=client, end_day=date(2024, 11, 15))
 
-    assert client.hourly_cost_requests == [(["META"], date(2020, 1, 2), date(2020, 4, 1))]
+    assert client.hourly_cost_requests == [(["XYZ"], date(2024, 7, 1), date(2024, 10, 1))]

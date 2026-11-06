@@ -143,7 +143,6 @@ SELECT_SYMBOLS_WITHOUT_LISTING_EXCHANGE: LiteralString = (
     + """
     SELECT DISTINCT symbol FROM summary
     WHERE symbol NOT IN (SELECT symbol FROM summary_listing)
-        AND symbol NOT IN (SELECT old_symbol FROM databento_symbol_link)
     ORDER BY symbol
     """
 )
@@ -165,12 +164,11 @@ SAVE_IMPORT_BARS: LiteralString = (
 
 # Symbol change links (section 8.8.4): the last day of the old symbol and the first day of the new symbol are adjacent
 # trading days, the last close and the first open differ by 1% or less, and the listing exchange is the same. A symbol
-# with more than 1 candidate gets no link. A candidate has proof when both listing exchanges come from the statistics
-# (before 2024-07-01: an EQUS.SUMMARY exchange is a copy of the old symbol), the open is not near 10 USD (many SPACs and
-# IPOs open there), and the first volume is within 3 times of the last volume. Without proof, the link waits for the
-# user check. `state` is the state of a link that an earlier import recorded. A rejected link stays rejected. A new
-# symbol with a saved bar before its first bar of this import is a reused ticker or an old instrument: it gets no new
-# link, so 2 histories do not merge.
+# with more than 1 candidate gets no link. From 2024-07-01 an EQUS.SUMMARY exchange is a copy of the old symbol, so a
+# link only records a rename for the user to read and `is_moved` is false. Before that day a new link needs proof: the
+# open is not near 10 USD (many SPACs and IPOs open there), and the first volume is within 3 times of the last volume.
+# A link that an earlier import recorded applies again. A new symbol with a saved bar before its first bar of this
+# import is a reused ticker or an old instrument: it gets no new link, so 2 histories do not merge.
 SELECT_SYMBOL_LINKS: LiteralString = """
     WITH trading_day AS (
         SELECT start_utc, lead(start_utc) OVER (ORDER BY start_utc) AS next_start_utc
@@ -184,8 +182,8 @@ SELECT_SYMBOL_LINKS: LiteralString = """
     ), candidate AS (
         SELECT last_bar.symbol AS old_symbol, first_bar.symbol AS new_symbol, last_bar.exchange,
             first_bar.start_utc AS change_start_utc,
-            first_bar.start_utc < TIMESTAMPTZ '2024-07-01 00:00:00+00'
-                AND first_bar.open NOT BETWEEN 9.5 AND 10.5
+            first_bar.start_utc < TIMESTAMPTZ '2024-07-01 00:00:00+00' AS is_moved,
+            first_bar.open NOT BETWEEN 9.5 AND 10.5
                 AND first_bar.volume BETWEEN last_bar.volume / 3 AND last_bar.volume * 3 AS is_proved
         FROM last_bar
             JOIN trading_day ON trading_day.start_utc = last_bar.start_utc
@@ -194,26 +192,24 @@ SELECT_SYMBOL_LINKS: LiteralString = """
         WHERE first_bar.symbol <> last_bar.symbol AND last_bar.close > 0
             AND abs(first_bar.open / last_bar.close - 1) <= 0.01
     )
-    SELECT candidate.old_symbol, candidate.new_symbol, candidate.exchange, candidate.change_start_utc,
-        candidate.is_proved, link.state
+    SELECT candidate.old_symbol, candidate.new_symbol, candidate.exchange, candidate.change_start_utc, candidate.is_moved
     FROM candidate
         LEFT JOIN databento_symbol_link AS link ON link.old_symbol = candidate.old_symbol
             AND link.new_symbol = candidate.new_symbol AND link.exchange = candidate.exchange
             AND link.change_day = (candidate.change_start_utc AT TIME ZONE 'UTC')::date
     WHERE candidate.old_symbol NOT IN (SELECT old_symbol FROM candidate GROUP BY old_symbol HAVING count(*) > 1)
         AND candidate.new_symbol NOT IN (SELECT new_symbol FROM candidate GROUP BY new_symbol HAVING count(*) > 1)
-        AND link.state IS DISTINCT FROM 'rejected'
-        AND (link.state IS NOT NULL OR NOT EXISTS (
+        AND (link.id IS NOT NULL OR ((candidate.is_proved OR NOT candidate.is_moved) AND NOT EXISTS (
             SELECT FROM databento_bar AS older_bar
             WHERE older_bar.symbol = candidate.new_symbol AND older_bar.exchange = candidate.exchange
                 AND older_bar.start_utc < candidate.change_start_utc
-        ))
+        )))
     ORDER BY candidate.change_start_utc, candidate.old_symbol
 """
 
 INSERT_SYMBOL_LINK: LiteralString = """
-    INSERT INTO databento_symbol_link (old_symbol, new_symbol, exchange, change_day, state)
-    VALUES (%(old_symbol)s, %(new_symbol)s, %(exchange)s, %(change_day)s, %(state)s)
+    INSERT INTO databento_symbol_link (old_symbol, new_symbol, exchange, change_day)
+    VALUES (%(old_symbol)s, %(new_symbol)s, %(exchange)s, %(change_day)s)
     ON CONFLICT (old_symbol, new_symbol, exchange, change_day) DO NOTHING
 """
 
@@ -222,46 +218,6 @@ MOVE_TO_NEW_SYMBOL: LiteralString = """
     UPDATE databento_import_bar SET symbol = %(new_symbol)s
     WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s AND start_utc < %(change_start_utc)s
 """
-
-# A link can follow an earlier import: the rows that this import did not read go to the new symbol too. A saved bar or
-# a stock split of the new symbol on the same day stays. The daily bar summary of the new symbol comes from the save of
-# the import. A saved quarter gets the new symbol, so its member keeps its bars. A quarter that has both symbols keeps
-# both rows.
-MOVE_SAVED_ROWS_TO_NEW_SYMBOL: tuple[LiteralString, ...] = (
-    """
-    UPDATE databento_bar AS old_bar SET symbol = %(new_symbol)s
-    WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s AND start_utc < %(change_start_utc)s
-        AND NOT EXISTS (
-            SELECT FROM databento_bar AS new_bar
-            WHERE new_bar.symbol = %(new_symbol)s AND new_bar.exchange = old_bar.exchange
-                AND new_bar.currency = old_bar.currency AND new_bar.bar_period = old_bar.bar_period
-                AND new_bar.start_utc = old_bar.start_utc
-        )
-    """,
-    """
-    UPDATE databento_bar_saved_range SET symbol = %(new_symbol)s
-    WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s
-    """,
-    """
-    UPDATE stock_split AS old_split SET symbol = %(new_symbol)s
-    WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s AND ex_date_utc < %(change_start_utc)s
-        AND NOT EXISTS (
-            SELECT FROM stock_split AS new_split
-            WHERE new_split.symbol = %(new_symbol)s AND new_split.exchange = old_split.exchange
-                AND new_split.currency = old_split.currency AND new_split.ex_date_utc = old_split.ex_date_utc
-        )
-    """,
-    "DELETE FROM daily_bar_summary WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s",
-    """
-    UPDATE us_universe_member AS old_member SET symbol = %(new_symbol)s
-    WHERE symbol = %(old_symbol)s AND exchange = %(exchange)s
-        AND NOT EXISTS (
-            SELECT FROM us_universe_member AS new_member
-            WHERE new_member.quarter_start_utc = old_member.quarter_start_utc AND new_member.symbol = %(new_symbol)s
-                AND new_member.exchange = old_member.exchange AND new_member.currency = old_member.currency
-        )
-    """,
-)
 
 SELECT_LAST_IMPORT_DAY: LiteralString = "SELECT max(start_utc) FROM databento_import_bar"
 

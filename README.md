@@ -388,15 +388,15 @@ the detection rule):
 # List the stock splits that wait for the check and the symbol links that are not checked.
 docker compose --file deploy/compose.yaml --env-file .env run --rm web \
   python -m atrade.app.databento_check
-# Confirm all of them. Reject each wrong stock split and each wrong waiting symbol link by its ID.
+# Confirm all of them. Reject each wrong stock split by its ID.
 docker compose --file deploy/compose.yaml --env-file .env run --rm web \
-  python -m atrade.app.databento_check --accept --reject-split <ID> --reject-link <ID>
+  python -m atrade.app.databento_check --accept --reject-split <ID>
 ```
 
-A confirmed stock split changes the stored bars before its ex-date. A symbol
-link that waits moves the saved history of the old symbol only when you accept
-it. A rejected stock split or symbol link changes nothing, and the next import
-keeps it rejected.
+A confirmed stock split changes the stored bars before its ex-date. A rejected
+stock split changes nothing, and the next import keeps it rejected. The check
+moves no bar of a symbol link. A rename from 2024-07-01 is a new listing with
+its own bars, and the list shows it for you to read.
 
 Buy the hourly bars after the first import
 (`docs/architecture/market_data.md` section 8.8.1). They do not wait for the

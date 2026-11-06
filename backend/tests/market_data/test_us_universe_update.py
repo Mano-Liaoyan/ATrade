@@ -79,7 +79,7 @@ async def test_the_update_at_06_00_et_downloads_the_100_days_to_the_last_ranking
 
 
 @pytest.mark.anyio
-async def test_a_rename_in_the_window_moves_no_bar_in_the_update_and_the_update_logs_the_waiting_link(
+async def test_a_rename_in_the_window_moves_no_bar_and_the_update_logs_it(
     database_url: str, clock: FixedClock, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     insert_daily_bars(database_url, nasdaq("SQ"), [date(2024, 9, 13)], "1", 1)
@@ -93,7 +93,7 @@ async def test_a_rename_in_the_window_moves_no_bar_in_the_update_and_the_update_
         create_update(database_url, clock, client, tmp_path).update_if_due()
 
     assert [symbol for _, symbol, _ in await read_ranked_symbols(database_url)] == ["XYZ", "SQ"]
-    assert "SQ to XYZ (waits: its bars did not move)" in caplog.text
+    assert "SQ to XYZ (a new listing: no bar moved)" in caplog.text
 
 
 @pytest.mark.anyio

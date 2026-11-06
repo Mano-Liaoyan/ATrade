@@ -807,48 +807,48 @@ daily close of each instrument and day. Primary key `symbol`, `exchange`,
   2. The last close of the old symbol and the first open of the new symbol
      differ by 1% or less.
   3. The listing exchange is the same.
-- A wrong move has no undo, so a link moves bars only with proof. All these
-  conditions must be true:
+- A move has no undo, so a link moves bars only before 2024-07-01 and only
+  with proof. All these conditions must be true:
   - The new symbol starts before 2024-07-01. Thus both listing exchanges come
     from the statistics.
   - The first open of the new symbol is not from 9.50 to 10.50 USD. A delisted
     SPAC and a new IPO are both near 10 USD.
   - The first volume of the new symbol is within 3 times of the last volume
     of the old symbol.
+- Before 2024-07-01, a candidate without proof gets no link. The 2 symbols
+  stay 2 instruments.
 - A new symbol with a saved bar before its first bar of the import gets no
   new link. It is a reused ticker or an old instrument, and a move would merge
   2 histories. A second import of a recorded link still applies that link.
-- A link with proof has the state `moved`. The import saves all history of a
-  linked old symbol under the new symbol, the same as IBKR does. This
-  includes the bars, saved ranges, stock splits, and universe members that
-  an earlier import or update saved. A quarter that has both symbols keeps
-  both rows. A stock split of the new symbol on the same day stays, and the
-  stock split of the old symbol keeps its symbol. The old symbol loses its daily bar summary.
-- A link without proof has the state `waiting`. It moves no bar. The 2 symbols
-  stay 2 instruments until the user check. `--accept` of
-  `app/databento_check.py` moves the saved rows of all waiting links.
-  `--reject-link <ID>` gives one link the state `rejected`. A later import
-  does not list a rejected link and moves no bar for it.
-- In the EQUS.SUMMARY period, a new symbol has no earlier bar and thus no
-  listing exchange (section 8.14). When conditions 1 and 2 are true for one
-  old symbol that has a listing exchange, the new symbol gets that exchange.
-  This exchange is a copy, not a proof of condition 3, so each link in this
-  period waits for the user check. A new symbol of a rejected link keeps the
-  copied exchange.
+- A link before 2024-07-01 saves all history of the old symbol in the import
+  under the new symbol, the same as IBKR does. The bars and stock splits that
+  an earlier import saved do not move.
+- In the EQUS.SUMMARY period (from 2024-07-01), a new symbol has no earlier
+  bar and thus no listing exchange (section 8.14). When conditions 1 and 2
+  are true for one old symbol that has a listing exchange, the new symbol gets
+  that exchange. This exchange is a copy, not a proof of condition 3, so no bar
+  moves. The new symbol is a new listing with its own bars, and the old bars
+  stay under the old symbol.
+- Limit: rank history restarts at a rename in the EQUS.SUMMARY period. The new
+  symbol has no history before the rename, so the universe ranking sees a new
+  listing.
+- A saved quarter that has the old symbol keeps it. The stopped member sells
+  at its last bar by the existing path for a member that stops trading.
 - The import writes each link to `databento_symbol_link`: `old_symbol`,
-  `new_symbol`, `exchange`, `change_day`, `state`, `checked_at_utc` (empty
-  until the user checks it). `(old_symbol, new_symbol, exchange, change_day)`
-  is unique. Migration `e6c1f3a8d247` adds `state`. The earlier links have the
-  state `moved`: the migration does not check them again.
+  `new_symbol`, `exchange`, `change_day`, `checked_at_utc` (empty until the
+  user checks it). `(old_symbol, new_symbol, exchange, change_day)` is unique.
+  A row with `change_day` from 2024-07-01 only records a rename for the user:
+  no bar moved. The quarterly update log and the check program show these
+  renames. An earlier link stays with its moved bars.
 - Adjacent trading days: no day of the import with a bar of any symbol is
   between the 2 days. A symbol with more than 1 candidate link gets no link.
   Links of 2 changes in a row go in the order of their change days, so the
   history ends under the last symbol.
 - The import links the symbols before it finds the stock splits, so the
   stock splits use the full history under the new symbol.
-- The user checks all detected links one time.
-- Thus a backtest does not see a symbol change as a stop of trading. The
-  new symbol has the history that the universe ranking needs.
+- The user checks all detected links one time. The check moves no bar.
+- Thus a backtest does not see a symbol change before 2024-07-01 as a stop of
+  trading. The new symbol has the history that the universe ranking needs.
 
 ## 8.9 Quarterly US universe
 
@@ -945,8 +945,8 @@ Quarterly update in the `forward-test` worker:
   day (a gap in `databento_bar`), and saves nothing.
 - The members and the ranks of a saved quarter do not change. The history
   calculation adds only the quarters without members, so a quarter that the
-  update calculated with the earlier window keeps it. Only a symbol link
-  changes a saved symbol (section 8.8.4).
+  update calculated with the earlier window keeps it. A symbol link does not
+  change a saved symbol (section 8.8.4).
 
 ## 8.10 HK instrument list
 
@@ -1213,12 +1213,12 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   stays with `import_rejected`, so the next import does not find it again,
   and the bars do not change.
 - Decided (#191, changed by #324): the import saves the bars before the
-  check. It applies the symbol links with proof at once. The stock splits of
-  the IBKR stock split check change the bars when the check finds them. The
-  stock splits of the detection rule and the waiting symbol links change the
-  bars only after the user check.
-- Not done (#191): a command that undoes a symbol link in the state `moved`.
-  The import log and the check list show each link.
+  check. It applies the symbol links before 2024-07-01 at once. The stock
+  splits of the IBKR stock split check change the bars when the check finds
+  them. The stock splits of the detection rule change the bars only after the
+  user check.
+- Not done (#191): a command that undoes a symbol link that moved bars. The
+  import log and the check list show each link.
 - Decided (#191): symbol reuse (a different company uses the symbol later)
   is not detected. The bars of both companies are under the same
   instrument. The link rule does not link them, because the new symbol has
@@ -1231,8 +1231,10 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
 - Decided (#190, changed for renames): the listing exchange of an
   EQUS.SUMMARY bar is the exchange of the latest earlier Databento daily bar
   of the same symbol. A renamed symbol has the exchange of its old symbol
-  (section 8.8.4), because a rename without bars loses data. Another symbol
-  without an earlier bar gets no bar, and the import names it.
+  (section 8.8.4), because a rename without bars loses data. It is a new
+  listing with its own bars: no bar moves, and rank history restarts at the
+  rename. Another symbol without an earlier bar gets no bar, and the import
+  names it.
 - Decided (#190): the trading day of an official open or close is the New
   York date of its `ts_event`. The import uses the latest new value
   (`update_action` 1) of each day.

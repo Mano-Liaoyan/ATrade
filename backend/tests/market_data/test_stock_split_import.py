@@ -359,7 +359,7 @@ RENAME_IN_SUMMARY = create_summary_file(
 
 
 @pytest.mark.anyio
-async def test_a_symbol_renamed_in_the_equs_summary_period_gets_its_bars_and_after_the_check_the_saved_history(
+async def test_a_symbol_renamed_in_the_equs_summary_period_is_a_new_listing_and_the_check_moves_no_bar(
     database_url: str, tmp_path: Path, gateway: FakeGatewayConnection
 ) -> None:
     history = create_history_files(create_bars("SQ", TRADING_DAYS[:2], [("100", "100", 1000)] * 2))
@@ -371,15 +371,21 @@ async def test_a_symbol_renamed_in_the_equs_summary_period_gets_its_bars_and_aft
     second_report = import_databento_files(database_url=database_url, file_paths=summary_path)
 
     assert read_table(database_url, SYMBOL_LINK_QUERY) == [("SQ", "XYZ", "NASDAQ", SUMMARY_DAYS[2], CHECKED_AT_UTC)]
+    assert [link.is_moved for link in report.symbol_links] == [False]
     assert report.symbols_without_listing_exchange == []
     assert second_report.symbols_without_listing_exchange == []
     assert [bar.start_utc.date() for bar in await read_bars(database_url, "XYZ", end=date(2025, 12, 31))] == [
-        *TRADING_DAYS[:2],
-        *SUMMARY_DAYS[:4],
+        *SUMMARY_DAYS[2:4],
     ]
-    assert await read_bars(database_url, "SQ", end=date(2025, 12, 31)) == []
-    assert read_table(database_url, "SELECT DISTINCT symbol FROM databento_bar_saved_range") == [("XYZ",)]
-    assert read_table(database_url, "SELECT symbol FROM daily_bar_summary") == [("XYZ",)]
+    assert [bar.start_utc.date() for bar in await read_bars(database_url, "SQ", end=date(2025, 12, 31))] == [
+        *TRADING_DAYS[:2],
+        *SUMMARY_DAYS[:2],
+    ]
+    assert read_table(database_url, "SELECT DISTINCT symbol FROM databento_bar_saved_range ORDER BY symbol") == [
+        ("SQ",),
+        ("XYZ",),
+    ]
+    assert read_table(database_url, "SELECT symbol FROM daily_bar_summary ORDER BY symbol") == [("SQ",), ("XYZ",)]
 
 
 def test_a_new_symbol_with_2_possible_old_symbols_stays_without_a_listing_exchange(

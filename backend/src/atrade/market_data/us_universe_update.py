@@ -110,7 +110,7 @@ class UsUniverseUpdate:
 
     def log_import(self, report: DatabentoImportReport) -> None:
         links = ", ".join(
-            f"{link.old_symbol} to {link.new_symbol}{'' if link.is_moved else ' (waits: its bars did not move)'}"
+            f"{link.old_symbol} to {link.new_symbol}{'' if link.is_moved else ' (a new listing: no bar moved)'}"
             for link in report.symbol_links
         )
         logger.info(
