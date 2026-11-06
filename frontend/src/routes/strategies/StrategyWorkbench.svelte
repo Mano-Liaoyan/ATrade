@@ -336,10 +336,11 @@
   }
 
   // The draft clears after the reload: text typed during the save goes to the draft of the saved version. A save of
-  // unchanged code keeps the version, so its draft stays.
+  // unchanged code keeps the version, so its draft stays. A failed reload also keeps the draft: it holds the typed text.
   async function openSavedCode(id: number, versionNumber: number, baseVersionNumber: number, sentCode: string): Promise<void> {
     await openStrategy.reload(fetch, id, versionNumber, sentCode);
-    if (versionNumber !== baseVersionNumber) {
+    const opened = openStrategy.version;
+    if (opened?.strategy_id === id && opened.version_number === versionNumber && versionNumber !== baseVersionNumber) {
       clearDraft({ strategyId: id, versionNumber: baseVersionNumber });
     }
   }

@@ -230,6 +230,27 @@ test('disables the version list during a save', async ({ page }, currentTest) =>
   await expect(page.getByRole('combobox', { name: 'Version' })).toBeEnabled();
 });
 
+test('keeps the text typed during a save when the new version does not open', async ({ page }, currentTest) => {
+  const name = createUniqueName(currentTest, 'Typed');
+  await createStrategy(page, name);
+  await replaceCode(page, VALID_CODE);
+  const finishSave = await holdSave(page);
+  await page.route('**/api/strategies/*/versions/*', (route) => route.fulfill({ status: 500, json: { detail: 'Read failed' } }));
+
+  await page.getByRole('button', { name: 'Save version' }).click();
+  await expect(page.getByRole('button', { name: 'Saving version…' })).toBeVisible();
+  await replaceCode(page, `${VALID_CODE}# typed during the save\n`);
+  finishSave();
+  await expectOutputLine(page, `Saved as ${name} v2.`);
+  await page.unrouteAll();
+  await page.reload();
+
+  await expect(page.getByRole('combobox', { name: 'Version' })).toHaveText('v2');
+  await page.getByRole('combobox', { name: 'Version' }).click();
+  await page.getByRole('option', { name: 'v1' }).click();
+  await expect(page.getByRole('textbox', { name: 'Strategy code' })).toContainText('# typed during the save');
+});
+
 test('keeps unsaved edits in the browser after a reload', async ({ page }, currentTest) => {
   const name = createUniqueName(currentTest, 'Draft');
   await createStrategy(page, name);
