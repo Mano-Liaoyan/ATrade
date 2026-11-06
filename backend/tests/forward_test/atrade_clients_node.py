@@ -77,6 +77,9 @@ class BuyOnceStrategy(Strategy):
         balance = None if account is None else account.balance_total()
         return None if balance is None else balance.as_decimal()
 
+    def count_open_orders(self) -> int:
+        return self.cache.orders_open_count(strategy_id=self.strategy_id)  # pyright: ignore[reportUnknownMemberType]
+
     def on_start(self) -> None:
         self.positions_at_start = self.own_positions()
         self.subscribe_bars(DAY_BAR_TYPE)  # pyright: ignore[reportUnknownMemberType]
@@ -149,6 +152,7 @@ def build_node[LedgerT: OwnerLedger](
             instruments=(APPLE,),
             fill_check_interval_seconds=POLL_SECONDS,
             reconnect_interval_seconds=POLL_SECONDS,
+            open_order_check_interval_seconds=POLL_SECONDS,
         ),
         world.ledger,
         world.gateway,

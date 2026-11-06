@@ -1192,6 +1192,12 @@ Execution client (`OwnerLedgerExecutionClient`,
   price precision of the instrument in the NautilusTrader cache: the IB data
   client loads IB instruments (#215).
 - Each order adds 1 PostgreSQL query. The time is not measured.
+- Each 60 s, it compares the sent orders with the open orders of its client
+  ID. It reads the open orders first and the executions after them, also the
+  held fills. The strategy gets `OrderCanceled` for an open order that IBKR
+  no longer has and that has no unsaved fill, so the strategy does not wait
+  for an order that IBKR ended, for example a day order at the market close.
+  An order that is younger than 60 s waits for the next check.
 - It sends only market and limit orders. A stop order gets `OrderDenied`, and
   `submit_order_list` reaches no IBKR order. So `POST /api/forward-tests`
   refuses code with such a call with an AST check. A backtest runs this code.

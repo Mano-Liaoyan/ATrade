@@ -8,6 +8,8 @@ and keeps its fills in the owner ledger (docs/architecture/forward_test.md secti
   sends a fill for each new execution (execId) of an order that it sent in this run. It reads them once more at the
   stop. A failed save is tried again at the next read. The child saves all other fills after each cancel step
   (section 12.6).
+- IBKR can end an order without a fill, for example a day order at the market close. The client compares its sent
+  orders with the open orders every `open_order_check_interval_seconds` and sends a cancel for each ended order.
 - ib_async does not connect again by itself. The fill check connects again after a socket loss, for example at the
   daily IB Gateway restart, and then reads the fills of the gap (section 12.7).
 - Reconciliation reports the owner positions and the owner cash, not the account positions and the account cash.
@@ -71,6 +73,7 @@ OWNER_LEDGER_EXECUTION_CLIENT_NAME = "ATRADE_OWNER_LEDGER"
 ACCOUNT_CURRENCY = "USD"
 DEFAULT_FILL_CHECK_INTERVAL_SECONDS = 1.0
 DEFAULT_RECONNECT_INTERVAL_SECONDS = 10.0
+DEFAULT_OPEN_ORDER_CHECK_INTERVAL_SECONDS = 60.0
 NANOSECONDS_PER_SECOND = 1_000_000_000
 ORDER_TYPES: dict[OrderType, IbkrOrderType] = {OrderType.MARKET: "MKT", OrderType.LIMIT: "LMT"}
 TIMES_IN_FORCE: dict[TimeInForce, IbkrTimeInForce] = {TimeInForce.DAY: "DAY", TimeInForce.GTC: "GTC"}
@@ -94,7 +97,7 @@ class OrderGateway(Protocol):
 
     async def read_own_open_orders(self) -> list[OpenOrder]: ...
 
-    async def read_executions(self) -> list[Execution]: ...
+    async def read_executions(self, *, include_held: bool = False) -> list[Execution]: ...
 
     def disconnect(self) -> None: ...
 
@@ -108,6 +111,7 @@ class OwnerLedgerInput:
     instruments: tuple[Instrument, ...]
     fill_check_interval_seconds: float = DEFAULT_FILL_CHECK_INTERVAL_SECONDS
     reconnect_interval_seconds: float = DEFAULT_RECONNECT_INTERVAL_SECONDS
+    open_order_check_interval_seconds: float = DEFAULT_OPEN_ORDER_CHECK_INTERVAL_SECONDS
 
 
 @dataclass
@@ -118,6 +122,8 @@ class SentOrder:
     order_ref: str
     # The execIds of the executions that are in the owner ledger.
     saved_execution_ids: set[str]
+    # The loop time of the send.
+    sent_at: float
 
 
 def create_quantity(value: Decimal) -> Quantity:
@@ -161,6 +167,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
         self.sent_orders: dict[int, SentOrder] = {}
         self.fill_check_task: asyncio.Task[None] | None = None
         self.next_reconnect_at = 0.0
+        self.next_open_order_check_at = 0.0
 
     def add_instruments(self, instruments: tuple[Instrument, ...]) -> None:
         """The new members of a quarter of a multi-instrument forward test (section 12.17)."""
@@ -203,6 +210,7 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             await asyncio.sleep(self.ledger_input.fill_check_interval_seconds)
             await self.reconnect_after_socket_loss()
             await self.read_new_fills()
+            await self.check_open_orders()
 
     async def reconnect_after_socket_loss(self) -> None:
         """Only for a lost socket: a Gateway without its IBKR link keeps the socket (status "no_ibkr_connection")."""
@@ -223,6 +231,42 @@ class OwnerLedgerExecutionClient(ExecutionClient):
             return
         except Exception:
             logger.exception("Forward test %s could not save a fill", self.ledger_input.forward_test_id)
+
+    async def check_open_orders(self) -> None:
+        """A failed read does not stop the fill check. The next interval reads again."""
+        now = asyncio.get_running_loop().time()
+        if now < self.next_open_order_check_at or self.gateway.read_status() != "connected":
+            return
+        self.next_open_order_check_at = now + self.ledger_input.open_order_check_interval_seconds
+        try:
+            await self.cancel_ended_orders(now)
+        except GatewayRequestError:
+            return
+        except Exception:
+            logger.exception("Forward test %s could not check its open orders", self.ledger_input.forward_test_id)
+
+    async def cancel_ended_orders(self, now: float) -> None:
+        """Sends a cancel for each open order of this run that IBKR no longer has and that has no unsaved fill.
+
+        The executions come after the open orders, so they hold each fill of an order that left the open orders, also
+        a held fill. An order of the last interval can be missing from the answer, so it waits for the next check.
+        """
+        open_order_ids = {order.order_id for order in await self.gateway.read_own_open_orders()}
+        executions = await self.gateway.read_executions(include_held=True)
+        unsaved_order_ids = {
+            execution.order_id
+            for execution in executions
+            if execution.order_id in self.sent_orders
+            and execution.client_id == self.ledger_input.client_id
+            and execution.execution_id not in self.sent_orders[execution.order_id].saved_execution_ids
+        }
+        oldest_sent_at = now - self.ledger_input.open_order_check_interval_seconds
+        for order_id, sent_order in self.sent_orders.items():
+            if order_id in open_order_ids or order_id in unsaved_order_ids or sent_order.sent_at > oldest_sent_at:
+                continue
+            order = self.cache.order(ClientOrderId(sent_order.order_ref))
+            if order is not None and order.is_open:
+                self.generate_order_canceled(order, VenueOrderId(str(order_id)), self.clock.timestamp_ns())
 
     async def send_new_fills(self, executions: list[Execution]) -> None:
         for execution in executions:
@@ -304,7 +348,8 @@ class OwnerLedgerExecutionClient(ExecutionClient):
         except GatewayRequestError as error:
             self.generate_order_rejected(order, str(error), self.clock.timestamp_ns(), False)
             return
-        self.sent_orders[order_id] = SentOrder(order, instrument, side, order_ref, set())
+        sent_at = asyncio.get_running_loop().time()
+        self.sent_orders[order_id] = SentOrder(order, instrument, side, order_ref, set(), sent_at)
         self.generate_order_accepted(order, VenueOrderId(str(order_id)), self.clock.timestamp_ns())
 
     @override

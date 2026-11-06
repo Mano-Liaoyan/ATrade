@@ -6,6 +6,7 @@ the strategy position. Then a stock split changes the owner position, and a rest
 """
 
 import asyncio
+from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 
@@ -236,6 +237,42 @@ async def test_two_equal_partial_fills_of_one_order_both_go_into_the_owner_ledge
 
     assert world.ledger.read_quantity(FORWARD_TEST_ID, APPLE) == BUY_QUANTITY
     assert strategy.positions_at_stop == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))]
+
+
+@pytest.mark.anyio
+async def test_an_order_that_ibkr_ends_without_a_fill_is_no_longer_open(database_url: str) -> None:
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        await wait_until(lambda: strategy.count_open_orders() == 1)
+        world.gateway.open_orders.clear()
+        await wait_until(lambda: strategy.count_open_orders() == 0)
+
+    assert world.ledger.fills == []
+
+
+@pytest.mark.anyio
+async def test_a_held_fill_of_an_order_that_left_the_open_orders_does_not_cancel_the_order(database_url: str) -> None:
+    """A fill stays out of the fill read until its commission report comes. The open orders no longer show the order."""
+    world = make_world(database_url)
+
+    strategy = make_strategy(claims_external_orders=True)
+    async with run_node(world, strategy, 1) as data_factory:
+        await send_today_bar(world, data_factory, "100")
+        await wait_until(lambda: bool(world.gateway.open_orders))
+        await wait_until(lambda: strategy.count_open_orders() == 1)
+        open_order = world.gateway.open_orders.pop()
+        execution = make_execution(
+            ACCOUNT_ID, order_id=open_order.order_id, quantity="10", price=FILL_PRICE, client_id=CLIENT_ID
+        )
+        world.gateway.executions.append(replace(execution, is_held=True))
+        await asyncio.sleep(POLL_SECONDS * 5)
+        assert strategy.count_open_orders() == 1
+        world.gateway.executions[0] = execution
+        await wait_until(lambda: strategy.own_positions() == [(Decimal(BUY_QUANTITY), Decimal(FILL_PRICE))])
 
 
 @pytest.mark.anyio
