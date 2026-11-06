@@ -41,6 +41,11 @@ Until Phase 3 is done, the rules marked "until Phase 3" stay in force.
   1 user `Strategy`, and 1 client ID.
 - Input: a strategy version, 1 instrument, 1 bar type, and an optional end
   time. The start time is always "now".
+- The instruments must be in USD. The cash of a forward test is in USD, and
+  the strategy and the equity read prices in the instrument currency. A forward
+  test has no exchange rates, so another currency gives wrong order sizes and a
+  wrong equity. `POST /api/forward-tests` refuses another currency with `422`,
+  also for one member of a `rule` or `list` universe (section 12.13).
 - Without an end time, the forward test runs until the user stops it.
 - The end time is a date and a time. The browser shows it in the local time
   zone. The database stores UTC. The end time cannot change while the forward
@@ -496,8 +501,9 @@ Phase 3 changes (#146, #149):
     is `start_balance_usd`. `422` without a start balance, for each
     refusal of `check_backtest_request` (an empty period), and for an
     instrument that is not in USD: a forward test has no exchange rates, so
-    its values are in the instrument currency and would not compare with a
-    backtest in USD (`backtest.md` section 10.8). The
+    an old forward test in another currency does not compare with a backtest
+    in USD (`backtest.md` section 10.8). A new start refuses such an instrument
+    (section 12.1). The
     backtest reads only saved bars: without saved bars of the period it
     fails with the message of section 10.
   - The comparison page `/forward-tests/{id}/comparison/{backtest_id}` reads
@@ -697,7 +703,7 @@ and the status codes of the new refusals are choices of this document.
 
 | Route | Change |
 |---|---|
-| `POST /api/forward-tests` | `StartForwardTestRequest` gets `universe` (`kind`: `single`, `rule`, or `list`, then `symbol`, `exchange`, and `currency` for `single`, or `top_n` from 1 to 500 for `rule`) and `allocated_capital_usd` (decimal text, larger than 0). `422` for a `rule` or `list` universe with a bar period other than `1-DAY`, for `top_n` out of range, for an empty watchlist, or for an `allocated_capital_usd` that is not larger than 0. `409` with `StartRefusedResponse` (`detail`, `forward_test_id` null, `unallocated_usd`) when the allocated capital is larger than the unallocated amount, for example `"The allocated capital 30,000.00 USD is larger than the unallocated 21,250.00 USD."`. `409` when the paper account check did not pass or IBKR sent no `NetLiquidation` in USD, because ATrade cannot calculate the unallocated amount. The "already runs on" `409` goes away (section 12.2). |
+| `POST /api/forward-tests` | `StartForwardTestRequest` gets `universe` (`kind`: `single`, `rule`, or `list`, then `symbol`, `exchange`, and `currency` for `single`, or `top_n` from 1 to 500 for `rule`) and `allocated_capital_usd` (decimal text, larger than 0). `422` for a `rule` or `list` universe with a bar period other than `1-DAY`, for `top_n` out of range, for an empty watchlist, for an instrument or a member that is not in USD (`"A forward test supports only USD instruments, because a forward test has no exchange rates. Not in USD: 700 HKD."`), or for an `allocated_capital_usd` that is not larger than 0. `409` with `StartRefusedResponse` (`detail`, `forward_test_id` null, `unallocated_usd`) when the allocated capital is larger than the unallocated amount, for example `"The allocated capital 30,000.00 USD is larger than the unallocated 21,250.00 USD."`. `409` when the paper account check did not pass or IBKR sent no `NetLiquidation` in USD, because ATrade cannot calculate the unallocated amount. The "already runs on" `409` goes away (section 12.2). |
 | `GET /api/forward-tests/capital` (new) | `200` with `{"net_liquidation_usd", "allocated_usd", "unallocated_usd"}`. `allocated_usd` is the sum of `allocated_capital_usd` of the forward tests that hold a client ID. `unallocated_usd` is `net_liquidation_usd` minus `allocated_usd`. All 3 are `null` when the paper account check did not pass or no USD value is available. The start dialog reads it. |
 | `GET /api/forward-tests`, `GET /api/forward-tests/{id}` | `ForwardTestResponse` gets `universe_kind`, `universe_top_n`, `allocated_capital_usd`, and `split_checks_needed` (a list of `symbol`, `exchange` of the instruments of the forward test in the "Split check needed" state). `ForwardTestDetailResponse` gets `instruments` (section 12.16) and `fills` rows with `symbol`, `exchange`, and `kind` (`fill` or `split_adjustment`). |
 | `POST /api/forward-tests/{id}/same-period-backtests` | Uses `allocated_capital_usd` and the recorded members (section 12.10). `422` "no start balance" only for an old row without `allocated_capital_usd` and without a start balance. `422` (`"The forward test has no recorded members in its period."`) for a multi-instrument forward test without recorded members. |

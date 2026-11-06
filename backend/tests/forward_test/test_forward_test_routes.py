@@ -318,6 +318,11 @@ async def test_the_end_time_is_optional_and_must_be_later_than_now(web_client: h
     assert (later_response.json()["crash_count"], later_response.json()["interruptions"]) == (0, [])
 
 
+NOT_IN_USD_REFUSAL = (
+    "A forward test supports only USD instruments, because a forward test has no exchange rates. Not in USD: 700 HKD."
+)
+
+
 def make_universe_request(strategy_version_id: int, universe: JsonObject, bar_period: str = "1-DAY") -> JsonObject:
     return {
         "strategy_version_id": strategy_version_id,
@@ -372,6 +377,40 @@ async def test_refuses_a_watchlist_forward_test_with_an_empty_watchlist(web_clie
 
     assert response.status_code == 422
     assert response.json()["detail"] == "The watchlist has no instrument."
+
+
+@pytest.mark.anyio
+async def test_refuses_a_single_instrument_that_is_not_in_usd(web_client: httpx.AsyncClient) -> None:
+    """The cash is USD and the fills are in the instrument currency. Without exchange rates, they do not add up."""
+    strategy_version_id = await save_test_strategy_version(web_client)
+    universe = {"kind": "single", "symbol": "700", "exchange": "SEHK", "currency": "HKD"}
+
+    response = await web_client.post(FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, universe))
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == NOT_IN_USD_REFUSAL
+    assert (await web_client.get(FORWARD_TESTS_PATH)).json() == []
+
+
+@pytest.mark.anyio
+async def test_refuses_a_watchlist_with_a_member_that_is_not_in_usd(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO watchlist_instrument (symbol, exchange, currency, added_at_utc)
+            VALUES ('AAPL', 'NASDAQ', 'USD', now()), ('700', 'SEHK', 'HKD', now())
+            """
+        )
+
+    response = await web_client.post(
+        FORWARD_TESTS_PATH, json=make_universe_request(strategy_version_id, {"kind": "list"})
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == NOT_IN_USD_REFUSAL
 
 
 @pytest.mark.anyio

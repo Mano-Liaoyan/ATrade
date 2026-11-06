@@ -5,6 +5,7 @@ The Web process writes only `desired_state` after the start. The forward-test wo
 tables, and the page reads the list again.
 """
 
+from collections.abc import Iterable
 from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
@@ -286,6 +287,19 @@ def refuse_request(detail: str) -> HTTPException:
     return HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail)
 
 
+def require_usd_instruments(instruments: Iterable[Instrument]) -> None:
+    """The cash of a forward test is in USD, and the strategy and the equity read prices in the instrument currency.
+    Without exchange rates, another currency gives wrong order sizes and a wrong equity (section 12.1)."""
+    others = [
+        f"{instrument.symbol} {instrument.currency}" for instrument in instruments if instrument.currency != "USD"
+    ]
+    if others:
+        raise refuse_request(
+            "A forward test supports only USD instruments, because a forward test has no exchange rates."
+            f" Not in USD: {', '.join(others)}."
+        )
+
+
 def read_universe_body(request: StartForwardTestRequest) -> UniverseBody:
     """The universe of the request. The flat `symbol`, `exchange`, and `currency` are a single instrument."""
     has_flat_fields = request.symbol is not None or request.exchange is not None or request.currency is not None
@@ -382,6 +396,7 @@ class ForwardTestRoutes:
             if universe.symbol is None or universe.exchange is None or universe.currency is None or universe.top_n:
                 raise refuse_request("A single-instrument forward test needs symbol, exchange, and currency only.")
             instrument = Instrument(symbol=universe.symbol, exchange=universe.exchange, currency=universe.currency)
+            require_usd_instruments([instrument])
             return replace(forward_test_request, instrument=instrument)
         if universe.symbol is not None or universe.exchange is not None or universe.currency is not None:
             raise refuse_request(f"A {universe.kind} universe does not take symbol, exchange, or currency.")
@@ -410,6 +425,7 @@ class ForwardTestRoutes:
             members = await read_watchlist_instruments(database_url=self.database_url)
             if not members:
                 raise refuse_request("The watchlist has no instrument.")
+        require_usd_instruments(members)
         return replace(
             forward_test_request,
             universe_top_n=universe.top_n,

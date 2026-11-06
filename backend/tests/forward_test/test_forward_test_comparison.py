@@ -70,10 +70,9 @@ def test_a_live_fill_after_the_bar_close_and_the_backtest_fill_at_the_next_open_
     assert [(row.bar_end_utc, row.price_difference_usd) for row in rows] == [(bar_ends_utc[1], Decimal(-1))]
 
 
-async def start_forward_test(web_client: httpx.AsyncClient, *, currency: str = "USD") -> JsonObject:
+async def start_forward_test(web_client: httpx.AsyncClient) -> JsonObject:
     strategy_version_id = await save_test_strategy_version(web_client)
-    request = make_start_request(strategy_version_id) | {"currency": currency}
-    return (await web_client.post(FORWARD_TESTS_PATH, json=request)).json()
+    return (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))).json()
 
 
 def write_forward_test_end(database_url: str, forward_test_id: int, *, is_stopped: bool = True) -> None:
@@ -239,8 +238,11 @@ async def test_the_same_period_backtest_of_an_old_forward_test_is_refused_withou
 async def test_the_same_period_backtest_is_refused_for_an_instrument_that_is_not_in_usd(
     web_client: httpx.AsyncClient, database_url: str
 ) -> None:
-    forward_test = await start_forward_test(web_client, currency="EUR")
+    forward_test = await start_forward_test(web_client)
     write_forward_test_end(database_url, forward_test["id"])
+    # An old forward test: a new start refuses this currency.
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute("UPDATE forward_test SET currency = 'EUR' WHERE id = %s", (forward_test["id"],))
 
     response = await start_same_period_backtest(web_client, forward_test["id"])
 

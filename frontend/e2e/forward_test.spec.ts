@@ -76,6 +76,28 @@ async function fillCapitalBelowTheUnallocatedAmount(dialog: Locator, capitalUsd:
   await expect(startButton).toBeEnabled();
 }
 
+test('the New forward test dialog shows why an instrument that is not in USD does not start', async ({
+  page,
+}, currentTest) => {
+  const strategyName = `Forward test HKD ${currentTest.project.name} ${String(Date.now() % 1_000_000)}`;
+  await createStrategy(page, strategyName);
+
+  await page.getByRole('link', { name: 'Forward tests', exact: true }).click();
+  await page.getByRole('button', { name: 'New forward test' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New forward test' });
+  await dialog.getByRole('combobox', { name: 'Strategy', exact: true }).click();
+  await page.getByRole('option', { name: strategyName }).click();
+  await expect(dialog.getByRole('combobox', { name: 'Strategy version' })).toHaveText(`${strategyName} v1`);
+  await dialog.getByLabel('Symbol').fill('700');
+  await dialog.getByLabel('Exchange').fill('SEHK');
+  await dialog.getByLabel('Currency').fill('HKD');
+  await fillCapitalBelowTheUnallocatedAmount(dialog, '1000');
+  await dialog.getByRole('button', { name: 'Start forward test' }).click();
+
+  await expect(dialog.getByText('Forward test not started')).toBeVisible();
+  await expect(dialog.getByText('Not in USD: 700 HKD.')).toBeVisible();
+});
+
 test('starts a forward test in the New forward test dialog, sees it running, and stops it from the header line', async ({
   page,
 }, currentTest) => {
