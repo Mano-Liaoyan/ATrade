@@ -1,5 +1,4 @@
-// Public entry of the strategy capability: the strategy HTTP client, the unsaved drafts in the browser, and the
-// language server connection of the editor.
+// Public entry of the strategy capability: the strategy HTTP client and the unsaved drafts in the browser.
 export {
   createStrategy,
   deleteStrategy,
@@ -33,7 +32,6 @@ export {
   type DraftKey,
   type StrategyVersionKey,
 } from './strategy_drafts';
-export { connectStrategyLanguageServer, type LanguageServerConnection } from './strategy_language_server';
 export {
   BLANK_RULES,
   COMPARISON_CHOICES,

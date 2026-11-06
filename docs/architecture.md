@@ -403,6 +403,11 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   and build time.
 - `src/lib/` has one directory per capability (`lib/market_data/`,
   `lib/backtest/`, and so on) and `lib/foundation/`.
+- `#lib/strategy_language_server` is a separate entry for the language
+  server connection of the editor. Only the strategy editor page imports it.
+  `@codemirror/lsp-client` has no `sideEffects` field, so a bundler keeps it
+  in each page that imports its barrel. Keep it out of `#lib/strategy`, or
+  each page that imports `#lib/strategy` loads CodeMirror.
 - A capability can import only `#lib/foundation/<module>` and the generated
   API types `#lib/api`. Capabilities must not import each other. Only
   `src/routes/` combines capabilities.
