@@ -5,6 +5,7 @@ The closes of the 20 bars from 2026-03-02: 100, 102, 104, 106, 108, 110, 108, 10
 """
 
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ from tests.backtest.test_strategy_template_backtest import (
     BAR_COUNT,
     FIRST_BAR_UTC,
     PAPER_CAPITAL_USD,
+    make_bar,
     make_request,
     make_wave_bars,
 )
@@ -174,3 +176,33 @@ def test_each_exit_item_runs_in_the_engine(tmp_path: Path) -> None:
     trades = run_strategy_on_bars(run, tmp_path)
 
     assert [trade.side for trade in trades[:4]] == ["BUY", "SELL", "BUY", "SELL"]
+
+
+def run_first_bar_cross(look_back_closes: list[int], first_close: int, work_directory: Path) -> list[str]:
+    """The sides of the trades of "close crosses above SMA(3)" on 1 first bar and later bars with the same close."""
+    entry = group("all_of", condition(price(), "crosses_above", indicator("sma", period=3)))
+    start_utc = datetime(2026, 2, 1, tzinfo=UTC)
+    look_back_bars = [
+        make_bar(start_utc - timedelta(days=len(look_back_closes) - index), Decimal(close))
+        for index, close in enumerate(look_back_closes)
+    ]
+    bars = [make_bar(start_utc + timedelta(days=index), Decimal(first_close)) for index in range(5)]
+    trades = run_strategy_on_bars(
+        StrategyRun(
+            code=make_rules_code(StrategyRules.model_validate(make_rules(entry))),
+            request=make_request(start_utc, len(bars)),
+            starting_cash=PAPER_CAPITAL_USD,
+            bars=bars,
+            look_back_bars=look_back_bars,
+        ),
+        work_directory,
+    )
+    return [trade.side for trade in trades]
+
+
+def test_a_cross_at_the_first_bar_after_the_look_back_bars_fills(tmp_path: Path) -> None:
+    assert run_first_bar_cross([100, 100, 100], 120, tmp_path) == ["BUY"]
+
+
+def test_a_close_that_stays_above_the_average_after_the_look_back_bars_is_no_cross(tmp_path: Path) -> None:
+    assert run_first_bar_cross([110, 120, 130], 140, tmp_path) == []

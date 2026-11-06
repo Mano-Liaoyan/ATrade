@@ -209,6 +209,7 @@ def write_atrade_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
 def write_imports(rules: StrategyRules, parts: CodeParts) -> list[str]:
     standard = [
         *(["import math"] if isinstance(rules.settings.position_size, PercentOfEquity) else []),
+        *(["from collections.abc import Sequence"] if parts.indicators else []),
         *(["from datetime import timedelta"] if parts.indicators else []),
     ]
     return [
@@ -311,6 +312,19 @@ def write_indicator_object(indicator: IndicatorUse) -> str:
     )
 
 
+def write_on_historical_bars(parts: CodeParts) -> list[str]:
+    """Only the code with an indicator asks for look-back bars (`write_on_start`)."""
+    if not parts.indicators:
+        return []
+    return [
+        "    def on_historical_bars(self, bars: Sequence[Bar]) -> None:",
+        "        # A cross compares the first bar with the last look-back bar. A late answer must not replace a live bar.",
+        "        if bars and self.previous_values is None:",
+        "            self.previous_values = self.read_values(bars[-1])",
+        "",
+    ]
+
+
 def write_strategy(parts: CodeParts, entry: str, exit_checks: list[str], buy: list[str]) -> list[str]:
     indicators = [write_indicator_object(indicator) for indicator in parts.indicators]
     values = [f'            "{key}": {expression},' for key, expression in parts.values.items()]
@@ -326,6 +340,7 @@ def write_strategy(parts: CodeParts, entry: str, exit_checks: list[str], buy: li
         "",
         *write_on_start(parts),
         "",
+        *write_on_historical_bars(parts),
         "    def on_bar(self, bar: Bar) -> None:",
         "        position = self.read_open_position()",
         "        self.bars_in_position = 0 if position is None else self.bars_in_position + 1",
