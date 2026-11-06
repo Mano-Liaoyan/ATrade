@@ -1002,10 +1002,10 @@ Table `custom_indicator`: `custom_indicator_id`, `name` (unique, without case),
 | Route | Behavior |
 |---|---|
 | `GET /api/custom-indicators` | `200` with the list by name: `[{"custom_indicator_id", "key", "name", "expression", "chart_placement", "value_description", "kept", "assistant_conversation_id"}]`. |
-| `POST /api/custom-indicators` | Body `{"name", "expression", "chart_placement", "value_description"}`. `201` with the row. `422` with `{"problems": [{"location", "message"}]}`. |
+| `POST /api/custom-indicators` | Body `{"name", "expression", "chart_placement", "value_description"}`. `201` with the row. `422` with `{"problems": [{"location", "message"}]}`. `409` with `{"detail"}` when another save takes the name after the name check. |
 | `POST /api/custom-indicators/check` | The same body. `200` with `{"problems": [...], "look_back_bars"}`. `look_back_bars` is null when the expression has a problem. It saves nothing. The optional parameter `custom_indicator_id` names the row that the body changes, so the row does not conflict with its own name. |
 | `GET /api/custom-indicators/{id}` | `200` with the row. `404` for an unknown id. |
-| `PUT /api/custom-indicators/{id}` | The body of `POST`. `200` with the row. `404` or `422`. |
+| `PUT /api/custom-indicators/{id}` | The body of `POST`. `200` with the row. `404`, `409` (as `POST`), or `422`. |
 | `POST /api/custom-indicators/{id}/keep` | `200` with the row, and `kept` true. `404` for an unknown id. |
 | `DELETE /api/custom-indicators/{id}` | `204`. `404` for an unknown id. A delete is always allowed. |
 

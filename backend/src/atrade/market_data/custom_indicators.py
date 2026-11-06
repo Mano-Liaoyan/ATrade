@@ -39,6 +39,7 @@ SELECT_FIELDS = (
     "custom_indicator_id, name, expression, chart_placement, value_description, kept, assistant_conversation_id"
 )
 NOT_FOUND: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
+NAME_IN_USE: dict[int | str, dict[str, Any]] = {status.HTTP_409_CONFLICT: ERROR_RESPONSE}
 CHECK_FAILED: dict[int | str, dict[str, Any]] = {
     status.HTTP_422_UNPROCESSABLE_CONTENT: {"model": IndicatorCheckFailedResponse}
 }
@@ -113,6 +114,10 @@ def check_fields(body: CustomIndicatorBody) -> list[IndicatorProblem]:
     return problems
 
 
+def make_name_in_use_message(body: CustomIndicatorBody) -> str:
+    return f"A custom indicator with the name {body.name!r} exists."
+
+
 async def check_custom_indicator(
     connection: psycopg.AsyncConnection, body: CustomIndicatorBody, custom_indicator_id: int | None
 ) -> list[IndicatorProblemResponse]:
@@ -128,7 +133,7 @@ async def check_custom_indicator(
                 (body.name.strip(), custom_indicator_id),
             )
             if await cursor.fetchone() is not None:
-                problems.append(IndicatorProblem(("name",), f"A custom indicator with the name {body.name!r} exists."))
+                problems.append(IndicatorProblem(("name",), make_name_in_use_message(body)))
     return [IndicatorProblemResponse(location=list(item.location), message=item.message) for item in problems]
 
 
@@ -140,6 +145,11 @@ def refuse(problems: list[IndicatorProblemResponse]) -> JSONResponse:
 def raise_not_found(custom_indicator_id: int) -> HTTPException:
     message = f"Custom indicator {custom_indicator_id} does not exist."
     return HTTPException(status.HTTP_404_NOT_FOUND, detail=message)
+
+
+def name_in_use(body: CustomIndicatorBody) -> HTTPException:
+    """Another save committed the name after the check. Only the unique index sees that."""
+    return HTTPException(status.HTTP_409_CONFLICT, detail=make_name_in_use_message(body))
 
 
 def change_refused(custom_indicator_id: int) -> HTTPException:
@@ -227,18 +237,21 @@ class CustomIndicatorRoutes:
             problems = await check_custom_indicator(connection, body, None)
             if problems:
                 return refuse(problems)
-            async with connection.cursor() as cursor:
-                await cursor.execute(
-                    f"""
-                    INSERT INTO custom_indicator
-                        (name, expression, chart_placement, value_description, kept, assistant_conversation_id,
-                         created_at_utc, changed_at_utc)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING {SELECT_FIELDS}
-                    """,
-                    (*self.read_values(body), conversation_id is None, conversation_id, now_utc, now_utc),
-                )
-                row = await cursor.fetchone()
+            try:
+                async with connection.cursor() as cursor:
+                    await cursor.execute(
+                        f"""
+                        INSERT INTO custom_indicator
+                            (name, expression, chart_placement, value_description, kept, assistant_conversation_id,
+                             created_at_utc, changed_at_utc)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING {SELECT_FIELDS}
+                        """,
+                        (*self.read_values(body), conversation_id is None, conversation_id, now_utc, now_utc),
+                    )
+                    row = await cursor.fetchone()
+            except psycopg.errors.UniqueViolation as error:
+                raise name_in_use(body) from error
             await connection.commit()
         if row is None:
             message = "INSERT RETURNING gave no row."
@@ -263,17 +276,20 @@ class CustomIndicatorRoutes:
             if problems:
                 await self.read(custom_indicator_id)
                 return refuse(problems)
-            async with connection.cursor() as cursor:
-                await cursor.execute(
-                    f"""
-                    UPDATE custom_indicator
-                    SET name = %s, expression = %s, chart_placement = %s, value_description = %s, changed_at_utc = %s
-                    WHERE custom_indicator_id = %s
-                    RETURNING {SELECT_FIELDS}
-                    """,
-                    (*self.read_values(body), self.clock.read_now_utc(), custom_indicator_id),
-                )
-                row = await cursor.fetchone()
+            try:
+                async with connection.cursor() as cursor:
+                    await cursor.execute(
+                        f"""
+                        UPDATE custom_indicator
+                        SET name = %s, expression = %s, chart_placement = %s, value_description = %s, changed_at_utc = %s
+                        WHERE custom_indicator_id = %s
+                        RETURNING {SELECT_FIELDS}
+                        """,
+                        (*self.read_values(body), self.clock.read_now_utc(), custom_indicator_id),
+                    )
+                    row = await cursor.fetchone()
+            except psycopg.errors.UniqueViolation as error:
+                raise name_in_use(body) from error
             await connection.commit()
         if row is None:
             raise raise_not_found(custom_indicator_id)
@@ -347,14 +363,14 @@ def create_custom_indicator_assistant_router(
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         response_model=CustomIndicatorResponse,
-        responses=CHECK_FAILED,
+        responses={**CHECK_FAILED, **NAME_IN_USE},
     )
     router.add_api_route(
         "/api/custom-indicators/{custom_indicator_id}",
         change,
         methods=["PUT"],
         response_model=CustomIndicatorResponse,
-        responses={**NOT_FOUND, **CHECK_FAILED, status.HTTP_403_FORBIDDEN: ERROR_RESPONSE},
+        responses={**NOT_FOUND, **CHECK_FAILED, **NAME_IN_USE, status.HTTP_403_FORBIDDEN: ERROR_RESPONSE},
     )
     return router
 
@@ -374,14 +390,14 @@ def create_custom_indicator_router(*, database_url: str, clock: Clock) -> APIRou
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         response_model=CustomIndicatorResponse,
-        responses=CHECK_FAILED,
+        responses={**CHECK_FAILED, **NAME_IN_USE},
     )
     router.add_api_route(
         "/api/custom-indicators/{custom_indicator_id}",
         routes.change,
         methods=["PUT"],
         response_model=CustomIndicatorResponse,
-        responses={**NOT_FOUND, **CHECK_FAILED},
+        responses={**NOT_FOUND, **CHECK_FAILED, **NAME_IN_USE},
     )
     router.add_api_route(
         "/api/custom-indicators/{custom_indicator_id}/keep", routes.keep, methods=["POST"], responses=NOT_FOUND
