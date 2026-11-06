@@ -2,7 +2,8 @@
      with the Settings, Entry, and Exit blocks. Right: the read-only code from the rules. After each rule change, the tab
      asks the backend for the code (POST /api/strategy-rules/code), highlights the changed lines, and scrolls the code
      region (not the page) to the first one. Each side scrolls in its own ScrollRegion. Above the blocks is the warning
-     of section 9.8.4 when the code of the open version changed after the rules. -->
+     of section 9.8.4 when the code of the open version changed after the rules. When the backend makes no code, the
+     error shows above the code from the last answer until the next answer. -->
 <script lang="ts">
   import { untrack } from 'svelte';
   import { Checkbox, ContentSwitcher, InlineNotification, Select } from '#lib/foundation/carbon';
@@ -68,6 +69,7 @@
   );
 
   let code = $state('');
+  let codeMessage = $state('');
   let changedLines: number[] = $state([]);
   let codeRegion: HTMLDivElement | undefined = $state();
   let codeEditor: { scrollLineIntoRegion: (line: number, region: HTMLElement) => void } | undefined = $state();
@@ -80,9 +82,14 @@
     requestNumber += 1;
     const thisRequest = requestNumber;
     void generateRulesCode(fetch, requestedRules).then((result) => {
-      if (thisRequest !== requestNumber || result.kind === 'failed') {
+      if (thisRequest !== requestNumber) {
         return;
       }
+      if (result.kind === 'failed') {
+        codeMessage = result.message;
+        return;
+      }
+      codeMessage = '';
       const previousCode = untrack(() => code);
       if (result.value === previousCode) {
         return;
@@ -335,6 +342,9 @@
     </ScrollRegion>
   </div>
   <div class="rules-tab__code">
+    {#if codeMessage !== ''}
+      <InlineNotification kind="error" lowContrast title="Code not made" subtitle={codeMessage} />
+    {/if}
     <ScrollRegion label="Code from the rules" fill bind:viewport={codeRegion}>
       <CodeEditor
         bind:this={codeEditor}
@@ -362,7 +372,9 @@
   }
 
   .rules-tab__code {
+    display: flex;
     flex: 1 1 0;
+    flex-direction: column;
     min-inline-size: 0;
     border-inline-start: 1px solid var(--cds-border-subtle-01);
     background: var(--cds-layer-01);

@@ -310,7 +310,7 @@
       writeOutputError(`Version not read: ${result.message}`);
       return;
     }
-    const draft = readDraft(localStorage, { strategyId: id, versionNumber });
+    const draft = readDraft({ strategyId: id, versionNumber });
     await loadRules(id, result.value);
     openVersion = result.value;
     editorCode = draft ?? result.value.code;
@@ -345,7 +345,7 @@
     }
     rulesVersionNumber = versionNumber ?? 0;
     savedRules = versionRules;
-    rules = readRulesDraft(localStorage, { strategyId: id, versionNumber: rulesVersionNumber }) ?? versionRules;
+    rules = readRulesDraft({ strategyId: id, versionNumber: rulesVersionNumber }) ?? versionRules;
   }
 
   function changeRules(changed: StrategyRules): void {
@@ -355,9 +355,9 @@
     }
     const draftKey = { strategyId: strategy.id, versionNumber: rulesVersionNumber };
     if (JSON.stringify(changed) === JSON.stringify(savedRules)) {
-      clearRulesDraft(localStorage, draftKey);
+      clearRulesDraft(draftKey);
     } else {
-      writeRulesDraft(localStorage, draftKey, changed);
+      writeRulesDraft(draftKey, changed);
     }
   }
 
@@ -368,9 +368,9 @@
     }
     const draftKey = { strategyId: openVersion.strategy_id, versionNumber: openVersion.version_number };
     if (code === openVersion.code) {
-      clearDraft(localStorage, draftKey);
+      clearDraft(draftKey);
     } else {
-      writeDraft(localStorage, draftKey, code);
+      writeDraft(draftKey, code);
     }
   }
 
@@ -419,9 +419,9 @@
       return;
     }
     if (rulesToSave === null) {
-      clearDraft(localStorage, { strategyId: id, versionNumber: baseVersionNumber });
+      clearDraft({ strategyId: id, versionNumber: baseVersionNumber });
     } else {
-      clearRulesDraft(localStorage, { strategyId: id, versionNumber: savedRulesVersionNumber });
+      clearRulesDraft({ strategyId: id, versionNumber: savedRulesVersionNumber });
     }
     const label = formatVersionLabel(name, result.version.version_number);
     await loadStrategy(id, result.version.version_number);

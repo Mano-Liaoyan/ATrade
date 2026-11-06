@@ -499,6 +499,34 @@ test('a star puts RSI first in Add indicator without an add, and the favorite st
   await expect(dialog.getByRole('button', { name: 'Remove RSI from favorite indicators' })).toBeVisible();
 });
 
+test('Enter on a star changes the favorite and does not add the indicator', async ({ page }) => {
+  await openChart(page);
+  await page.getByRole('button', { name: 'Add indicator' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add indicator' });
+  const star = dialog.getByRole('button', { name: 'Add SMA to favorite indicators' });
+  await star.focus();
+
+  await page.keyboard.press('Enter');
+
+  await expect(dialog.getByRole('button', { name: 'Remove SMA from favorite indicators' })).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => (chartIndicatorSet.read() as { favorites: string[] }).favorites).toEqual(['sma']);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('list', { name: 'Legend' }).getByRole('listitem')).toHaveCount(1);
+});
+
+test('a link to another page leaves a chart with a visible indicator', async ({ page }) => {
+  await openChart(page);
+  await page.getByRole('button', { name: 'Add indicator' }).click();
+  await page.getByRole('dialog', { name: 'Add indicator' }).getByRole('option', { name: 'SMA' }).click();
+  await expect(legendRow(page, 'SMA 50')).toBeVisible();
+
+  await page.getByRole('link', { name: 'Backtests' }).click();
+
+  await expect(page).toHaveURL(/\/backtests/);
+  await expect(page.getByRole('complementary', { name: 'Backtests' })).toBeVisible();
+});
+
 test('a failed save shows the detail text over the chart, and the chart keeps the change', async ({ page }) => {
   await page.route('**/api/market-data/chart-indicators', async (route) => {
     if (route.request().method() === 'PUT') {

@@ -2,7 +2,7 @@
      Command. The text filters the items (the label and the keywords), Arrow Up and Arrow Down move the highlight, and
      Enter or a click selects the highlighted item and closes the dialog. Escape closes it without a choice. The list
      has no groups. The items keep their order. An item can have an icon button at its end (`action`, Carbon contained
-     list item action). The button is in the tab order, and a click on it calls `onAction` and does not select. -->
+     list item action). The button is in the tab order, and a click or Enter on it calls `onAction` and does not select. -->
 <script lang="ts">
   import Close20 from '@carbon/icons/es/close/20.js';
   import Search16 from '@carbon/icons/es/search/16.js';
@@ -42,6 +42,13 @@
       searchText = '';
     }
     onOpenChange(nextOpen);
+  }
+
+  // Command.Root takes Enter and selects the highlighted item, so Enter on an action button stops here.
+  function keepEnterOnAction(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.stopPropagation();
+    }
   }
 
   function selectItem(item: CommandDialogItem): void {
@@ -124,7 +131,7 @@
                                   {/if}
                                 </div>
                                 {#if item.action !== undefined}
-                                  <div class="cds--contained-list-item__action command-dialog-action">
+                                  <div class="cds--contained-list-item__action command-dialog-action" role="none" onkeydown={keepEnterOnAction}>
                                     <IconButton
                                       label={item.action.label}
                                       icon={item.action.icon}
