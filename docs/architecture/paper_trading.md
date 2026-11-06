@@ -647,13 +647,16 @@ Decided (#214):
   (`read_exchange_rate(currency, "USD")`). Without a rate, the order gets
   `502`, and the fill is written at a later read.
 - The Web process records the fills of orders by hand from `reqExecutions`
-  before each order by hand and each second while `/ws/paper-trading` is
-  open (with the order list). A fill counts when it has the Web client ID,
+  before each order by hand, each second while `/ws/paper-trading` is open
+  (with the order list), and each 60 seconds in a background task
+  (`ManualOrderLedger.keep_recording_fills`), so that no page has to be open.
+  A fill counts when it has the Web client ID,
   the checked account, and an IBKR order ID of a `manual_order` row, and
   its time is not before the ledger start (the positions at the ledger start
   have the older fills). `reqExecutions` returns only the fills of the
-  current day (section 21), so a fill is lost when no page and no order by
-  hand reads it on its day. It then shows as "Unattributed".
+  current day (section 21), so a fill is lost when the Web process has no
+  connection to IB Gateway for the rest of its day. It then shows as
+  "Unattributed".
 - Fills from outside ATrade are not written into the ledger. They show as
   "Unattributed". Whether `reqExecutions` returns the fills of other client
   IDs is not checked (section 21).

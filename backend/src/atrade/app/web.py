@@ -56,7 +56,7 @@ from atrade.market_data import (
     LiveDailyBarHub,
     create_market_data_router,
 )
-from atrade.paper_trading import PaperAccountMonitor, create_paper_trading_router
+from atrade.paper_trading import ManualOrderLedger, PaperAccountMonitor, create_paper_trading_router
 from atrade.screen import SCREEN_CHANGE_SOCKET, create_screen_router
 from atrade.strategy import (
     STRATEGY_CHANGE_SOCKET,
@@ -131,6 +131,9 @@ def create_web_app(
     live_daily_bar_hub: the shared live daily bars of the watchlist. Default: the IBKR limits of a real account.
     """
     paper_account_monitor = PaperAccountMonitor(settings=settings, gateway_connection=gateway_connection)
+    manual_order_ledger = ManualOrderLedger(
+        paper_account_monitor=paper_account_monitor, database_url=settings.database_url, clock=clock
+    )
     backtest_runner = BacktestRunner(
         database_url=settings.database_url,
         clock=clock,
@@ -152,13 +155,15 @@ def create_web_app(
         connection_task = start_background_task(gateway_connection.keep_connected())
         # The paper account check runs after each connection, also when no browser is open.
         check_task = start_background_task(paper_account_monitor.keep_checking())
+        # The fills of orders by hand reach the ledger on their day, also when no browser is open.
+        fill_task = start_background_task(manual_order_ledger.keep_recording_fills())
         backtest_task = start_background_task(backtest_runner.keep_running())
         daily_bar_task = start_background_task(daily_bar_update.keep_updating())
         table_change_task = start_background_task(table_change_feed.keep_listening())
         try:
             yield
         finally:
-            for task in (table_change_task, daily_bar_task, backtest_task, check_task, connection_task):
+            for task in (table_change_task, daily_bar_task, backtest_task, fill_task, check_task, connection_task):
                 task.cancel()
                 # `wait` does not raise the error of a dead task, so the disconnect always runs.
                 await asyncio.wait([task])

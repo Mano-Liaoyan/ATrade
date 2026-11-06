@@ -3,17 +3,20 @@
 
 - The ledger starts at the first passed paper account check with a USD cash value: the positions of the account and
   its cash go to "By hand" as `ledger_start` rows.
-- The Web process records the fills of its orders by hand from reqExecutions before each order by hand and each second
-  while /ws/paper-trading is open. A fill before the ledger start is already in the start positions.
+- The Web process records the fills of its orders by hand from reqExecutions before each order by hand, each second
+  while /ws/paper-trading is open, and each 60 seconds without a page. A fill before the ledger start is already in the
+  start positions.
 - Rule 2 uses the limit price, or the last daily close for a market order, without the commission. Amounts of other
   currencies are converted to USD with the IBKR forex rate.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from decimal import Decimal
 from typing import Literal
 
+import anyio
 import psycopg
 
 from atrade.foundation.bar import BarPeriod, TimeRange
@@ -31,6 +34,10 @@ BY_HAND_LABEL = "By hand"
 LAST_CLOSE_DAYS = 10
 CENT = Decimal("0.01")
 BOUGHT_SIDE = "BOT"
+# reqExecutions returns only the fills of the current day, so the recording does not wait for a page or an order.
+FILL_RECORD_INTERVAL_SECONDS = 60.0
+
+logger = logging.getLogger("atrade.paper_trading")
 
 type LedgerRule = Literal["sell_more_than_position", "buy_more_than_cash", "ledger_not_started", "split_check_needed"]
 
@@ -95,6 +102,17 @@ class ManualOrderLedger:
             )
             await connection.commit()
             return await owner_ledger_store.select_entries(connection, account=account)
+
+    async def keep_recording_fills(self) -> None:
+        """Runs until the caller cancels it. A database error is logged, and the next run tries again."""
+        while True:
+            account = self.paper_account_monitor.read_checked_account_id()
+            if account is not None:
+                try:
+                    await self.record_fills(account)
+                except psycopg.Error:
+                    logger.exception("The fills of orders by hand were not recorded.")
+            await anyio.sleep(FILL_RECORD_INTERVAL_SECONDS)
 
     async def record_fills(self, account: str) -> None:
         """Writes the fills of the orders by hand of this Web client ID. IBKR errors leave them for the next time."""

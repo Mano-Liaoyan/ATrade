@@ -21,6 +21,7 @@ from atrade.app.web import create_web_app
 from atrade.foundation.settings import Settings
 from atrade.ibkr import AccountValue
 from atrade.ibkr import gateway_connection as gateway_connection_module
+from atrade.paper_trading import ManualOrderLedger, PaperAccountMonitor, manual_order_ledger
 from tests.fakes.clock import FixedClock
 from tests.fakes.ibkr import (
     WEB_CLIENT_ID,
@@ -34,6 +35,7 @@ from tests.ibkr.test_read_executions import GatewayMessages, make_ib_execution
 ACCOUNT_ID = "DU1234567"
 ORDERS_PATH = "/api/paper-trading/orders"
 MESSAGE_WAIT_SECONDS = 5
+FILL_WAIT_SECONDS = 2
 BY_HAND: dict[str, Any] = {"kind": "by_hand", "forward_test_id": None}
 
 type JsonObject = dict[str, Any]
@@ -273,6 +275,64 @@ async def test_records_each_fill_of_an_order_by_hand_once(
     with psycopg.connect(database_url) as connection:
         row = connection.execute("SELECT count(*) FROM owner_ledger_entry WHERE entry_kind = 'fill'").fetchone()
     assert row == (2,)
+
+
+def count_fills(database_url: str) -> int:
+    with psycopg.connect(database_url) as connection:
+        row = connection.execute("SELECT count(*) FROM owner_ledger_entry WHERE entry_kind = 'fill'").fetchone()
+    assert row is not None
+    return row[0]
+
+
+@pytest.mark.anyio
+async def test_records_a_fill_by_hand_while_no_page_is_open(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(manual_order_ledger, "FILL_RECORD_INTERVAL_SECONDS", 0.01)
+    gateway_connection = make_gateway()
+    settings = Settings(database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=ACCOUNT_ID)
+    app = create_web_app(settings=settings, clock=clock, gateway_connection=gateway_connection)
+
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=ASGIWebSocketTransport(app=app), base_url="http://test") as client,
+    ):
+        response = await client.post(
+            ORDERS_PATH, json=make_order(symbol="AAPL", side="BUY", quantity=10, limit_price="100")
+        )
+        gateway_connection.executions = [
+            make_execution(ACCOUNT_ID, order_id=response.json()["ibkr_order_id"], quantity="10", price="100")
+        ]
+        with anyio.move_on_after(FILL_WAIT_SECONDS):
+            while count_fills(database_url) == 0:
+                await anyio.sleep(0.01)
+
+    assert count_fills(database_url) == 1
+
+
+@pytest.mark.anyio
+async def test_the_fill_recording_continues_after_a_database_error(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(manual_order_ledger, "FILL_RECORD_INTERVAL_SECONDS", 0)
+    settings = Settings(database_url=database_url, frontend_build_dir=frontend_build_dir, ibkr_account_id=ACCOUNT_ID)
+    monitor = PaperAccountMonitor(settings=settings, gateway_connection=make_gateway())
+    ledger = ManualOrderLedger(paper_account_monitor=monitor, database_url=database_url, clock=clock)
+    accounts: list[str] = []
+
+    with anyio.CancelScope() as scope:
+
+        async def fail_once(account: str) -> None:
+            accounts.append(account)
+            if len(accounts) == 1:
+                message = "The database is not available."
+                raise psycopg.OperationalError(message)
+            scope.cancel()
+
+        monkeypatch.setattr(ledger, "record_fills", fail_once)
+        await ledger.keep_recording_fills()
+
+    assert accounts == [ACCOUNT_ID, ACCOUNT_ID]
 
 
 @pytest.mark.anyio
