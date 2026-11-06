@@ -19,7 +19,6 @@
     ContextMenu,
     DataTable,
     IconButton,
-    InlineNotification,
     readSequentialColor,
     Select,
     SortHeader,
@@ -54,6 +53,7 @@
   import SweepPointChart from '../SweepPointChart.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
   import { RunWorkbench } from '../../run_workbench.svelte';
+  import RunCenter from '../../RunCenter.svelte';
 
   const PANELS: PanelSpec[] = [
     { id: 'overview', minPixels: 160 },
@@ -140,221 +140,217 @@
         }}
       />
     {/snippet}
-    {#if workbench.listMessage !== ''}
-      <InlineNotification kind="error" title="Parameter sweeps not read" subtitle={workbench.listMessage} lowContrast />
-    {:else}
-      <div class="table-region sweep-list">
-        <ContextMenu readLabel={(key: string) => `Parameter sweep #${key}`} readItems={readMenuItems}>
-          <ScrollRegion label="Parameter sweep list" fill>
-            <DataTable columns={LIST_COLUMNS} size="sm">
-              {#snippet rows()}
-                {#each workbench.items as item (item.id)}
-                  {@const status = readSweepStatus(item.status_counts)}
-                  <tr
-                    data-context-key={item.id}
-                    class={['link-row', item.id === sweepId && 'cds--data-table--selected']}
-                    onclick={(event) => {
-                      if (!(event.target instanceof Element && event.target.closest('a') !== null)) {
-                        void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) }));
-                      }
-                    }}
-                  >
-                    <th scope="row" align="right">
-                      <span class="status-id">
-                        <StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} align="right" />
-                        <a
-                          class="row-link"
-                          href={resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) })}
-                          aria-current={item.id === sweepId ? 'page' : undefined}>#{item.id}</a
-                        >
-                      </span>
-                    </th>
-                    <td>
-                      <span class="ellipsis" title={formatVersionLabel(item.strategy_name, item.version_number)}
-                        >{formatVersionLabel(item.strategy_name, item.version_number)}</span
+    <div class="table-region sweep-list">
+      <ContextMenu readLabel={(key: string) => `Parameter sweep #${key}`} readItems={readMenuItems}>
+        <ScrollRegion label="Parameter sweep list" fill>
+          <DataTable columns={LIST_COLUMNS} size="sm">
+            {#snippet rows()}
+              {#each workbench.items as item (item.id)}
+                {@const status = readSweepStatus(item.status_counts)}
+                <tr
+                  data-context-key={item.id}
+                  class={['link-row', item.id === sweepId && 'cds--data-table--selected']}
+                  onclick={(event) => {
+                    if (!(event.target instanceof Element && event.target.closest('a') !== null)) {
+                      void goto(resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) }));
+                    }
+                  }}
+                >
+                  <th scope="row" align="right">
+                    <span class="status-id">
+                      <StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} align="right" />
+                      <a
+                        class="row-link"
+                        href={resolve('/sweeps/[[sweepId]]', { sweepId: String(item.id) })}
+                        aria-current={item.id === sweepId ? 'page' : undefined}>#{item.id}</a
                       >
-                    </td>
-                    <td align="right">{item.status_counts['finished'] ?? 0} / {item.run_count}</td>
-                  </tr>
-                {/each}
-              {/snippet}
-            </DataTable>
-          </ScrollRegion>
-        </ContextMenu>
-      </div>
-    {/if}
+                    </span>
+                  </th>
+                  <td>
+                    <span class="ellipsis" title={formatVersionLabel(item.strategy_name, item.version_number)}
+                      >{formatVersionLabel(item.strategy_name, item.version_number)}</span
+                    >
+                  </td>
+                  <td align="right">{item.status_counts['finished'] ?? 0} / {item.run_count}</td>
+                </tr>
+              {/each}
+            {/snippet}
+          </DataTable>
+        </ScrollRegion>
+      </ContextMenu>
+    </div>
   </SideColumn>
 
-  {#if shownSweep === null || chart === null}
-    <div class="atrade-run-empty">
-      {#if workbench.detailMessage !== ''}
-        <InlineNotification kind="error" title="Parameter sweep not read" subtitle={workbench.detailMessage} lowContrast />
-      {:else if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === ''}
-        <EmptyText text="No parameter sweeps" />
-      {/if}
-    </div>
-  {:else}
-    {@const detail = shownSweep}
-    {@const shownChart = chart}
-    <PanelSplit storageKey="atrade.sweep-page.panel-split" panels={PANELS}>
-      {#snippet panel(id, state)}
-        {#if id === 'overview'}
-          <Panel {...state} label={`Parameter sweep #${String(detail.id)}`}>
-            {#snippet header()}
-              <h1 class="atrade-run-title">
-                <span class="atrade-run-number">#{detail.id}</span>
-                <a
-                  class="cds--link"
-                  href={resolve('/strategies/[strategyId]/versions/[versionNumber]', {
-                    strategyId: String(detail.strategy_id),
-                    versionNumber: String(detail.version_number),
-                  })}>{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
-                >
-              </h1>
-              <span class="status-line" role="status" aria-label="Run counts">
-                {#each STATUS_LINE as status (status)}
-                  <span class="status-count"
-                    ><StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} />{String(
-                      detail.status_counts[status] ?? 0,
-                    )}</span
+  <RunCenter {workbench} listTitle="Parameter sweeps not read" detailTitle="Parameter sweep not read">
+    {#if shownSweep === null || chart === null}
+      <div class="atrade-run-empty">
+        {#if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === '' && workbench.detailMessage === ''}
+          <EmptyText text="No parameter sweeps" />
+        {/if}
+      </div>
+    {:else}
+      {@const detail = shownSweep}
+      {@const shownChart = chart}
+      <PanelSplit storageKey="atrade.sweep-page.panel-split" panels={PANELS}>
+        {#snippet panel(id, state)}
+          {#if id === 'overview'}
+            <Panel {...state} label={`Parameter sweep #${String(detail.id)}`}>
+              {#snippet header()}
+                <h1 class="atrade-run-title">
+                  <span class="atrade-run-number">#{detail.id}</span>
+                  <a
+                    class="cds--link"
+                    href={resolve('/strategies/[strategyId]/versions/[versionNumber]', {
+                      strategyId: String(detail.strategy_id),
+                      versionNumber: String(detail.version_number),
+                    })}>{formatVersionLabel(detail.strategy_name, detail.version_number)}</a
                   >
-                {/each}
-              </span>
-            {/snippet}
-            <div class="chart-toolbar">
-              <Select
-                label="Metric"
-                size="sm"
-                items={[...SWEEP_METRICS]}
-                value={metric}
-                onValueChange={(value: SweepMetricKey) => {
-                  metric = value;
-                }}
-              />
-              {#if shownChart.kind === 'heatmap' && shownChart.slice !== null}
-                {@const slice = shownChart.slice}
+                </h1>
+                <span class="status-line" role="status" aria-label="Run counts">
+                  {#each STATUS_LINE as status (status)}
+                    <span class="status-count"
+                      ><StatusIndicator label={describeBacktestStatus(status)} kind={findBacktestStatusKind(status)} />{String(
+                        detail.status_counts[status] ?? 0,
+                      )}</span
+                    >
+                  {/each}
+                </span>
+              {/snippet}
+              <div class="chart-toolbar">
                 <Select
-                  label={slice.parameter}
+                  label="Metric"
                   size="sm"
-                  items={slice.values.map((value) => ({ value: String(value), label: String(value) }))}
-                  value={String(slice.value)}
-                  onValueChange={(value: string) => {
-                    sliceValue = slice.values.find((item) => String(item) === value) ?? null;
+                  items={[...SWEEP_METRICS]}
+                  value={metric}
+                  onValueChange={(value: SweepMetricKey) => {
+                    metric = value;
                   }}
                 />
-              {/if}
-            </div>
-            {#if shownChart.kind === 'points'}
-              <div class="point-chart">
-                <SweepPointChart parameter={shownChart.parameter} points={shownChart.points} {metric} {metricLabel} />
+                {#if shownChart.kind === 'heatmap' && shownChart.slice !== null}
+                  {@const slice = shownChart.slice}
+                  <Select
+                    label={slice.parameter}
+                    size="sm"
+                    items={slice.values.map((value) => ({ value: String(value), label: String(value) }))}
+                    value={String(slice.value)}
+                    onValueChange={(value: string) => {
+                      sliceValue = slice.values.find((item) => String(item) === value) ?? null;
+                    }}
+                  />
+                {/if}
               </div>
-            {:else}
-              {@const heatmap = shownChart.heatmap}
-              <div class="table-region">
-                <ScrollRegion label="Heatmap" fill>
-                  <table class="cds--data-table cds--data-table--xs heatmap" aria-label={`${metricLabel} heatmap`}>
-                    <thead>
-                      <tr>
-                        <th scope="col"><div class="cds--table-header-label">{shownChart.rowParameter} \ {shownChart.columnParameter}</div></th>
-                        {#each heatmap.columns as column (column)}
-                          <th scope="col" align="right"><div class="cds--table-header-label">{String(column)}</div></th>
-                        {/each}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each heatmap.rows as row, rowIndex (row)}
+              {#if shownChart.kind === 'points'}
+                <div class="point-chart">
+                  <SweepPointChart parameter={shownChart.parameter} points={shownChart.points} {metric} {metricLabel} />
+                </div>
+              {:else}
+                {@const heatmap = shownChart.heatmap}
+                <div class="table-region">
+                  <ScrollRegion label="Heatmap" fill>
+                    <table class="cds--data-table cds--data-table--xs heatmap" aria-label={`${metricLabel} heatmap`}>
+                      <thead>
                         <tr>
-                          <th scope="row" align="right">{String(row)}</th>
-                          {#each heatmap.cells[rowIndex] ?? [] as cell, columnIndex (columnIndex)}
-                            {#if cell === null}
-                              <td align="right">{formatSweepMetric(metric, null)}</td>
-                            {:else}
-                              {@const color = readSequentialColor(heatmap.step(cell))}
-                              <td align="right" style:background-color={color.background} style:color={color.text}
-                                >{formatSweepMetric(metric, cell)}</td
-                              >
-                            {/if}
+                          <th scope="col"><div class="cds--table-header-label">{shownChart.rowParameter} \ {shownChart.columnParameter}</div></th>
+                          {#each heatmap.columns as column (column)}
+                            <th scope="col" align="right"><div class="cds--table-header-label">{String(column)}</div></th>
                           {/each}
                         </tr>
-                      {/each}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {#each heatmap.rows as row, rowIndex (row)}
+                          <tr>
+                            <th scope="row" align="right">{String(row)}</th>
+                            {#each heatmap.cells[rowIndex] ?? [] as cell, columnIndex (columnIndex)}
+                              {#if cell === null}
+                                <td align="right">{formatSweepMetric(metric, null)}</td>
+                              {:else}
+                                {@const color = readSequentialColor(heatmap.step(cell))}
+                                <td align="right" style:background-color={color.background} style:color={color.text}
+                                  >{formatSweepMetric(metric, cell)}</td
+                                >
+                              {/if}
+                            {/each}
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </ScrollRegion>
+                </div>
+              {/if}
+            </Panel>
+          {:else}
+            <Panel {...state} label="Runs">
+              <div class="table-region">
+                <ScrollRegion label="Runs" fill>
+                  <div class="cds--data-table-container">
+                    <table class="cds--data-table cds--data-table--sm cds--data-table--sort runs">
+                      <thead>
+                        <tr>
+                          {#each parameterNames as name (name)}
+                            <SortHeader
+                              label={name}
+                              align="right"
+                              direction={sortColumn === name ? sortDirection : null}
+                              onSort={() => {
+                                sortBy(name);
+                              }}
+                            />
+                          {/each}
+                          <SortHeader
+                            label="Status"
+                            direction={sortColumn === SWEEP_STATUS_COLUMN ? sortDirection : null}
+                            onSort={() => {
+                              sortBy(SWEEP_STATUS_COLUMN);
+                            }}
+                          />
+                          {#each SWEEP_METRICS as item (item.value)}
+                            <SortHeader
+                              label={item.label}
+                              align="right"
+                              direction={sortColumn === item.value ? sortDirection : null}
+                              onSort={() => {
+                                sortBy(item.value);
+                              }}
+                            />
+                          {/each}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {#each sortedRows as row (row.backtestId)}
+                          <tr
+                            class="link-row"
+                            onclick={(event) => {
+                              openRun(event, row.backtestId);
+                            }}
+                          >
+                            {#each parameterNames as name, index (name)}
+                              <td align="right">
+                                {#if index === 0}
+                                  <a class="row-link" href={resolve('/backtests/[[backtestId]]', { backtestId: String(row.backtestId) })}>{String(row.values[name])}</a>
+                                {:else}
+                                  {String(row.values[name])}
+                                {/if}
+                              </td>
+                            {/each}
+                            <td>
+                              <StatusIndicator label={describeBacktestStatus(row.status)} kind={findBacktestStatusKind(row.status)} />
+                            </td>
+                            {#each SWEEP_METRICS as item (item.value)}
+                              <td align="right">{formatSweepMetric(item.value, (row.values[item.value] ?? null) as number | null)}</td>
+                            {/each}
+                          </tr>
+                        {/each}
+                      </tbody>
+                    </table>
+                  </div>
                 </ScrollRegion>
               </div>
-            {/if}
-          </Panel>
-        {:else}
-          <Panel {...state} label="Runs">
-            <div class="table-region">
-              <ScrollRegion label="Runs" fill>
-                <div class="cds--data-table-container">
-                  <table class="cds--data-table cds--data-table--sm cds--data-table--sort runs">
-                    <thead>
-                      <tr>
-                        {#each parameterNames as name (name)}
-                          <SortHeader
-                            label={name}
-                            align="right"
-                            direction={sortColumn === name ? sortDirection : null}
-                            onSort={() => {
-                              sortBy(name);
-                            }}
-                          />
-                        {/each}
-                        <SortHeader
-                          label="Status"
-                          direction={sortColumn === SWEEP_STATUS_COLUMN ? sortDirection : null}
-                          onSort={() => {
-                            sortBy(SWEEP_STATUS_COLUMN);
-                          }}
-                        />
-                        {#each SWEEP_METRICS as item (item.value)}
-                          <SortHeader
-                            label={item.label}
-                            align="right"
-                            direction={sortColumn === item.value ? sortDirection : null}
-                            onSort={() => {
-                              sortBy(item.value);
-                            }}
-                          />
-                        {/each}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {#each sortedRows as row (row.backtestId)}
-                        <tr
-                          class="link-row"
-                          onclick={(event) => {
-                            openRun(event, row.backtestId);
-                          }}
-                        >
-                          {#each parameterNames as name, index (name)}
-                            <td align="right">
-                              {#if index === 0}
-                                <a class="row-link" href={resolve('/backtests/[[backtestId]]', { backtestId: String(row.backtestId) })}>{String(row.values[name])}</a>
-                              {:else}
-                                {String(row.values[name])}
-                              {/if}
-                            </td>
-                          {/each}
-                          <td>
-                            <StatusIndicator label={describeBacktestStatus(row.status)} kind={findBacktestStatusKind(row.status)} />
-                          </td>
-                          {#each SWEEP_METRICS as item (item.value)}
-                            <td align="right">{formatSweepMetric(item.value, (row.values[item.value] ?? null) as number | null)}</td>
-                          {/each}
-                        </tr>
-                      {/each}
-                    </tbody>
-                  </table>
-                </div>
-              </ScrollRegion>
-            </div>
-          </Panel>
-        {/if}
-      {/snippet}
-    </PanelSplit>
-  {/if}
+            </Panel>
+          {/if}
+        {/snippet}
+      </PanelSplit>
+    {/if}
+  </RunCenter>
 
   <AssistantColumn />
 </Workbench>

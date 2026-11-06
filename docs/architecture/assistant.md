@@ -1127,6 +1127,10 @@ Decided (each workbench page has the column):
   column opens the newest conversation.
 - Each page reads the conversation list again when it opens. When the
   socket of the open conversation is closed, the page opens a new socket.
+- A socket close during a run ends the run in the log, because `web` stops
+  the run (25.10) and no `settled` message comes. "Stop" changes to the
+  disabled "Send" with its reason. A running tool step shows "Failed". A
+  running backtest step shows "Interrupted", because the backtest can go on.
 - "Send" stays disabled ("connecting") until the socket is open and the
   saved messages are read, so a sent message is not lost when the saved
   messages replace the log.

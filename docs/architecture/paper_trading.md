@@ -343,7 +343,7 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   Implemented (#214): the notification "Order not sent" with the `detail`.
   When the instrument is in the "Split check needed" state, the review button
   is disabled and the panel says why, for example "AAPL needs a split check.
-  Apply the split or keep the ledger on the paper trading page.".
+  Apply the split or keep the ledger on the Home page.".
   Implemented (#220): `findInstrumentOrderBlock(account, instrument)` reads
   the `split_check` of the position of the instrument.
 - Phase 3: the review button no longer depends on `/ws/forward-tests`, because
@@ -379,7 +379,7 @@ capital (section 10). The frontend reads it with `readPaperCapital()` of
   not answer for the last close or the forex rate. An order by hand on an
   instrument in the state gets `409` with the `rule` `split_check_needed`
   and the `detail` "AAPL needs a split check. Apply the split or keep the
-  ledger on the paper trading page.". A cancel is not blocked. The tests are
+  ledger on the Home page.". A cancel is not blocked. The tests are
   in `backend/tests/paper_trading/test_stock_split_routes.py`.
 - Implemented (#214): `OrderRefusedByLedgerResponse` with `rule`
   `sell_more_than_position`, `buy_more_than_cash`, or `ledger_not_started`
@@ -449,7 +449,7 @@ Sources: [Forward tests of multi-instrument strategies](https://github.com/Mano-
 - The owner ledger is the record of the fills, positions, and cash of each
   owner in PostgreSQL. `paper_trading` owns its tables.
 - For each instrument, the IBKR position minus the sum of the owner
-  positions must be 0. When it is not 0, the paper trading page shows the
+  positions must be 0. When it is not 0, the Home page shows the
   difference as "Unattributed" (section 11.7).
 
 Owners and their cash:
@@ -561,7 +561,7 @@ The "Split check needed" state:
 - While an instrument is in this state, no owner can send an order on it.
   The strategy of a forward test gets `OrderDenied`. An order by hand gets
   `409` with the reason. Other instruments trade as usual.
-- The paper trading page shows the state in the Positions table
+- The Home page shows the state in the Positions table
   (section 11.7). The forward test page shows it in the header line
   ([`forward_test.md`](forward_test.md) section 12.16).
 - "Apply split 4:1" writes the ledger change above
@@ -613,11 +613,11 @@ Implemented (#220, migration `f66ac656f66b`):
 ## 11.12 Limits of the owner ledger (Phase 3)
 
 - Version 1 does not handle cash dividends. A cash dividend changes the
-  paper account cash without a fill. The paper trading page shows it as an
+  paper account cash without a fill. The Home page shows it as an
   "Unattributed" difference. Cash dividends are in the "Not yet specified"
   list of the planning map.
 - Spin-offs, mergers, symbol changes, and delistings are not handled. The
-  page shows the difference as "Unattributed".
+  Home page shows the difference as "Unattributed".
 - Version 1 is long only. No owner sells short or uses margin.
 - Nobody checked if IBKR refuses opposite orders of 2 owners on one
   instrument (self-trade prevention).

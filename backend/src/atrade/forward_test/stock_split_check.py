@@ -213,7 +213,7 @@ class StockSplitCheck:
         return is_complete
 
     async def restart_after_apply(self) -> None:
-        """After "Apply split" on the paper trading page, restarts the forward tests that got a split adjustment."""
+        """After "Apply split" on the Home page, restarts the forward tests that got a split adjustment."""
         try:
             for split_check, forward_test_ids in await read_unrestarted_split_checks(database_url=self.database_url):
                 if forward_test_ids:

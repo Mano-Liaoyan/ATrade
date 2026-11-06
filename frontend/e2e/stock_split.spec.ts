@@ -34,10 +34,10 @@ test('the split check shows on the 3 pages and Apply split 4:1 ends it', async (
   const panel = page.getByRole('form', { name: `Paper order of ${symbol}`, exact: true });
   await expect(panel.getByRole('button', { name: 'Review buy order' })).toBeDisabled();
   await expect(panel).toContainText(
-    `${symbol} needs a split check. Apply the split or keep the ledger on the paper trading page.`,
+    `${symbol} needs a split check. Apply the split or keep the ledger on the Home page.`,
   );
 
-  // The paper trading page: the Positions row with the ratio, the IBKR share counts, and the 2 buttons.
+  // The Home page: the Positions row with the ratio, the IBKR share counts, and the 2 buttons.
   await page.goto('/');
   const positions = page.getByRole('region', { name: 'Positions', exact: true }).first();
   const splitRow = positions

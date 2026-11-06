@@ -74,6 +74,7 @@
   import { createInstrumentHref } from '../../instrument_href';
   import { START_FORWARD_TEST_FORM_ID } from '../../palette_commands';
   import { RunWorkbench } from '../../run_workbench.svelte';
+  import RunCenter from '../../RunCenter.svelte';
   import ForwardTestList from '../ForwardTestList.svelte';
   import StartForwardTestDialog from '../StartForwardTestDialog.svelte';
   import AssistantColumn from '../../assistant/AssistantColumn.svelte';
@@ -171,12 +172,20 @@
     stoppingId = forwardTest.id;
     actionFailure = null;
     const result = await stopForwardTest(fetch, forwardTest.id);
+    stoppingId = null;
     if (result.kind === 'failed') {
-      stoppingId = null;
       actionFailure = { title: 'Forward test not stopped', message: result.message };
-    } else if (forwardTest.id !== forwardTestId) {
-      // A stop from the list context menu: the header line shows only the open forward test.
-      stoppingId = null;
+      return;
+    }
+    // The socket pushes the list again later. The buttons show the accepted stop at once.
+    workbench.items = workbench.items.map((item) =>
+      item.id === forwardTest.id ? { ...item, desired_state: 'stopped' } : item,
+    );
+    if (workbench.detail?.forward_test.id === forwardTest.id) {
+      workbench.detail = {
+        ...workbench.detail,
+        forward_test: { ...workbench.detail.forward_test, desired_state: 'stopped' },
+      };
     }
   }
 
@@ -242,208 +251,208 @@
     />
   </SideColumn>
 
-  {#if shownDetail === null}
-    <div class="atrade-run-empty">
-      {#if workbench.detailMessage !== ''}
-        <InlineNotification kind="error" title="Forward test not read" subtitle={workbench.detailMessage} lowContrast />
-      {:else if workbench.isConnected && workbench.items.length === 0}
-        <EmptyText text="No forward tests" />
-      {/if}
-    </div>
-  {:else}
-    {@const forwardTest = shownDetail.forward_test}
-    {@const records = shownDetail}
-    {@const chartInstrument = readForwardTestInstrument(forwardTest)}
-    {@const chartKey = String(forwardTest.id)}
-    <PanelSplit storageKey="atrade.forward-test-page.panel-split" panels={PANELS}>
-      {#snippet panel(id, state)}
-        {#if id === 'chart'}
-          <Panel {...state} label={`Forward test #${String(forwardTest.id)}`}>
-            {#snippet header()}
-              <span class="atrade-run-status" role="status" aria-label="Forward test status">
-                <StatusIndicator
-                  label={describeForwardTestStatus(forwardTest.status)}
-                  kind={findForwardTestStatusKind(forwardTest.status)}
-                />
-                {#if showsCrashCount(forwardTest)}
-                  <StatusIndicator kind="warning" label={`Crashes in a row: ${String(forwardTest.crash_count)} of 3`} />
-                {/if}
-                {#if forwardTest.split_checks_needed.length > 0}
+  <RunCenter {workbench} listTitle="Forward tests not read" detailTitle="Forward test not read">
+    {#if shownDetail === null}
+      <div class="atrade-run-empty">
+        {#if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === '' && workbench.detailMessage === ''}
+          <EmptyText text="No forward tests" />
+        {/if}
+      </div>
+    {:else}
+      {@const forwardTest = shownDetail.forward_test}
+      {@const records = shownDetail}
+      {@const chartInstrument = readForwardTestInstrument(forwardTest)}
+      {@const chartKey = String(forwardTest.id)}
+      <PanelSplit storageKey="atrade.forward-test-page.panel-split" panels={PANELS}>
+        {#snippet panel(id, state)}
+          {#if id === 'chart'}
+            <Panel {...state} label={`Forward test #${String(forwardTest.id)}`}>
+              {#snippet header()}
+                <span class="atrade-run-status" role="status" aria-label="Forward test status">
                   <StatusIndicator
-                    kind="warning"
-                    label={`Split check needed: ${forwardTest.split_checks_needed.map((item) => item.symbol).join(', ')}`}
+                    label={describeForwardTestStatus(forwardTest.status)}
+                    kind={findForwardTestStatusKind(forwardTest.status)}
                   />
+                  {#if showsCrashCount(forwardTest)}
+                    <StatusIndicator kind="warning" label={`Crashes in a row: ${String(forwardTest.crash_count)} of 3`} />
+                  {/if}
+                  {#if forwardTest.split_checks_needed.length > 0}
+                    <StatusIndicator
+                      kind="warning"
+                      label={`Split check needed: ${forwardTest.split_checks_needed.map((item) => item.symbol).join(', ')}`}
+                    />
+                  {/if}
+                </span>
+                <h1 class="atrade-run-title">
+                  <span class="atrade-run-number">#{forwardTest.id}</span>
+                  <a
+                    class="cds--link"
+                    href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(forwardTest.strategy_id), versionNumber: String(forwardTest.version_number) })}
+                    >{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</a
+                  >
+                  {@render instrumentOrUniverse(forwardTest, records.instruments.length)}
+                  <span class="atrade-run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
+                </h1>
+                {#if forwardTest.allocated_capital_usd !== null}
+                  <span class="run-note run-capital">Capital {formatAmount(forwardTest.allocated_capital_usd)} USD</span>
                 {/if}
-              </span>
-              <h1 class="atrade-run-title">
-                <span class="atrade-run-number">#{forwardTest.id}</span>
-                <a
-                  class="cds--link"
-                  href={resolve('/strategies/[strategyId]/versions/[versionNumber]', { strategyId: String(forwardTest.strategy_id), versionNumber: String(forwardTest.version_number) })}
-                  >{formatVersionLabel(forwardTest.strategy_name, forwardTest.version_number)}</a
-                >
-                {@render instrumentOrUniverse(forwardTest, records.instruments.length)}
-                <span class="atrade-run-period">{formatBarPeriod(forwardTest.bar_period)}</span>
-              </h1>
-              {#if forwardTest.allocated_capital_usd !== null}
-                <span class="run-note run-capital">Capital {formatAmount(forwardTest.allocated_capital_usd)} USD</span>
-              {/if}
-              <span class="atrade-run-actions">
-                {#if chartInstrument !== null}
-                  <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
-                {/if}
-                {#if chartView === 'bars' && chartInstrument !== null}
-                  <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={forwardTest.strategy_indicators} />
-                {/if}
-                {#if canStop(forwardTest)}
+                <span class="atrade-run-actions">
+                  {#if chartInstrument !== null}
+                    <ChartViewSwitcher value={chartView} onValueChange={changeChartView} />
+                  {/if}
+                  {#if chartView === 'bars' && chartInstrument !== null}
+                    <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={forwardTest.strategy_indicators} />
+                  {/if}
+                  {#if canStop(forwardTest)}
+                    <IconButton
+                      label={describeStopButton(forwardTest)}
+                      icon={StopFilledAlt16}
+                      tone="error"
+                      disabled={stoppingId === forwardTest.id}
+                      onclick={() => void stop(forwardTest)}
+                    />
+                  {/if}
                   <IconButton
-                    label={describeStopButton(forwardTest)}
-                    icon={StopFilledAlt16}
-                    tone="error"
-                    disabled={stoppingId === forwardTest.id}
-                    onclick={() => void stop(forwardTest)}
+                    label={describeBacktestButton(forwardTest)}
+                    icon={Compare16}
+                    align="bottom-end"
+                    disabled={!canBacktestSamePeriod(forwardTest) || isStartingBacktest}
+                    onclick={() => void backtestSamePeriod(forwardTest)}
                   />
-                {/if}
-                <IconButton
-                  label={describeBacktestButton(forwardTest)}
-                  icon={Compare16}
-                  align="bottom-end"
-                  disabled={!canBacktestSamePeriod(forwardTest) || isStartingBacktest}
-                  onclick={() => void backtestSamePeriod(forwardTest)}
-                />
-              </span>
-            {/snippet}
-            {#if actionFailure !== null}
-              <InlineNotification
-                kind="error"
-                title={actionFailure.title}
-                subtitle={actionFailure.message}
-                lowContrast
-                onClose={() => {
-                  actionFailure = null;
-                }}
-              />
-            {/if}
-            {#if records.metrics !== null}
-              <KeyMetricRow metrics={records.metrics} startCapitalUsd={readStartCapital(forwardTest)} />
-            {/if}
-            {#if chartView === 'bars' && chartInstrument !== null}
-              <div class="chart">
-                <RunBarChart
-                  instrument={chartInstrument}
-                  barPeriod={forwardTest.bar_period}
-                  range={{
-                    startUtc: forwardTest.created_at_utc,
-                    ...(forwardTest.stopped_at_utc === null ? {} : { endUtc: forwardTest.stopped_at_utc }),
+                </span>
+              {/snippet}
+              {#if actionFailure !== null}
+                <InlineNotification
+                  kind="error"
+                  title={actionFailure.title}
+                  subtitle={actionFailure.message}
+                  lowContrast
+                  onClose={() => {
+                    actionFailure = null;
                   }}
-                  label="Bar chart of {formatInstrument(chartInstrument)}, {forwardTest.bar_period} bars"
-                  chart={runChart}
-                  runKey={chartKey}
-                  strategyIndicators={forwardTest.strategy_indicators}
-                  records={records.fills}
-                />
-              </div>
-            {:else if records.metrics !== null}
-              <div class="chart">
-                <EquityDrawdownChart
-                  curves={[{ name: 'Equity', points: records.equity_curve, startCapitalUsd: readStartCapital(forwardTest) }]}
-                  label="Equity and drawdown"
-                  interruptions={chartInterruptions}
-                  fill
-                />
-              </div>
-            {/if}
-          </Panel>
-        {:else}
-          <Panel
-            {...state}
-            label="Forward test tables"
-            tabs={{
-              label: 'Forward test tables',
-              items: TABLE_TABS,
-              value: selectedTable,
-              onValueChange: (value: string) => {
-                selectedTable = value as ForwardTestTable;
-              },
-            }}
-          >
-            {#if selectedTable === 'fills'}
-              {#if chartInstrument === null}
-                <ForwardTestFillTable fills={records.fills} />
-              {:else}
-                <ForwardTestFillTable
-                  fills={records.fills}
-                  selectedIndex={runChart.readSelectedRow(chartKey)}
-                  onRowPoint={(row: number | null) => {
-                    runChart.pointedRow = row;
-                  }}
-                  onRowSelect={selectFillRow}
                 />
               {/if}
-            {:else if selectedTable === 'instruments'}
-              <UniverseInstrumentTable instruments={records.instruments} countHeader="Fills" />
-            {:else if selectedTable === 'comparison'}
-              {#if records.same_period_backtests.length === 0}
-                <EmptyText text="No backtests of the same period" />
-              {:else}
-                <ScrollRegion label="Comparison" fill>
-                  <DataTable columns={COMPARISON_COLUMNS} size="sm">
-                    {#snippet rows()}
-                      {#each records.same_period_backtests as backtest (backtest.id)}
-                        <tr>
-                          <th scope="row" align="right">
-                            <StatusIndicator
-                              label={describeBacktestStatus(backtest.status)}
-                              kind={findBacktestStatusKind(backtest.status)}
-                              align="right"
-                            />
-                            <a
-                              class="cds--link"
-                              aria-label={`Compare with backtest #${String(backtest.id)}`}
-                              href={resolve('/forward-tests/[forwardTestId]/comparison/[backtestId]', {
-                                forwardTestId: String(forwardTest.id),
-                                backtestId: String(backtest.id),
-                              })}>#{backtest.id}</a
-                            >
-                          </th>
-                          <td>{formatUtcTime(backtest.start_utc)}</td>
-                          <td>{formatUtcTime(backtest.end_utc)}</td>
-                          <td align="right">
-                            {#if backtest.metrics !== null}
-                              <ChangeText
-                                value={Number(backtest.metrics.total_return_percent)}
-                                text={formatPercent(backtest.metrics.total_return_percent)}
+              {#if records.metrics !== null}
+                <KeyMetricRow metrics={records.metrics} startCapitalUsd={readStartCapital(forwardTest)} />
+              {/if}
+              {#if chartView === 'bars' && chartInstrument !== null}
+                <div class="chart">
+                  <RunBarChart
+                    instrument={chartInstrument}
+                    barPeriod={forwardTest.bar_period}
+                    range={{
+                      startUtc: forwardTest.created_at_utc,
+                      ...(forwardTest.stopped_at_utc === null ? {} : { endUtc: forwardTest.stopped_at_utc }),
+                    }}
+                    label="Bar chart of {formatInstrument(chartInstrument)}, {forwardTest.bar_period} bars"
+                    chart={runChart}
+                    runKey={chartKey}
+                    strategyIndicators={forwardTest.strategy_indicators}
+                    records={records.fills}
+                  />
+                </div>
+              {:else if records.metrics !== null}
+                <div class="chart">
+                  <EquityDrawdownChart
+                    curves={[{ name: 'Equity', points: records.equity_curve, startCapitalUsd: readStartCapital(forwardTest) }]}
+                    label="Equity and drawdown"
+                    interruptions={chartInterruptions}
+                    fill
+                  />
+                </div>
+              {/if}
+            </Panel>
+          {:else}
+            <Panel
+              {...state}
+              label="Forward test tables"
+              tabs={{
+                label: 'Forward test tables',
+                items: TABLE_TABS,
+                value: selectedTable,
+                onValueChange: (value: string) => {
+                  selectedTable = value as ForwardTestTable;
+                },
+              }}
+            >
+              {#if selectedTable === 'fills'}
+                {#if chartInstrument === null}
+                  <ForwardTestFillTable fills={records.fills} />
+                {:else}
+                  <ForwardTestFillTable
+                    fills={records.fills}
+                    selectedIndex={runChart.readSelectedRow(chartKey)}
+                    onRowPoint={(row: number | null) => {
+                      runChart.pointedRow = row;
+                    }}
+                    onRowSelect={selectFillRow}
+                  />
+                {/if}
+              {:else if selectedTable === 'instruments'}
+                <UniverseInstrumentTable instruments={records.instruments} countHeader="Fills" />
+              {:else if selectedTable === 'comparison'}
+                {#if records.same_period_backtests.length === 0}
+                  <EmptyText text="No backtests of the same period" />
+                {:else}
+                  <ScrollRegion label="Comparison" fill>
+                    <DataTable columns={COMPARISON_COLUMNS} size="sm">
+                      {#snippet rows()}
+                        {#each records.same_period_backtests as backtest (backtest.id)}
+                          <tr>
+                            <th scope="row" align="right">
+                              <StatusIndicator
+                                label={describeBacktestStatus(backtest.status)}
+                                kind={findBacktestStatusKind(backtest.status)}
+                                align="right"
                               />
-                            {/if}
-                          </td>
+                              <a
+                                class="cds--link"
+                                aria-label={`Compare with backtest #${String(backtest.id)}`}
+                                href={resolve('/forward-tests/[forwardTestId]/comparison/[backtestId]', {
+                                  forwardTestId: String(forwardTest.id),
+                                  backtestId: String(backtest.id),
+                                })}>#{backtest.id}</a
+                              >
+                            </th>
+                            <td>{formatUtcTime(backtest.start_utc)}</td>
+                            <td>{formatUtcTime(backtest.end_utc)}</td>
+                            <td align="right">
+                              {#if backtest.metrics !== null}
+                                <ChangeText
+                                  value={Number(backtest.metrics.total_return_percent)}
+                                  text={formatPercent(backtest.metrics.total_return_percent)}
+                                />
+                              {/if}
+                            </td>
+                          </tr>
+                        {/each}
+                      {/snippet}
+                    </DataTable>
+                  </ScrollRegion>
+                {/if}
+              {:else}
+                <ScrollRegion label="Logs" fill>
+                  {#if forwardTest.error_message !== null}
+                    <pre class="atrade-run-log">{forwardTest.error_message}</pre>
+                  {/if}
+                  <DataTable columns={EVENT_COLUMNS} size="sm">
+                    {#snippet rows()}
+                      {#each listForwardTestEvents(forwardTest) as event, eventIndex (eventIndex)}
+                        <tr>
+                          <td>{formatUtcTime(event.timeUtc)}</td>
+                          <td>{event.text}</td>
                         </tr>
                       {/each}
                     {/snippet}
                   </DataTable>
                 </ScrollRegion>
               {/if}
-            {:else}
-              <ScrollRegion label="Logs" fill>
-                {#if forwardTest.error_message !== null}
-                  <pre class="atrade-run-log">{forwardTest.error_message}</pre>
-                {/if}
-                <DataTable columns={EVENT_COLUMNS} size="sm">
-                  {#snippet rows()}
-                    {#each listForwardTestEvents(forwardTest) as event, eventIndex (eventIndex)}
-                      <tr>
-                        <td>{formatUtcTime(event.timeUtc)}</td>
-                        <td>{event.text}</td>
-                      </tr>
-                    {/each}
-                  {/snippet}
-                </DataTable>
-              </ScrollRegion>
-            {/if}
-          </Panel>
-        {/if}
-      {/snippet}
-    </PanelSplit>
-  {/if}
+            </Panel>
+          {/if}
+        {/snippet}
+      </PanelSplit>
+    {/if}
+  </RunCenter>
 
   <AssistantColumn />
 </Workbench>

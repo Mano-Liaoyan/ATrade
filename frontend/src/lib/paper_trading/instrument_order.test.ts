@@ -55,7 +55,7 @@ describe('findInstrumentOrderBlock', () => {
     const account = makeAccount(PASSED, [{ ...makePosition('AAPL', 'NASDAQ', '40'), split_check: splitCheck }]);
     expect(findInstrumentOrderBlock(account, AAPL)).toEqual({
       kind: 'warning',
-      text: 'AAPL needs a split check. Apply the split or keep the ledger on the paper trading page.',
+      text: 'AAPL needs a split check. Apply the split or keep the ledger on the Home page.',
     });
   });
 

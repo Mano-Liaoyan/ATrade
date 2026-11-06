@@ -49,4 +49,4 @@ user applies the split or keeps the ledger. Decision:
   split ratio; what a running `LiveNode` does when a position report has a
   new quantity (the restart avoids it).
 - Cash dividends, spin-offs, mergers, symbol changes, and delistings are not
-  handled. The paper trading page shows the difference as "Unattributed".
+  handled. The Home page shows the difference as "Unattributed".

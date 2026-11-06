@@ -482,6 +482,10 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
   backtest, forward test, parameter sweep, and screen pages: the list, the
   navigation to the newest run or to `defaultId`, the read of the open run, and
   the New dialog.
+- `routes/RunCenter.svelte` is the center area of the backtest, forward test,
+  and parameter sweep pages. When a read of the list or of the open run fails,
+  it shows the reason above the content. The rows and the numbers of the last
+  read stay.
 - While a button action runs, the button is disabled and its text says why,
   for example "Saving…", "Creating…", or "Starting…".
 - UI rule: a status icon stands alone, with no word next to it, before the
@@ -1880,7 +1884,7 @@ The map [Wayfinder: indicators, screens, and strategy help](https://github.com/M
 ### 20.2 Limits of the first version
 
 - The first version does not handle cash dividends. Backtests do not include
-  dividends. On the paper trading page, a dividend shows as an
+  dividends. On the Home page, a dividend shows as an
   "Unattributed" difference (section 11).
 
 ### 20.3 Later work

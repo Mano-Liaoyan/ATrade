@@ -196,6 +196,24 @@ test('Send becomes Stop while the AI assistant runs, and Stop ends the run', asy
   await expect(column.getByRole('button', { name: 'Send' })).toBeVisible();
 });
 
+test('a socket close during a run ends the run: the disabled Send says to reload', async ({ page }, currentTest) => {
+  let closeSocket: () => Promise<void> = () => Promise.resolve();
+  await page.routeWebSocket(/\/ws\/assistant\?conversation_id=/, (socket) => {
+    socket.connectToServer();
+    closeSocket = () => socket.close();
+  });
+  await openStrategyWithConversation(page, createUniqueName(currentTest, 'Closed socket'));
+  const column = assistantColumn(page);
+  await sendMessage(page, 'Please wait.');
+  await expect(conversationLog(page).getByText('Working on it')).toBeVisible();
+  await expect(column.getByRole('button', { name: 'Stop' })).toBeVisible();
+
+  await closeSocket();
+
+  await expect(column.getByRole('button', { name: 'Send' })).toBeDisabled();
+  await expect(column.getByText('The connection to the AI assistant closed. Reload the page to send.')).toBeVisible();
+});
+
 test('a saved version shows a diff card: the card opens CodeDiff, Keep opens the version, Discard keeps the open one', async ({
   page,
 }, currentTest) => {
