@@ -29,6 +29,7 @@ from atrade.backtest.backtest_metrics import (
     calculate_equity_curve,
     calculate_metrics,
     calculate_universe_equity_curve,
+    clip_to_equity_curve,
 )
 from atrade.backtest.backtest_store import BacktestRequest, BacktestResult, UniversePeriod
 from atrade.backtest.backtest_universe import (
@@ -307,7 +308,7 @@ async def save_result(job: BacktestJob, inputs: BacktestInputs, starting_cash: D
         trades = convert_trades_to_usd(inputs.exchange_rates, trades)
     metrics = calculate_metrics(
         paper_capital_usd=request.paper_capital_usd,
-        time_range=request.time_range,
+        time_range=clip_to_equity_curve(request.time_range, equity_curve, request.bar_period),
         equity_curve=equity_curve,
         trades=trades,
     )

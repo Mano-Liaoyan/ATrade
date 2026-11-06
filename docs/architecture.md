@@ -2072,11 +2072,13 @@ option and records it in this document.
 - Decided (#171): a named CHECK constraint holds the values of
   `strategy_version.source`, and `read_strategy_version` does not return
   `source` and `rules` (strategy section 9.1.1).
-- Decided (#165): the daily returns use the UTC date as the trading day,
-  `years` comes from the request range, and `metrics.missing_reasons` gives
+- Decided (#165, changed): the daily returns use the UTC date as the trading
+  day, `years` comes from the part of the request range between the first
+  and the last bar, and `metrics.missing_reasons` gives
   the reason of each null metric (backtest sections 10.9.1 to 10.9.3).
 - Decided (#166): the out-of-sample share is a share of the calendar time
-  of the request range, and the split time does not align to a bar end. The
+  of the part of the request range with saved bars, and the split time does
+  not align to a bar end. The
   route calculates the split metrics at each read from the saved equity
   curve and trades. The out-of-sample Sharpe percent is null when the
   in-sample Sharpe ratio is 0, below 0, or null (backtest section 10.9.4).

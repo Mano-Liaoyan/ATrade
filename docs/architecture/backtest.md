@@ -692,9 +692,11 @@ backtest run and no new data source.
 The backend calculates the metrics. Backtests and forward tests save them
 and use the same functions (section 10.4). `E_0` is the paper capital.
 `E_end` is the final equity. `years` is the number of calendar days of the
-range divided by 365.25. Decided (#165): the range goes from `start_utc` to
-`end_utc` of the backtest request. A forward test uses its start and its stop
-(or now). The mean equity of the turnover is the mean of all equity points.
+range divided by 365.25. Decided (#165, changed): the range goes from the
+start of the first bar to the end of the last bar inside `start_utc` and
+`end_utc` of the backtest request. A range beyond the saved bars thus gives
+the same CAGR, Calmar ratio, and turnover as the range of the saved bars. A
+forward test uses its start and its stop (or now). The mean equity of the turnover is the mean of all equity points.
 
 | Metric | Definition |
 |---|---|
@@ -754,7 +756,10 @@ longer bars first.
   The default is 30. The range is 0 to 50. 0 means no split.
 - The out-of-sample part is the last `out_of_sample_share` percent of the
   backtest range. The split time is the start of the out-of-sample part.
-- The start route calculates `split_time_utc`. After the start, nobody can
+- The start route calculates `split_time_utc` from the part of the request
+  range between the first and the last saved bar. Thus the split time is
+  always inside the bars. A screen universe has no members before its run,
+  so all instruments of its currency count. After the start, nobody can
   change it. To use a different share, the user starts a new backtest.
   Reason: the user must not move the split time after the user sees the
   result.
@@ -770,12 +775,14 @@ longer bars first.
   a backtest.
 - A forward test has no split.
 - Decided (#166): the out-of-sample share is a share of the calendar time
-  of the range: `split_time_utc = start_utc + (end_utc − start_utc) ×
-  (100 − out_of_sample_share) / 100`. The split time does not align to a bar
+  of the range with bars: `split_time_utc = first + (last − first) ×
+  (100 − out_of_sample_share) / 100`, where `first` and `last` are the start
+  of the first saved bar and the end of the last saved bar in the request
+  range. The split time does not align to a bar
   end. An equity point or a fill at or before the split time is in sample.
   A round trip is in the part where it ends. The in-sample range goes from
-  `start_utc` to the split time, and the out-of-sample range from the split
-  time to `end_utc`. The out-of-sample part starts with the equity of the
+  the first bar to the split time, and the out-of-sample range from the
+  split time to the last bar. The out-of-sample part starts with the equity of the
   last in-sample point (the paper capital when there is none) and with the
   position that is open at the split time. Reason: it is the simplest, and
   it needs no bars.

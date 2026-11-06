@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 
 from atrade.backtest import backtest_store
 from atrade.backtest.backtest_store import BacktestRequest, BacktestRow, ParameterValues, UniversePeriod
+from atrade.foundation.bar import TimeRange
 from atrade.strategy import StrategyParameter
 
 MAX_SWEEP_PARAMETERS = 3
@@ -100,6 +101,7 @@ async def insert_sweep(  # noqa: PLR0913 readability-exception: the keywords of 
     connection: psycopg.AsyncConnection,
     *,
     request: BacktestRequest,
+    bar_range: TimeRange,
     grid: list[GridEntry],
     combinations: list[ParameterValues],
     universe_periods: list[UniversePeriod],
@@ -128,6 +130,7 @@ async def insert_sweep(  # noqa: PLR0913 readability-exception: the keywords of 
             await backtest_store.insert_backtest(
                 connection,
                 request=replace(request, parameters=combination),
+                bar_range=bar_range,
                 created_at_utc=created_at_utc,
                 universe_periods=universe_periods,
                 sweep_id=sweep_id,

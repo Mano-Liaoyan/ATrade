@@ -214,13 +214,14 @@ async def insert_backtest(  # noqa: PLR0913 readability-exception: the keywords 
     connection: psycopg.AsyncConnection,
     *,
     request: BacktestRequest,
+    bar_range: TimeRange,
     created_at_utc: datetime,
     universe_periods: list[UniversePeriod] | None = None,
     conversation_id: int | None = None,
     sweep_id: int | None = None,
 ) -> BacktestRow:
     """Adds a queued backtest, and the members of each universe period of a multi-instrument backtest. One
-    transaction."""
+    transaction. `bar_range` is the part of the request range with saved bars: it gives the split time."""
     instrument = request.instrument
     async with connection.transaction(), connection.cursor(row_factory=class_row(BacktestRow)) as cursor:
         # The warning of docs/architecture/backtest.md section 10.12: the bars of an instrument that waits for the
@@ -251,7 +252,7 @@ async def insert_backtest(  # noqa: PLR0913 readability-exception: the keywords 
                 "end_utc": request.time_range.end_utc,
                 "paper_capital_usd": request.paper_capital_usd,
                 "out_of_sample_share": request.out_of_sample_share,
-                "split_time_utc": find_split_time(request.time_range, request.out_of_sample_share),
+                "split_time_utc": find_split_time(bar_range, request.out_of_sample_share),
                 "created_at_utc": created_at_utc,
                 "conversation_id": conversation_id,
                 "source_order": None

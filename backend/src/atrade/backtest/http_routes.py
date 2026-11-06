@@ -30,6 +30,7 @@ from atrade.backtest.backtest_metrics import (
     EquityPoint,
     SplitMetrics,
     calculate_split_metrics,
+    clip_to_equity_curve,
     round_value,
 )
 from atrade.backtest.backtest_robustness import SharpeProbabilityKind, read_robustness
@@ -319,7 +320,9 @@ def calculate_finished_split_metrics(
         return None
     return calculate_split_metrics(
         paper_capital_usd=row.paper_capital_usd,
-        time_range=TimeRange(start_utc=row.start_utc, end_utc=row.end_utc),
+        time_range=clip_to_equity_curve(
+            TimeRange(start_utc=row.start_utc, end_utc=row.end_utc), equity_curve, BarPeriod(row.bar_period)
+        ),
         equity_curve=equity_curve,
         trades=trades,
         split_time_utc=row.split_time_utc,

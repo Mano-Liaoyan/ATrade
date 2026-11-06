@@ -89,8 +89,8 @@ async def test_finished_backtest_shows_metrics_equity_curve_and_trades(
         "average_loss_usd": None,
         # 13 of the 20 bar ends have a position.
         "exposure_percent": "60.00",
-        # Fills of 1040 + 1060 + 960 = 3060, mean equity 10049, 31 / 365.25 years.
-        "turnover_per_year": "3.59",
+        # Fills of 1040 + 1060 + 960 = 3060, mean equity 10049, 20 / 365.25 years: the saved bars of the range.
+        "turnover_per_year": "5.56",
         "win_rate_percent": "100.00",
         "missing_reasons": {
             "cagr_percent": "The range is shorter than 90 days",

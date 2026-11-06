@@ -420,6 +420,21 @@ def calculate_part_metrics(part: MetricPart) -> BacktestMetrics:
     )
 
 
+def clip_to_bars(time_range: TimeRange, first_start_utc: datetime, last_end_utc: datetime) -> TimeRange:
+    """The part of the range that has bars (docs/architecture/backtest.md section 10.9.2)."""
+    return TimeRange(
+        start_utc=max(time_range.start_utc, first_start_utc), end_utc=min(time_range.end_utc, last_end_utc)
+    )
+
+
+def clip_to_equity_curve(time_range: TimeRange, equity_curve: list[EquityPoint], bar_period: BarPeriod) -> TimeRange:
+    """`clip_to_bars` from the equity curve, which has one point at the end of each bar. A curve without points gives
+    the range."""
+    if not equity_curve:
+        return time_range
+    return clip_to_bars(time_range, equity_curve[0].time_utc - bar_period.length, equity_curve[-1].time_utc)
+
+
 def find_split_time(time_range: TimeRange, out_of_sample_share: int) -> datetime | None:
     """The start of the out-of-sample part: the last `out_of_sample_share` percent of the calendar time of the range
     (docs/architecture/backtest.md section 10.9.4). The time does not align to a bar end. None when the share is 0."""

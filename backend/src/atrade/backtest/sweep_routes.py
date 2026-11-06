@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
 from atrade.backtest import backtest_store
+from atrade.backtest.backtest_access import find_bar_range
 from atrade.backtest.backtest_start import BacktestRefusal, prepare_backtest
 from atrade.backtest.backtest_store import BacktestStatus, ParameterValues
 from atrade.backtest.http_routes import (
@@ -152,10 +153,12 @@ class SweepRoutes:
         )
         if isinstance(prepared, BacktestRefusal):
             refuse(prepared.detail)
+        bar_range = await find_bar_range(database_url=self.database_url, request=prepared, universe_periods=periods)
         async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
             sweep_id = await insert_sweep(
                 connection,
                 request=replace(prepared, parameters=None),
+                bar_range=bar_range,
                 grid=request.grid,
                 combinations=combinations,
                 universe_periods=periods,
