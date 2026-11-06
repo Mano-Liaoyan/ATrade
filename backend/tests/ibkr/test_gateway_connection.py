@@ -125,6 +125,19 @@ async def test_place_order_and_wait_raises_the_ibkr_message_of_a_rejected_order(
 
 
 @pytest.mark.anyio
+async def test_place_order_and_wait_raises_when_ibkr_makes_the_order_inactive(monkeypatch: pytest.MonkeyPatch) -> None:
+    connection = make_connected_order_connection(monkeypatch, 1046)
+
+    def make_order_inactive() -> None:
+        connection.ib.trades()[0].orderStatus.status = OrderStatus.Inactive
+
+    asyncio.get_running_loop().call_soon(make_order_inactive)
+
+    with pytest.raises(GatewayRequestError, match="Order 1046 has the status Inactive"):
+        await connection.place_order_and_wait(AAPL_ORDER)
+
+
+@pytest.mark.anyio
 async def test_place_order_and_wait_returns_the_id_when_ibkr_accepts_the_order(monkeypatch: pytest.MonkeyPatch) -> None:
     connection = make_connected_order_connection(monkeypatch, 1043)
 

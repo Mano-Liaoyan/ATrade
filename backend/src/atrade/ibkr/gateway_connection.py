@@ -471,8 +471,8 @@ class IbAsyncGatewayConnection:
         """Sends the order and waits a short time for the first answer of IBKR. Without an answer in the time, the
         order can still be good, so this function returns the ID.
 
-        Raises GatewayRequestError when IBKR rejects the order: ib_async then sets the status Cancelled and writes the
-        IBKR message into the trade log.
+        Raises GatewayRequestError when IBKR rejects the order: the status is then Cancelled or Inactive, and the trade
+        log can have the IBKR message.
         """
         trade = self.send_order(request)
         loop = asyncio.get_running_loop()
@@ -481,8 +481,9 @@ class IbAsyncGatewayConnection:
             trade.orderStatus.status == OrderStatus.PendingSubmit and loop.time() < deadline and self.ib.isConnected()
         ):
             await asyncio.sleep(ORDER_ANSWER_CHECK_SECONDS)
-        if trade.orderStatus.status == OrderStatus.Cancelled:
-            message = f"Order {trade.order.orderId} has the status Cancelled. {trade.log[-1].message}"
+        status = trade.orderStatus.status
+        if status in {OrderStatus.Cancelled, OrderStatus.Inactive}:
+            message = f"Order {trade.order.orderId} has the status {status}. {trade.log[-1].message}"
             raise GatewayRequestError(message)
         return trade.order.orderId
 

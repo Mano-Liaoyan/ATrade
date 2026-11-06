@@ -118,7 +118,8 @@ The public entry `atrade.ibkr` exports:
   check first.
 - `place_order_and_wait(request)` is `place_order` for orders by hand. It
   waits at most 2 seconds while the status is `PendingSubmit`, and raises
-  `GatewayRequestError` with the IBKR message when the status is `Cancelled`,
+  `GatewayRequestError` with the IBKR message when the status is `Cancelled`
+  or `Inactive`,
   for example after error 201. Without an answer in the time, it returns the
   ID. A forward test uses `place_order` and finds an ended order in its open
   order check.
