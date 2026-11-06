@@ -1,4 +1,4 @@
-# Build context for deploy/web.Dockerfile is the repository root.
+# The build context of deploy/web.Dockerfile and deploy/assistant.Dockerfile is the repository root.
 .git
 .env
 **/node_modules
@@ -10,3 +10,7 @@ frontend/build
 frontend/.svelte-kit
 frontend/test-results
 frontend/playwright-report
+# Tests are not in the images. A commit that changes only tests does not restart forward tests.
+backend/tests
+frontend/e2e
+frontend/src/**/*.test.ts

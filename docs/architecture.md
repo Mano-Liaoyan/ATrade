@@ -1337,9 +1337,7 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   volume and stops (`check_database_password` in `app/web.py`).
 - Before Compose starts, `./start run` checks the env file. It stops with a
   message when `ATRADE_POSTGRES_PASSWORD` is not set in the env file or in the
-  process environment. It writes a warning for each variable of the old stack
-  (for example `ATRADE_API_HTTP_PORT`, `ATRADE_IBKR_PAPER_ACCOUNT_ID`). The
-  test is `backend/tests/app/test_start_script.py`.
+  process environment. The test is `backend/tests/app/test_start_script.py`.
 - Services added later (`ib-gateway`, `forward-test`) must not
   block the local start when their credentials are missing. They fail with a
   clear message, or they are in a Compose profile. `ib-gateway` is in the
@@ -1400,14 +1398,23 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
   `restrict,command="<checkout>/scripts/deploy"`. The key can run nothing
   else.
 - `scripts/deploy` accepts only a full SHA of a commit on `origin/main`. It
-  stops when `.env` is not there. It checks out the commit (detached HEAD),
+  stops when `.env` is not there. When the commit is an ancestor of `HEAD` and
+  is not `HEAD`, it writes the reason and exits with 0 and changes nothing,
+  because CI runs can end in a different order than their commits
+  ([#379](https://github.com/Mano-Liaoyan/ATrade/issues/379)). Else it checks
+  out the commit (detached HEAD),
   then runs `./start run --detach --wait`. The server builds the images. The
   build is the production build: `vp build` for the SPA, `uv sync --no-dev`,
   and uvicorn with 1 worker. The test is
   `backend/tests/app/test_deploy_script.py`.
+- The deploy workflow runs one deployment at a time (concurrency group
+  `deploy`). `queue: max` keeps all waiting runs in order. Without it, GitHub
+  keeps 1 waiting run, and an older commit can cancel the run of a newer commit.
 - `.env` stays on the server (section 15). GitHub has no ATrade secrets.
 - A deployment recreates `web` and `forward-test` when their image changes.
-  The worker restarts the running forward tests (section 12.7).
+  The worker restarts the running forward tests (section 12.7). `.dockerignore`
+  excludes `backend/tests`, `frontend/e2e`, and `frontend/src/**/*.test.ts`, so
+  a commit that changes only these files does not change the image.
 
 ## 15. Secrets and configuration
 

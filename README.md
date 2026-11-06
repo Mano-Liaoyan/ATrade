@@ -197,27 +197,23 @@ For development and checks, also:
 
 ### First start
 
-1. If a `.env` from the old ATrade stack is in the repository root (it has
-   variables such as `ATRADE_API_HTTP_PORT` or
-   `ATRADE_IBKR_PAPER_ACCOUNT_ID`), move it to a different name, for example
-   `.env.old-stack`. The rewrite does not read these variables.
-2. Copy `.env.example` to `.env`.
-3. Replace the placeholder values in `.env`. Do not commit `.env`. Set
+1. Copy `.env.example` to `.env`.
+2. Replace the placeholder values in `.env`. Do not commit `.env`. Set
    `ATRADE_POSTGRES_PASSWORD` to a new password (letters, digits, and `-`
    only). PostgreSQL keeps this password in its volume at the first start.
-4. On rootless Podman without the memory cgroup controller, set
+3. On rootless Podman without the memory cgroup controller, set
    `ATRADE_WEB_MEMORY_LIMIT=0` and `ATRADE_ASSISTANT_MEMORY_LIMIT=0`.
-5. Start all services:
+4. Start all services:
 
    ```sh
    ./start run -d --wait
    ```
 
-6. Open <http://127.0.0.1:8000> (or the port in `ATRADE_WEB_PORT`).
+5. Open <http://127.0.0.1:8000> (or the port in `ATRADE_WEB_PORT`).
    `GET /api/health` returns `"status": "ok"`.
 
 `./start run` stops with a message when `ATRADE_POSTGRES_PASSWORD` is not
-set, and writes a warning for each variable of the old stack.
+set.
 
 When `web` stops with "PostgreSQL refused the password", the volume
 `atrade-postgres18-data` has the password of an earlier start. Set that

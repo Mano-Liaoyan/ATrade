@@ -28,6 +28,11 @@ main() {
     printf 'ERROR: Commit %s is not on origin/main. Only commits of main are deployed.\n' "$commit" >&2
     exit 1
   fi
+  # CI runs can end in a different order than their commits. An older commit must not replace a newer one.
+  if [[ "$commit" != "$(git rev-parse HEAD)" ]] && git merge-base --is-ancestor "$commit" HEAD; then
+    printf 'Skipping %s: it is older than the deployed commit %s.\n' "$commit" "$(git rev-parse HEAD)"
+    exit 0
+  fi
   git checkout --quiet --detach "$commit"
   printf 'Deploying %s\n' "$(git log -1 --format='%h %s')"
   # --wait: Compose waits until the services are running and their health checks pass.

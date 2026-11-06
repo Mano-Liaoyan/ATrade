@@ -90,6 +90,40 @@ def test_reads_the_commit_from_the_ssh_forced_command(tmp_path: Path) -> None:
     assert start_calls.exists()
 
 
+def test_skips_a_commit_older_than_the_deployed_commit(tmp_path: Path) -> None:
+    start_calls = tmp_path / "start_calls.txt"
+    server = make_server_checkout(tmp_path, start_calls)
+    author = tmp_path / "author"
+    older_commit = commit_file(author, "older.txt")
+    newer_commit = commit_file(author, "newer.txt")
+    git(author, "push", "--quiet", "origin", "main")
+    run_deploy(server, [newer_commit])
+    start_calls.unlink()
+
+    result = run_deploy(server, [older_commit])
+
+    assert result.returncode == 0, result.stderr
+    assert "older than the deployed commit" in result.stdout
+    assert git(server, "rev-parse", "HEAD") == newer_commit
+    assert not start_calls.exists()
+
+
+def test_deploys_the_current_commit_again(tmp_path: Path) -> None:
+    start_calls = tmp_path / "start_calls.txt"
+    server = make_server_checkout(tmp_path, start_calls)
+    author = tmp_path / "author"
+    commit = commit_file(author, "change.txt")
+    git(author, "push", "--quiet", "origin", "main")
+    run_deploy(server, [commit])
+    start_calls.unlink()
+
+    result = run_deploy(server, [commit])
+
+    assert result.returncode == 0, result.stderr
+    assert git(server, "rev-parse", "HEAD") == commit
+    assert start_calls.read_text() == "run --detach --wait\n"
+
+
 def test_refuses_a_commit_that_is_not_on_main(tmp_path: Path) -> None:
     start_calls = tmp_path / "start_calls.txt"
     server = make_server_checkout(tmp_path, start_calls)
