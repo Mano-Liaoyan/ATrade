@@ -30,7 +30,7 @@
   function findActiveRow(event: PointerEvent): void {
     const { target } = event;
     // A removed row leaves null in rowElements.
-    activeRowIndex = target instanceof Node ? rowElements.findIndex((element) => element?.contains(target)) : -1;
+    activeRowIndex = target instanceof Node ? rowElements.findIndex((element) => element?.contains(target) === true) : -1;
   }
 
   /** A pointer that leaves the window gives a pointerout without a next element. */
@@ -72,7 +72,7 @@
             tabindex="-1"
             onclick={() => {
               const anchor = rowElements[index];
-              if (anchor !== undefined) {
+              if (anchor !== undefined && anchor !== null) {
                 actions.onOpenSettings(row, anchor);
               }
             }}>{row.name}</button
@@ -102,7 +102,7 @@
                 floatingTooltip
                 onclick={() => {
                   const anchor = rowElements[index];
-                  if (anchor !== undefined) {
+                  if (anchor !== undefined && anchor !== null) {
                     actions.onOpenSettings(row, anchor);
                   }
                 }}
