@@ -5,6 +5,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
+import psycopg
 import pytest
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
@@ -18,6 +19,7 @@ from atrade.market_data import (
     save_received_bars,
 )
 from atrade.screen import run_screen_at
+from atrade.screen.screen_point_in_time import read_quarter_start_at
 from atrade.screen.screen_run import ScreenOutcome, run_screen_steps
 from tests.screen.test_screen_run_routes import add_to_watchlist, make_definition
 
@@ -49,6 +51,34 @@ async def save_rising_bars(
     ]
     bar_request = BarRequest(instrument, BarPeriod.ONE_DAY, TimeRange(at_day(first_index), at_day(end_index)))
     await save_received_bars(database_url=database_url, bar_request=bar_request, bars=bars)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("as_of_utc", "quarter_start_utc"),
+    [
+        (datetime(2024, 12, 31, tzinfo=UTC), datetime(2024, 10, 1, tzinfo=UTC)),
+        (datetime(2025, 1, 1, tzinfo=UTC), datetime(2025, 1, 2, tzinfo=UTC)),
+        (datetime(2025, 4, 1, tzinfo=UTC), datetime(2025, 4, 1, tzinfo=UTC)),
+    ],
+    ids=["last_day_of_a_quarter", "calendar_start_of_a_quarter_without_trading", "first_trading_day_of_a_quarter"],
+)
+async def test_a_point_in_time_run_reads_the_quarter_of_the_calendar_month_of_its_date(
+    database_url: str, as_of_utc: datetime, quarter_start_utc: datetime
+) -> None:
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            INSERT INTO us_universe_member (
+                quarter_start_utc, rank, symbol, exchange, currency, average_trading_value, last_ranking_day_utc
+            )
+            VALUES ('2024-10-01', 1, 'AAA', 'NASDAQ', 'USD', 1, '2024-09-30'),
+                ('2025-01-02', 1, 'BBB', 'NASDAQ', 'USD', 1, '2024-12-31'),
+                ('2025-04-01', 1, 'CCC', 'NASDAQ', 'USD', 1, '2025-03-31')
+            """
+        )
+
+    assert await read_quarter_start_at(database_url, as_of_utc) == quarter_start_utc
 
 
 @pytest.mark.anyio

@@ -20,16 +20,19 @@ from atrade.screen.screen_running import read_start_instruments
 
 logger = logging.getLogger("atrade.screen")
 
-# `read_us_universe_quarter_starts` gives the quarters that start before its end. 1 microsecond more keeps a quarter
-# that starts exactly at `as_of_utc`.
-SMALLEST_STEP = timedelta(microseconds=1)
+# A quarter starts on its first trading day, so at most 7 days after the first day of its month.
+QUARTER_START_WINDOW = timedelta(days=7)
 
 
 async def read_quarter_start_at(database_url: str, as_of_utc: datetime) -> datetime | None:
-    """The last quarter of the US universe that starts at or before `as_of_utc`, or None. Only the US universe has a
-    list for each quarter. The other start instruments are the lists of today."""
-    quarter_starts = await read_us_universe_quarter_starts(database_url=database_url, end_utc=as_of_utc + SMALLEST_STEP)
-    return quarter_starts[-1] if quarter_starts else None
+    """The last quarter of the US universe whose calendar month starts at or before `as_of_utc`, or None. The list of a
+    quarter ranks only days before its first trading day, so a date before that day adds no look-ahead. Only the US
+    universe has a list for each quarter. The other start instruments are the lists of today."""
+    quarter_starts = await read_us_universe_quarter_starts(
+        database_url=database_url, end_utc=as_of_utc + QUARTER_START_WINDOW
+    )
+    started = [start for start in quarter_starts if start.replace(day=1) <= as_of_utc]
+    return started[-1] if started else None
 
 
 async def run_screen_at(

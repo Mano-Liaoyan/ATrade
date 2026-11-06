@@ -427,8 +427,10 @@ kinds:
   before `as_of_utc` (`read_daily_bar_summaries_before` of `market_data`,
   the same calculation as the saved summary) and reads the indicator bars
   only before `as_of_utc`. It saves no screen result. The start list of
-  `quarter_universe` is the last quarter that starts at or before
-  `as_of_utc`. The other start lists are the lists of today. The form source
+  `quarter_universe` is the last quarter whose calendar month starts at or
+  before `as_of_utc`. A quarter starts on its first trading day, so
+  2025-01-01 reads the quarter of 2025-01-02. That list ranks only days
+  before its quarter start, so this adds no look-ahead. The other start lists are the lists of today. The form source
   "Screen" and the screen page buttons are in `backtest.md` section 10.10.7.
 - Done in #413: the prefilter of a point-in-time run. Step 2 reads up to 252
   daily bars of each instrument that step 1 keeps. Before this read,
