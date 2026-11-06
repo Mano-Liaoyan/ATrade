@@ -16,6 +16,7 @@ from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from atrade.strategy import STRATEGY_LANGUAGE_SERVER_PATH, create_strategy_language_server_router
+from atrade.strategy.language_server import start_language_server, stop_language_server
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from tests.strategy.language_server_session import LanguageServerSession
 
@@ -42,6 +43,25 @@ def test_client() -> Iterator[TestClient]:
     app.include_router(create_strategy_language_server_router())
     with TestClient(app) as client:
         yield client
+
+
+def read_variable_names(process_id: int) -> set[bytes]:
+    environment = Path(f"/proc/{process_id}/environ").read_bytes()
+    return {variable.split(b"=")[0] for variable in environment.split(b"\0")}
+
+
+@pytest.mark.anyio
+async def test_language_server_process_gets_no_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABENTO_API_KEY", "db-test-key")
+
+    process = await start_language_server()
+    try:
+        variable_names = read_variable_names(process.pid)
+    finally:
+        await stop_language_server(process)
+
+    assert b"PATH" in variable_names
+    assert b"DATABENTO_API_KEY" not in variable_names
 
 
 def read_language_server_child_ids() -> set[int]:

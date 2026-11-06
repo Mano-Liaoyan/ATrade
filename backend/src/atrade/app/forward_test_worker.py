@@ -26,7 +26,7 @@ from atrade.forward_test import (
     read_running_member_lists,
 )
 from atrade.foundation.clock import Clock, SystemClock
-from atrade.foundation.process_protection import block_process_reads
+from atrade.foundation.process_protection import block_process_reads, create_child_environment
 from atrade.foundation.settings import Settings
 from atrade.ibkr import GatewayConnection, IbAsyncGatewayConnection
 from atrade.market_data import DatabentoHistoricalClient, UsUniverseUpdate
@@ -34,6 +34,9 @@ from atrade.market_data import DatabentoHistoricalClient, UsUniverseUpdate
 logger = logging.getLogger("atrade.forward_test_worker")
 # The service is read-only with a tmpfs on /tmp (deploy/compose.yaml). The import reads the file, so it can go.
 UNIVERSE_DOWNLOAD_DIR = Path("/tmp/databento")
+# The strategy code runs in the child, so the child gets only the settings that it reads. The child keeps the
+# refusal of the live trading mode.
+FORWARD_TEST_CHILD_VARIABLES = ("DATABASE_URL", "ATRADE_TRADING_MODE", "ATRADE_IBKR_HOST", "ATRADE_IBKR_PAPER_PORT")
 
 
 class ForwardTestProcess:
@@ -51,9 +54,12 @@ class ForwardTestProcess:
 
 
 async def start_forward_test_process(forward_test_id: int, mode: ChildMode) -> ForwardTestProcess:
-    # The child gets the environment of the worker: the IBKR settings and DATABASE_URL. The forward-test service has
-    # no IBKR user name or password (deploy/compose.yaml).
-    process = await asyncio.create_subprocess_exec(*FORWARD_TEST_PROCESS_COMMAND, str(forward_test_id), mode)
+    process = await asyncio.create_subprocess_exec(
+        *FORWARD_TEST_PROCESS_COMMAND,
+        str(forward_test_id),
+        mode,
+        env=create_child_environment(*FORWARD_TEST_CHILD_VARIABLES),
+    )
     logger.info("Started the %s child of forward test %s (PID %s).", mode, forward_test_id, process.pid)
     return ForwardTestProcess(process)
 

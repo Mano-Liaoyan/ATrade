@@ -17,6 +17,8 @@ from typing import Any, cast
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from atrade.foundation.process_protection import create_child_environment
+
 STRATEGY_LANGUAGE_SERVER_PATH = "/ws/strategy-language-server"
 # Strategy code is user code, not ATrade code: the "standard" mode shows type errors without the strict style rules.
 TYPE_CHECKING_MODE = "standard"
@@ -65,6 +67,7 @@ async def start_language_server() -> asyncio.subprocess.Process:
     command = find_language_server_command()
     return await asyncio.create_subprocess_exec(
         *command,
+        env=create_child_environment(),
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.DEVNULL,

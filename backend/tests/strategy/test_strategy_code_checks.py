@@ -1,7 +1,12 @@
 """Checks before save through the HTTP route: each failed check blocks the save and names the line and the reason."""
 
+import asyncio
+from typing import Any
+
 import httpx
 import pytest
+
+from atrade.strategy.code_checks import find_ruff_problems
 
 VALID_CODE = """from nautilus_trader.config import StrategyConfig
 from nautilus_trader.trading import Strategy
@@ -15,6 +20,25 @@ class EmptyConfig(StrategyConfig):
 class EmptyStrategy(Strategy):
     pass
 """
+
+
+@pytest.mark.anyio
+async def test_ruff_process_gets_no_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABENTO_API_KEY", "db-test-key")
+    start_process = asyncio.create_subprocess_exec
+    environments: list[dict[str, str] | None] = []
+
+    async def record_environment(*command: Any, **options: Any) -> asyncio.subprocess.Process:
+        environments.append(options.get("env"))
+        return await start_process(*command, **options)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", record_environment)
+
+    assert await find_ruff_problems("value = 1\n") == []
+
+    [environment] = environments
+    assert environment is not None
+    assert "DATABENTO_API_KEY" not in list(environment)
 
 
 async def create_strategy(web_client: httpx.AsyncClient) -> int:

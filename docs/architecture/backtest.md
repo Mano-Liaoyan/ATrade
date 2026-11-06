@@ -96,7 +96,7 @@ puts the new parts of this section in phases.
 | Defaults | The user can change the timeout and the concurrency in the UI. PostgreSQL stores them. |
 | Memory | Do not use `RLIMIT_AS`. The `web` container has a memory limit. The child sets `oom_score_adj` to 1000, so the kernel stops the backtest first when memory is low. |
 | CPU | The child runs with `nice 10`. |
-| Environment | Allow list: `PATH`, `HOME`, `TZ`, `DATABASE_URL`. IBKR and Cloudflare secrets are not passed. |
+| Environment | Allow list: `PATH`, `HOME`, `TZ`, `DATABASE_URL`. IBKR and Cloudflare secrets are not passed. `create_child_environment()` of `foundation/process_protection.py` makes the list. The forward test child, the language server, and ruff use the same function. |
 | Parent process | At start, `web` and the forward-test worker call `prctl(PR_SET_DUMPABLE, 0)` (`foundation/process_protection.py`, Linux only). A child cannot read `/proc/<parent>/environ`, and the parent writes no core dump. |
 | Network | No network isolation. The child must connect to PostgreSQL. |
 | File system | The container root file system is read-only. Only `/tmp` is writable. |
@@ -135,15 +135,11 @@ Strategy code can do these things. The results come from a real backtest in the
   IB Gateway was not connected.
 - Database: a child has the full `DATABASE_URL`. The role `atrade` is the
   PostgreSQL superuser, so the child can read and change all tables.
-- Other processes: the prctl block ends at exec. By reading, the language
-  server and ruff get the full `web` environment. A run with a test value showed
-  that a child can read the environment of such a process. So a child can read
-  `DATABENTO_API_KEY` from `/proc/<language server>/environ` while the strategy
-  editor is open.
-- Forward test child: it gets the environment of the worker
-  (`docs/architecture/forward_test.md`). When `.env` has `DATABENTO_API_KEY`, the
-  `os.environ` of the child holds the key. The block on the worker does not
-  change this.
+- Health check: the prctl block ends at exec. By reading, the Compose health check
+  of `web` runs `python -c` with the full environment of the container, every 5
+  seconds. In a run with a test value, a child read the key from a process that
+  `podman exec` started in the same way. So a child that reads `/proc` in a loop
+  can possibly read the key while the health check runs.
 - Other hosts, by reading: a child can connect to `ib-gateway:4004` and to the
   internet.
 
