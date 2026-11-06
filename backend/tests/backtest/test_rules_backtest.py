@@ -1,7 +1,7 @@
 """The code from rule builder rules runs in a real backtest child on the bars of `tests/backtest/bars/` (#172).
 
 The closes of the 20 bars from 2026-03-02: 100, 102, 104, 106, 108, 110, 108, 106, 104, 102, 100, 98, 96, 98,
-100, 102, 104, 106, 108, 110. A market order fills at the close of its bar, at the bar end time (the next day).
+100, 102, 104, 106, 108, 110. A market order fills at the open of the next bar.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -78,14 +78,14 @@ async def test_the_look_back_follows_the_longest_indicator_of_the_rules(
 ) -> None:
     # SMA(200) needs 200 bars. With the earlier look-back of 60 days, it had no value in the 20 bars of the range,
     # and the strategy never traded. Now the look-back gives the last 200 saved bars at 50, so SMA(200) is 50 on
-    # the first bar of the range (close 100), and the strategy buys on it. The order fills at the bar end.
+    # the first bar of the range (close 100), and the strategy buys on it. The order fills at the next open.
     save_test_bars(database_url)
     save_bars_before_the_start(database_url, 300)
     rules = make_rules(group("all_of", condition(price(), "above", indicator("sma", period=200))))
 
     backtest = await run_saved_rules(web_client, database_url, clock, rules)
 
-    assert backtest["trades"][0]["time_utc"] == "2026-03-03T00:00:00Z"
+    assert backtest["trades"][0]["time_utc"] == "2026-03-03T00:00:00.000001Z"
     assert backtest["trades"][0]["side"] == "BUY"
     # Look-back bars make no fill and no equity point (section 10.3.1).
     assert backtest["equity_curve"][0]["time_utc"] == "2026-03-03T00:00:00Z"
@@ -96,13 +96,13 @@ async def test_without_saved_bars_before_the_start_the_indicators_warm_up_on_the
     web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
 ) -> None:
     # The same behaviour as before: SMA(3) has its first value on the third bar of the range (03-04, close 104),
-    # and the order fills at the end of that bar.
+    # and the order fills at the next open.
     save_test_bars(database_url)
     rules = make_rules(group("all_of", condition(price(), "above", indicator("sma", period=3))))
 
     backtest = await run_saved_rules(web_client, database_url, clock, rules)
 
-    assert backtest["trades"][0]["time_utc"] == "2026-03-05T00:00:00Z"
+    assert backtest["trades"][0]["time_utc"] == "2026-03-05T00:00:00.000001Z"
 
 
 @pytest.mark.anyio

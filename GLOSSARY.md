@@ -212,6 +212,12 @@ range, one backtest for each combination of parameter values. In Chinese,
 write 参数扫描.
 _Avoid_: optimization, grid search, batch backtest
 
+**Fill warning**:
+The warning of a backtest in which the free cash did not pay for a market
+order at the open of the next bar: the order became smaller, or the engine
+refused it. In Chinese, write 成交警告.
+_Avoid_: margin call, order error
+
 **Trade**:
 One fill of an order in a backtest or a forward test: the time, the side, the
 quantity, and the price.

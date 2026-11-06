@@ -151,6 +151,7 @@ New columns are null on existing rows, except where a default is given.
 | 2 | `backtest` | Add `conversation_id` (foreign key to `assistant_conversation`, `ON DELETE SET NULL`). It is set when the AI assistant starts the backtest ([#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). Done (#180): migration `4a6c8e1b3d57_backtest_add_conversation_id.py`. |
 | 3 | `backtest` | `symbol`, `exchange`, and `currency` can be null. Add `universe_kind` (`single`, `rule`, `list`, or `screen`; not null, default `single`), the universe parameters of section 10.10.2 (done in #199: `universe_top_n`, migration `d7b9c5d5e28d_backtest_add_universe.py`; a multi-instrument backtest has null `symbol` and `exchange`, and `currency` holds the currency of all members), `sweep_id` (foreign key to `parameter_sweep`, null for a backtest that is not in a sweep), and `parameters` (JSON, the parameter values of a sweep run, else null). Done in #208 (migration `4dbfcca36529_backtest_add_screen_universe.py`): `universe_screen` (`jsonb`, the copy `{"screen_id", "name", "market", "definition"}`, no foreign key) and `universe_rebalance_period` (`quarter` or `month`). Both are set only for `universe_kind` `screen` (CHECK). |
 | 3 | `backtest` | Add `source_order` (JSON list of bar sources) and `bar_count_by_source` (JSON object), section 10.12. Done in #197: migration `2f6b8d1c4e97_backtest_add_bar_source_columns.py`, 2 `jsonb` columns. |
+| 3 | `backtest` | Add `fill_warning` (text, null without a changed order), section 10.10.3. Migration `a9d3e7c15b42_backtest_add_fill_warning.py`. |
 | 3 | `backtest_universe_member` | New. `backtest_id`, `period_start_utc`, `symbol`, `exchange`. One row for each member of the universe in each universe period (section 10.10.2). `ON DELETE CASCADE` with its backtest. Done in #199. |
 | 3 | `backtest_trade` | Add `symbol` and `exchange`. The exchange is the real exchange, not the simulated venue `SMART` ([ADR 0003](../adr/0003-one-simulated-venue-per-currency.md)). Done in #199: a single-instrument backtest writes its instrument too. Trades from before the migration have null. |
 | 3 | `parameter_sweep` | New. Done in #203 (migration `b22fc9704bfc_backtest_create_parameter_sweep.py`): `id`, `strategy_version_id` (foreign key to `strategy_version` with no `ON DELETE` action), `grid` (JSON, section 10.11.1), `created_at_utc`. The runs hold the universe, the bar period, the range, `paper_capital_usd`, and `out_of_sample_share`, so the table does not repeat them. The same migration adds `backtest.sweep_id`, `backtest.parameters` (`jsonb`), and the status `cancelled`. |
@@ -371,7 +372,7 @@ Changes of later phases:
 | 2 | `POST /api/backtests` | The AI assistant port allows this route (section 10.13). A backtest has `conversation_id`. Done (#180): each backtest of `GET /api/backtests` and `GET /api/backtests/{backtest_id}` has `conversation_id` (null for a backtest of the user). The route of port 8000 never sets it. The public entry exports `start_backtest(*, database_url, exchange_rate_reader, request, created_at_utc, universe_periods, conversation_id)`: it makes the checks of `POST /api/backtests` and returns the ID of the queued backtest or a `BacktestRefusal` (`detail`). Port 8001 calls it with the conversation ID (#181). |
 | 3 | `POST /api/backtests` | The body names a universe (section 10.10.6, done in #199 for `single`, `rule`, and `list`) and can contain `source_order` (section 10.12, done in #197): a list of `BarSource` values, only for this backtest. Without it, the route saves the global source order. `422` when the list is empty, has a value 2 times, has a value that is not a `BarSource`, or leaves out a bar source; then no row is added. The saved-bar check of the start route reads through this source order. |
 | 3 | `GET /api/backtests` | Without the query `sweep_id`, the list has no sweep runs. With `sweep_id`, it has only the runs of that sweep. Done in #203: the list has no sweep runs. The query `sweep_id` is not there yet; `GET /api/sweeps/{sweep_id}` lists the runs. |
-| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), `has_split_check_pending` (boolean, section 10.12, done in #324, also in `GET /api/backtests`), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. Done in #204: `sweep_id` and `parameters` (null for a backtest that is not a sweep run), also in `GET /api/backtests`. Done in #200: `instruments`, a list of `{"symbol", "exchange", "trade_count", "net_profit_usd", "quarter_count"}`, one item for each universe member by symbol, empty for a single-instrument backtest. `net_profit_usd` is the sum of the round trips that ended, after commissions. `quarter_count` is the number of universe periods of the member. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
+| 3 | `GET /api/backtests/{backtest_id}` | The backtest also has `universe_kind`, the universe parameters, `sweep_id`, `parameters`, `source_order`, `bar_count_by_source`, `survivorship_bias` (boolean, section 10.12), `has_split_check_pending` (boolean, section 10.12, done in #324, also in `GET /api/backtests`), `fill_warning` (text or null, section 10.10.3, also in `GET /api/backtests`), and `instruments` (section 10.10.7). Each trade has `symbol` and `exchange`. Done in #197: `source_order`, `bar_count_by_source` (`{"ibkr": 9, "databento": 11}`, null until the backtest finishes), and `survivorship_bias`. Done in #199: `universe_kind` and `universe_top_n` (also in `GET /api/backtests`), and `symbol` and `exchange` of each trade. Done in #204: `sweep_id` and `parameters` (null for a backtest that is not a sweep run), also in `GET /api/backtests`. Done in #200: `instruments`, a list of `{"symbol", "exchange", "trade_count", "net_profit_usd", "quarter_count"}`, one item for each universe member by symbol, empty for a single-instrument backtest. `net_profit_usd` is the sum of the round trips that ended, after commissions. `quarter_count` is the number of universe periods of the member. `symbol` and `exchange` of a multi-instrument backtest are null. Both lists are null on a backtest from before the migration. `GET /api/backtests` has the same 3 fields. |
 | 3 | `/api/sweeps` | New routes, section 10.11.3. |
 
 The JSON names of the Phase 1 and Phase 3 fields are choices of this
@@ -903,22 +904,62 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
   not added.
 - In one multi-currency account, USD cash cannot pay for an HKD instrument.
   The engine does not convert cash, also with a USD/HKD pair in the account.
-- A market order fills at the open of the next bar. The cash of a sell is
-  free only after its fill. A buy that the strategy sends at the same time
-  as a sell can use only the cash from before the sell.
+- A market order fills at the open of the next bar of its instrument. The
+  engine alone does not do this. It fills an order on a bar at the close of
+  that bar, also with a `StaticLatencyModel`. Checked on 2.0.0rc7: signal
+  close 120, next open 150, next close 200, fill 200. So ATrade adds these
+  2 parts to the engine run, in `backtest/strategy_engine_run.py`:
+  - `make_open_ticks` adds 1 trade tick at the open of each bar, 1
+    microsecond after the bar start. A strategy that does not subscribe to
+    trade ticks does not see them.
+  - `NextOpenOrders` holds each market order of `submit_order` and each
+    `close_position` until the next open tick of the instrument. All
+    instruments of one rebalance thus fill on one price basis, and the
+    `add_data` order has no effect.
+- The time of such a fill is the bar start plus 1 microsecond. It is later
+  than the end of the bar before. So the fill counts in the equity point at
+  the end of its bar, with the close of that bar. The trade tables show the
+  bar start.
+- A held order is not in the engine cache. Until the open tick,
+  `orders_inflight_count` does not count it, and `close_position` of the
+  same instrument does nothing.
+- The held orders go 1 nanosecond apart, in the order of the strategy calls.
+  Each order sees the cash after the fill of the order before. So a buy
+  sent after a sell can use the cash of that sell.
+- Cash: the engine ends a run with `RuntimeError` when a fill makes the cash
+  negative. The check before each held order uses the open price. A buy
+  that the free cash pays only in part becomes a smaller order of the whole
+  shares that the cash pays. A buy without the cash for 1 share goes to the
+  engine, and the engine refuses it with `OrderDenied`. The run finishes.
+  `backtest.fill_warning` gives the count of these orders and the first of
+  them. The count also has each other order that the engine refused. IBKR
+  refuses such an order and does not reduce it. The backtest reduces it,
+  because a strategy that buys with all its cash would else lose each entry
+  on a gap up.
+- An order without a next open fills at once at the last close. This
+  applies to an order on the last bar of the run, and to a sell of a member
+  without later saved bars.
+- Not held: `close_all_positions`, `submit_order_list`, and limit and stop
+  orders. A market order from these calls fills at the close of the
+  current bar. A buy stop order over a gap can still end the run with the
+  `RuntimeError`.
+- Backtest results from before this rule are not directly comparable with
+  new results.
 - One fill uses at most 1/4 of the bar volume. The engine fills the rest of
   the order in one more fill, at a price 1 tick different. All orders end as
   `FILLED`. Thus a test can have more trades than orders (29 trades for 23
   orders).
 - 500 instruments × 2,500 daily bars: `run()` takes 2.45 seconds, with a
-  peak memory of about 2 GB.
+  peak memory of about 2 GB. The open ticks change a measured run from
+  5.5 seconds to about 10 seconds, with the build of the ticks. The peak
+  memory goes from 2.6 GB to 3.2 GB.
 - Custom data (checked in #198): `subscribe_data(DataType(...))` without a
   client ID gets the custom data that `add_data` added. With a client ID,
   the backtest engine finds no data client and logs an error. Data items
   with the same time come in the order of the `add_data` calls.
 - Estimate, not checked: a universe of 500 instruments on 1-hour bars has
   about 7.35 million bars (about 2,100 trading days × 7 bars). One run then
-  takes about 15 seconds, with a peak memory of 4 to 5 GB.
+  takes about 30 seconds, with a peak memory of 5 to 6 GB.
 
 ### 10.10.4 Run flow changes
 
@@ -1119,8 +1160,10 @@ with universe data from the new route `GET /api/us-universe/range`
   as `top_n`.
 - Decided (#199): all members are on the simulated venue `SMART`, also for
   a currency that is not USD. A strategy that sells a member at the period
-  start in which it leaves gets a fill at the last close of that member: the
-  child reads no bars of the member after its last period.
+  start in which it leaves gets a fill at the next open of that member. The
+  child reads the bars of each member for the whole range. It uses the bars
+  outside the member periods only for the open ticks. Without a later saved
+  bar, the fill is at the last close of the member.
 - Decided (#208): the header line text of a `screen` universe is
   "Screen <name>, each quarter" (or "each month"). The Instruments tab column
   of a monthly `screen` universe is "Months"; it counts the periods of the

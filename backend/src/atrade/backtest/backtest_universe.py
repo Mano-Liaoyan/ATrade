@@ -169,11 +169,15 @@ def find_universe_look_back_length(bar_period: BarPeriod, single_look_back: time
 
 @dataclass(frozen=True)
 class MemberBars:
-    """The bars of one member in its universe periods, and its look-back bars before the start of each range."""
+    """The bars of one member in its universe periods, and its look-back bars before the start of each range.
+
+    `open_bars` holds the member's bars of the whole backtest range. Only their open prices go to the engine.
+    """
 
     instrument: Instrument
     bars: list[Bar]
     look_back_bars: list[Bar]
+    open_bars: list[Bar]
 
 
 @dataclass(frozen=True)
@@ -223,6 +227,16 @@ async def read_universe_bars(
                 instrument=member,
                 bars=bars,
                 look_back_bars=[look_back_by_start[start_utc] for start_utc in sorted(look_back_by_start)],
+                # A member that leaves still sells at its next open, also outside its periods.
+                open_bars=(
+                    await read_saved_bars(
+                        database_url=database_url,
+                        bar_request=BarRequest(
+                            instrument=member, bar_period=request.bar_period, time_range=request.time_range
+                        ),
+                        source_order=source_order,
+                    )
+                ).bars,
             )
         )
     return UniverseBars(members=members, bar_count_by_source=bar_count_by_source)

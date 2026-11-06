@@ -189,6 +189,8 @@ class BacktestResponse(BaseModel):
     survivorship_bias: bool
     # True when an instrument waited for the IBKR stock split check when the backtest was created (section 10.12).
     has_split_check_pending: bool
+    # The run warning when the free cash did not pay for an order at the open (section 10.10.3). Else null.
+    fill_warning: str | None
     # The parameter sweep of a sweep run and its parameter values (section 10.11). Null for another backtest.
     sweep_id: int | None
     parameters: ParameterValues | None
@@ -389,6 +391,7 @@ def make_backtest_response(row: BacktestRow, strategy_version: StrategyVersion |
         else {BarSource(value): count for value, count in row.bar_count_by_source.items()},
         survivorship_bias=has_survivorship_bias(request),
         has_split_check_pending=row.has_split_check_pending,
+        fill_warning=row.fill_warning,
         sweep_id=row.sweep_id,
         parameters=row.parameters,
     )

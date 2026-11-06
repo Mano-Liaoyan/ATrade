@@ -3746,6 +3746,17 @@
             "type": "boolean",
             "title": "Has Split Check Pending"
           },
+          "fill_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Warning"
+          },
           "sweep_id": {
             "anyOf": [
               {
@@ -3840,6 +3851,7 @@
           "bar_count_by_source",
           "survivorship_bias",
           "has_split_check_pending",
+          "fill_warning",
           "sweep_id",
           "parameters",
           "equity_curve",
@@ -4280,6 +4292,17 @@
             "type": "boolean",
             "title": "Has Split Check Pending"
           },
+          "fill_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Warning"
+          },
           "sweep_id": {
             "anyOf": [
               {
@@ -4333,6 +4356,7 @@
           "bar_count_by_source",
           "survivorship_bias",
           "has_split_check_pending",
+          "fill_warning",
           "sweep_id",
           "parameters"
         ],
@@ -4857,6 +4881,17 @@
             "type": "boolean",
             "title": "Has Split Check Pending"
           },
+          "fill_warning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Warning"
+          },
           "sweep_id": {
             "anyOf": [
               {
@@ -4955,6 +4990,7 @@
           "bar_count_by_source",
           "survivorship_bias",
           "has_split_check_pending",
+          "fill_warning",
           "sweep_id",
           "parameters",
           "equity_curve",

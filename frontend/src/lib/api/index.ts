@@ -1180,6 +1180,8 @@ export interface components {
             survivorship_bias: boolean;
             /** Has Split Check Pending */
             has_split_check_pending: boolean;
+            /** Fill Warning */
+            fill_warning: string | null;
             /** Sweep Id */
             sweep_id: number | null;
             parameters: components["schemas"]["ParameterValues"] | null;
@@ -1312,6 +1314,8 @@ export interface components {
             survivorship_bias: boolean;
             /** Has Split Check Pending */
             has_split_check_pending: boolean;
+            /** Fill Warning */
+            fill_warning: string | null;
             /** Sweep Id */
             sweep_id: number | null;
             parameters: components["schemas"]["ParameterValues"] | null;
@@ -1492,6 +1496,8 @@ export interface components {
             survivorship_bias: boolean;
             /** Has Split Check Pending */
             has_split_check_pending: boolean;
+            /** Fill Warning */
+            fill_warning: string | null;
             /** Sweep Id */
             sweep_id: number | null;
             parameters: components["schemas"]["ParameterValues"] | null;
