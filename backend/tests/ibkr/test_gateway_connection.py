@@ -1,6 +1,7 @@
 """The real ib_async connection when no IB Gateway listens: it keeps trying and reports "not connected". Also the
 IBKR link: IB Gateway accepts the API connection, but it has no connection to the IBKR servers."""
 
+import asyncio
 import logging
 import socket
 from contextlib import aclosing
@@ -8,7 +9,7 @@ from datetime import UTC, datetime
 
 import anyio
 import pytest
-from ib_async import BarData, BarDataList, RequestError
+from ib_async import BarData, BarDataList, OrderStatus, RequestError
 
 from atrade.foundation.bar import BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
@@ -18,6 +19,16 @@ from atrade.market_data import LiveDailyBarHub
 
 LOCAL_HOST = "127.0.0.1"
 AAPL = Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD")
+AAPL_ORDER = OrderRequest(
+    account="DU1234567",
+    instrument=AAPL,
+    side="BUY",
+    quantity=1,
+    order_type="MKT",
+    limit_price=None,
+    time_in_force="DAY",
+    order_ref="ATRADE-BY-HAND",
+)
 ONE_DAY_RANGE = TimeRange(datetime(2026, 3, 2, tzinfo=UTC), datetime(2026, 3, 3, tzinfo=UTC))
 # The tests make each historical data timeout this short.
 SHORT_TIMEOUT_SECONDS = 0.05
@@ -78,23 +89,69 @@ async def test_reports_a_failed_instrument_search_without_a_connection() -> None
 @pytest.mark.anyio
 async def test_sends_reads_and_cancels_no_order_without_a_connection() -> None:
     connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=find_closed_local_port(), client_id=1)
-    order_request = OrderRequest(
-        account="DU1234567",
-        instrument=Instrument(symbol="AAPL", exchange="NASDAQ", currency="USD"),
-        side="BUY",
-        quantity=1,
-        order_type="MKT",
-        limit_price=None,
-        time_in_force="DAY",
-        order_ref="ATRADE-BY-HAND",
-    )
 
     with pytest.raises(GatewayRequestError, match="not connected"):
-        await connection.place_order(order_request)
+        await connection.place_order(AAPL_ORDER)
     with pytest.raises(GatewayRequestError, match="not connected"):
         await connection.read_open_orders()
     with pytest.raises(GatewayRequestError, match="not connected"):
         await connection.cancel_order(1)
+
+
+def ignore_message(*_args: object) -> None:
+    pass
+
+
+def make_connected_order_connection(monkeypatch: pytest.MonkeyPatch, order_id: int) -> IbAsyncGatewayConnection:
+    """The real ib_async order state: the client only records the placeOrder message, and no IB Gateway answers."""
+    connection = IbAsyncGatewayConnection(host=LOCAL_HOST, port=4004, client_id=1)
+    monkeypatch.setattr(connection.ib, "isConnected", lambda: True)
+    monkeypatch.setattr(connection.ib.client, "getReqId", lambda: order_id)
+    monkeypatch.setattr(connection.ib.client, "placeOrder", ignore_message)
+    monkeypatch.setattr(gateway_connection_module, "ORDER_ANSWER_TIMEOUT_SECONDS", SHORT_TIMEOUT_SECONDS)
+    monkeypatch.setattr(gateway_connection_module, "ORDER_ANSWER_CHECK_SECONDS", SHORT_CHECK_SECONDS)
+    return connection
+
+
+@pytest.mark.anyio
+async def test_place_order_and_wait_raises_the_ibkr_message_of_a_rejected_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = make_connected_order_connection(monkeypatch, 1042)
+    asyncio.get_running_loop().call_soon(connection.ib.wrapper.error, 1042, 201, "Order rejected - reason: margin", "")
+
+    with pytest.raises(GatewayRequestError, match="Order rejected - reason: margin"):
+        await connection.place_order_and_wait(AAPL_ORDER)
+
+
+@pytest.mark.anyio
+async def test_place_order_and_wait_returns_the_id_when_ibkr_accepts_the_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    connection = make_connected_order_connection(monkeypatch, 1043)
+
+    def accept_order() -> None:
+        connection.ib.trades()[0].orderStatus.status = OrderStatus.Submitted
+
+    asyncio.get_running_loop().call_soon(accept_order)
+
+    assert await connection.place_order_and_wait(AAPL_ORDER) == 1043
+
+
+@pytest.mark.anyio
+async def test_place_order_and_wait_returns_the_id_when_ibkr_does_not_answer_in_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    connection = make_connected_order_connection(monkeypatch, 1044)
+
+    assert await connection.place_order_and_wait(AAPL_ORDER) == 1044
+
+
+@pytest.mark.anyio
+async def test_place_order_does_not_wait_for_the_answer_of_ibkr(monkeypatch: pytest.MonkeyPatch) -> None:
+    connection = make_connected_order_connection(monkeypatch, 1045)
+    monkeypatch.setattr(gateway_connection_module, "ORDER_ANSWER_TIMEOUT_SECONDS", 60.0)
+
+    with anyio.fail_after(SHORT_TIMEOUT_SECONDS * 10):
+        assert await connection.place_order(AAPL_ORDER) == 1045
 
 
 @pytest.mark.anyio

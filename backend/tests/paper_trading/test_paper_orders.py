@@ -307,11 +307,11 @@ async def test_refuses_a_limit_price_that_is_too_large_for_a_float(
 
 
 @pytest.mark.anyio
-async def test_reports_an_ibkr_error_and_stores_no_order(
+async def test_reports_an_order_that_ibkr_rejects_after_the_send_and_stores_no_order(
     database_url: str, clock: FixedClock, frontend_build_dir: Path
 ) -> None:
     gateway_connection = make_connected_gateway([ACCOUNT_ID])
-    gateway_connection.order_error_message = "Order rejected"
+    gateway_connection.order_rejection_message = "Order rejected"
     async with open_client(
         database_url=database_url,
         clock=clock,
@@ -324,6 +324,7 @@ async def test_reports_an_ibkr_error_and_stores_no_order(
     assert send_response.status_code == 502
     assert "Order rejected" in send_response.json()["detail"]
     assert manual_orders_response.json() == {"manual_orders": []}
+    assert gateway_connection.open_orders == []
 
 
 @pytest.mark.anyio

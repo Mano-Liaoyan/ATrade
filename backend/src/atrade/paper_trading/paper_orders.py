@@ -278,7 +278,7 @@ class PaperOrderRoutes:
                 order_ref=MANUAL_ORDER_REF,
             )
             try:
-                ibkr_order_id = await self.paper_account_monitor.gateway_connection.place_order(order_request)
+                ibkr_order_id = await self.paper_account_monitor.gateway_connection.place_order_and_wait(order_request)
             except GatewayRequestError as error:
                 message = f"IB Gateway refused the order: {error}"
                 raise HTTPException(status.HTTP_502_BAD_GATEWAY, detail=message) from error

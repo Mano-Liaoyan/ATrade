@@ -12,7 +12,19 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Literal, Protocol
 
-from ib_async import IB, BarData, BarDataList, Contract, ContractDescription, Fill, Forex, Order, RequestError, Trade
+from ib_async import (
+    IB,
+    BarData,
+    BarDataList,
+    Contract,
+    ContractDescription,
+    Fill,
+    Forex,
+    Order,
+    OrderStatus,
+    RequestError,
+    Trade,
+)
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.instrument import Instrument
@@ -46,6 +58,9 @@ CONNECT_TIMEOUT_SECONDS = 10.0
 OPEN_ORDERS_TIMEOUT_SECONDS = 10.0
 CANCEL_CONFIRMATION_TIMEOUT_SECONDS = 10.0
 CANCEL_CONFIRMATION_CHECK_SECONDS = 0.1
+# The Web process holds its send lock during this wait, so the wait stays short.
+ORDER_ANSWER_TIMEOUT_SECONDS = 2.0
+ORDER_ANSWER_CHECK_SECONDS = 0.05
 # ATrade trades stocks only. reqMatchingSymbols also returns other security types, for example indexes.
 STOCK_SECURITY_TYPE = "STK"
 HISTORICAL_DATA_TIMEOUT_SECONDS = 60.0
@@ -132,6 +147,11 @@ class GatewayConnection(Protocol):
 
     async def place_order(self, request: OrderRequest) -> int:
         """Sends the order and returns its IBKR order ID. Raises GatewayRequestError without a connection."""
+        ...
+
+    async def place_order_and_wait(self, request: OrderRequest) -> int:
+        """Like place_order, for an order by hand. Also raises GatewayRequestError when IBKR rejects the order in the
+        first 2 seconds."""
         ...
 
     async def read_open_orders(self) -> list[OpenOrder]:
@@ -439,9 +459,30 @@ class IbAsyncGatewayConnection:
             message = f"IB Gateway at {self.host}:{self.port} has no connection to IBKR."
             raise GatewayRequestError(message)
 
-    async def place_order(self, request: OrderRequest) -> int:
+    def send_order(self, request: OrderRequest) -> Trade:
         self.require_connection()
-        trade = self.ib.placeOrder(build_contract(request.instrument), build_order(request))
+        return self.ib.placeOrder(build_contract(request.instrument), build_order(request))
+
+    async def place_order(self, request: OrderRequest) -> int:
+        return self.send_order(request).order.orderId
+
+    async def place_order_and_wait(self, request: OrderRequest) -> int:
+        """Sends the order and waits a short time for the first answer of IBKR. Without an answer in the time, the
+        order can still be good, so this function returns the ID.
+
+        Raises GatewayRequestError when IBKR rejects the order: ib_async then sets the status Cancelled and writes the
+        IBKR message into the trade log.
+        """
+        trade = self.send_order(request)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + ORDER_ANSWER_TIMEOUT_SECONDS
+        while (
+            trade.orderStatus.status == OrderStatus.PendingSubmit and loop.time() < deadline and self.ib.isConnected()
+        ):
+            await asyncio.sleep(ORDER_ANSWER_CHECK_SECONDS)
+        if trade.orderStatus.status == OrderStatus.Cancelled:
+            message = f"Order {trade.order.orderId} has the status Cancelled. {trade.log[-1].message}"
+            raise GatewayRequestError(message)
         return trade.order.orderId
 
     async def read_open_orders(self) -> list[OpenOrder]:

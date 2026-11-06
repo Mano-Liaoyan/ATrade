@@ -48,7 +48,7 @@ The public entry `atrade.ibkr` exports:
 
 | Name | Purpose |
 |---|---|
-| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_status()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_exchange_rate(currency, quote_currency)`, `read_daily_exchange_rates(currency, quote_currency, time_range)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
+| `GatewayConnection` | A `Protocol` with the functions that other modules use: `keep_connected()`, `is_connected()`, `read_status()`, `read_port()`, `read_connection_number()`, `read_managed_accounts()`, `read_account_values()`, `read_portfolio()`, `search_instruments(query)`, `read_exchange_rate(currency, quote_currency)`, `read_daily_exchange_rates(currency, quote_currency, time_range)`, `read_historical_bars(instrument, bar_period, time_range)`, `place_order(request)`, `place_order_and_wait(request)`, `read_open_orders()`, `cancel_order(order_id)`, `connect()`, `read_own_open_orders()`, `cancel_order_and_wait(order_id)`, `read_executions()`, `disconnect()`. |
 | `GatewayRequestError` | IB Gateway did not answer a request: no connection, a timeout, or an IBKR API error. |
 | `GatewayStatus` | `connected`, `unreachable` (no API connection), or `no_ibkr_connection` (the API connection is there, but IB Gateway has no connection to the IBKR servers). |
 | `AccountValue` | One account value from IBKR: `account`, `tag` (for example `NetLiquidation`), `value` (text), `currency`. |
@@ -104,7 +104,8 @@ The public entry `atrade.ibkr` exports:
   the same functions. Its data stays in memory. Tests set
   `is_gateway_reachable`, `connected`, `has_ibkr_connection`, `port`, `managed_accounts`,
   `account_values`, `portfolio`, `instruments`, `search_error_message`,
-  `historical_bars_error_message`, `open_orders`, `order_error_message`, `cancel_error_message`, `executions`,
+  `historical_bars_error_message`, `open_orders`, `order_error_message`, `order_rejection_message`,
+  `cancel_error_message`, `executions`,
   `exchange_rates`, `exchange_rate_error_message`, and `daily_exchange_rates` (one rate for each
   day of the range) directly. It records each rate request in `exchange_rate_requests`, and each
   daily rate request in `daily_exchange_rate_requests`. Each change of `connected` from false to true gives a new
@@ -115,6 +116,12 @@ The public entry `atrade.ibkr` exports:
   primary exchange of the instrument, and returns the IBKR order ID. It does
   not check the account. The caller (`paper_trading`) runs the paper account
   check first.
+- `place_order_and_wait(request)` is `place_order` for orders by hand. It
+  waits at most 2 seconds while the status is `PendingSubmit`, and raises
+  `GatewayRequestError` with the IBKR message when the status is `Cancelled`,
+  for example after error 201. Without an answer in the time, it returns the
+  ID. A forward test uses `place_order` and finds an ended order in its open
+  order check.
 - `read_open_orders()` calls `reqAllOpenOrders` and returns the orders that
   are not done, from all client IDs. A lock allows only one request at a
   time, because ib_async keeps one result per request type. The timeout is
