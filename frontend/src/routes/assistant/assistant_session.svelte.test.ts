@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 import { AssistantSession } from './assistant_session.svelte';
 
 const CONVERSATION_ID = 7;
+const OTHER_CONVERSATION_ID = 8;
 const READ_DELAY_MILLISECONDS = 1000;
 const READ_LIMIT = 125;
 
@@ -126,6 +127,37 @@ describe('the title read after a run', () => {
     await vi.advanceTimersByTimeAsync(5 * READ_DELAY_MILLISECONDS);
 
     expect(listReadCount).toBeLessThanOrEqual(2);
+  });
+});
+
+describe('a title read in flight', () => {
+  it('keeps the conversation that the user opens during the read', async () => {
+    const session = await openSession();
+    const answers: ((response: Response) => void)[] = [];
+    vi.stubGlobal('fetch', (input: RequestInfo | URL) =>
+      (input as string).endsWith('/conversations')
+        ? new Promise<Response>((resolve) => {
+            answers.push(resolve);
+          })
+        : fakeFetch(input),
+    );
+    fakeSocket().receive({ type: 'run_state', state: 'settled' });
+    await vi.advanceTimersByTimeAsync(READ_DELAY_MILLISECONDS);
+
+    session.openConversation(OTHER_CONVERSATION_ID);
+    const otherSocket = fakeSocket();
+    const conversations = [CONVERSATION_ID, OTHER_CONVERSATION_ID].map((id) => ({
+      id,
+      title,
+      title_state: titleState,
+      created_at_utc: '2026-01-02T03:04:05Z',
+    }));
+    answers[0]?.(jsonResponse({ conversations }));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(session.conversationId).toBe(OTHER_CONVERSATION_ID);
+    expect(fakeSocket()).toBe(otherSocket);
+    expect(session.conversations).toHaveLength(2);
   });
 });
 

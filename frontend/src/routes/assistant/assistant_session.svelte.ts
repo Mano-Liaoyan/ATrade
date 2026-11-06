@@ -158,6 +158,7 @@ export class AssistantSession {
   ): Promise<void> {
     this.#listReadCount += 1;
     const readCount = this.#listReadCount;
+    const openId = this.conversationId;
     const result = await listConversations(fetch);
     // An older answer does not change the column.
     if (readCount !== this.#listReadCount) {
@@ -168,7 +169,10 @@ export class AssistantSession {
       return;
     }
     this.conversations = result.value;
-    this.openConversation(findConversationToOpen(result.value, selectId, opensNewest));
+    // The user opened another conversation during the read: that conversation keeps its socket.
+    if (this.conversationId === openId) {
+      this.openConversation(findConversationToOpen(result.value, selectId, opensNewest));
+    }
   }
 
   async readModels(): Promise<void> {
