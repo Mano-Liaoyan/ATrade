@@ -350,6 +350,32 @@ async def test_compares_the_metrics_the_equity_curves_the_fills_and_the_interrup
 
 
 @pytest.mark.anyio
+async def test_a_split_adjustment_is_not_a_row_of_the_compared_fills(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    forward_test = await start_forward_test(web_client)
+    write_forward_test_records(database_url, forward_test["id"])
+    write_forward_test_end(database_url, forward_test["id"])
+    backtest_id = (await start_same_period_backtest(web_client, forward_test["id"])).json()["backtest_id"]
+    write_backtest_result(database_url, backtest_id)
+    with psycopg.connect(database_url, autocommit=True) as connection, connection.cursor() as cursor:
+        # One split adjustment in the bar group of the first fill, and one in a bar without a fill.
+        cursor.executemany(
+            """
+            INSERT INTO owner_ledger_entry (owner_kind, forward_test_id, entry_kind, time_utc, account, symbol,
+                exchange, currency, quantity_change, cash_change, stock_split_id)
+            VALUES ('forward_test', %s, 'split_adjustment', %s, 'DU1234567', 'AAPL', 'NASDAQ', 'USD', 10, 0, 1)
+            """,
+            [(forward_test["id"], make_minute(5, 30)), (forward_test["id"], make_minute(6, 30))],
+        )
+
+    comparison = (await web_client.get(f"{FORWARD_TESTS_PATH}/{forward_test['id']}/comparison/{backtest_id}")).json()
+
+    # The last row is the backtest fill at 03:10, which has no forward test fill.
+    assert [fill["forward_test_price_usd"] for fill in comparison["fills"]] == ["100.05", "101.00", None]
+
+
+@pytest.mark.anyio
 async def test_a_queued_backtest_has_no_result_yet(web_client: httpx.AsyncClient, database_url: str) -> None:
     forward_test = await start_forward_test(web_client)
     write_forward_test_end(database_url, forward_test["id"])

@@ -500,6 +500,8 @@ class ComparisonRoutes:
                     exchange=forward_test_fill.instrument.exchange,
                 )
                 for forward_test_fill in forward_test_fills
+                # A split adjustment has the price 0. In a bar group it would change the average fill price.
+                if forward_test_fill.kind == "fill"
             ],
             backtest_fills=name_fills(backtest.trades, backtest.request.instrument),
             equity_curves=[equity_curve, backtest.equity_curve],

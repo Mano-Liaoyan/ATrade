@@ -445,7 +445,8 @@ Phase 3 changes (#146, #149):
 - The comparison page uses the comparison view of section 9.5 ([`strategy.md`](strategy.md)): one key
   metric row for each test and both equity and drawdown curves on one chart.
 - A fill table shows, for each bar, the fill price on each side and the
-  difference.
+  difference. A stock split adjustment is not a fill, so it is not in this
+  table.
 - The chart marks interruptions in grey.
 - Forward test metrics use the same metric functions that `backtest` exports.
 - Phase 1 (#137): the forward test metrics include the new metrics of
