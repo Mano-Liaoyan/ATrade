@@ -775,7 +775,9 @@ longer bars first.
   period. The time range does not matter. A change of the code and a change
   of a parameter both count. Phase 3: each run of a parameter sweep counts.
 - ATrade calculates `N` when it reads a backtest. Thus a later backtest
-  makes the DSR of an earlier backtest lower.
+  makes the DSR of an earlier backtest lower. A delete of a parameter sweep
+  removes its runs, so it lowers `N`, and the DSR of the other backtests can
+  go up.
 - When `N` is 1, the page shows PSR(0). When `N` is above 1, the page shows
   the DSR.
 - The functions use the daily Sharpe ratio (not annualized) of each trial.

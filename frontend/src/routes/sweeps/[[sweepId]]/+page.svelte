@@ -143,7 +143,7 @@
       return;
     }
     deleteMessage = '';
-    workbench.items = workbench.items.filter((item) => item.id !== id);
+    workbench.removeItem(id);
     await goto(resolve('/sweeps/[[sweepId]]', { sweepId: undefined }), { replace: true });
   }
 

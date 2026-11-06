@@ -53,3 +53,74 @@ for (const runPage of RUN_PAGES) {
     await expect(row).toBeVisible();
   });
 }
+
+const FAKE_SWEEP = {
+  id: 9302,
+  strategy_version_id: 1,
+  strategy_id: 1,
+  strategy_name: 'Fake',
+  version_number: 1,
+  grid: [{ name: 'fast_period', values: [10] }],
+  created_at_utc: '2026-01-02T03:04:05Z',
+  run_count: 0,
+  status_counts: {},
+};
+
+test('the delete of the last parameter sweep shows the empty state, not a failed read', async ({ page }) => {
+  let isDeleted = false;
+  let socket: WebSocketRoute | undefined;
+  let finishDetailRead = (): void => undefined;
+  const detailReadAfterDelete = new Promise<void>((resolve) => {
+    finishDetailRead = resolve;
+  });
+  await page.routeWebSocket(/\/ws\/sweeps$/, (route) => {
+    socket = route;
+  });
+  await page.route('**/api/sweeps', (route) => route.fulfill({ json: isDeleted ? [] : [FAKE_SWEEP] }));
+  await page.route('**/api/sweeps/9302', async (route) => {
+    if (route.request().method() === 'DELETE') {
+      // The change push comes before the answer of the delete, so the page reads the deleted sweep.
+      isDeleted = true;
+      socket?.send(JSON.stringify({ type: 'changed' }));
+      await detailReadAfterDelete;
+      await route.fulfill({ status: 204 });
+    } else if (isDeleted) {
+      await route.fulfill({ status: 404, json: { detail: 'Parameter sweep not found' } });
+      finishDetailRead();
+    } else {
+      await route.fulfill({ json: { ...FAKE_SWEEP, runs: [] } });
+    }
+  });
+  await page.goto('/sweeps/9302');
+
+  await page.getByRole('button', { name: 'Delete parameter sweep' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete parameter sweep' }).click();
+
+  await expect(page).toHaveURL(/\/sweeps$/);
+  await expect(page.getByRole('main').getByText('No parameter sweeps', { exact: true })).toBeVisible();
+  await expect(page.getByText('Parameter sweep not read', { exact: true })).toHaveCount(0);
+});
+
+test('a list read from before the delete does not open the deleted parameter sweep', async ({ page }) => {
+  let finishListRead = (): void => undefined;
+  const listRead = new Promise<void>((resolve) => {
+    finishListRead = resolve;
+  });
+  await page.routeWebSocket(/\/ws\/sweeps$/, () => undefined);
+  await page.route('**/api/sweeps', async (route) => {
+    await listRead;
+    await route.fulfill({ json: [FAKE_SWEEP] });
+  });
+  await page.route('**/api/sweeps/9302', (route) =>
+    route.request().method() === 'DELETE' ? route.fulfill({ status: 204 }) : route.fulfill({ json: { ...FAKE_SWEEP, runs: [] } }),
+  );
+  await page.goto('/sweeps/9302');
+
+  await page.getByRole('button', { name: 'Delete parameter sweep' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete parameter sweep' }).click();
+  await expect(page).toHaveURL(/\/sweeps$/);
+  finishListRead();
+
+  await expect(page.getByRole('main').getByText('No parameter sweeps', { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/sweeps$/);
+});

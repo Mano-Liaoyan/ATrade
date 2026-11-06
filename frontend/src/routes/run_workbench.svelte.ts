@@ -38,6 +38,7 @@ export class RunWorkbench<Item extends { id: number }, Detail> {
   detailMessage = $state('');
   isStartDialogOpen = $state(false);
   #startHash: string | undefined;
+  #removedIds: number[] = [];
 
   constructor(options: RunWorkbenchOptions<Item, Detail>) {
     this.#startHash = options.startHash;
@@ -53,7 +54,7 @@ export class RunWorkbench<Item extends { id: number }, Detail> {
             return;
           }
           this.listMessage = '';
-          this.items = result.value;
+          this.items = result.value.filter((item) => !this.#removedIds.includes(item.id));
         },
         onConnectionChange: (isConnected) => {
           this.isConnected = isConnected;
@@ -83,6 +84,8 @@ export class RunWorkbench<Item extends { id: number }, Detail> {
     $effect(() => {
       const id = options.openId();
       if (id === null) {
+        // A failed read of a run that was deleted must not hide the empty state.
+        this.detailMessage = '';
         return;
       }
       if (options.readsDetailOnChange === true) {
@@ -115,6 +118,12 @@ export class RunWorkbench<Item extends { id: number }, Detail> {
         this.isStartDialogOpen = true;
       }
     });
+  }
+
+  /** Removes a deleted run. A list read that started before the delete does not add it again. */
+  removeItem(id: number): void {
+    this.#removedIds.push(id);
+    this.items = this.items.filter((item) => item.id !== id);
   }
 
   changeStartDialog = (open: boolean): void => {
