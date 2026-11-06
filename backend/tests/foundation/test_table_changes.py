@@ -33,6 +33,11 @@ APP_CHANGE_SOCKETS = [
     WATCHLIST_CHANGE_SOCKET,
     FORWARD_TEST_CHANGE_SOCKET,
 ]
+NEW_FILL: LiteralString = (
+    "INSERT INTO owner_ledger_entry (owner_kind, entry_kind, time_utc, account, symbol, exchange, currency, "
+    "quantity_change, price, cash_change, ibkr_execution_id) "
+    "VALUES ('by_hand', 'fill', now(), 'DU1', 'AAPL', 'NASDAQ', 'USD', 1, 100, -100, 'E1')"
+)
 
 
 @asynccontextmanager
@@ -53,7 +58,7 @@ async def open_change_socket(
         while not feed.signals:
             await anyio.sleep(0.01)
         task_group.start_soon(feed.keep_listening)
-        assert await receive_type(socket) == "changed"
+        await receive_changed(socket)
         yield socket
         task_group.cancel_scope.cancel()
 
@@ -61,6 +66,13 @@ async def open_change_socket(
 async def receive_type(socket: AsyncWebSocketSession) -> str:
     with anyio.fail_after(MESSAGE_WAIT_SECONDS):
         return str(json.loads(await socket.receive_text())["type"])
+
+
+async def receive_changed(socket: AsyncWebSocketSession) -> None:
+    """A heartbeat can come first when the notification is slow."""
+    with anyio.fail_after(MESSAGE_WAIT_SECONDS):
+        while json.loads(await socket.receive_text())["type"] != "changed":
+            pass
 
 
 async def write_in_other_connection(database_url: str, statement: LiteralString) -> None:
@@ -77,20 +89,26 @@ async def test_a_change_of_a_watched_table_sends_changed(database_url: str) -> N
             "VALUES ('AAPL', 'NASDAQ', 'USD', now())",
         )
 
-        assert await receive_type(socket) == "changed"
+        await receive_changed(socket)
 
 
 @pytest.mark.anyio
 async def test_a_new_owner_ledger_fill_sends_changed_on_the_forward_test_socket(database_url: str) -> None:
     async with open_change_socket(database_url, FORWARD_TEST_CHANGE_SOCKET) as socket:
+        await write_in_other_connection(database_url, NEW_FILL)
+
+        await receive_changed(socket)
+
+
+@pytest.mark.anyio
+async def test_a_fill_that_is_read_again_sends_only_the_heartbeat(database_url: str) -> None:
+    await write_in_other_connection(database_url, NEW_FILL)
+    async with open_change_socket(database_url, FORWARD_TEST_CHANGE_SOCKET) as socket:
         await write_in_other_connection(
-            database_url,
-            "INSERT INTO owner_ledger_entry (owner_kind, entry_kind, time_utc, account, symbol, exchange, currency, "
-            "quantity_change, price, cash_change, ibkr_execution_id) "
-            "VALUES ('by_hand', 'fill', now(), 'DU1', 'AAPL', 'NASDAQ', 'USD', 1, 100, -100, 'E1')",
+            database_url, NEW_FILL + " ON CONFLICT (ibkr_execution_id) WHERE ibkr_execution_id IS NOT NULL DO NOTHING"
         )
 
-        assert await receive_type(socket) == "changed"
+        assert await receive_type(socket) == "heartbeat"
 
 
 @pytest.mark.anyio
