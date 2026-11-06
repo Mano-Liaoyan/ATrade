@@ -150,7 +150,7 @@ async def test_run_splits_lines_only_at_the_newline(character: str) -> None:
 
     events = [event async for event in client.run(7, "Hi.", SELECTION, "Be short.")]
 
-    assert events == [TextDelta(text=delta) for delta in deltas]
+    assert events == [MessageDeltaMessage(text=delta) for delta in deltas]
 
 
 @pytest.mark.anyio
