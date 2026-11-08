@@ -63,11 +63,13 @@ class HoldMembersStrategy(Strategy):
         for name, bar_type in list(self.members.items()):
             if name in new_members:
                 continue
-            self.unsubscribe_bars(bar_type)
             del self.members[name]
             if name in self.held:
+                # Keep the bars of a held instrument until the sell fills. on_bar then stops them.
                 self.send_market_order(bar_type, OrderSide.SELL)
                 self.held.discard(name)
+            else:
+                self.unsubscribe_bars(bar_type)
         for name, bar_type in new_members.items():
             if name in self.members:
                 continue
@@ -79,7 +81,10 @@ class HoldMembersStrategy(Strategy):
 
     def on_bar(self, bar: Bar) -> None:
         name = str(bar.bar_type)
-        if name in self.members and name not in self.held and self.averages[name].initialized:
+        if name not in self.members:
+            self.unsubscribe_bars(bar.bar_type)
+            return
+        if name not in self.held and self.averages[name].initialized:
             self.send_market_order(bar.bar_type, OrderSide.BUY)
             self.held.add(name)
 

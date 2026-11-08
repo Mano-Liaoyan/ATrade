@@ -933,8 +933,13 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 - A multi-instrument backtest has one currency. The equity curve and the
   metrics change to USD as in section 10.8.
 - The bar period is 1 day or 1 hour. One backtest uses one bar period.
-- The child reads the bars of each instrument only for the universe periods
-  in which it is a member, plus its look-back bars.
+- The child reads the bars of each instrument for the universe periods in
+  which it is a member, plus its look-back bars. The engine gets all bars of
+  the instrument from the start of its first universe period to the backtest
+  end (#418). The strategy gets them only while it subscribes to them. Thus
+  a strategy that keeps the bar subscription of a held instrument after the
+  instrument leaves can manage the position until it sells. The engine gets
+  no bar before the first period start of the instrument.
 - A listing move saves one symbol on 2 exchanges, and each listing can be a
   member. After the bar read, the child merges the listings of one symbol
   into one member with all bars, on the exchange of the last bar. The trade
@@ -1084,7 +1089,10 @@ Checked with NautilusTrader 2.0.0rc7 and synthetic bars
    section 10.8.
 2. The runner does not change.
 3. The child reads the saved bars of each member for its universe periods,
-   plus the look-back bars, through the source order (section 10.12).
+   plus the look-back bars, through the source order (section 10.12). It
+   also reads the bars of the whole range of a member that is not a member
+   for the whole range. The engine gets the bars from the first period start
+   of each member to the backtest end (section 10.10.1).
 4. The child converts the bars of all members to Arrow bytes.
 5. The child runs the engine with one simulated venue for the currency, one
    `CASH` account with the paper capital in that currency, one `Equity`
@@ -1239,7 +1247,10 @@ with universe data from the new route `GET /api/us-universe/range`
   `subscribe_data(DataType("UniverseUpdate"))` in `on_start` and gets the
   list in `on_data(data)` as `data.data.bar_types`. Then it subscribes to
   the bars of the new members and unsubscribes from the bars of the old
-  members. Reason: a timer needs the list in the strategy before the time,
+  members. Changed (#418): when the strategy holds an old member, it sends
+  the sell and keeps the bar subscription. It unsubscribes at the next bar
+  of the instrument when the position is flat. The AI assistant example and
+  the rule builder code in the universe mode do this. Reason: a timer needs the list in the strategy before the time,
   so the strategy can read a later list. The engine sends the custom data
   in time order with the bars, so the strategy cannot read a later list.
   The regression test is `backend/tests/backtest/test_universe_update.py`.
@@ -1278,8 +1289,16 @@ with universe data from the new route `GET /api/us-universe/range`
   a currency that is not USD. A strategy that sells a member at the period
   start in which it leaves gets a fill at the next open of that member. The
   child reads the bars of each member for the whole range. It uses the bars
-  outside the member periods only for the open ticks. Without a later saved
-  bar, the fill is at the last close of the member.
+  before the first member period only for the open ticks. Without a later
+  saved bar, the fill is at the last close of the member.
+- Decided (#418): the engine gets the bars of a member after it leaves (section
+  10.10.1). Memory goes up for a large `rule` universe: one engine bar uses
+  approximately 1.4 KiB at the peak (measured with 200,000 1-day bars). The
+  child already holds these bars as the open bars of the member. Example:
+  `top_n` 500 for 10 years with 25 members that leave each quarter gives
+  approximately 1,000 old members with 5 years (1,260 bars) each after their
+  leave. This adds approximately 1.26 million engine bars, approximately
+  1.8 GiB at the peak.
 - Decided (#208): the header line text of a `screen` universe is
   "Screen <name>, each quarter" (or "each month"). The Instruments tab column
   of a monthly `screen` universe is "Months"; it counts the periods of the
