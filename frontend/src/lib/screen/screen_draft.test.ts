@@ -65,6 +65,10 @@ describe('screen draft', () => {
     ]);
   });
 
+  it('adds a new "Not an ETF" filter to the filters', () => {
+    expect(addCondition(definition, newCondition('not_etf', 'US')).filters).toEqual([...definition.filters, { field: 'not_etf' }]);
+  });
+
   it('a new exchange filter selects all exchanges of the market', () => {
     expect(newCondition('exchange', 'US')).toEqual({ field: 'exchange', values: ['NASDAQ', 'NYSE'] });
     expect(newCondition('exchange', 'HK')).toEqual({ field: 'exchange', values: ['SEHK'] });

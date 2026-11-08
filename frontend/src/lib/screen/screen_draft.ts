@@ -16,7 +16,7 @@ export type ConditionTarget =
   | { part: 'order' };
 export type ListPart = 'filters' | 'indicator_conditions';
 
-export type FilterKind = 'last_price' | 'average_trading_value_20' | 'exchange' | 'still_trading';
+export type FilterKind = 'last_price' | 'average_trading_value_20' | 'exchange' | 'still_trading' | 'not_etf';
 export type IndicatorConditionKind = 'compare' | 'close_versus_line' | 'rank';
 export type ConditionKind = FilterKind | IndicatorConditionKind;
 
@@ -42,7 +42,7 @@ export const MARKET_EXCHANGES: Record<ScreenMarket, string[]> = { US: ['NASDAQ',
 // The lines of "Close above or below a line" (section 24.4.1): the catalog key and its output.
 export const LINE_OUTPUTS: Record<string, string> = { sma: 'value', ema: 'value', donchian_channel: 'upper' };
 
-const FILTER_KINDS: readonly string[] = ['last_price', 'average_trading_value_20', 'exchange', 'still_trading'];
+const FILTER_KINDS: readonly string[] = ['last_price', 'average_trading_value_20', 'exchange', 'still_trading', 'not_etf'];
 
 function items(value: unknown): Item[] {
   return Array.isArray(value) ? (value as Item[]) : [];
@@ -57,6 +57,8 @@ export function newCondition(kind: ConditionKind, market: ScreenMarket): Item {
   switch (kind) {
     case 'still_trading':
       return { field: 'still_trading' };
+    case 'not_etf':
+      return { field: 'not_etf' };
     case 'last_price':
       return { field: 'last_price', operator: '>=', value: '5' };
     case 'average_trading_value_20':

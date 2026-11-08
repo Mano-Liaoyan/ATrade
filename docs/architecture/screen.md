@@ -82,6 +82,7 @@ A screen has 4 parts, in this fixed order:
    | Field | Condition |
    |---|---|
    | Still trading | The instrument still trades. |
+   | Not an ETF | The symbol is not in the US ETF list. |
    | Close | The close (official close) of the last daily bar compared with a number. |
    | Avg trading value (20) | The average trading value of the last 20 daily bars compared with a number, in the currency of the market. |
    | Exchange | The exchange is one of the selected exchanges. |
@@ -139,6 +140,7 @@ The definition is JSON. The indicator reference is the reference of section
   "start": "quarter_universe",
   "filters": [
     {"field": "still_trading"},
+    {"field": "not_etf"},
     {"field": "last_price", "operator": ">", "value": "5"},
     {"field": "average_trading_value_20", "operator": ">", "value": "5000000"},
     {"field": "exchange", "values": ["NASDAQ", "NYSE"]}
@@ -162,6 +164,7 @@ The definition is JSON. The indicator reference is the reference of section
   | Part | Keys | Values |
   |---|---|---|
   | Filter `still_trading` | `field` | |
+  | Filter `not_etf` | `field` | |
   | Filter `last_price`, `average_trading_value_20` | `field`, `operator`, `value` | `operator`: `<`, `<=`, `>`, `>=`. `value`: a decimal string. |
   | Filter `exchange` | `field`, `values` | A list of 1 or more exchanges. |
   | Condition `compare` | `kind`, `indicator`, `operator`, `value` | As the number filters. |
@@ -218,6 +221,12 @@ Decided (#206):
   instrument is at most 7 calendar days older than the daily bars date of
   the run. The daily bars date is the date of the newest last daily bar of
   the start instruments.
+- Decided (#420): the data has no security type (no Databento `definition`
+  purchase). "Not an ETF" is a rule of `screen`: a USD instrument passes
+  when its symbol is not in `US_ETF_SYMBOLS` of `market_data`
+  (`market_data/us_etf_symbols.py`, market_data.md section 8.14), the hand
+  list of the quarterly universe. An HK instrument always passes. Limit: an
+  ETF that is not in the list passes. Add its symbol to the list.
 - A start instrument without a summary row is excluded with the reason
   "No daily bars". A filter on the average trading value (20) of an
   instrument with fewer than 20 daily bars gives "No value: Avg trading
@@ -405,7 +414,7 @@ kinds:
     section 8.11).
   - `average_trading_value_20` uses close × volume. A stock split does not
     change this value.
-  - `still_trading` and `exchange` use no price.
+  - `still_trading`, `not_etf`, and `exchange` use no price.
 - Limit: the summary does not multiply an IBKR close for a stock split of
   the IBKR stock split check. The bar does not show if IBKR adjusted it. When
   IBKR adjusted the bar, a later stock split changes `last_price`.
@@ -551,6 +560,7 @@ Behavior:
   |---|---|
   | Start instruments | Instruments (the start instruments of the market, section 24.2) |
   | Still trading | none |
+  | Not an ETF | none |
   | Close, Avg trading value (20) | Operator, Value |
   | Exchange | A checkbox for each exchange of the market: US NASDAQ and NYSE, HK SEHK |
   | Indicator (compare) | Indicator, its parameters, Output (only for MACD, Bollinger Bands, and the Donchian channel), Operator, Value |
@@ -567,7 +577,7 @@ Behavior:
   screen") shows in an error notification. While a change has a problem,
   the bar has no funnel counts.
 - Decided (#212): "Add condition" is a menu: Close, Avg trading value (20),
-  Exchange, Still trading, then Indicator, Close vs line, and Rank. An item
+  Exchange, Still trading, Not an ETF, then Indicator, Close vs line, and Rank. An item
   opens the edit popover of a new condition with the values of the #145
   prototype (Close ≥ 5, Avg trading value (20) ≥ 20,000,000, all exchanges
   of the market, RSI(14) < 30, Close above SMA(200), top 20% by

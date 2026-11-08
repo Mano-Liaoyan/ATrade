@@ -113,7 +113,7 @@ CASES = [
         [
             problem(
                 ["definition", "filters", 0, "field"],
-                "Unknown field 'market_cap'. Known: still_trading, last_price, average_trading_value_20, exchange.",
+                "Unknown field 'market_cap'. Known: still_trading, not_etf, last_price, average_trading_value_20, exchange.",
             )
         ],
     ),

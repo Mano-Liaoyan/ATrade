@@ -19,6 +19,8 @@ const Id = Type.Integer({ minimum: 1 });
 const Definition = Type.Record(Type.String(), Type.Unknown(), {
   description:
     'The screen definition of screen.md 24.4.1: start, filters, indicator_conditions, and order. ' +
+    'Filter fields: still_trading, not_etf, last_price, average_trading_value_20, exchange. ' +
+    'still_trading and not_etf have only the key field. not_etf removes the US symbols of the ETF list. ' +
     'Call list_indicators to get the indicator keys, the parameter ranges, and the meaning of each value.',
 });
 

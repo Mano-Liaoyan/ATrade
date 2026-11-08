@@ -1288,6 +1288,12 @@ The owner ledger part is in [`paper_trading.md`](paper_trading.md) and
   trading value. Only the instruments with the highest trading values can be
   members, so the list does not need all ETFs. Add a symbol when an ETF shows
   in `us_universe_member`.
+- Decided (#420): the screen filter `not_etf` uses the same list
+  (`US_ETF_SYMBOLS` of the public entry, screen.md section 24.5). Thus the
+  list also has more common ETFs, ETNs, and leveraged and inverse products,
+  also single-stock products. A change of the list changes only the quarters
+  that the universe calculates after the change. The stored
+  `us_universe_member` rows do not change.
 - Decided (#192): the first quarter of `us_universe_member` starts on
   2018-10-01, the first quarter with a full 63-day window after 2018-05-01.
   The Databento import program calculates each quarter from 2018-10-01 that

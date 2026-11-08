@@ -47,6 +47,7 @@
   ];
   const FILTER_TITLES: Record<string, string> = {
     still_trading: 'Still trading',
+    not_etf: 'Not an ETF',
     last_price: 'Close',
     average_trading_value_20: 'Avg trading value (20)',
     exchange: 'Exchange',

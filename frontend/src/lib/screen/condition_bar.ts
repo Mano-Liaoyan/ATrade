@@ -64,6 +64,8 @@ function describeFilter(filter: Item): ConditionTag {
   switch (filter['field']) {
     case 'still_trading':
       return { subject: 'Still trading', operation: '', value: '' };
+    case 'not_etf':
+      return { subject: 'Not an ETF', operation: '', value: '' };
     case 'exchange':
       return { subject: 'Exchange', operation: 'in', value: readItems(filter['values']).map(text).join(', ') };
     case 'last_price':

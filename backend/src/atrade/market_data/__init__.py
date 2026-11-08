@@ -1,7 +1,7 @@
 """Public entry of the market_data capability: instrument search, the instrument lookup, bars, bar sources and the
 source order, saved bars, the indicator catalog and indicator series of bar charts, received bars to save, the daily bars of many instruments, the daily
 bar summary and the daily bar update, the Databento import, its user check, and the IBKR stock split check, the hourly bar purchase list, the
-quarterly US universe, live bars, the shared live daily bars of the watchlist, and daily exchange rates in USD."""
+quarterly US universe and its ETF symbol list, live bars, the shared live daily bars of the watchlist, and daily exchange rates in USD."""
 
 from atrade.market_data.bar_models import BarResponse, to_bar_response
 from atrade.market_data.bar_reading import (
@@ -80,6 +80,7 @@ from atrade.market_data.stock_split_evidence import (
     read_stock_split_candidates,
     record_stock_split_evidence,
 )
+from atrade.market_data.us_etf_symbols import US_ETF_SYMBOLS
 from atrade.market_data.us_trading_days import find_first_trading_day_of_quarter, find_previous_trading_day
 from atrade.market_data.us_trading_days import is_trading_day as is_us_trading_day
 from atrade.market_data.us_universe import (
@@ -97,6 +98,7 @@ __all__ = [
     "CUSTOM_INDICATOR_CHANGE_SOCKET",
     "MARKET_DATA_SOCKET_MESSAGE_MODELS",
     "SUMMARY_BAR_COUNT",
+    "US_ETF_SYMBOLS",
     "BarRequest",
     "BarResponse",
     "BarSource",
