@@ -46,6 +46,9 @@
     type WatchlistInstrument,
   } from '#lib/watchlist';
 
+  // The start of the Databento history (backend `DATABENTO_HISTORY_START_UTC`, docs/architecture/backtest.md 10.12).
+  const DATABENTO_HISTORY_START_DATE = '2018-05-01';
+
   interface Props {
     open: boolean;
     onError: (error: NotificationMessage | null) => void;
@@ -118,11 +121,19 @@
     return results.find((result) => result.id === sourceResultId) ?? results[0] ?? null;
   });
   const fixedListCount = $derived(sourceSymbols?.length ?? fixedListResult?.result_count ?? 0);
-  // A fixed list is chosen at the end of the range. A rule that does not start from the US universe of each quarter
-  // starts from the list of today (docs/architecture/screen.md section 24.13).
-  const screenHasSurvivorshipBias = $derived(
-    screenMode === 'fixed' || (selectedScreen !== null && selectedScreen.definition['start'] !== 'quarter_universe'),
-  );
+  // A fixed list is chosen at the end of the range. A rule that starts from the watchlist or the HK instrument list
+  // starts from the list of today (docs/architecture/screen.md section 24.13). A rule that starts from all US
+  // instruments with daily bars has the instruments that stopped trading from the Databento start 2018-05-01.
+  const screenHasSurvivorshipBias = $derived.by(() => {
+    if (screenMode === 'fixed') {
+      return true;
+    }
+    const start = selectedScreen?.definition['start'];
+    if (start === undefined || start === 'quarter_universe') {
+      return false;
+    }
+    return start !== 'all_with_daily_bars' || startDate === '' || startDate < DATABENTO_HISTORY_START_DATE;
+  });
   // The reason the start dialog shows while the request is null.
   const missingChoice = $derived.by(() => {
     if (strategyVersionId === '' || universeChoice !== 'screen') {

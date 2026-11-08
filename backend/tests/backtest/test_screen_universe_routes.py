@@ -80,17 +80,43 @@ async def test_a_later_change_or_delete_of_the_screen_does_not_change_the_backte
 
 
 @pytest.mark.anyio
-async def test_a_screen_that_starts_from_the_watchlist_has_the_survivorship_bias_warning(
-    web_client: httpx.AsyncClient, database_url: str
+@pytest.mark.parametrize(
+    ("start", "range_fields", "survivorship_bias"),
+    [
+        pytest.param("watchlist", {}, True, id="watchlist"),
+        # The Databento history has the US instruments that stopped trading from 2018-05-01.
+        pytest.param("all_with_daily_bars", {}, False, id="all US instruments in the Databento history"),
+        pytest.param(
+            "all_with_daily_bars",
+            {"start_utc": "2018-05-01T00:00:00+00:00"},
+            False,
+            id="all US instruments from the Databento start",
+        ),
+        pytest.param(
+            "all_with_daily_bars",
+            {"start_utc": "2018-04-30T00:00:00+00:00"},
+            True,
+            id="all US instruments before the Databento start",
+        ),
+    ],
+)
+async def test_the_survivorship_bias_warning_of_a_screen_follows_its_start_list(
+    web_client: httpx.AsyncClient,
+    database_url: str,
+    start: str,
+    range_fields: dict[str, str],
+    survivorship_bias: bool,
 ) -> None:
     save_universe_test_data(database_url)
-    screen_id = await create_screen(web_client, make_definition(start="watchlist"))
+    screen_id = await create_screen(web_client, make_definition(start=start))
     saved = await save_test_strategy_version(web_client)
 
-    response = await start_screen_backtest(web_client, saved["strategy_version_id"], screen_id=screen_id)
+    response = await start_screen_backtest(
+        web_client, saved["strategy_version_id"], screen_id=screen_id, **range_fields
+    )
 
     assert response.status_code == 201, response.text
-    assert response.json()["survivorship_bias"] is True
+    assert response.json()["survivorship_bias"] is survivorship_bias
 
 
 @pytest.mark.anyio

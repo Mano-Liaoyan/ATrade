@@ -1549,6 +1549,15 @@ Phase 3. Sources: [#141](https://github.com/Mano-Liaoyan/ATrade/issues/141),
   rule of the currency and the start date. The "New backtest" form always
   shows the warning for the Watchlist option. Reason: the simplest
   solution; the backtest page needs no new rule.
+- Decided (#419): a `screen` universe whose screen starts from the
+  watchlist or the HK instrument list always has `survivorship_bias` true.
+  A US screen that starts from `quarter_universe` or `all_with_daily_bars`
+  uses the rule of the currency and the start date: true only when the
+  backtest starts before 2018-05-01. The "New backtest" form uses the same
+  rule with its start date. Code: `has_survivorship_bias` and
+  `DATABENTO_HISTORY_START_UTC` of `backtest_access.py`, and
+  `frontend/src/routes/backtests/BacktestRequestFields.svelte`. Tests:
+  `backend/tests/backtest/test_screen_universe_routes.py`.
 - Left to the implementation: none. The English warning text is a translation
   of the decided Chinese text.
 

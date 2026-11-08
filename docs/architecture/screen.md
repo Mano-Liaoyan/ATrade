@@ -680,10 +680,16 @@ Behavior:
 - Decided (#208): the point-in-time run of a backtest uses the global
   source order, as the screen page. The source order of the backtest applies
   to the bars of the run.
-- Decided (#208): a point-in-time backtest whose screen does not start from
-  `quarter_universe` (the watchlist, all US instruments with daily bars, or
-  the HK instrument list) has `survivorship_bias` true, and the form shows
-  the warning: these start lists are the lists of today.
+- Decided (#208): a point-in-time backtest whose screen starts from the
+  watchlist or the HK instrument list has `survivorship_bias` true, and the
+  form shows the warning: these start lists are the lists of today.
+- Decided (#419): a point-in-time backtest whose US screen starts from
+  `all_with_daily_bars` uses the US rule of `backtest.md` section 10.12.
+  `survivorship_bias` is true only when the backtest starts before
+  2018-05-01. Reason: from 2018-05-01, `databento_bar` has all US
+  instruments, also the instruments that stopped trading, and the run checks
+  "Still trading" at the start of each period. The form uses the same rule
+  with its start date.
 - Decided (#207): "Add to watchlist" adds many instruments with one
   `POST /api/watchlist` for each instrument, one after the other. The route
   checks each instrument with IBKR ([`market_data.md`](market_data.md)
