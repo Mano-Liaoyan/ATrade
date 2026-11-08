@@ -62,17 +62,16 @@ def has_survivorship_bias(request: BacktestRequest) -> bool:
     """True for an HK backtest and a US backtest that starts before the Databento history: their universe has no
     instruments that stopped trading (docs/architecture/backtest.md section 10.12). Also true for a fixed `list`
     universe: its members are chosen at the end of the range (docs/architecture/screen.md section 24.9). Also true for
-    a `screen` universe whose screen does not start from the US universe of each quarter: its start list is the list
-    of today (screen.md section 24.13)."""
+    a `screen` universe that starts from the watchlist or the HK instrument list: its start list is the list of today
+    (screen.md section 24.13). A US screen that starts from all instruments with daily bars follows the US rule: the
+    Databento history has the instruments that stopped trading."""
     universe = request.universe
     if universe is not None and universe.kind == "list":
         return True
-    if (
-        universe is not None
-        and universe.screen is not None
-        and universe.screen.definition["start"] != "quarter_universe"
-    ):
-        return True
+    if universe is not None and universe.screen is not None:
+        start = universe.screen.definition["start"]
+        if start not in ("quarter_universe", "all_with_daily_bars"):
+            return True
     currency = request.currency
     if currency == "HKD":
         return True
