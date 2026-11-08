@@ -11,6 +11,7 @@ describe('buildConditionGroups', () => {
         start: 'quarter_universe',
         filters: [
           { field: 'still_trading' },
+          { field: 'not_etf' },
           { field: 'last_price', operator: '>', value: '5' },
           { field: 'average_trading_value_20', operator: '>=', value: '5000000' },
           { field: 'exchange', values: ['NASDAQ', 'NYSE'] },
@@ -36,6 +37,7 @@ describe('buildConditionGroups', () => {
       [{ subject: 'Quarter universe', operation: '', value: '' }],
       [
         { subject: 'Still trading', operation: '', value: '' },
+        { subject: 'Not an ETF', operation: '', value: '' },
         { subject: 'Close', operation: '>', value: '5' },
         { subject: 'Avg trading value (20)', operation: '≥', value: '5,000,000' },
         { subject: 'Exchange', operation: 'in', value: 'NASDAQ, NYSE' },

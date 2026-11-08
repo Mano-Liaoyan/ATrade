@@ -22,7 +22,7 @@ START_INSTRUMENTS = {
 }
 OPERATORS = ("<", "<=", ">", ">=")
 NUMBER_FILTER_FIELDS = ("last_price", "average_trading_value_20")
-FILTER_FIELDS = ("still_trading", *NUMBER_FILTER_FIELDS, "exchange")
+FILTER_FIELDS = ("still_trading", "not_etf", *NUMBER_FILTER_FIELDS, "exchange")
 LINE_INDICATORS = {"sma": "value", "ema": "value", "donchian_channel": "upper"}
 SIDES = ("above", "below")
 RANK_ENDS = ("top", "bottom")
@@ -118,7 +118,7 @@ def read_key(value: object, key: str) -> object:
 
 def check_filter(item: object, location: Location) -> list[ScreenProblem]:
     field = read_key(item, "field")
-    if field == "still_trading":
+    if field in ("still_trading", "not_etf"):
         return check_object(item, location, required=("field",), optional=())[0]
     if field in NUMBER_FILTER_FIELDS:
         problems, fields = check_object(item, location, required=("field", "operator", "value"), optional=())

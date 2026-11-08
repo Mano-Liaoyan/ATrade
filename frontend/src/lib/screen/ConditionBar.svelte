@@ -70,6 +70,7 @@
     ['average_trading_value_20', 'Avg trading value (20)'],
     ['exchange', 'Exchange'],
     ['still_trading', 'Still trading'],
+    ['not_etf', 'Not an ETF'],
     ['compare', 'Indicator'],
     ['close_versus_line', 'Close vs line'],
     ['rank', 'Rank'],

@@ -20,7 +20,7 @@ from nautilus_trader.model import Bar as NautilusBar
 from atrade.foundation.bar import Bar
 from atrade.foundation.instrument import Instrument
 from atrade.indicator import create_indicator, find_indicator_definition, make_nautilus_bar
-from atrade.market_data import SUMMARY_BAR_COUNT, DailyBarSummary
+from atrade.market_data import SUMMARY_BAR_COUNT, US_ETF_SYMBOLS, DailyBarSummary
 
 type DailyBarsReader = Callable[[list[Instrument], datetime, int], Awaitable[dict[Instrument, list[Bar]]]]
 type Definition = Mapping[str, Any]
@@ -117,6 +117,8 @@ def describe_filter(item: Mapping[str, Any]) -> str:
     field = item["field"]
     if field == "still_trading":
         return "Still trading"
+    if field == "not_etf":
+        return "Not an ETF"
     if field == "exchange":
         return f"Exchange in {', '.join(item['values'])}"
     name = "Close" if field == "last_price" else AVERAGE_TRADING_VALUE_NAME
@@ -137,6 +139,9 @@ def check_filter(item: Mapping[str, Any], summary: DailyBarSummary, daily_bars_d
     field = item["field"]
     if field == "still_trading":
         return summary.last_day_start_utc.date() >= daily_bars_date - timedelta(days=STILL_TRADING_DAYS)
+    if field == "not_etf":
+        # The ETF list has only US symbols, so an HK instrument always passes.
+        return summary.instrument.currency != "USD" or summary.instrument.symbol not in US_ETF_SYMBOLS
     if field == "exchange":
         return summary.instrument.exchange in item["values"]
     if field == "last_price":

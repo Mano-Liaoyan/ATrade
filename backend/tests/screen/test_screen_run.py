@@ -277,6 +277,23 @@ async def test_still_trading_keeps_the_instruments_with_a_daily_bar_in_the_last_
     assert reasons(outcome) == {"GONE": "filters[0]: Still trading", "NONE": "No daily bars"}
 
 
+@pytest.mark.anyio
+async def test_not_etf_removes_the_us_symbols_of_the_etf_list_and_keeps_the_hk_instruments() -> None:
+    hk_instrument = Instrument(symbol="SPY", exchange="SEHK", currency="HKD")
+    bars = {
+        stock("AAPL"): make_bars("10", 5),
+        stock("SPY"): make_bars("20", 5),
+        stock("NVDL"): make_bars("30", 5),
+        hk_instrument: make_bars("40", 5),
+    }
+
+    outcome = await run(make_definition(filters=[{"field": "not_etf"}]), bars)
+
+    assert sorted(symbols(outcome)) == ["AAPL", "SPY"]
+    assert [row.instrument for row in outcome.rows if row.instrument.symbol == "SPY"] == [hk_instrument]
+    assert reasons(outcome) == {"SPY": "filters[0]: Not an ETF", "NVDL": "filters[0]: Not an ETF"}
+
+
 def custom(expression: str, name: str = "Custom") -> dict[str, Any]:
     formula = {"name": name, "expression": expression, "chart_placement": "own"}
     return {"indicator": "custom_1", "parameters": {}, "output": "value", "formula": formula}
