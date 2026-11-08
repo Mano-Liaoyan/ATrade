@@ -199,7 +199,8 @@ def find_universe_look_back_length(bar_period: BarPeriod, single_look_back: time
 class MemberBars:
     """The bars of one member in its universe periods, and its look-back bars before the start of each range.
 
-    `open_bars` holds the member's bars of the whole backtest range. Only their open prices go to the engine.
+    `open_bars` holds the member's bars of the whole backtest range. Their open prices go to the engine. Their bars
+    from the first period start of the member go to the engine too (section 10.10.1).
     """
 
     instrument: Instrument

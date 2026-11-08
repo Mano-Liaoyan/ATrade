@@ -36,6 +36,7 @@ CLOSE_TWICE_CODE = (STRATEGIES_DIRECTORY / "close_position_twice.py").read_text(
 BUY_UNLESS_IN_FLIGHT_CODE = (STRATEGIES_DIRECTORY / "buy_unless_in_flight.py").read_text()
 FOLLOW_UNIVERSE_CODE = (STRATEGIES_DIRECTORY / "follow_universe.py").read_text()
 REBALANCE_CODE = (STRATEGIES_DIRECTORY / "rebalance_in_one_bar.py").read_text()
+HOLD_AFTER_LEAVE_CODE = (STRATEGIES_DIRECTORY / "hold_after_leave.py").read_text()
 START_UTC = datetime(2026, 3, 2, tzinfo=UTC)
 OPEN_FILL_DELAY = timedelta(milliseconds=1)
 WAVE = Instrument(symbol="WAVE", exchange="ARCA", currency="USD")
@@ -327,7 +328,7 @@ def test_all_members_of_one_rebalance_fill_at_their_next_open_in_each_member_ord
 
 
 def test_an_order_held_for_the_last_open_of_the_data_fills_at_that_open(tmp_path: Path) -> None:
-    # The bar of day 1 is outside the member periods. Only its open tick and its last close tick go to the engine.
+    # The bar of day 1 is outside the member data of the test. Its open tick and its last close tick go to the engine.
     held = Member(AAA, [(100, 120), (150, 200)], 1)
     other = Member(BBB, [(50, 60)], 1)
     changed_orders: list[str] = []
@@ -354,6 +355,24 @@ def test_a_member_that_leaves_sells_at_its_next_open_outside_its_periods(tmp_pat
 
     # The list of the new period comes at the end of bar 3. The real next open of AAA is the open of bar 4.
     assert ("AAA", "SELL", Decimal("90.00"), find_open_time(3)) in read_symbol_fills(trades)
+
+
+def test_a_held_member_that_leaves_gets_its_later_bars_and_sells_on_one(tmp_path: Path) -> None:
+    leaver = Member(AAA, [(100, 120), (150, 200), (170, 180), (90, 95), (91, 96)], 3)
+    stayer = Member(BBB, [(50, 60), (70, 90), (80, 85), (81, 86), (82, 87)], 5)
+
+    trades = run_universe(
+        [make_member(leaver), make_member(stayer)], make_exit_periods(), tmp_path, HOLD_AFTER_LEAVE_CODE
+    )
+
+    # AAA leaves at the start of day 3. The strategy gets the bar of day 3 and sells at the next open, on day 4.
+    aaa_fills = sorted(
+        (side, price, time_utc) for symbol, side, price, time_utc in read_symbol_fills(trades) if symbol == "AAA"
+    )
+    assert aaa_fills == [
+        ("BUY", Decimal("150.00"), find_open_time(1)),
+        ("SELL", Decimal("91.00"), find_open_time(4)),
+    ]
 
 
 def test_a_member_without_later_bars_sells_at_its_last_close_at_once(tmp_path: Path) -> None:

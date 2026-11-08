@@ -17,7 +17,7 @@ from nautilus_trader.persistence import DataCatalogConfig, ParquetDataCatalog
 from atrade.backtest.arrow_bars import convert_bars_to_arrow_bytes
 from atrade.backtest.backtest_metrics import BacktestTrade
 from atrade.backtest.backtest_store import ParameterValues, UniversePeriod
-from atrade.backtest.backtest_universe import MemberBars
+from atrade.backtest.backtest_universe import MemberBars, merge_bars
 from atrade.backtest.strategy_engine_run import (
     CATALOG_FIRST_NS,
     CATALOG_LAST_NS,
@@ -33,7 +33,7 @@ from atrade.backtest.strategy_engine_run import (
     run_engine,
 )
 from atrade.backtest.universe_update import make_universe_update
-from atrade.foundation.bar import BarPeriod
+from atrade.foundation.bar import Bar, BarPeriod
 from atrade.foundation.instrument import Instrument
 
 SIMULATED_VENUE: Final = Venue("SMART")
@@ -74,6 +74,23 @@ def make_universe_updates(run: UniverseRun) -> list[CustomData]:
     ]
 
 
+def find_engine_bars(member: MemberBars, periods: list[UniversePeriod]) -> list[Bar]:
+    """The bars of the member from the start of its first universe period to the backtest end. A strategy that keeps
+    its bar subscription after the member leaves can manage a held position (section 10.10.1)."""
+    first_start_utc = min(
+        (
+            period.start_utc
+            for period in periods
+            if any(instrument.symbol == member.instrument.symbol for instrument in period.members)
+        ),
+        default=None,
+    )
+    if first_start_utc is None:
+        return member.bars
+    later_bars = [bar for bar in member.open_bars if bar.start_utc >= first_start_utc]
+    return merge_bars([later_bars, member.bars])
+
+
 def create_universe_catalog(look_back_bars: list[list[NautilusBar]], work_directory: Path) -> DataCatalogConfig:
     """One catalog with the look-back bars of all members. A request gets only the bars up to the engine time."""
     catalog_path = work_directory / LOOK_BACK_CATALOG_DIRECTORY_NAME
@@ -97,7 +114,8 @@ def run_universe_strategy(
     open_ticks: list[list[TradeTick]] = []
     last_close_ticks: list[TradeTick] = []
     for member in run.members:
-        all_bars = member.look_back_bars + member.bars
+        engine_bars = find_engine_bars(member, run.periods)
+        all_bars = member.look_back_bars + engine_bars
         if not all_bars:
             continue
         # The open bars of the whole range hold more bars than `all_bars`: their prices also need a precision.
@@ -110,9 +128,9 @@ def run_universe_strategy(
         member_data.append(
             MemberData(
                 bars=wrangler.process_record_batch_bytes(
-                    convert_bars_to_arrow_bytes(round_up_volumes(member.bars), run.bar_period)
+                    convert_bars_to_arrow_bytes(round_up_volumes(engine_bars), run.bar_period)
                 )
-                if member.bars
+                if engine_bars
                 else [],
                 look_back_bars=wrangler.process_record_batch_bytes(
                     convert_bars_to_arrow_bytes(member.look_back_bars, run.bar_period)
