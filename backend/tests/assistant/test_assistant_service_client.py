@@ -73,6 +73,7 @@ async def test_run_reads_the_json_lines_and_skips_unknown_events() -> None:
     assert str(requests[0].url) == "http://assistant:8002/conversations/7/runs"
     assert json.loads(requests[0].content) == {
         "text": "Hi.",
+        "images": [],
         **SELECTION_BODY,
         "thinking_level": "high",
         "system_prompt": "Be short.",
@@ -264,7 +265,7 @@ async def test_credentials_and_providers_are_read_and_a_missing_credential_is_fa
         "id": "google",
         "name": "Google",
         "login_methods": ["api_key"],
-        "models": [{"id": "gemini", "name": "Gemini", "thinking_levels": ["off", "low", "high"]}],
+        "models": [{"id": "gemini", "name": "Gemini", "thinking_levels": ["off", "low", "high"], "reads_images": True}],
     }
     providers = client_for(httpx.Response(200, json={"providers": [provider_body]}), requests)
     missing = client_for(httpx.Response(404, json={"detail": "The credential c1 does not exist."}), requests)
@@ -275,7 +276,9 @@ async def test_credentials_and_providers_are_read_and_a_missing_credential_is_fa
             id="google",
             name="Google",
             login_methods=["api_key"],
-            models=[ProviderModel(id="gemini", name="Gemini", thinking_levels=["off", "low", "high"])],
+            models=[
+                ProviderModel(id="gemini", name="Gemini", thinking_levels=["off", "low", "high"], reads_images=True)
+            ],
         )
     ]
     assert await missing.delete_credential("c1") is False

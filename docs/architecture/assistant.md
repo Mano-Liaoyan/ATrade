@@ -533,6 +533,8 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 - The model list of a provider comes from pi
   (`ModelRuntime.getAvailable(provider)` gives only the models with a
   credential).
+- Each model has `reads_images`: pi lists `image` in the `input` of the
+  model. The composer attaches images only for such a model (25.10).
 - Implemented (#183): `GET /api/assistant/providers` lists each pi provider
   with at least one login method (`login_methods`: `oauth` for a
   subscription login, `api_key`). The `models` of a provider are the union
@@ -886,11 +888,25 @@ Browser to server:
 
 | `type` | Content |
 |---|---|
-| `prompt` | A new user message. |
+| `prompt` | A new user message, with its optional `images` (see below). |
 | `abort` | Stop the current run (the "Stop" button). |
 | `login_answer` | The answer to a `login_step` of kind `prompt`. |
 | `login_start` | Start a login (#183). |
 
+- `images` of `prompt` is a list of at most 4 items
+  `{mime_type, base64}`. `mime_type` is `image/png`, `image/jpeg`,
+  `image/webp`, or `image/gif`. `base64` is the file without the `data:` prefix,
+  at most 4,000,000 characters (a file of 3 MB). With these limits, a message
+  stays under the 16 MiB WebSocket limit of uvicorn. A message with images
+  must have text. A `prompt` outside the limits gets `error` and starts no
+  run.
+- `assistant` gives the images to pi (`prompt(text, {images})`). pi resizes
+  a large image and writes the images into the JSONL file, so the next runs
+  of the conversation also send them to the model. A delete of the
+  conversation deletes them. A model without `reads_images` gets an `error`
+  and no model call. The saved messages of 25.11 have only text, so a
+  reopened conversation does not show the images. The AI assistant can still
+  read them.
 - Phase 3 adds a message for the condition card (a screen ID), like
   `strategy_version_saved`. See 25.14. Decided (#210):
 
@@ -1023,7 +1039,8 @@ below are choices of this document. The implementation can change them.
     `version_number` (25.9).
 - #183 implements the providers and credentials rows:
   - `GET /api/assistant/providers` answers `{"providers": [{id, name,
-    login_methods, models: [{id, name, thinking_levels}]}]}` (25.7.1).
+    login_methods, models: [{id, name, thinking_levels, reads_images}]}]}`
+    (25.7.1).
   - `GET /api/assistant/credentials` answers `{"credentials": [{id, name,
     provider, type, key_last4, state, state_message}]}`. `key_last4` is the
     last 4 characters of an API key, null for a subscription login.
@@ -1064,7 +1081,7 @@ log, the message input, and Minimize.
 |---|---|
 | Top | Conversation `Select`, "New conversation" button, "Credentials" icon button, "Prompt" icon button. The tooltip of "Prompt" names the prompt version of the open conversation, for example "Prompt v3". |
 | Middle | The conversation messages (`role="log"`) in a `ScrollRegion`. Tool steps, diff cards, metric cards, and (phase 3) condition cards. |
-| Bottom | The composer: one box with the message input, and under the input the inline model `Select` (the full model name), the inline thinking `Select`, and the "Send" icon button. While the AI assistant runs, "Send" becomes "Stop". Under the box: the inline provider and credential `Select`s. |
+| Bottom | The composer: one box with the message input, and under the input the inline model `Select` (the full model name), the inline thinking `Select`, the "Attach images" icon button, and the "Send" icon button. Paste and drop also add images. The attached images are thumbnails over the input, each with a remove button. While the AI assistant runs, "Send" becomes "Stop". Under the box: the inline provider and credential `Select`s. |
 
 - A tool step is one line: a status icon (`StatusIndicator`, the state in
   its tooltip, for example "Running") before the title, for example

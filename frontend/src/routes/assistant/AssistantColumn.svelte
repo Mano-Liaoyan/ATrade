@@ -5,14 +5,16 @@
      the open conversation, for example "Prompt v3". Top: the conversation Select (all conversations),
      "New conversation", "Rename conversation", and "Delete conversation" (a danger Dialog first). Middle: the
      conversation log. Bottom: the composer, one box with the message input, the inline
-     Model (the full name) and Thinking Selects, and the "Send" icon button, which becomes "Stop" (abort) while the AI
-     assistant runs. Under the box: the inline Provider and Credential Selects.
+     Model (the full name) and Thinking Selects, "Attach images" (also paste and drop, for a model that reads images),
+     and the "Send" icon button, which becomes "Stop" (abort) while the AI assistant runs. Under the box: the inline Provider and Credential Selects.
      The strategy page gives its open strategy, its diff card actions, and its Output tab for the errors. A page
      without an Output tab shows the last error in the column. A diff card of another strategy, or on another page,
      opens the strategy page: the card opens the diff there, and Keep opens the version. -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import AiAgent16 from '@carbon/icons/es/ai-agent/16.js';
+  import Attachment16 from '@carbon/icons/es/attachment/16.js';
+  import Close16 from '@carbon/icons/es/close/16.js';
   import Edit16 from '@carbon/icons/es/edit/16.js';
   import Password16 from '@carbon/icons/es/password/16.js';
   import Script16 from '@carbon/icons/es/script/16.js';
@@ -26,7 +28,9 @@
     changeProvider,
     CredentialsDialog,
     describeSendButton,
+    IMAGE_INPUT_ACCEPT,
     listSelectItems,
+    MAX_IMAGE_COUNT,
     PromptDialog,
     type DiffItem,
     type ThinkingLevel,
@@ -58,6 +62,7 @@
   let renameTitle = $state('');
   let isDeleteOpen = $state(false);
   let isDeleting = $state(false);
+  let imageInput = $state<HTMLInputElement>();
 
   const conversation = $derived(session.conversation);
   const log = $derived(session.log);
@@ -68,7 +73,17 @@
       hasCredential: session.selection.credentialId !== '',
       connection: session.connection,
       isRunning: log.isRunning,
+      imageCount: session.images.length,
+      hasText: session.text.trim() !== '',
+      modelReadsImages: session.modelReadsImages,
     }),
+  );
+  const attachLabel = $derived(
+    !session.modelReadsImages
+      ? 'The selected model does not read images'
+      : session.images.length >= MAX_IMAGE_COUNT
+        ? `A message can have at most ${String(MAX_IMAGE_COUNT)} images`
+        : 'Attach images',
   );
 
   $effect(() => {
@@ -143,6 +158,30 @@
       if (!log.isRunning) {
         send();
       }
+    }
+  }
+
+  function addChosenImages(): void {
+    if (imageInput !== undefined) {
+      void session.addImages([...(imageInput.files ?? [])]);
+      imageInput.value = '';
+    }
+  }
+
+  /** A paste with text (for example a table cell, which also has a picture of itself) stays a text paste. */
+  function pasteImages(event: ClipboardEvent): void {
+    const files = [...(event.clipboardData?.files ?? [])];
+    if (files.length > 0 && event.clipboardData?.getData('text/plain') === '') {
+      event.preventDefault();
+      void session.addImages(files);
+    }
+  }
+
+  function dropImages(event: DragEvent): void {
+    const files = [...(event.dataTransfer?.files ?? [])];
+    if (files.length > 0) {
+      event.preventDefault();
+      void session.addImages(files);
     }
   }
 
@@ -244,10 +283,58 @@
   />
 
   <div class="assistant-bottom">
-    <div class="composer" role="group" aria-label="New message">
-      <textarea class="message-input" aria-label="Message" rows="2" bind:value={session.text} onkeydown={sendOnEnter}
+    <div
+      class="composer"
+      role="group"
+      aria-label="New message"
+      ondragover={(event: DragEvent) => {
+        event.preventDefault();
+      }}
+      ondrop={dropImages}
+    >
+      {#if session.images.length > 0}
+        <ul class="composer-images" aria-label="Attached images">
+          {#each session.images as image, index (index)}
+            <li class="composer-image">
+              <img src={image.url} alt={`Attached image ${String(index + 1)}`} />
+              <IconButton
+                size="xs"
+                label={`Remove image ${String(index + 1)}`}
+                icon={Close16}
+                align="bottom-start"
+                onclick={() => {
+                  session.removeImage(index);
+                }}
+              />
+            </li>
+          {/each}
+        </ul>
+      {/if}
+      <textarea
+        class="message-input"
+        aria-label="Message"
+        rows="2"
+        bind:value={session.text}
+        onkeydown={sendOnEnter}
+        onpaste={pasteImages}
       ></textarea>
       <div class="composer-bar">
+        <input
+          bind:this={imageInput}
+          type="file"
+          accept={IMAGE_INPUT_ACCEPT}
+          multiple
+          hidden
+          aria-label="Image files"
+          onchange={addChosenImages}
+        />
+        <IconButton
+          label={attachLabel}
+          icon={Attachment16}
+          align="right"
+          disabled={attachLabel !== 'Attach images'}
+          onclick={() => imageInput?.click()}
+        />
         <div class="model-field">
           <Select
             label="Model"
@@ -419,6 +506,27 @@
   .composer:focus-within {
     outline: 2px solid var(--cds-focus);
     outline-offset: -2px;
+  }
+
+  .composer-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cds-spacing-03);
+    margin: 0;
+    padding: var(--cds-spacing-03) var(--cds-spacing-05) 0;
+    list-style: none;
+  }
+
+  .composer-image {
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .composer-image img {
+    display: block;
+    block-size: var(--cds-spacing-10);
+    inline-size: var(--cds-spacing-10);
+    object-fit: cover;
   }
 
   .message-input {

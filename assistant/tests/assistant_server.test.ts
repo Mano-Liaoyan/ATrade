@@ -119,6 +119,14 @@ describe('the conversation routes', () => {
     });
   });
 
+  test('POST runs refuses images that are not a list with 400', async () => {
+    const baseUrl = await startOnFreePort([]);
+
+    const response = await postJson(`${baseUrl}/conversations/3/runs`, { ...RUN_BODY, images: 'not a list' });
+
+    expect(response.status).toBe(400);
+  });
+
   test('POST runs refuses a body without a selection with 400', async () => {
     const baseUrl = await startOnFreePort();
 
@@ -228,8 +236,8 @@ describe('the credential routes', () => {
     };
 
     expect(providers.find((provider) => provider.id === FAKE_KEY_PROVIDER)?.models).toEqual([
-      { id: 'fake-model', name: 'Fake model', thinking_levels: ['off'] },
-      { id: 'fake-model-2', name: 'Fake model 2', thinking_levels: ['off', 'low', 'medium', 'high', 'xhigh'] },
+      { id: 'fake-model', name: 'Fake model', thinking_levels: ['off'], reads_images: false },
+      { id: 'fake-model-2', name: 'Fake model 2', thinking_levels: ['off', 'low', 'medium', 'high', 'xhigh'], reads_images: false },
     ]);
   });
 

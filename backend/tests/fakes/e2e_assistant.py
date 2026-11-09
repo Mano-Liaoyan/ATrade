@@ -16,7 +16,7 @@ requested thinking level runs with "off". The messages are kept, so a reload sho
 
 import hashlib
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime, timedelta
 
 import anyio
@@ -33,6 +33,7 @@ from atrade.assistant import (
     MessageDeltaMessage,
     MessageEndMessage,
     ModelSelection,
+    PromptImage,
     ProviderModel,
     ProviderSummary,
     ScreenRunFinishedMessage,
@@ -115,7 +116,9 @@ class E2EAssistantService(FakeAssistantService):
                 models=[
                     # GPT A has no reasoning, so it has only "off".
                     ProviderModel(id="gpt-a", name="GPT A"),
-                    ProviderModel(id="gpt-b", name="GPT B", thinking_levels=list(E2E_ALL_THINKING_LEVELS)),
+                    ProviderModel(
+                        id="gpt-b", name="GPT B", thinking_levels=list(E2E_ALL_THINKING_LEVELS), reads_images=True
+                    ),
                     # A name that is longer than the Model field of the 28rem column.
                     ProviderModel(
                         id="gpt-long",
@@ -166,9 +169,15 @@ class E2EAssistantService(FakeAssistantService):
         return end
 
     async def run(
-        self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
+        self,
+        conversation_id: int,
+        text: str,
+        selection: ModelSelection,
+        system_prompt: str,
+        images: Sequence[PromptImage] = (),
     ) -> AsyncIterator[AssistantEvent]:
         self.runs.append((conversation_id, text, selection))
+        self.run_images.append(list(images))
         self.system_prompts.append(system_prompt)
         self.first_texts.setdefault(conversation_id, text)
         self.messages.setdefault(conversation_id, []).append(

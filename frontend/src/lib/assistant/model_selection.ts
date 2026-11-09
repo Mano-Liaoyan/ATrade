@@ -128,6 +128,11 @@ export function listSelectItems(
   };
 }
 
+export function findModelReadsImages(providers: readonly Provider[], selection: ModelSelection): boolean {
+  const provider = providers.find((item) => item.id === selection.provider);
+  return provider?.models.find((item) => item.id === selection.model)?.reads_images ?? false;
+}
+
 /** The socket of the open conversation. It does not connect again after a close (conversation_socket.ts). */
 export type ConnectionState = 'connecting' | 'open' | 'closed';
 
@@ -136,6 +141,9 @@ export interface SendState {
   hasCredential: boolean;
   connection: ConnectionState;
   isRunning: boolean;
+  imageCount: number;
+  hasText: boolean;
+  modelReadsImages: boolean;
 }
 
 export interface SendButton {
@@ -158,6 +166,10 @@ export function describeSendButton(state: SendState): SendButton {
         ? 'Connecting to the AI assistant.'
         : state.connection === 'closed'
           ? 'The connection to the AI assistant closed. Reload the page to send.'
-          : null;
+          : state.imageCount > 0 && !state.modelReadsImages
+            ? 'The selected model does not read images. Remove the images or select another model.'
+            : state.imageCount > 0 && !state.hasText
+              ? 'Write a message to send the images.'
+              : null;
   return { action: 'send', label: 'Send', disabledReason };
 }

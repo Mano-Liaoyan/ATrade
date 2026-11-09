@@ -2,7 +2,7 @@
 
 The assistant service listens on port 8002 in the network atrade-assistant-internal. web calls it over HTTP:
 
-- `POST /conversations/{id}/runs` with the user message, the model selection with the thinking level, and the system
+- `POST /conversations/{id}/runs` with the user message, its images, the model selection with the thinking level, and the system
   prompt. The answer is one JSON line for each pi event that web needs: `text_delta`, `message_end` (with the model,
   the credential name, and the thinking level),
   `error`, and the tool events `tool_step`, `strategy_version_saved`, `backtest_finished`, `screen_saved`, and
@@ -20,12 +20,12 @@ The assistant service listens on port 8002 in the network atrade-assistant-inter
 messages of /ws/assistant directly, so the JSON lines become these messages in one step (`read_event_line`).
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, Protocol
 
 import httpx
-from pydantic import BaseModel, Field, JsonValue, TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, JsonValue, StringConstraints, TypeAdapter, ValidationError
 
 # The service name in deploy/compose.yaml and the port of assistant/src/main.ts.
 ASSISTANT_SERVICE_URL = "http://assistant:8002"
@@ -41,6 +41,21 @@ UNUSED_EVENT_ERROR_TYPES = {"union_tag_invalid", "union_tag_not_found"}
 
 # The thinking levels of pi (THINKING_LEVEL_OPTIONS of pi-coding-agent). A model without reasoning has only "off".
 type ThinkingLevel = Literal["off", "minimal", "low", "medium", "high", "xhigh", "max"]
+
+
+# One image is at most 3 MB, so 4 images and the JSON around them stay under the 16 MiB WebSocket limit of uvicorn.
+MAX_PROMPT_IMAGES = 4
+MAX_PROMPT_IMAGE_BASE64_LENGTH = 4_000_000
+
+
+class PromptImage(BaseModel):
+    """One image of a user message. `base64` is the file without the `data:` prefix."""
+
+    mime_type: Literal["image/png", "image/jpeg", "image/webp", "image/gif"]
+    base64: Annotated[
+        str,
+        StringConstraints(max_length=MAX_PROMPT_IMAGE_BASE64_LENGTH, pattern=r"^[A-Za-z0-9+/]+={0,2}$"),
+    ]
 
 
 class AssistantServiceError(Exception):
@@ -215,6 +230,8 @@ class ProviderModel:
     name: str
     # The thinking levels of the model, in the order of pi. Only "off" for a model without reasoning.
     thinking_levels: list[ThinkingLevel] = field(default_factory=lambda: list[ThinkingLevel](["off"]))
+    # The model accepts images in a user message.
+    reads_images: bool = False
 
 
 @dataclass(frozen=True)
@@ -240,7 +257,12 @@ class ConversationMessage:
 
 class AssistantService(Protocol):
     def run(
-        self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
+        self,
+        conversation_id: int,
+        text: str,
+        selection: ModelSelection,
+        system_prompt: str,
+        images: Sequence[PromptImage] = (),
     ) -> AsyncIterator[AssistantEvent]:
         """Runs one user message with the system prompt of the conversation. The iterator ends at the settled run."""
         ...
@@ -276,7 +298,12 @@ def to_provider(provider: dict[str, Any]) -> ProviderSummary:
         name=provider["name"],
         login_methods=provider["login_methods"],
         models=[
-            ProviderModel(id=model["id"], name=model["name"], thinking_levels=model["thinking_levels"])
+            ProviderModel(
+                id=model["id"],
+                name=model["name"],
+                thinking_levels=model["thinking_levels"],
+                reads_images=model["reads_images"],
+            )
             for model in provider["models"]
         ],
     )
@@ -353,11 +380,17 @@ class AssistantServiceClient:
             raise not_reachable(error) from error
 
     async def run(
-        self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
+        self,
+        conversation_id: int,
+        text: str,
+        selection: ModelSelection,
+        system_prompt: str,
+        images: Sequence[PromptImage] = (),
     ) -> AsyncIterator[AssistantEvent]:
         # A tool can wait 15 minutes for a backtest (25.4.2).
         body = {
             "text": text,
+            "images": [image.model_dump() for image in images],
             **selection_body(selection),
             "thinking_level": selection.thinking_level,
             "system_prompt": system_prompt,

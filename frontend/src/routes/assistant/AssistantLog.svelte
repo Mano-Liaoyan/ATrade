@@ -98,7 +98,12 @@
           author={item.role === 'user' ? 'You' : 'AI assistant'}
           continued={entry.continued}
           streaming={item.streaming}
-        >{#if item.role === 'user'}{item.text}{:else}<Markdown text={item.text} />{/if}{#if item.modelLine !== null}<span
+        >{#if item.imageUrls !== undefined}<span class="message-images"
+              >{#each item.imageUrls as url, index (index)}<img
+                  src={url}
+                  alt={`Attached image ${String(index + 1)}`}
+                />{/each}</span
+            >{/if}{#if item.role === 'user'}{item.text}{:else}<Markdown text={item.text} />{/if}{#if item.modelLine !== null}<span
               class="message-model">{item.modelLine}</span
             >{/if}</ChatMessage
         >
@@ -207,6 +212,19 @@
     display: flex;
     margin-block-start: var(--cds-spacing-03);
     min-inline-size: 0;
+  }
+
+  .message-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--cds-spacing-03);
+    margin-block-end: var(--cds-spacing-03);
+  }
+
+  .message-images img {
+    display: block;
+    max-inline-size: 100%;
+    max-block-size: calc(var(--cds-spacing-13) * 2);
   }
 
   .message-model {

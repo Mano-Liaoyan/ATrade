@@ -27,6 +27,8 @@ class ProviderModelResponse(BaseModel):
     name: str
     # The thinking levels of the model, in the order of pi. Only "off" for a model without reasoning.
     thinking_levels: list[ThinkingLevel]
+    # The model accepts images in a user message.
+    reads_images: bool
 
 
 class ProviderResponse(BaseModel):
@@ -66,7 +68,12 @@ class CredentialRoutes:
                     name=provider.name,
                     login_methods=provider.login_methods,
                     models=[
-                        ProviderModelResponse(id=model.id, name=model.name, thinking_levels=model.thinking_levels)
+                        ProviderModelResponse(
+                            id=model.id,
+                            name=model.name,
+                            thinking_levels=model.thinking_levels,
+                            reads_images=model.reads_images,
+                        )
                         for model in provider.models
                     ],
                 )

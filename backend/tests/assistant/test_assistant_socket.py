@@ -20,6 +20,7 @@ from atrade.assistant import (
     MessageDeltaMessage,
     MessageEndMessage,
     ModelSelection,
+    PromptImage,
     ScreenRunFinishedMessage,
     ScreenSavedMessage,
     StrategyVersionSavedMessage,
@@ -133,6 +134,44 @@ async def test_a_prompt_streams_the_answer_between_running_and_settled(
             ModelSelection(provider="fake", model="fake-model", credential_id="fake-key-1", thinking_level="medium"),
         )
     ]
+
+
+@pytest.mark.anyio
+async def test_a_prompt_gives_its_images_to_the_assistant_service(
+    connection: AssistantConnection, assistant_service: FakeAssistantService
+) -> None:
+    assistant_service.run_scripts = [[FIRST_ANSWER]]
+
+    await connection.send(
+        {
+            "type": "prompt",
+            "text": "What is this?",
+            "images": [{"mime_type": "image/png", "base64": "aGk="}],
+            **FIRST_MODEL,
+        }
+    )
+    await connection.receive_until_settled()
+
+    assert assistant_service.run_images == [[PromptImage(mime_type="image/png", base64="aGk=")]]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "images",
+    [
+        [{"mime_type": "image/png", "base64": "aGk="}] * 5,
+        [{"mime_type": "image/svg+xml", "base64": "aGk="}],
+        [{"mime_type": "image/png", "base64": "not base64"}],
+        [{"mime_type": "image/png", "base64": "a" * 4_000_001}],
+    ],
+)
+async def test_a_prompt_with_images_outside_the_limits_starts_no_run(
+    connection: AssistantConnection, assistant_service: FakeAssistantService, images: list[dict[str, str]]
+) -> None:
+    await connection.send({"type": "prompt", "text": "What is this?", "images": images, **FIRST_MODEL})
+
+    assert (await connection.receive())["type"] == "error"
+    assert assistant_service.runs == []
 
 
 @pytest.mark.anyio

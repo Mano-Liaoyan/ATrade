@@ -96,7 +96,12 @@ async def test_get_providers_answers_the_providers_of_the_assistant_service(
             name="Anthropic",
             login_methods=["oauth", "api_key"],
             models=[
-                ProviderModel(id="claude-sonnet-4-5", name="Claude Sonnet 4.5", thinking_levels=["off", "low", "high"])
+                ProviderModel(
+                    id="claude-sonnet-4-5",
+                    name="Claude Sonnet 4.5",
+                    thinking_levels=["off", "low", "high"],
+                    reads_images=True,
+                )
             ],
         ),
         ProviderSummary(id="google", name="Google", login_methods=["api_key"], models=[]),
@@ -111,7 +116,12 @@ async def test_get_providers_answers_the_providers_of_the_assistant_service(
                 "name": "Anthropic",
                 "login_methods": ["oauth", "api_key"],
                 "models": [
-                    {"id": "claude-sonnet-4-5", "name": "Claude Sonnet 4.5", "thinking_levels": ["off", "low", "high"]}
+                    {
+                        "id": "claude-sonnet-4-5",
+                        "name": "Claude Sonnet 4.5",
+                        "thinking_levels": ["off", "low", "high"],
+                        "reads_images": True,
+                    }
                 ],
             },
             {"id": "google", "name": "Google", "login_methods": ["api_key"], "models": []},

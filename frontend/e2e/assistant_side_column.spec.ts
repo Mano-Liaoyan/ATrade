@@ -8,6 +8,9 @@ function createUniqueName(currentTest: TestInfo, title: string): string {
   return `AI ${title} ${currentTest.project.name} ${String(Date.now())}`;
 }
 
+// A valid 1x1 PNG.
+const ONE_PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
 function assistantColumn(page: Page): Locator {
   return page.getByRole('complementary', { name: 'AI assistant' });
 }
@@ -183,6 +186,32 @@ test('the composer is one box with the message, Model, Thinking, and Send; Provi
     };
   });
   expect(field.title).toBe(field.isCut ? fullName : null);
+});
+
+test('a model that reads images takes an attached image, and the message shows it; another model says why not', async ({
+  page,
+}, currentTest) => {
+  await openStrategyWithConversation(page, createUniqueName(currentTest, 'Image'));
+  const column = assistantColumn(page);
+  await expect(column.getByRole('button', { name: 'The selected model does not read images' })).toBeVisible();
+
+  await selectOption(page, 'Model', 'GPT B');
+  await column.getByLabel('Image files').setInputFiles({
+    name: 'chart.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(ONE_PIXEL_PNG, 'base64'),
+  });
+  await expect(column.getByRole('img', { name: 'Attached image 1' })).toBeVisible();
+
+  await selectOption(page, 'Model', 'GPT A');
+  await expect(column.getByText('The selected model does not read images. Remove the images or select another model.')).toBeVisible();
+  await selectOption(page, 'Model', 'GPT B');
+
+  await sendMessage(page, 'What is this?');
+  const log = conversationLog(page);
+  await expect(log.getByRole('img', { name: 'Attached image 1' })).toBeVisible();
+  await expect(log).toContainText('What is this?');
+  await expect(column.getByRole('list', { name: 'Attached images' })).toHaveCount(0);
 });
 
 test('Send becomes Stop while the AI assistant runs, and Stop ends the run', async ({ page }, currentTest) => {
