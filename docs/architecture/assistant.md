@@ -763,6 +763,11 @@ editable part.
   `data.data.bar_types` (backtest section 10.10.8). A real backtest in the
   tests runs the example of the prompt. A saved prompt version keeps its old
   text, so the `run_backtest` description also has this rule.
+- The warm-up handler rule: the bars of `request_bars` go to the indicators
+  of `register_indicator_for_bars` and to `on_historical_bars(self, bars)`.
+  NautilusTrader 2.0 does not call `on_historical_data` for bars. The prompt
+  and the `run_backtest` description have this rule, and a real engine run
+  in the tests shows it (`tests/backtest/test_historical_bars_handler.py`).
 - The forbidden actions in the prompt only tell the model. They are not a
   security control. The allow-list of port 8001 is the control (25.3).
 
