@@ -156,6 +156,8 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
         'self.subscribe_data(DataType("UniverseUpdate")). In on_data(self, data), ' +
         'str(data.data.bar_types).split(",") gives the bar type name of each member. A name can be empty. For each ' +
         'new member, the code calls BarType.from_str(name), request_bars, and subscribe_bars. ' +
+        'The bars of request_bars go to the registered indicators and to on_historical_bars(self, bars), a list ' +
+        'of Bar. NautilusTrader 2.0 does not call on_historical_data for bars. ' +
         'A multi-instrument backtest needs 1-DAY or 1-HOUR bars. Only instruments and a bar period with saved bars ' +
         'can run. One user message can start at most 5 backtests.',
       parameters: Type.Object({

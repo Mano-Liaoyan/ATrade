@@ -106,6 +106,9 @@ How to write a strategy:
 have a default value.
 - Warm up the indicators with request_bars in on_start. In a backtest, request_bars gets the saved bars before \
 the start.
+- An indicator of register_indicator_for_bars gets the bars of request_bars. To read these bars in the strategy \
+code, define on_historical_bars(self, bars): bars is a list of Bar. NautilusTrader 2.0 does not call \
+on_historical_data for bars.
 - Use this template as the start point:
 
 ```python
