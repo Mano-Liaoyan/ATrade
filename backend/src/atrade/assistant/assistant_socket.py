@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field, StringConstraints, TypeAdapter, Validatio
 
 from atrade.assistant import conversation_store
 from atrade.assistant.assistant_service import (
+    MAX_PROMPT_IMAGES,
     AssistantErrorMessage,
     AssistantService,
     AssistantServiceError,
@@ -33,6 +34,7 @@ from atrade.assistant.assistant_service import (
     MessageDeltaMessage,
     MessageEndMessage,
     ModelSelection,
+    PromptImage,
     ScreenRunFinishedMessage,
     ScreenSavedMessage,
     StrategyVersionSavedMessage,
@@ -49,11 +51,12 @@ NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_lengt
 
 
 class PromptMessage(BaseModel):
-    """Browser to server: a new user message, with the provider, the model, the credential, and the thinking level of
-    this message."""
+    """Browser to server: a new user message with its images, and the provider, the model, the credential, and the
+    thinking level of this message."""
 
     type: Literal["prompt"] = "prompt"
     text: NonEmptyText
+    images: list[PromptImage] = Field(default_factory=list[PromptImage], max_length=MAX_PROMPT_IMAGES)
     provider: NonEmptyText
     model: NonEmptyText
     credential_id: NonEmptyText
@@ -190,7 +193,7 @@ class ConversationSocket:
                     credential_id=message.credential_id,
                     thinking_level=message.thinking_level,
                 )
-                task_group.start_soon(self.run, self.conversation_id, message.text, selection)
+                task_group.start_soon(self.run, self.conversation_id, message.text, message.images, selection)
                 self.is_running = True
             case AbortMessage():
                 await self.assistant_service.abort(self.conversation_id)
@@ -213,12 +216,12 @@ class ConversationSocket:
             raise AssistantServiceError(message)
         return join_system_prompt(parts.editable_part, parts.fixed_part)
 
-    async def run(self, conversation_id: int, text: str, selection: ModelSelection) -> None:
+    async def run(self, conversation_id: int, text: str, images: list[PromptImage], selection: ModelSelection) -> None:
         await self.send(RunStateMessage(state="running"))
         has_answer = False
         try:
             system_prompt = await self.read_system_prompt(conversation_id)
-            async for event in self.assistant_service.run(conversation_id, text, selection, system_prompt):
+            async for event in self.assistant_service.run(conversation_id, text, selection, system_prompt, images):
                 if isinstance(event, MessageEndMessage):
                     has_answer = True
                     await self.save_last_model(event)

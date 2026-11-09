@@ -43,12 +43,14 @@ export {
   type ConversationDetail,
 } from './conversation_api';
 export { openConversationSocket, type ConversationSocket } from './conversation_socket';
+export { IMAGE_INPUT_ACCEPT, MAX_IMAGE_COUNT, readMessageImages, type MessageImage } from './message_images';
 export {
   changeProvider,
   DEFAULT_THINKING_LEVEL,
   describeSendButton,
   describeThinkingSelect,
   findDefaultSelection,
+  findModelReadsImages,
   isThinkingLevel,
   listSelectItems,
   type ConnectionState,

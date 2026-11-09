@@ -8261,13 +8261,18 @@
             },
             "type": "array",
             "title": "Thinking Levels"
+          },
+          "reads_images": {
+            "type": "boolean",
+            "title": "Reads Images"
           }
         },
         "type": "object",
         "required": [
           "id",
           "name",
-          "thinking_levels"
+          "thinking_levels",
+          "reads_images"
         ],
         "title": "ProviderModelResponse"
       },
@@ -11466,8 +11471,35 @@
         "title": "PositionMessage",
         "type": "object"
       },
+      "PromptImage": {
+        "description": "One image of a user message. `base64` is the file without the `data:` prefix.",
+        "properties": {
+          "mime_type": {
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp",
+              "image/gif"
+            ],
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "base64": {
+            "maxLength": 4000000,
+            "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+            "title": "Base64",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mime_type",
+          "base64"
+        ],
+        "title": "PromptImage",
+        "type": "object"
+      },
       "PromptMessage": {
-        "description": "Browser to server: a new user message, with the provider, the model, the credential, and the thinking level of\nthis message.",
+        "description": "Browser to server: a new user message with its images, and the provider, the model, the credential, and the\nthinking level of this message.",
         "properties": {
           "type": {
             "const": "prompt",
@@ -11479,6 +11511,14 @@
             "minLength": 1,
             "title": "Text",
             "type": "string"
+          },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/PromptImage"
+            },
+            "maxItems": 4,
+            "title": "Images",
+            "type": "array"
           },
           "provider": {
             "minLength": 1,

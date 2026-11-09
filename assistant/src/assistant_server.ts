@@ -2,7 +2,7 @@
 // 25.14). Only web calls it. The browser never connects to it.
 //
 //   GET    /health                          The Compose health check.
-//   POST   /conversations/{id}/runs         {text, provider, model, credential_id, thinking_level, system_prompt} → the
+//   POST   /conversations/{id}/runs         {text, images, provider, model, credential_id, thinking_level, system_prompt} → the
 //                                           run events as JSON lines.
 //   POST   /conversations/{id}/abort        → 204.
 //   POST   /conversations/{id}/title        {provider, model, credential_id} → {title}, or 502 {detail}.
@@ -15,7 +15,7 @@
 //                                           The login stops when web closes the request.
 //   POST   /login-answers                   {prompt_id, value} → 204, or 404 when no login waits for the prompt.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import type { Conversations } from './conversations.ts';
+import type { Conversations, PromptImage } from './conversations.ts';
 import type { CreateModelRuntime, CredentialFile } from './credential_file.ts';
 import type { LoginMethod, Logins } from './logins.ts';
 import { isThinkingLevel, THINKING_LEVELS, type ModelSelection, type ThinkingLevel } from './model_selection.ts';
@@ -98,12 +98,26 @@ function readThinkingLevel(body: Record<string, unknown>): ThinkingLevel {
   return value;
 }
 
+function readImages(body: Record<string, unknown>): PromptImage[] {
+  const value = body['images'] ?? [];
+  if (!Array.isArray(value)) {
+    throw new BadRequestError('The field images must be a list.');
+  }
+  return (value as Record<string, unknown>[]).map((image) => ({
+    type: 'image',
+    mimeType: readText(image, 'mime_type'),
+    // eslint-disable-next-line @typescript-eslint/naming-convention -- readability-exception: the field name of pi.
+    data: readText(image, 'base64'),
+  }));
+}
+
 function createRoutes(conversations: Conversations): Record<string, RouteAction> {
   return {
     'POST runs': async (conversationId, request, response) => {
       const body = await readJson(request);
       const runRequest = {
         text: readText(body, 'text'),
+        images: readImages(body),
         selection: readSelection(body),
         thinkingLevel: readThinkingLevel(body),
         systemPrompt: readText(body, 'system_prompt'),

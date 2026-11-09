@@ -29,6 +29,8 @@ export interface MessageItem extends ItemBase {
   kind: 'message';
   role: 'user' | 'assistant';
   text: string;
+  /** The `data:` URLs of the images of a message sent now. A saved message has only text (25.11). */
+  imageUrls?: readonly string[];
   /** "model · thinking level · credential name" under an AI assistant message. Null for a user message. */
   modelLine: string | null;
   streaming: boolean;
@@ -130,8 +132,14 @@ export function readConversationLog(messages: readonly SavedMessage[], createdAt
   );
 }
 
-export function addUserMessage(log: ConversationLog, text: string, sentAtUtc: string): ConversationLog {
-  return append(log, { kind: 'message', role: 'user', text, modelLine: null, streaming: false }, sentAtUtc);
+export function addUserMessage(
+  log: ConversationLog,
+  text: string,
+  sentAtUtc: string,
+  imageUrls: readonly string[] = [],
+): ConversationLog {
+  const images = imageUrls.length > 0 ? { imageUrls } : {};
+  return append(log, { kind: 'message', role: 'user', text, modelLine: null, streaming: false, ...images }, sentAtUtc);
 }
 
 function findStreamingMessage(log: ConversationLog): MessageItem | null {

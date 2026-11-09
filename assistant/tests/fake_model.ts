@@ -21,7 +21,12 @@ async function createFakeModelRuntime(baseUrl: string, workDir: string): Promise
       api: 'openai-completions',
       apiKey: 'fake-key',
       // fake-thinking-model has thinking levels. The other models have only "off".
-      models: [{ id: 'fake-model' }, { id: 'fake-model-2' }, { id: 'fake-thinking-model', reasoning: true }],
+      models: [
+        { id: 'fake-model' },
+        { id: 'fake-model-2' },
+        { id: 'fake-thinking-model', reasoning: true },
+        { id: 'fake-image-model', input: ['text', 'image'] },
+      ],
     },
   };
   writeFileSync(modelsPath, JSON.stringify({ providers }));

@@ -37,8 +37,18 @@ export type RunEvent =
 /** The tools of one run. The budget counts the backtests of the current user message. */
 export type CreateTools = (run: { conversationId: string; budget: UserMessageBudget }) => ToolDefinition[];
 
+/** One image of a user message, in the form of pi. `data` is base64. */
+export interface PromptImage {
+  type: 'image';
+  mimeType: string;
+  // eslint-disable-next-line @typescript-eslint/naming-convention -- readability-exception: the field name of pi.
+  data: string;
+}
+
 export interface RunRequest {
   text: string;
+  /** The images of the user message. The JSONL file keeps them, so the next runs also send them to the model. */
+  images?: PromptImage[];
   selection: ModelSelection;
   /** The requested thinking level. The model can lower it (assistant_session.ts). */
   thinkingLevel: ThinkingLevel;
@@ -141,6 +151,10 @@ export class Conversations {
 
   private async runSession(conversationId: string, request: RunRequest, emit: (event: RunEvent) => void) {
     const opened = await this.options.openModel(request.selection);
+    const images = request.images ?? [];
+    if (images.length > 0 && !opened.model.input.includes('image')) {
+      throw new Error(`The model ${opened.model.name} does not read images.`);
+    }
     await mkdir(conversationDir(this.options.piDir), { recursive: true });
     if (this.abortedRuns.has(conversationId)) {
       return;
@@ -169,7 +183,7 @@ export class Conversations {
       toRunEvents(event, labels).forEach(emit);
     });
     try {
-      await session.prompt(request.text);
+      await session.prompt(request.text, { images });
     } finally {
       unsubscribe();
       session.dispose();

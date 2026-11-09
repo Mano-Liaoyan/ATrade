@@ -2567,6 +2567,8 @@ export interface components {
             name: string;
             /** Thinking Levels */
             thinking_levels: components["schemas"]["ThinkingLevel"][];
+            /** Reads Images */
+            reads_images: boolean;
         };
         /** ProviderResponse */
         ProviderResponse: {
@@ -3713,9 +3715,22 @@ export interface components {
             split_check: components["schemas"]["SplitCheckMessage"] | null;
         };
         /**
+         * PromptImage
+         * @description One image of a user message. `base64` is the file without the `data:` prefix.
+         */
+        PromptImage: {
+            /**
+             * Mime Type
+             * @enum {string}
+             */
+            mime_type: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+            /** Base64 */
+            base64: string;
+        };
+        /**
          * PromptMessage
-         * @description Browser to server: a new user message, with the provider, the model, the credential, and the thinking level of
-         *     this message.
+         * @description Browser to server: a new user message with its images, and the provider, the model, the credential, and the
+         *     thinking level of this message.
          */
         PromptMessage: {
             /**
@@ -3726,6 +3741,8 @@ export interface components {
             type: "prompt";
             /** Text */
             text: string;
+            /** Images */
+            images?: components["schemas"]["PromptImage"][];
             /** Provider */
             provider: string;
             /** Model */

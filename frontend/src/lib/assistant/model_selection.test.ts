@@ -14,15 +14,15 @@ const PROVIDERS: Provider[] = [
     name: 'OpenAI',
     login_methods: ['api_key'],
     models: [
-      { id: 'gpt-a', name: 'GPT A', thinking_levels: ['off'] },
-      { id: 'gpt-b', name: 'GPT B', thinking_levels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] },
+      { id: 'gpt-a', name: 'GPT A', thinking_levels: ['off'], reads_images: false },
+      { id: 'gpt-b', name: 'GPT B', thinking_levels: ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'], reads_images: false },
     ],
   },
   {
     id: 'anthropic',
     name: 'Anthropic',
     login_methods: ['oauth'],
-    models: [{ id: 'claude-x', name: 'Claude X', thinking_levels: ['off', 'low', 'medium', 'high'] }],
+    models: [{ id: 'claude-x', name: 'Claude X', thinking_levels: ['off', 'low', 'medium', 'high'], reads_images: false }],
   },
   { id: 'google', name: 'Google', login_methods: ['api_key'], models: [] },
 ];
@@ -120,7 +120,15 @@ describe('the Thinking select', () => {
 });
 
 describe('the Send button', () => {
-  const ready = { hasConversation: true, hasCredential: true, connection: 'open' as const, isRunning: false };
+  const ready = {
+    hasConversation: true,
+    hasCredential: true,
+    connection: 'open' as const,
+    isRunning: false,
+    imageCount: 0,
+    hasText: true,
+    modelReadsImages: false,
+  };
 
   it('sends when a conversation, a credential, and the connection are ready', () => {
     expect(describeSendButton(ready)).toEqual({ action: 'send', label: 'Send', disabledReason: null });
@@ -137,5 +145,15 @@ describe('the Send button', () => {
     expect(describeSendButton({ ...ready, connection: 'closed' }).disabledReason).toBe(
       'The connection to the AI assistant closed. Reload the page to send.',
     );
+  });
+
+  it('says why images cannot be sent', () => {
+    expect(describeSendButton({ ...ready, imageCount: 1 }).disabledReason).toBe(
+      'The selected model does not read images. Remove the images or select another model.',
+    );
+    expect(describeSendButton({ ...ready, imageCount: 1, modelReadsImages: true, hasText: false }).disabledReason).toBe(
+      'Write a message to send the images.',
+    );
+    expect(describeSendButton({ ...ready, imageCount: 1, modelReadsImages: true }).disabledReason).toBeNull();
   });
 });

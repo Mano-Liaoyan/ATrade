@@ -16,8 +16,9 @@ export interface ProviderSummary {
   name: string;
   /** The login methods of pi for this provider: "oauth" (a subscription login) and "api_key". */
   login_methods: LoginMethod[];
-  /** `thinking_levels`: the thinking levels of the model (only "off" for a model without reasoning). */
-  models: { id: string; name: string; thinking_levels: ThinkingLevel[] }[];
+  /** `thinking_levels`: the thinking levels of the model (only "off" for a model without reasoning).
+   * `reads_images`: the model accepts images in a user message. */
+  models: { id: string; name: string; thinking_levels: ThinkingLevel[]; reads_images: boolean }[];
 }
 
 async function readModels(
@@ -29,7 +30,7 @@ async function readModels(
   for (const credential of file.list().filter((stored) => stored.provider === providerId)) {
     const runtime = await createRuntime(new SelectedCredentialStore(file, credential.id));
     for (const model of await runtime.getAvailable(providerId)) {
-      models.set(model.id, { id: model.id, name: model.name, thinking_levels: listThinkingLevels(model) });
+      models.set(model.id, { id: model.id, name: model.name, thinking_levels: listThinkingLevels(model), reads_images: model.input.includes('image') });
     }
   }
   return [...models.values()];

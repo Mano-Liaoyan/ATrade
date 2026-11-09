@@ -7,7 +7,7 @@ A login plays `login_script`. After a login step `prompt`, the login waits for `
 answers are kept in `login_answers`. A deleted credential leaves `credentials`.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from typing import Final, Literal
 
 import anyio
@@ -20,6 +20,7 @@ from atrade.assistant import (
     LoginEndMessage,
     LoginStepMessage,
     ModelSelection,
+    PromptImage,
     ProviderSummary,
 )
 
@@ -32,6 +33,8 @@ class FakeAssistantService:
     def __init__(self) -> None:
         self.run_scripts: list[list[ScriptItem]] = []
         self.runs: list[tuple[int, str, ModelSelection]] = []
+        # The images of each run, in the order of runs.
+        self.run_images: list[list[PromptImage]] = []
         # The system prompt of each run, in the order of runs.
         self.system_prompts: list[str] = []
         self.aborts: list[int] = []
@@ -63,10 +66,16 @@ class FakeAssistantService:
         self.release_event.set()
 
     async def run(
-        self, conversation_id: int, text: str, selection: ModelSelection, system_prompt: str
+        self,
+        conversation_id: int,
+        text: str,
+        selection: ModelSelection,
+        system_prompt: str,
+        images: Sequence[PromptImage] = (),
     ) -> AsyncIterator[AssistantEvent]:
         self.require_reachable()
         self.runs.append((conversation_id, text, selection))
+        self.run_images.append(list(images))
         self.system_prompts.append(system_prompt)
         script = self.run_scripts.pop(0) if self.run_scripts else []
         self.run_started.set()

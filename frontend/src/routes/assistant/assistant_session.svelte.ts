@@ -5,6 +5,7 @@
 // is one module object, so a page change keeps the open conversation and does not close its socket (a closed socket
 // stops the run, 25.10).
 import { SvelteMap } from 'svelte/reactivity';
+import type { components } from '#lib/api';
 import {
   addServerMessage,
   addUserMessage,
@@ -16,13 +17,16 @@ import {
   EMPTY_LOG,
   endRun,
   findDefaultSelection,
+  findModelReadsImages,
   isThinkingLevel,
   listConversations,
   listCredentials,
   listProviders,
+  MAX_IMAGE_COUNT,
   openConversationSocket,
   readConversation,
   readConversationLog,
+  readMessageImages,
   renameConversation,
   type ConnectionState,
   type Conversation,
@@ -31,6 +35,7 @@ import {
   type Credential,
   type DiffItem,
   type LastModel,
+  type MessageImage,
   type ModelSelection,
   type Provider,
   type ThinkingLevel,
@@ -94,6 +99,8 @@ function readLastModel(item: Conversation | null): LastModel {
   };
 }
 
+type PromptImageType = components['schemas']['PromptImage']['mime_type'];
+
 export class AssistantSession {
   conversations = $state<Conversation[]>([]);
   conversationId = $state<number | null>(null);
@@ -114,6 +121,9 @@ export class AssistantSession {
   readonly thinking = $derived(describeThinkingSelect(this.providers, this.selection, this.thinkingLevel));
   /** The message input. It stays across pages. */
   text = $state('');
+  /** The images of the new message. They stay across pages, like the text. */
+  images = $state.raw<MessageImage[]>([]);
+  readonly modelReadsImages = $derived(findModelReadsImages(this.providers, this.selection));
   /** The choice of each diff card of the open conversation, by its item ID. */
   readonly diffChoices = new SvelteMap<number, DiffChoice>();
   /** The choice of each screen of the condition cards, by its screen ID. All cards of one screen share it. */
@@ -273,6 +283,22 @@ export class AssistantSession {
     writeStoredLayout(THINKING_LEVEL_STORAGE_KEY, level);
   }
 
+  async addImages(files: readonly File[]): Promise<void> {
+    if (!this.modelReadsImages) {
+      this.reportError('The selected model does not read images.');
+      return;
+    }
+    const result = await readMessageImages(files, MAX_IMAGE_COUNT - this.images.length);
+    this.images = [...this.images, ...result.images].slice(0, MAX_IMAGE_COUNT);
+    if (result.problem !== null) {
+      this.reportError(result.problem);
+    }
+  }
+
+  removeImage(index: number): void {
+    this.images = this.images.toSpliced(index, 1);
+  }
+
   /** Sends the message input. False when nothing was sent: web refuses a prompt during a run or without a credential,
    * so the message stays in the input. */
   send(): boolean {
@@ -283,13 +309,20 @@ export class AssistantSession {
     this.#socket.send({
       type: 'prompt',
       text: message,
+      images: this.images.map((image) => ({ mime_type: image.mimeType as PromptImageType, base64: image.base64 })),
       provider: this.selection.provider,
       model: this.selection.model,
       credential_id: this.selection.credentialId,
       thinking_level: this.thinking.value,
     });
-    this.log = addUserMessage(this.log, message, readNowUtc());
+    this.log = addUserMessage(
+      this.log,
+      message,
+      readNowUtc(),
+      this.images.map((image) => image.url),
+    );
     this.text = '';
+    this.images = [];
     return true;
   }
 
