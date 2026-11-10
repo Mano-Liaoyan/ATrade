@@ -263,9 +263,9 @@ prompt does not list the tools.
 - Decided: `textResult` in `assistant/src/tool_results.ts` limits the text of
   each tool result to 100,000 characters
   (`MAX_TOOL_RESULT_CHARACTERS`). It cuts a longer text and adds a note with
-  the full length. Compaction is off, so each later user message sends all
-  earlier tool results to the model again. A result that is too large stops
-  each later message of the conversation with "prompt is too long".
+  the full length. Each later user message sends the earlier tool results
+  to the model again until pi compacts them (25.8.1), so a smaller result
+  keeps more of the conversation in the context window.
 - Decided: a backtest with an error message (for example a failed
   backtest with a Python traceback) also has `error_summary`, the last line
   of `error_message` that is not empty, in `read_backtest`, in the
@@ -675,6 +675,12 @@ Implemented (#179, #184):
   custom entry `atrade_credential` with the credential name. So each AI
   assistant message of the file has its model (from pi) and its credential
   name.
+- Decided: pi compaction is on, with the pi default settings. Before the
+  messages fill the context window of the model, pi asks the model for a
+  summary of the old messages. The next model requests have the summary and
+  the recent messages. The JSONL file keeps all messages, so the side column
+  still shows the full conversation. With compaction off, a long conversation
+  stopped each later message with "prompt is too long".
 - `assistant_prompt_version`: see 25.9.1.
 
 - A conversation belongs to at most one strategy.

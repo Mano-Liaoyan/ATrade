@@ -4,7 +4,7 @@ import type { WebPortAnswer } from './web_port_client.ts';
 
 const HTTP_OK_FIRST = 200;
 const HTTP_OK_LAST = 299;
-/** The longest text of one tool result. Compaction is off, so the model gets each result again with each message. */
+/** The longest text of one tool result. The model gets each result again with each message until pi compacts it. */
 export const MAX_TOOL_RESULT_CHARACTERS = 100_000;
 
 /** The structured part of a tool result. pi keeps it out of the model text. web reads it from the run events. */

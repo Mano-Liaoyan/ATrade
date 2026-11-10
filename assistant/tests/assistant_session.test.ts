@@ -129,4 +129,42 @@ export default function (pi) {
 
     expect(requests[0]?.tools ?? []).toEqual([]);
   });
+
+  test('compacts the old messages when the conversation is near the context window', async () => {
+    const RESULT_CHARACTERS = 40_000;
+    let calls = 0;
+    const readStrategy = defineTool({
+      name: 'read_strategy',
+      label: 'Read strategy',
+      description: 'Reads a strategy.',
+      parameters: Type.Object({}),
+      execute: () => {
+        calls += 1;
+        const text = `RESULT-${String(calls)} `.padEnd(RESULT_CHARACTERS, 'x');
+        return Promise.resolve({ content: [{ type: 'text', text }], details: {} });
+      },
+    });
+    const toolCall = { toolName: 'read_strategy', toolArguments: {} };
+    server = await startFakeModelServer([toolCall, toolCall, toolCall]);
+    const { modelRuntime, model } = await openFakeModel(server.baseUrl, workDir, 'fake-small-model');
+    const session = await createAssistantSession({
+      modelRuntime,
+      model,
+      thinkingLevel: 'off',
+      piDir: workDir,
+      customTools: [readStrategy],
+      systemPrompt: 'You are the ATrade strategy assistant.',
+    });
+    try {
+      await session.prompt('Start.');
+      await session.prompt('Continue.');
+    } finally {
+      session.dispose();
+    }
+
+    expect(calls).toBe(3);
+    const lastRequest = JSON.stringify(server.requests.at(-1)?.messages);
+    expect(lastRequest).toContain('Continue.');
+    expect(lastRequest).not.toContain('RESULT-1 ');
+  });
 });

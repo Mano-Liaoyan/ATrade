@@ -52,7 +52,8 @@ async function createResourceLoader(
 }
 
 export async function createAssistantSession(options: AssistantSessionOptions): Promise<AgentSession> {
-  const settings = SettingsManager.inMemory({ compaction: { enabled: false } });
+  // The default settings: pi compacts the old messages into a summary before the context window is full (25.8.1).
+  const settings = SettingsManager.inMemory();
   const { session } = await createAgentSession({
     cwd: options.piDir,
     agentDir: options.piDir,
