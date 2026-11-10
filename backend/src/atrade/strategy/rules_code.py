@@ -292,19 +292,36 @@ def write_chart_indicator(indicator: IndicatorUse) -> str:
     parameters = ", ".join(f'"{name}": "{indicator.name}_{name}"' for name in indicator.parameters)
     if definition.expression is None:
         return f'    {{"indicator": "{definition.key}", "parameters": {{{parameters}}}}},'
-    formula = {
+    formula: dict[str, object] = {
         "name": definition.name,
         "expression": definition.expression,
         "chart_placement": definition.chart_placement,
     }
-    return f'    {{"indicator": "{definition.key}", "parameters": {{}}, "formula": {formula!r}}},'
+    if definition.parameters:
+        formula["parameters"] = [
+            {
+                "name": parameter.name,
+                "label": parameter.label,
+                "value_type": parameter.value_type.__name__,
+                "default": parameter.default,
+                "minimum": parameter.minimum,
+                "maximum": parameter.maximum,
+                "description": parameter.description,
+            }
+            for parameter in definition.parameters
+        ]
+    return f'    {{"indicator": "{definition.key}", "parameters": {{{parameters}}}, "formula": {formula!r}}},'
 
 
 def write_indicator_object(indicator: IndicatorUse) -> str:
     """The class with its configuration fields. A custom indicator holds the text of its expression (ADR 0009)."""
     definition = indicator.definition
     if definition.expression is not None:
-        return f"        self.{indicator.name} = atrade.indicator.FormulaIndicator({definition.expression!r})"
+        values = ", ".join(f'"{name}": config.{indicator.name}_{name}' for name in indicator.parameters)
+        parameters = f", parameters={{{values}}}" if values else ""
+        return (
+            f"        self.{indicator.name} = atrade.indicator.FormulaIndicator({definition.expression!r}{parameters})"
+        )
     return (
         f"        self.{indicator.name} = atrade.indicator.{type_name(indicator)}("
         + ", ".join(f"{name}=config.{indicator.name}_{name}" for name in indicator.parameters)

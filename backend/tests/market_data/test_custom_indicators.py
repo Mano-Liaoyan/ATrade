@@ -112,7 +112,7 @@ async def test_create_and_check_give_the_located_problems(
 @pytest.mark.anyio
 async def test_check_gives_the_look_back_of_a_correct_expression(web_client: httpx.AsyncClient) -> None:
     check = await web_client.post(f"{BASE_PATH}/check", json={**RATIO, "expression": "mean(rsi(14), 5)"})
-    assert check.json() == {"problems": [], "look_back_bars": 116}
+    assert check.json() == {"problems": [], "look_back_bars": 116, "default_look_back_bars": 116}
 
 
 @pytest.mark.anyio
@@ -292,3 +292,84 @@ async def test_a_saved_screen_keeps_its_expression_after_a_change_and_a_delete(w
     saved = (await web_client.get(f"/api/screens/{screen['id']}")).json()
     assert saved["definition"]["order"]["indicator"]["formula"]["expression"] == "close"
     assert (await web_client.post(f"/api/screens/{screen['id']}/runs")).status_code == 201
+
+
+LOOKBACK = {
+    "name": "lookback_days",
+    "label": "Look-back days",
+    "value_type": "int",
+    "default": 60,
+    "minimum": 5,
+    "maximum": 250,
+    "description": "The days of the mean.",
+}
+WITH_PARAMETER = {**RATIO, "expression": "close / mean(close, lookback_days)", "parameters": [LOOKBACK]}
+
+
+@pytest.mark.anyio
+async def test_a_custom_indicator_keeps_its_parameters_and_the_catalog_shows_them(
+    web_client: httpx.AsyncClient,
+) -> None:
+    created = await create(web_client, **WITH_PARAMETER)
+    assert created["parameters"] == [LOOKBACK]
+    assert (await web_client.get(f"{BASE_PATH}/{created['custom_indicator_id']}")).json() == created
+
+    item = (await web_client.get("/api/market-data/indicators")).json()[-1]
+    assert item["parameters"] == [
+        {
+            "name": "lookback_days",
+            "value_type": "int",
+            "default": 60,
+            "minimum": 5,
+            "maximum": 250,
+            "is_in_name": True,
+            "label": "Look-back days",
+            "description": "The days of the mean.",
+        }
+    ]
+    assert item["formula"]["parameters"] == [LOOKBACK]
+    assert check_indicator_reference({"indicator": item["key"], "formula": item["formula"]}) == []
+
+    changed = await web_client.put(f"{BASE_PATH}/{created['custom_indicator_id']}", json=RATIO)
+    assert changed.json()["parameters"] == []
+    assert "parameters" not in (await web_client.get("/api/market-data/indicators")).json()[-1]["formula"]
+
+
+@pytest.mark.anyio
+async def test_check_gives_the_look_back_of_the_maximum_and_of_the_default(web_client: httpx.AsyncClient) -> None:
+    check = await web_client.post(f"{BASE_PATH}/check", json=WITH_PARAMETER)
+
+    assert check.json() == {"problems": [], "look_back_bars": 250, "default_look_back_bars": 60}
+
+
+@pytest.mark.parametrize(
+    ("fields", "location", "message"),
+    [
+        ({"expression": "close / mean(close, days)"}, ["expression"], "Column 21: Unknown name 'days'"),
+        ({"expression": "close"}, ["expression"], "does not use the parameter 'lookback_days'"),
+        ({"parameters": [{**LOOKBACK, "maximum": 1001}]}, ["expression"], "from 1 to 1000"),
+        (
+            {
+                "expression": " + ".join(["mean(close, lookback_days)"] * 11),
+                "parameters": [{**LOOKBACK, "maximum": 1000}],
+            },
+            ["expression"],
+            "Window bars x bars read",
+        ),
+        ({"parameters": [{**LOOKBACK, "name": "Lookback"}]}, ["parameters", "0", "name"], "lower-case letter"),
+        ({"parameters": [{**LOOKBACK, "default": 300}]}, ["parameters", "0", "default"], "from the minimum"),
+    ],
+)
+@pytest.mark.anyio
+async def test_a_wrong_parameter_is_a_problem_and_saves_nothing(
+    web_client: httpx.AsyncClient, fields: dict[str, Any], location: list[str], message: str
+) -> None:
+    response = await web_client.post(BASE_PATH, json={**WITH_PARAMETER, **fields})
+    assert response.status_code == 422
+    problems = response.json()["problems"]
+    assert [problem["location"] for problem in problems] == [location]
+    assert message in problems[0]["message"]
+
+    check = await web_client.post(f"{BASE_PATH}/check", json={**WITH_PARAMETER, **fields})
+    assert check.json() == {"problems": problems, "look_back_bars": None, "default_look_back_bars": None}
+    assert (await web_client.get(BASE_PATH)).json() == []

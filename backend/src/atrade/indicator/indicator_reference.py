@@ -9,7 +9,12 @@ returns problems with the location in the reference, so a screen (section 24.6) 
 from collections.abc import Mapping
 from typing import cast
 
-from atrade.indicator.formula_reference import check_formula, is_custom_key, make_formula_definition
+from atrade.indicator.formula_reference import (
+    check_formula,
+    check_formula_values,
+    is_custom_key,
+    make_formula_definition,
+)
 from atrade.indicator.indicator_catalog import (
     INDICATOR_CATALOG,
     CatalogIndicator,
@@ -49,9 +54,14 @@ def check_indicator_reference(reference: object, *, has_output: bool = True) -> 
     if definition is None:
         known = ", ".join(INDICATOR_CATALOG)
         return [*problems, IndicatorProblem(("indicator",), f"Unknown indicator {key!r}. Known indicators: {known}.")]
+    parameters = fields.get("parameters", {})
+    parameter_problems = check_parameters(definition, parameters)
+    if is_custom and not parameter_problems:
+        formula = cast("Mapping[str, object]", fields["formula"])
+        parameter_problems = check_formula_values(formula, cast("Mapping[str, ParameterValue]", parameters))
     return [
         *problems,
-        *check_parameters(definition, fields.get("parameters", {})),
+        *parameter_problems,
         *(check_output(definition, fields.get("output")) if has_output else []),
     ]
 

@@ -517,3 +517,29 @@ async def test_a_run_without_the_prefilter_reads_all_kept_instruments_and_gives_
     assert [instrument.symbol for instrument in reader.reads[0][0]] == ["LOW", "HIGH"]
     assert symbols(outcome) == ["HIGH"]
     assert reasons(outcome) == {"LOW": "indicator_conditions[0]: Average trading value(20) >= 20000"}
+
+
+@pytest.mark.anyio
+async def test_a_parameter_of_a_custom_indicator_gives_the_rows_of_the_same_number() -> None:
+    days = {"name": "days", "label": "Days", "value_type": "int", "default": 4, "minimum": 2, "maximum": 10}
+    formula = {"name": "Custom", "expression": "lag(mean(close, days), 2)", "chart_placement": "own"}
+    with_parameter = {
+        "indicator": "custom_1",
+        "parameters": {"days": 3},
+        "output": "value",
+        "formula": {**formula, "parameters": [days]},
+    }
+    bars = {stock("SHORT"): make_bars("5", 4), stock("LONG"): make_bars("7", 5)}
+
+    async def run_order(reference: dict[str, Any]) -> ScreenOutcome:
+        return await run(make_definition(order={"indicator": reference, "direction": "descending"}), bars)
+
+    outcome = await run_order(with_parameter)
+    fixed = await run_order(custom("lag(mean(close, 3), 2)"))
+
+    assert symbols(outcome) == symbols(fixed) == ["LONG"]
+    assert outcome.rows[0].indicator_values == {"Custom(3)": 7.0}
+    assert fixed.rows[0].indicator_values == {"Custom": 7.0}
+    assert reasons(outcome) == {"SHORT": "No value: Custom(3)"}
+    # The default of the parameter is 4, so the look-back is 1 bar longer and no instrument has a value.
+    assert symbols(await run_order({**with_parameter, "parameters": {}})) == []

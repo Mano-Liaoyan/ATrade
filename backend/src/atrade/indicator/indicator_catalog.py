@@ -55,6 +55,9 @@ class IndicatorParameter:
     minimum: ParameterValue
     maximum: ParameterValue
     is_in_name: bool = True
+    # The name that the UI shows and the meaning, for a parameter of a custom indicator (section 23.10.1).
+    label: str = ""
+    description: str = ""
 
 
 @dataclass(frozen=True)
@@ -90,6 +93,8 @@ class IndicatorDefinition:
     orders: tuple[ParameterOrder, ...] = ()
     # The formula expression of a custom indicator (section 23.10). None for a built-in indicator.
     expression: str | None = None
+    # The look-back of a custom indicator: its expression gives the bars for the parameter values.
+    count_look_back_bars: Callable[[ParameterValues], int] | None = None
 
     def with_defaults(self, parameters: ParameterValues) -> dict[str, ParameterValue]:
         return {parameter.name: parameters.get(parameter.name, parameter.default) for parameter in self.parameters}
@@ -103,6 +108,8 @@ class IndicatorDefinition:
     def screen_look_back_bars(self, parameters: ParameterValues) -> int:
         """The number of daily bars that a screen reads for this indicator (section 23.4)."""
         values = self.with_defaults(parameters)
+        if self.count_look_back_bars is not None:
+            return self.count_look_back_bars(values)
         period_sum = sum(int(values[name]) for name in self.look_back.parameter_names)
         return self.look_back.factor * period_sum + self.look_back.extra_bars
 

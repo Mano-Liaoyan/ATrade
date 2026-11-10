@@ -6,7 +6,7 @@ stored indicator reference (docs/architecture/indicator.md section 23.6): `check
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictFloat, StrictInt, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, StrictFloat, StrictInt, model_validator
 
 from atrade.indicator import check_indicator_reference
 
@@ -41,6 +41,10 @@ class IndicatorFormula(RuleModel):
     name: str
     expression: str
     chart_placement: str
+    # The parameters of the custom indicator. A formula without parameters does not hold the field.
+    parameters: list[dict[str, JsonValue]] = Field(
+        default_factory=list[dict[str, JsonValue]], exclude_if=lambda value: not value
+    )
 
 
 class IndicatorOperand(RuleModel):

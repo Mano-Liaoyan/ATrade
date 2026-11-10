@@ -72,7 +72,7 @@ def read_reference_identity(reference: Mapping[str, object]) -> object:
     """Equal for 2 references that give the same values. A missing parameter counts as its default."""
     definition = find_indicator_definition(reference)
     parameters = cast("Mapping[str, int | float]", reference.get("parameters", {}))
-    return definition.expression or (definition.key, definition.with_defaults(parameters))
+    return (definition.expression or definition.key, definition.with_defaults(parameters))
 
 
 def check_column_names(fields: Mapping[str, object], location: Location) -> list[ScreenProblem]:

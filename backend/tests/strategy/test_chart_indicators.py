@@ -17,6 +17,7 @@ from atrade.strategy.strategy_rules import StrategyRules
 from atrade.strategy.strategy_template import STRATEGY_TEMPLATE
 from atrade.strategy.strategy_templates import STRATEGY_TEMPLATES
 from tests.strategy.rules_examples import (
+    DAYS_PARAMETER,
     condition,
     custom_indicator,
     group,
@@ -24,6 +25,7 @@ from tests.strategy.rules_examples import (
     make_rules,
     make_universe_rules,
     number,
+    parameter_indicator,
     price,
 )
 
@@ -326,3 +328,21 @@ async def test_a_wrong_formula_in_chart_indicators_blocks_the_save() -> None:
         '"formula": {"name": "X", "expression": "foo", "chart_placement": "own"}}]\n'
     )
     assert any("Unknown name 'foo'" in problem.message for problem in await check_strategy_code(code))
+
+
+def test_the_code_of_a_custom_indicator_lists_its_parameters_for_the_chart() -> None:
+    rules = make_rules(group("all_of", condition(parameter_indicator(20), "above", number(1))))
+    code = make_rules_code(StrategyRules.model_validate(rules))
+    formula = {
+        "name": "Ratio",
+        "expression": "close / mean(close, days)",
+        "chart_placement": "own",
+        "parameters": [DAYS_PARAMETER],
+    }
+
+    assert list_chart_indicators(code, {}) == [
+        {"indicator": "custom_3", "parameters": {"days": 20}, "formula": formula}
+    ]
+    assert list_chart_indicators(code, {"custom_3_1_days": 30}) == [
+        {"indicator": "custom_3", "parameters": {"days": 30}, "formula": formula}
+    ]
