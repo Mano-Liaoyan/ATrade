@@ -26,6 +26,8 @@ async function createFakeModelRuntime(baseUrl: string, workDir: string): Promise
         { id: 'fake-model-2' },
         { id: 'fake-thinking-model', reasoning: true },
         { id: 'fake-image-model', input: ['text', 'image'] },
+        // A small context window, so a test reaches the compaction threshold.
+        { id: 'fake-small-model', contextWindow: 40_000 },
       ],
     },
   };
@@ -33,9 +35,9 @@ async function createFakeModelRuntime(baseUrl: string, workDir: string): Promise
   return ModelRuntime.create({ authPath: path.join(runtimeDir, 'auth.json'), modelsPath });
 }
 
-export async function openFakeModel(baseUrl: string, workDir: string) {
+export async function openFakeModel(baseUrl: string, workDir: string, modelId = 'fake-model') {
   const modelRuntime = await createFakeModelRuntime(baseUrl, workDir);
-  const model = modelRuntime.getModel('fake', 'fake-model');
+  const model = modelRuntime.getModel('fake', modelId);
   if (model === undefined) {
     throw new Error('The fake model is not in the model runtime.');
   }
