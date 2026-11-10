@@ -124,3 +124,58 @@ test('the forward test bar chart shows a mark for each fill, linked to the Fills
   await tableRow(page, 'Fills', 1).hover();
   await expect(markItems(page).nth(0)).toHaveAttribute('data-ring', 'true');
 });
+
+const SERIES_ROUTE = '/api/market-data/indicator-series';
+
+/** The width of the chart canvas and the page place of its center. */
+async function readCanvasCenter(page: Page): Promise<{ width: number; centerX: number; centerY: number }> {
+  const canvas = await page.locator('.chart-canvas').boundingBox();
+  if (canvas === null) {
+    throw new Error('The page has no chart canvas.');
+  }
+  return { width: canvas.width, centerX: canvas.x + canvas.width / 2, centerY: canvas.y + canvas.height / 2 };
+}
+
+test('a drag of the bar chart with an indicator and trade marks keeps the page', async ({ page, request }) => {
+  const backtestId = await findRunId(request, '/api/backtests', 'E2E trade marks');
+  await page.goto(`/backtests/${String(backtestId)}?chart=bars`);
+  await expect(markItems(page)).toHaveCount(4);
+
+  await page.getByRole('button', { name: 'Add indicator' }).click();
+  await page.getByRole('dialog', { name: 'Add indicator' }).getByRole('option', { name: /^Bollinger Bands/ }).click();
+  const legend = page.getByRole('list', { name: 'Legend' }).getByRole('listitem').filter({ hasText: /^BB \d+/ });
+  await expect(legend.locator('.legend-value')).toHaveCount(3);
+
+  // The chart moves the crosshair when it draws the indicator lines with the pointer on it. The keyboard hides and
+  // shows the indicator, so the pointer stays on the chart. Each change reads the values again and draws the lines
+  // again: the test waits for the answer, because a new draw stops a drag.
+  const { width, centerX, centerY } = await readCanvasCenter(page);
+  await page.mouse.move(centerX - 1, centerY);
+  await page.mouse.move(centerX, centerY);
+  for (const [button, valueCount] of [
+    [/^Hide BB/, 0],
+    [/^Show BB/, 3],
+  ] as const) {
+    const answer = page.waitForResponse((response) => response.url().endsWith(SERIES_ROUTE));
+    await legend.getByRole('button', { name: button }).focus();
+    await page.keyboard.press('Enter');
+    await (await answer).finished();
+    await expect(legend.locator('.legend-value')).toHaveCount(valueCount);
+  }
+
+  // Each drag moves the marks. That must not draw the indicator lines again without end.
+  const dragSteps = 20;
+  for (const distance of [-width, width, width / 2]) {
+    await page.mouse.move(centerX, centerY);
+    await page.mouse.down();
+    await page.mouse.move(centerX + distance, centerY, { steps: dragSteps });
+    await page.mouse.up();
+  }
+
+  // The page still works: the keyboard hides the indicator.
+  await expect(legend.getByRole('button', { name: /^Hide BB/ })).toBeAttached();
+  await legend.getByRole('button', { name: /^Hide BB/ }).focus();
+  await page.keyboard.press('Enter');
+  await expect(legend.locator('.legend-value')).toHaveCount(0);
+  await expect(page.getByText('Internal Error')).toHaveCount(0);
+});

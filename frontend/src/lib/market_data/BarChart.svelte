@@ -185,7 +185,10 @@
   function followCrosshair(parameters: MouseEventParams): void {
     crosshairTime = parameters.time === undefined ? null : (parameters.time as number);
     const point = parameters.point;
-    const box = point === undefined || (parameters.paneIndex ?? 0) !== 0 ? undefined : findMarkAt(markBoxes, point.x, point.y);
+    // The chart calls this in the calls of the effects (setData, removeSeries) when the pointer is on the chart:
+    // untrack, so that the effects do not depend on the boxes that they change (keepMarkBoxes).
+    const boxes = untrack(() => markBoxes);
+    const box = point === undefined || (parameters.paneIndex ?? 0) !== 0 ? undefined : findMarkAt(boxes, point.x, point.y);
     hoveredMarkKey = box === undefined ? null : `${String(box.mark.barIndex)}:${box.mark.side}`;
   }
 
