@@ -298,6 +298,56 @@ async def test_stop_of_a_missing_forward_test_is_not_found(web_client: httpx.Asy
     assert response.status_code == 404
 
 
+def write_status(database_url: str, forward_test_id: int, status: str, *, client_id: int | None) -> None:
+    """The worker writes the status (section 12.3)."""
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            "UPDATE forward_test SET status = %(status)s, client_id = %(client_id)s WHERE id = %(id)s",
+            {"status": status, "client_id": client_id, "id": forward_test_id},
+        )
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", ["stopped", "failed"])
+async def test_deletes_a_forward_test_that_has_ended(
+    web_client: httpx.AsyncClient, database_url: str, status: str
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    forward_test = (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))).json()
+    write_status(database_url, forward_test["id"], status, client_id=None)
+
+    response = await web_client.delete(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")
+
+    assert response.status_code == 204
+    assert (await web_client.get(FORWARD_TESTS_PATH)).json() == []
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("status", "client_id"), [("starting", 10), ("running", 10), ("stop_failed", 10), ("failed", 10)]
+)
+async def test_refuses_to_delete_a_forward_test_that_has_not_ended(
+    web_client: httpx.AsyncClient, database_url: str, status: str, client_id: int
+) -> None:
+    strategy_version_id = await save_test_strategy_version(web_client)
+    forward_test = (await web_client.post(FORWARD_TESTS_PATH, json=make_start_request(strategy_version_id))).json()
+    write_status(database_url, forward_test["id"], status, client_id=client_id)
+
+    response = await web_client.delete(f"{FORWARD_TESTS_PATH}/{forward_test['id']}")
+
+    assert response.status_code == 409
+    assert response.json() == {"detail": f"Forward test #{forward_test['id']} has not ended. Stop it first."}
+    strategy_id = forward_test["strategy_id"]
+    assert (await web_client.delete(f"/api/strategies/{strategy_id}")).status_code == 409
+
+
+@pytest.mark.anyio
+async def test_delete_of_a_missing_forward_test_is_not_found(web_client: httpx.AsyncClient) -> None:
+    response = await web_client.delete(f"{FORWARD_TESTS_PATH}/999")
+
+    assert response.status_code == 404
+
+
 @pytest.mark.anyio
 async def test_uses_the_client_id_range_of_the_settings(
     database_url: str, clock: FixedClock, frontend_build_dir: Path

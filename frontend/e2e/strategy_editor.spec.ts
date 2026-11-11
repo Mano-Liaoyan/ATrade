@@ -302,6 +302,7 @@ test('deletes a strategy only after the confirmation', async ({ page }, currentT
   await page.getByRole('button', { name: 'Delete strategy' }).click();
   const dialog = page.getByRole('dialog', { name: `Delete ${name}` });
   await expect(dialog).toBeVisible();
+  await expect(dialog).toContainText('All versions of the strategy are deleted.');
   await dialog.getByRole('button', { name: 'Cancel' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name);

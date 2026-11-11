@@ -190,19 +190,6 @@ async def test_missing_backtest_is_not_found(web_client: httpx.AsyncClient) -> N
 
 
 @pytest.mark.anyio
-async def test_strategy_that_a_backtest_uses_cannot_be_deleted(
-    web_client: httpx.AsyncClient, database_url: str
-) -> None:
-    save_test_bars(database_url)
-    saved = await save_test_strategy_version(web_client)
-    await web_client.post("/api/backtests", json=make_backtest_request(saved["strategy_version_id"]))
-
-    response = await web_client.delete(f"/api/strategies/{saved['strategy_id']}")
-
-    assert response.status_code == 409
-
-
-@pytest.mark.anyio
 async def test_backtest_list_reads_the_strategy_versions_with_one_connection(
     web_client: httpx.AsyncClient, database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

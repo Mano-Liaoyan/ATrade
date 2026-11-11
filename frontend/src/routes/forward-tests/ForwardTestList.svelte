@@ -2,13 +2,15 @@
      the actual status icon from /ws/forward-tests before the number (the tooltip names the status), the strategy
      version, and the instrument symbol. The open forward test has the Carbon selected row color. A click on a row opens its forward
      test. Stop and "Backtest the same period" are in the header line of the open forward test. A right-click on a row
-     opens its context menu: "Open in new tab", and "Stop forward test" while it can stop. -->
+     opens its context menu: "Open in new tab", "Stop forward test" while it can stop, and "Delete forward test" after
+     its end. -->
 <script lang="ts">
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { ContextMenu, DataTable, StatusIndicator, type ContextMenuItem, type TableColumn } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
+    canDelete,
     canStop,
     describeForwardTestStatus,
     describeForwardTestUniverse,
@@ -22,9 +24,11 @@
     openForwardTestId: number | null;
     /** "Stop forward test" of the context menu. Without it, the menu has no Stop. */
     onStop?: (forwardTest: ForwardTest) => void;
+    /** "Delete forward test" of the context menu: the page asks before the delete. Without it, the menu has no Delete. */
+    onDeleteRequest?: (forwardTest: ForwardTest) => void;
   }
 
-  const { forwardTests, openForwardTestId, onStop }: Props = $props();
+  const { forwardTests, openForwardTestId, onStop, onDeleteRequest }: Props = $props();
 
   const COLUMNS: TableColumn[] = [
     { header: '#', align: 'right' },
@@ -56,6 +60,16 @@
         danger: true,
         onSelect: () => {
           onStop(forwardTest);
+        },
+      });
+    }
+    if (onDeleteRequest !== undefined && canDelete(forwardTest)) {
+      items.push({
+        label: 'Delete forward test',
+        divider: true,
+        danger: true,
+        onSelect: () => {
+          onDeleteRequest(forwardTest);
         },
       });
     }

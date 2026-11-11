@@ -167,19 +167,22 @@ Migration: `backend/migrations/versions/9a4c2f6e1b70_backtest_create_tables.py`.
 
 | Table | Columns |
 |---|---|
-| `backtest` | `id`, `strategy_version_id` (not null, foreign key to `strategy_version` with no `ON DELETE` action), `symbol`, `exchange`, `currency`, `bar_period`, `start_utc`, `end_utc`, `paper_capital_usd` (above 0), `status`, `error_message`, `created_at_utc`, `started_at_utc`, `ended_at_utc`, and the metrics `final_equity_usd`, `total_return_percent`, `max_drawdown_percent`, `trade_count` (null until the backtest finishes) |
+| `backtest` | `id`, `strategy_version_id` (not null, foreign key to `strategy_version` with `ON DELETE CASCADE`), `symbol`, `exchange`, `currency`, `bar_period`, `start_utc`, `end_utc`, `paper_capital_usd` (above 0), `status`, `error_message`, `created_at_utc`, `started_at_utc`, `ended_at_utc`, and the metrics `final_equity_usd`, `total_return_percent`, `max_drawdown_percent`, `trade_count` (null until the backtest finishes) |
 | `backtest_equity_point` | `backtest_id`, `time_utc`, `equity_usd`. Primary key `(backtest_id, time_utc)`. |
 | `backtest_trade` | `id`, `backtest_id`, `time_utc`, `side` (`BUY` or `SELL`), `quantity_shares`, `price_usd`, `commission_usd` |
 | `backtest_limits` | `single_row` (primary key, always true), `timeout_seconds` (above 0), `concurrency` (above 0). Migration `3e7a1c5d9b71_backtest_create_backtest_limits.py`. |
 
 - `status` is one of `queued`, `running`, `finished`, `failed`, `timed_out`.
-- Because of the `strategy_version_id` foreign key, a strategy that a
-  backtest uses cannot be deleted (section 9.1).
+- A strategy delete also deletes its backtests and parameter sweeps
+  (`ON DELETE CASCADE`, section 9.1). The trigger
+  `backtest_no_delete_while_active` refuses the delete of a queued or
+  running backtest, also in the cascade.
 - Rows of the result tables are deleted with their backtest
   (`ON DELETE CASCADE`). `DELETE /api/backtests/{backtest_id}` deletes a
   backtest (section 10.5). `forward_test_same_period_backtest` refuses
-  the delete of its backtests (`ON DELETE RESTRICT`, forward test section
-  12.10).
+  the delete of its backtests (a deferrable foreign key with no `ON DELETE`
+  action, checked at once outside a strategy delete, forward test section
+  12.12).
 
 ### 10.2.1 New columns and tables
 
@@ -1387,8 +1390,8 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
   A running run continues to its end. A sweep has no status column: its
   status is the run count of each status (#203).
 - The user can delete a sweep when no run is queued or running. The delete
-  removes the runs and their result rows. Then a strategy without other uses
-  can be deleted.
+  removes the runs and their result rows. A strategy delete also deletes its
+  sweeps.
 - A sweep run uses the `out_of_sample_share` of the request, the same as
   one backtest (#203).
 - A run opens on the backtest page like any other backtest.

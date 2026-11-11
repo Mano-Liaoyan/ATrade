@@ -44,9 +44,11 @@ puts the new parts of this section in phases.
 - Unsaved edits exist only in the browser `localStorage`.
 - The backtest table and the forward test table each have a
   `strategy_version_id` foreign key. It must not be null.
-- Strategy versions cannot be deleted. A strategy that no backtest, parameter
-  sweep, or forward test uses can be deleted. A strategy in use cannot be
-  deleted.
+- Strategy versions cannot be deleted. A strategy delete also deletes the
+  backtests, parameter sweeps, and forward tests of its versions. The delete
+  dialog names their counts and asks before the delete. The delete is refused
+  while one of them has not ended: a backtest or sweep run is queued or
+  running, or a forward test is not stopped.
 
 ### 9.1.1 Tables
 
@@ -101,10 +103,17 @@ New columns of `strategy_version`:
   `strategy_version`.
 - `strategy_version.strategy_id` has `ON DELETE CASCADE`. A strategy delete
   also deletes its versions.
-- The tables that later use a version (backtest, forward test) reference
-  `strategy_version (id)` with no `ON DELETE` action. When such a reference
-  exists, PostgreSQL refuses the strategy delete. The `strategy` capability
-  does not read the tables of other capabilities for this rule.
+- The tables that use a version (`backtest`, `parameter_sweep`,
+  `forward_test`) reference `strategy_version (id)` with `ON DELETE CASCADE`
+  (migrations `5c2e8a1f4d36_backtest_strategy_delete_cascade.py` and
+  `7e4b1d9a2c58_forward_test_delete.py`). The triggers
+  `backtest_no_delete_while_active` and `forward_test_no_delete_while_active`
+  refuse the delete of a backtest or forward test that has not ended
+  (SQLSTATE `55006`, `object_in_use`). The strategy delete runs
+  `SET CONSTRAINTS ALL DEFERRED`, so the deferrable foreign key of
+  `forward_test_same_period_backtest` is checked after the whole cascade. The
+  `strategy` capability does not read or write the tables of other
+  capabilities for this rule.
 - A save locks the `strategy` row (`SELECT ... FOR UPDATE`). Two saves of the
   same strategy cannot get the same version number.
 
@@ -291,7 +300,7 @@ entry exports `create_strategy_router(database_url=..., clock=...)`.
 | `POST /api/strategies/{strategy_id}/versions` | Body `{"code": ...}` or `{"rules": ...}`, exactly one of the two. With `code`, the source is `user`. With `rules`, the source is `rule_builder`: the route checks the rules (section 9.8.2), makes the code (section 9.8.3), and saves both. The checks of section 9.3 run on the code in both cases. `201` with the new version. `200` with the latest version when the code is the same (and, for a `rules` body, the rules are also the same). `422` with `{"problems": [{"line", "message"}]}` when a check blocks the save. `422` with the FastAPI validation body when the body has both or neither of `code` and `rules`, or when the rules do not match the rules format (section 9.8.2). `404` when the strategy does not exist. Port 8001 (phase 2) accepts only `{"code": ...}`; it saves with the source `ai_assistant` and the conversation ID (`assistant.md` 25.3.2). |
 | `POST /api/strategy-rules/code` (phase 1) | Body `{"rules": ...}`. Makes the code from the rules and saves nothing. `200` with `{"code"}`. `422` with the FastAPI validation body when the rules do not match the rules format (section 9.8.2). The "Rules" tab uses it for the read-only code (section 9.8.5). |
 | `GET /api/strategy-templates` (phase 1) | `200` with the template list (section 9.9.2): `[{"id", "name", "kind", "entry", "exit", "defaults", "market", "bar_period", "evidence", "sources": [{"label", "url"}], "differs_from_source"}]`, in the order of section 9.9. `kind` is `rules` or `code`. A code template has 1 rule: it is in `entry`, and `exit` is empty (section 9.9.5). The "New strategy" dialog uses it. |
-| `DELETE /api/strategies/{strategy_id}` | `204` when the strategy and its versions are deleted. `409` when a backtest or forward test uses a version. `404` when the strategy does not exist. |
+| `DELETE /api/strategies/{strategy_id}` | `204` when the strategy, its versions, and the backtests, parameter sweeps, and forward tests of the versions are deleted. `409` with "A backtest, parameter sweep, or forward test of this strategy has not ended. Wait for its end, or stop the forward test." `404` when the strategy does not exist. Only port 8000 has this route. |
 
 There is no route that changes or deletes one version. `PUT` and `DELETE` on a
 version path return `405`.

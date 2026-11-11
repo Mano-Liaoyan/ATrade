@@ -1,4 +1,4 @@
-"""HTTP routes of forward_test: start, stop, and list forward tests, and the tables of /ws/forward-tests.
+"""HTTP routes of forward_test: start, stop, list, and delete forward tests, and the tables of /ws/forward-tests.
 
 The Web process writes only `desired_state` after the start. The forward-test worker writes the actual state
 (docs/architecture.md section 12.3). /ws/forward-tests sends a change message after each change of the forward test
@@ -34,6 +34,7 @@ from atrade.forward_test.forward_test_universe import (
 )
 from atrade.foundation.bar import BarPeriod
 from atrade.foundation.clock import Clock
+from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.foundation.instrument import Instrument
 from atrade.foundation.table_changes import ChangeSocket
 from atrade.paper_trading import (
@@ -451,6 +452,15 @@ class ForwardTestRoutes:
         if not is_found:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Forward test not found.")
 
+    async def delete_forward_test(self, forward_test_id: int) -> None:
+        """Section 12.13. 409 while the forward test has not ended."""
+        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
+            if await forward_test_store.select_forward_test(connection, forward_test_id) is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Forward test not found.")
+            refusal = await forward_test_store.delete_forward_test(connection, forward_test_id)
+        if refusal is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=refusal)
+
 
 def create_forward_test_router(
     *, database_url: str, clock: Clock, client_ids: range, paper_account_monitor: PaperAccountMonitor
@@ -476,6 +486,14 @@ def create_forward_test_router(
         methods=["POST"],
         status_code=status.HTTP_202_ACCEPTED,
         response_model=None,
+    )
+    router.add_api_route(
+        "/api/forward-tests/{forward_test_id}",
+        routes.delete_forward_test,
+        methods=["DELETE"],
+        status_code=status.HTTP_204_NO_CONTENT,
+        response_model=None,
+        responses={status.HTTP_404_NOT_FOUND: ERROR_RESPONSE, status.HTTP_409_CONFLICT: ERROR_RESPONSE},
     )
 
     return router

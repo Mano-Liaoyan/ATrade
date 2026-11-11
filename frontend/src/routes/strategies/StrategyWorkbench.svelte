@@ -53,6 +53,7 @@
     writeStoredLayout,
   } from '#lib/foundation/workbench';
   import { ForwardTestsOnInstrumentsFeed, stopForwardTest, type ForwardTest } from '#lib/forward_test';
+  import { listSweeps } from '#lib/sweep';
   import {
     clearDraft,
     clearRulesDraft,
@@ -109,6 +110,7 @@
     type ResultSelection,
     type ResultTab,
     type WorkbenchShortcut,
+    describeStrategyDelete,
   } from './strategy_workbench';
 
   // versionNumber comes from the version address /strategies/<id>/versions/<n>. Without it, the latest version that is
@@ -145,6 +147,8 @@
   let isNewStrategyDialogOpen = $state(false);
   // The strategy of the delete dialog: the open strategy, or the row of the list context menu.
   let deleteTarget = $state<{ id: number; name: string } | null>(null);
+  // The dialog text with the backtests, parameter sweeps, and forward tests that the delete also deletes.
+  let deleteText = $state('');
   let isDeleteDialogOpen = $state(false);
   let isDeleting = $state(false);
   let isBacktestDialogOpen = $state(false);
@@ -522,7 +526,14 @@
     await goto(resolve('/strategies/[strategyId]', { strategyId: String(created.id) }));
   }
 
-  function requestDelete(target: { id: number; name: string }): void {
+  // The backtest list and the forward test list are live. The sweep list is read when the dialog opens.
+  async function requestDelete(target: { id: number; name: string }): Promise<void> {
+    const sweeps = await listSweeps(fetch);
+    deleteText = describeStrategyDelete(target.id, {
+      backtests,
+      sweeps: sweeps.kind === 'ok' ? sweeps.value : null,
+      forwardTests: forwardTestFeed.forwardTests,
+    });
     deleteTarget = { id: target.id, name: target.name };
     isDeleteDialogOpen = true;
   }
@@ -568,7 +579,7 @@
     {#snippet actions()}
       <IconButton label="New strategy" icon={Add16} onclick={openNewStrategyDialog} />
     {/snippet}
-    <StrategyList {strategies} errorMessage={listMessage} openStrategyId={activeStrategyId} onDeleteRequest={requestDelete} />
+    <StrategyList {strategies} errorMessage={listMessage} openStrategyId={activeStrategyId} onDeleteRequest={(target: StrategyListItem) => void requestDelete(target)} />
   </SideColumn>
 
   <div class="main">
@@ -606,7 +617,7 @@
             tone="neutral"
             onclick={() => {
               if (strategy !== null) {
-                requestDelete(strategy);
+                void requestDelete(strategy);
               }
             }}
           />
@@ -840,7 +851,7 @@
       void removeStrategy();
     }}
   >
-    <p>All versions of the strategy are deleted.</p>
+    <p>{deleteText}</p>
   </Dialog>
 {/if}
 

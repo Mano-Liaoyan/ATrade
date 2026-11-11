@@ -20,6 +20,7 @@ type SamePeriodBacktestResponse = components['schemas']['SamePeriodBacktestRespo
 
 export type StartResult = { kind: 'started'; forwardTest: ForwardTest } | { kind: 'failed'; message: string };
 export type StopResult = { kind: 'stop_requested' } | { kind: 'failed'; message: string };
+export type DeleteForwardTestResult = { kind: 'deleted' } | { kind: 'failed'; message: string };
 export type SamePeriodBacktestResult = { kind: 'started'; backtestId: number } | { kind: 'failed'; message: string };
 export type ComparisonResult = { kind: 'ok'; value: ForwardTestComparison } | { kind: 'failed'; message: string };
 export type ListResult = { kind: 'ok'; value: ForwardTest[] } | { kind: 'failed'; message: string };
@@ -145,6 +146,12 @@ export function canStop(forwardTest: ForwardTest): boolean {
   return forwardTest.desired_state === 'running' && forwardTest.client_id !== null;
 }
 
+/** A delete is possible when the forward test has ended: stopped, or failed without a client ID
+ * (docs/architecture/forward_test.md 12.13). */
+export function canDelete(forwardTest: ForwardTest): boolean {
+  return forwardTest.status === 'stopped' || (forwardTest.status === 'failed' && forwardTest.client_id === null);
+}
+
 /** The start of the equity curve and of the Net profit: the allocated capital, or the start balance of an old forward
  * test without an allocated capital (docs/architecture/forward_test.md 12.18). Null until an old forward test has a
  * start balance. */
@@ -205,6 +212,18 @@ export async function stopForwardTest(fetchFunction: typeof fetch, forwardTestId
     return outcome;
   }
   return { kind: 'stop_requested' };
+}
+
+/** A true delete of the forward test and its records. The owner ledger rows stay. The backend refuses a forward test
+ * that has not ended (409 with the reason). */
+export async function deleteForwardTest(fetchFunction: typeof fetch, forwardTestId: number): Promise<DeleteForwardTestResult> {
+  const outcome = await sendForwardTestRequest(
+    fetchFunction,
+    `${FORWARD_TESTS_PATH}/${String(forwardTestId)}`,
+    { method: 'DELETE' },
+    { notReachable: 'Backend not reachable. The forward test is not deleted.', failedAction: 'The delete' },
+  );
+  return outcome.kind === 'failed' ? outcome : { kind: 'deleted' };
 }
 
 export async function startSamePeriodBacktest(

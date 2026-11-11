@@ -315,3 +315,33 @@ export function listVersionItems(
 export function findDefaultVersionNumber(versions: readonly VersionFlags[]): number | undefined {
   return (versions.findLast((version) => !version.discarded) ?? versions.at(-1))?.version_number;
 }
+
+function countText(count: number, singular: string, plural: string): string {
+  return `${String(count)} ${count === 1 ? singular : plural}`;
+}
+
+/** The text of the delete dialog: the strategy delete also deletes the backtests, parameter sweeps, and forward tests
+ * of its versions (docs/architecture/strategy.md section 9.1). `sweeps` is null when the sweep list was not read. */
+export function describeStrategyDelete(
+  strategyId: number,
+  lists: {
+    backtests: readonly { strategy_id: number }[];
+    sweeps: readonly { strategy_id: number }[] | null;
+    forwardTests: readonly { strategy_id: number }[];
+  },
+): string {
+  if (lists.sweeps === null) {
+    return 'All versions of the strategy are deleted, with all their backtests, parameter sweeps, and forward tests.';
+  }
+  const counts: [number, string, string][] = [
+    [lists.backtests.filter((item) => item.strategy_id === strategyId).length, 'backtest', 'backtests'],
+    [lists.sweeps.filter((item) => item.strategy_id === strategyId).length, 'parameter sweep', 'parameter sweeps'],
+    [lists.forwardTests.filter((item) => item.strategy_id === strategyId).length, 'forward test', 'forward tests'],
+  ];
+  const parts = counts.filter(([count]) => count > 0).map(([count, singular, plural]) => countText(count, singular, plural));
+  if (parts.length === 0) {
+    return 'All versions of the strategy are deleted.';
+  }
+  const listed = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${String(parts.at(-1))}`;
+  return `All versions of the strategy are deleted, with ${String(listed)}.`;
+}
