@@ -281,12 +281,12 @@ test('a chart shows 1 custom indicator 2 times with 2 parameter values, and the 
   await page.goto(CHART_PATH);
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
 
-  for (const _ of [1, 2]) {
+  const legend = page.getByRole('list', { name: 'Legend' });
+  for (const count of [1, 2]) {
     await page.getByRole('button', { name: 'Add indicator' }).click();
     await page.getByRole('dialog', { name: 'Add indicator' }).getByRole('option', { name: 'Close ratio' }).click();
+    await expect(legend.getByRole('listitem').filter({ hasText: 'Close ratio 20' })).toHaveCount(count);
   }
-  const legend = page.getByRole('list', { name: 'Legend' });
-  await expect(legend.getByRole('listitem').filter({ hasText: 'Close ratio 20' })).toHaveCount(2);
 
   const first = legend.getByRole('listitem').filter({ hasText: 'Close ratio 20' }).first();
   await first.locator('.legend-name').hover();
