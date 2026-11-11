@@ -40,8 +40,10 @@ import { errorResult, type ToolResult } from './tool_results.ts';
 export const CLAUDE_CODE_PROVIDER = 'claude-code';
 /** The one credential of Claude Code: the Claude login of the container. It is not in the credential file. */
 export const CLAUDE_CODE_CREDENTIAL_ID = 'claude-code';
-/** The command that logs in Claude Code in the container. The user runs it in the repository on the server. */
-export const CLAUDE_LOGIN_COMMAND = 'docker compose -f deploy/compose.yaml exec assistant claude auth login';
+/** The command that logs in Claude Code in the container. The user runs it in the repository on the server.
+ * Compose reads `.env` only from the directory of the compose file, so the command gives it, as `./start` does. */
+export const CLAUDE_LOGIN_COMMAND =
+  'docker compose --file deploy/compose.yaml --env-file .env exec assistant claude auth login';
 
 const TOOL_SERVER = 'atrade';
 const BUILT_IN_TOOLS = ['WebSearch', 'WebFetch'];
