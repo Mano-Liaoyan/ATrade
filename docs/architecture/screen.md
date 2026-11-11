@@ -282,7 +282,9 @@ problem `["name"]` with the reason "A screen with the name '<name>' exists.".
 The market is a problem `["market"]` when it is not `US` or `HK`.
 
 A condition or the order can hold a reference to a custom indicator
-(indicator.md section 23.10).
+(indicator.md section 23.10). Its `parameters` hold the values of the
+parameters of the custom indicator, for example `{"lookback_days": 20}`. A
+parameter without a value has its default.
 
 One column name means one reference. A result names its columns by the
 indicator name, and a name does not show each parameter: `bars_per_year` of

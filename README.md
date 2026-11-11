@@ -96,7 +96,10 @@ controls (issue #71), and the start and stop of forward tests (issue #76):
   [`docs/architecture/indicator.md`](docs/architecture/indicator.md)
   section 23.9.
 - Custom indicators: the Settings page creates, changes, and deletes indicators
-  from a formula expression, for example `close / sma(50) - 1`. They are in
+  from a formula expression, for example `close / sma(50) - 1`. An expression
+  can have variables and parameters (for example `lookback_days`). A chart, a
+  screen condition, and a strategy set their own parameter values, so one
+  custom indicator can be on a chart 2 times with 2 values. They are in
   "Add indicator", the screen conditions, and the rule builder. A saved screen,
   strategy version, or backtest keeps its expression after a change or a delete.
   Routes are under `/api/custom-indicators`. The AI assistant can write and
