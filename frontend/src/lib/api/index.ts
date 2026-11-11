@@ -545,6 +545,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/backtests/{backtest_id}/rerun": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Rerun Backtest
+         * @description A new backtest of another version of the same strategy with the request of the backtest: the same
+         *     instruments, members of each universe period, screen copy, bar period, range, paper capital, out-of-sample
+         *     share, and source order (docs/architecture/backtest.md section 10.5).
+         */
+        post: operations["rerun_backtest_api_backtests__backtest_id__rerun_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/backtest-limits": {
         parameters: {
             query?: never;
@@ -2642,6 +2664,14 @@ export interface components {
         RenameConversationRequest: {
             /** Title */
             title: string;
+        };
+        /**
+         * RerunBacktestRequest
+         * @description A new backtest of this strategy version on the data of a backtest (docs/architecture/backtest.md 10.5).
+         */
+        RerunBacktestRequest: {
+            /** Strategy Version Id */
+            strategy_version_id: number;
         };
         RightOperand: components["schemas"]["PriceOperand"] | components["schemas"]["IndicatorOperand"] | components["schemas"]["NumberOperand"];
         /** RuleCondition */
@@ -5395,6 +5425,50 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BacktestResponse"];
+                };
+            };
+            /** @description The request is refused (detail is a text), or a field is not valid (detail is a list). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    rerun_backtest_api_backtests__backtest_id__rerun_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                backtest_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RerunBacktestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BacktestResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description The request is refused (detail is a text), or a field is not valid (detail is a list). */

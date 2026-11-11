@@ -411,6 +411,7 @@ clock, exchange_rate_reader)`, `BacktestRunner(*, database_url, clock, process_c
 | Route | Behavior |
 |---|---|
 | `POST /api/backtests` | Body `{"strategy_version_id", "symbol", "exchange", "currency", "bar_period", "start_utc", "end_utc", "paper_capital_usd"}`. `201` with the queued backtest. `422` when `paper_capital_usd` is missing or not above 0, a time has no time zone, the bar period is unknown, the range does not end after it starts, the strategy version does not exist, PostgreSQL has no saved bar of the instrument and bar period in the range (section 10.1), or the daily exchange rates of an instrument that is not in USD cannot be saved (section 10.8). |
+| `POST /api/backtests/{backtest_id}/rerun` | Body `{"strategy_version_id"}`. A backtest rerun: `201` with the queued backtest. It copies the request of the backtest: the instrument or the universe kind and its parameters, the members of each universe period (a `rule` or `list` universe), the screen copy (a `screen` universe), the bar period, the range, `paper_capital_usd`, `out_of_sample_share`, and `source_order`. The new backtest uses the strategy version of the body. The route makes the checks of `POST /api/backtests` again (saved bars, exchange rates). `404` when the backtest does not exist. `422` when the strategy version does not exist, when it is not a version of the strategy of the backtest, when the backtest is a sweep run ("Backtest #<id> is a run of sweep #<sweep id>. Start a sweep."), or when a check of the start refuses it. Only port 8000 has this route. |
 | `GET /api/backtests` | `200` with all backtests, the newest first. |
 | `GET /api/backtest-limits` | `200` with `{"timeout_seconds", "concurrency"}`. The defaults are `7200` and `1`. |
 | `PUT /api/backtest-limits` | Body `{"timeout_seconds", "concurrency"}`. `200` with the saved limits. `422` when `timeout_seconds` is not from 1 to 604800 or `concurrency` is not from 1 to 16. |
@@ -492,7 +493,10 @@ document. The implementation can change them.
     test" icon button. The button starts a forward test of the same strategy
     version, instrument, and bar period and opens it. For a bar period that
     is not live (`isLiveBarPeriod`), the button is disabled and its name says
-    why. The body has the `KeyMetricRow` and the `EquityDrawdownChart`, which
+    why. Before it, the "Rerun backtest with v<n>" icon button starts a backtest
+    rerun (section 10.5) with the latest version of the strategy that is not
+    discarded, and opens the new backtest. A sweep run does not have the button.
+    The body has the `KeyMetricRow` and the `EquityDrawdownChart`, which
     fills the rest of the panel. A queued or running backtest shows its
     status in the body instead.
   - The "Backtest tables" panel has the tabs Trades (32px rows), Orders, and
@@ -511,6 +515,11 @@ document. The implementation can change them.
   switcher (`ChartViewSwitcher`, `?chart=bars`), "Add indicator" in the
   header line while "Bars" shows, and `RunBarChart` with the strategy
   indicators. The trade marks come with #332.
+- The strategy page toolbar has the "Rerun backtest #<id> with v<n>" icon
+  button after "Run backtest" while a backtest tab is shown and no backtest of
+  the strategy runs. It starts a backtest rerun (section 10.5) of the shown
+  backtest with the open version, without a dialog. The new backtest opens in
+  its tab. A refusal goes to Output.
 - The "New backtest" dialog (`StartBacktestDialog`) has the start form (form
   id `start-backtest`). The address `#start-backtest` (command palette) opens
   it. After the start, the page opens the new backtest. The form combines the

@@ -26,6 +26,7 @@ export {
   listChartInstruments,
   readBacktestInstrument,
   readUsUniverseRange,
+  rerunBacktest,
   startBacktest,
   type Backtest,
   type BacktestComparison,

@@ -5,7 +5,7 @@
      "Show discarded versions" when the strategy has a discarded version, and icon buttons with the state in their icon and color), then the results panel and the editor panel with a
      splitter between them. The swap button puts the editor on top or at the bottom; the browser keeps the choice.
      Run backtest and Start forward test open the dialogs of the backtest page and the forward test page with the
-     open version. The results panel has one tab for each backtest of the strategy (number and total return), then Trades, Orders,
+     open version. Rerun backtest starts a backtest of the open version on the data of the shown backtest tab. The results panel has one tab for each backtest of the strategy (number and total return), then Trades, Orders,
      and Logs. A backtest that ends opens in its tab. The editor panel has the "Rules" tab (the rule builder, RulesTab) and
      the `strategy.py` tab (the code editor). While "Rules" is open, the save button and Ctrl S save the rules as a new
      version. When the code of the open version changed after the rules, the tab shows a warning, and the save first
@@ -29,6 +29,7 @@
   import ConnectionSignal16 from '@carbon/icons/es/connection-signal/16.js';
   import InProgress16 from '@carbon/icons/es/in-progress/16.js';
   import PlayFilledAlt16 from '@carbon/icons/es/play--filled--alt/16.js';
+  import Renew16 from '@carbon/icons/es/renew/16.js';
   import Save16 from '@carbon/icons/es/save/16.js';
   import StopFilledAlt16 from '@carbon/icons/es/stop--filled--alt/16.js';
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
@@ -36,7 +37,7 @@
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
   import { resolve } from '$app/paths';
-  import { BACKTESTS_SOCKET_PATH, isFinalStatus, listBacktests, type Backtest } from '#lib/backtest';
+  import { BACKTESTS_SOCKET_PATH, isFinalStatus, listBacktests, rerunBacktest, type Backtest } from '#lib/backtest';
   import { Dialog, Icon, IconButton, InlineNotification, Select, Toggle } from '#lib/foundation/carbon';
   import { CodeDiff, CodeEditor } from '#lib/foundation/code_editor';
   import { EmptyText } from '#lib/foundation/empty_text';
@@ -147,6 +148,7 @@
   let isDeleteDialogOpen = $state(false);
   let isDeleting = $state(false);
   let isBacktestDialogOpen = $state(false);
+  let isRerunning = $state(false);
   let isForwardTestDialogOpen = $state(false);
   // The new code of the rules while the diff dialog before a rules save is open (section 9.8.4), else null.
   let replacingCode = $state<string | null>(null);
@@ -421,6 +423,23 @@
     }
   }
 
+  // A new backtest of the open version on the data of the shown backtest tab (docs/architecture/backtest.md 10.6).
+  async function rerunShownBacktest(): Promise<void> {
+    if (openVersion === null || shownBacktest === null || runningBacktest !== null || isRerunning) {
+      return;
+    }
+    isRerunning = true;
+    const backtestId = shownBacktest.id;
+    const result = await rerunBacktest(fetch, backtestId, openVersion.id);
+    isRerunning = false;
+    if (result.kind === 'failed') {
+      writeOutputError(`Backtest #${String(backtestId)} not rerun: ${result.message}`);
+      return;
+    }
+    showBacktest(result.value.id);
+    writeOutput(describeBacktestEvent(result.value));
+  }
+
   async function toggleForwardTest(): Promise<void> {
     if (openVersion === null || isStoppingForwardTest) {
       return;
@@ -633,6 +652,19 @@
               shortcut={describeShortcut('backtest', isMac)}
               onclick={openBacktestDialog}
             />
+            {#if shownBacktest !== null && openVersion !== null}
+              <IconButton
+                label={isRerunning
+                  ? 'Starting backtest…'
+                  : `Rerun backtest #${String(shownBacktest.id)} with v${String(openVersion.version_number)}`}
+                icon={Renew16}
+                tone="success"
+                align="bottom-end"
+                disabled={isRerunning}
+                busy={isRerunning}
+                onclick={() => void rerunShownBacktest()}
+              />
+            {/if}
           {:else}
             <IconButton
               label="Backtest is running"

@@ -199,6 +199,14 @@ _Avoid_: preset, example, sample, starter
 A test of a strategy on historical bars. No order goes to a broker.
 _Avoid_: simulation, historical run
 
+**Backtest rerun**:
+A new backtest of a strategy version on the data of an earlier backtest of the
+same strategy: the same instruments, universe members, bar period, time range,
+paper capital, out-of-sample share, and source order. The user changes the
+strategy, saves a version, and compares the two results. In Chinese, write
+重跑回测.
+_Avoid_: replay, repeat, clone
+
 **Backtest limits**:
 The timeout of one backtest and the number of backtests that run at the same
 time (the concurrency). The user changes them in the UI. Other backtests wait

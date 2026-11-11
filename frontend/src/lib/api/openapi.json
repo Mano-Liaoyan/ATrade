@@ -1746,6 +1746,66 @@
         }
       }
     },
+    "/api/backtests/{backtest_id}/rerun": {
+      "post": {
+        "summary": "Rerun Backtest",
+        "description": "A new backtest of another version of the same strategy with the request of the backtest: the same\ninstruments, members of each universe period, screen copy, bar period, range, paper capital, out-of-sample\nshare, and source order (docs/architecture/backtest.md section 10.5).",
+        "operationId": "rerun_backtest_api_backtests__backtest_id__rerun_post",
+        "parameters": [
+          {
+            "name": "backtest_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Backtest Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RerunBacktestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BacktestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is refused (detail is a text), or a field is not valid (detail is a list).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/backtest-limits": {
       "get": {
         "summary": "Read Limits",
@@ -8517,6 +8577,20 @@
           "title"
         ],
         "title": "RenameConversationRequest"
+      },
+      "RerunBacktestRequest": {
+        "properties": {
+          "strategy_version_id": {
+            "type": "integer",
+            "title": "Strategy Version Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "strategy_version_id"
+        ],
+        "title": "RerunBacktestRequest",
+        "description": "A new backtest of this strategy version on the data of a backtest (docs/architecture/backtest.md 10.5)."
       },
       "RightOperand": {
         "oneOf": [
