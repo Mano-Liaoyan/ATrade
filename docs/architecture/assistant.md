@@ -1319,8 +1319,14 @@ Implemented (#185):
   says "The model has no thinking levels." (tooltip and accessible
   description).
 - The browser opens one `/ws/assistant` socket for the open conversation
-  (`conversation_socket.ts`). The socket does not connect again after a
-  close. Each `error` message goes to the Output tab of the "Problems and
+  (`conversation_socket.ts`). After a close, the page opens a new socket of
+  the open conversation after 1 second. The delay doubles after each
+  failed try, to at most 10 seconds, and goes back to 1 second when a
+  socket opens. Without a message for 25 seconds (two missing
+  `heartbeat` messages and a margin, for example after the computer
+  sleeps), the page closes the socket and connects again. A new socket of
+  the same conversation reads the saved messages after it opens, and keeps
+  the model selection and the Keep and Discard choices. Each `error` message goes to the Output tab of the "Problems and
   output" panel with the UTC time. After `run_state` `settled`, `web` calls
   the title model. The page reads the conversation list again after 1
   second for the generated title. While the open conversation has
@@ -1346,7 +1352,8 @@ Decided (each workbench page has the column):
   socket of the open conversation is closed, the page opens a new socket.
 - A socket close during a run ends the run in the log, because no
   `settled` message comes. The run goes on in `web` (25.10): the next
-  socket of the conversation (a reload, a page that opens) shows it again.
+  socket of the conversation (a reconnect, a reload, a page that opens)
+  shows it again.
   "Stop" changes to the
   disabled "Send" with its reason. A running tool step shows "Failed". A
   running backtest step shows "Interrupted", because the backtest can go on.
@@ -1688,8 +1695,8 @@ columns behave the same (section 13).
 - Decided (#185): the copy of the disabled controls. "Send" is disabled with
   a helper text under the input: "Start a new conversation to send.", "Add a
   credential to send.", "Connecting to the AI assistant.", or (after the
-  socket closed) "The connection to the AI assistant closed. Reload the page
-  to send.". "Rename
+  socket closed, until the page connects again) "The connection to the AI
+  assistant closed. Connecting again.". "Rename
   conversation" and "Delete conversation" are "No conversation to rename" and
   "No conversation to delete" without a conversation. A Select without items
   shows "No credential" or "No model".

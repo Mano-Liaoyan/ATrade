@@ -239,9 +239,21 @@ test('a reload during a run shows the run again: the message is not lost, and St
   await expect(column.getByRole('button', { name: 'Send' })).toBeVisible();
 });
 
-test('a socket close during a run ends the run: the disabled Send says to reload', async ({ page }, currentTest) => {
+test('a socket close during a run ends the run, and the page connects again and shows the run', async ({
+  page,
+}, currentTest) => {
   let closeSocket: () => Promise<void> = () => Promise.resolve();
-  await page.routeWebSocket(/\/ws\/assistant\?conversation_id=/, (socket) => {
+  // The new socket waits until the test lets it connect, so the closed state stays on the page for the checks.
+  let allowReconnect: () => void = () => undefined;
+  const reconnectAllowed = new Promise<void>((resolve) => {
+    allowReconnect = resolve;
+  });
+  let socketCount = 0;
+  await page.routeWebSocket(/\/ws\/assistant\?conversation_id=/, async (socket) => {
+    socketCount += 1;
+    if (socketCount > 1) {
+      await reconnectAllowed;
+    }
     socket.connectToServer();
     closeSocket = () => socket.close();
   });
@@ -254,7 +266,14 @@ test('a socket close during a run ends the run: the disabled Send says to reload
   await closeSocket();
 
   await expect(column.getByRole('button', { name: 'Send' })).toBeDisabled();
-  await expect(column.getByText('The connection to the AI assistant closed. Reload the page to send.')).toBeVisible();
+  await expect(column.getByText('The connection to the AI assistant closed. Connecting again.')).toBeVisible();
+
+  allowReconnect();
+
+  await expect(conversationLog(page).getByText('Working on it')).toBeVisible();
+  await expect(conversationLog(page).getByText('Please wait.', { exact: true })).toHaveCount(1);
+  await column.getByRole('button', { name: 'Stop' }).click();
+  await expect(column.getByRole('button', { name: 'Send' })).toBeVisible();
 });
 
 test('a saved version shows a diff card: the card opens CodeDiff, Keep opens the version, Discard keeps the open one', async ({

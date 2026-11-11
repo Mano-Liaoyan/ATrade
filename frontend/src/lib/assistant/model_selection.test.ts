@@ -176,7 +176,7 @@ describe('the Send button', () => {
     expect(describeSendButton({ ...ready, hasCredential: false }).disabledReason).toBe('Add a credential to send.');
     expect(describeSendButton({ ...ready, connection: 'connecting' }).disabledReason).toBe('Connecting to the AI assistant.');
     expect(describeSendButton({ ...ready, connection: 'closed' }).disabledReason).toBe(
-      'The connection to the AI assistant closed. Reload the page to send.',
+      'The connection to the AI assistant closed. Connecting again.',
     );
   });
 
