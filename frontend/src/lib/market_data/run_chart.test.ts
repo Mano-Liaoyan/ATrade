@@ -1,5 +1,6 @@
 // The link of a backtest or forward test bar chart with its Trades or Fills table (indicator.md section 23.9.9).
 import { describe, expect, it } from 'vite-plus/test';
+import type { ChartIndicatorSet } from './chart_indicator_set';
 import { findRowTrade, findRingTrades, RunChart } from './run_chart.svelte';
 
 // Row 1 is a split adjustment: it has no trade mark.
@@ -41,5 +42,29 @@ describe('RunChart.findInstrument', () => {
 
     expect(chart.findInstrument('1', instruments)).toEqual(instruments[1]);
     expect(chart.findInstrument('2', instruments)).toEqual(instruments[0]);
+  });
+});
+
+describe('RunChart.indicators', () => {
+  const SMA = { indicator: 'sma', parameters: { period: 50 }, hidden: false, lines: [{ output: 'value', color: 1, style: 'solid' as const, width: 2 }] };
+  const STRATEGY_SMA = { ...SMA, parameters: { period: 20 }, isFromStrategy: true as const };
+
+  it('saves a change of a run chart in the chart indicator set without the strategy indicators', async () => {
+    const savedSets: ChartIndicatorSet[] = [];
+    const fetchFunction: typeof fetch = (_input, init) => {
+      if (init?.method === 'PUT') {
+        savedSets.push(JSON.parse(init.body as string) as ChartIndicatorSet);
+      }
+      return Promise.resolve(new Response(JSON.stringify({ panes: [{ indicators: [] }], favorites: ['rsi'] })));
+    };
+    const chart = new RunChart();
+    await chart.indicatorSet.load(fetchFunction);
+
+    chart.indicators.changePanes(fetchFunction, '1', [{ indicators: [STRATEGY_SMA, SMA] }]);
+
+    expect(chart.indicators.readPanes('1', [])).toEqual([{ indicators: [STRATEGY_SMA, SMA] }]);
+    // Another run shows the saved panes.
+    expect(chart.indicators.readPanes('2', [])).toEqual([{ indicators: [SMA] }]);
+    await expect.poll(() => savedSets).toEqual([{ panes: [{ indicators: [SMA] }], favorites: ['rsi'] }]);
   });
 });

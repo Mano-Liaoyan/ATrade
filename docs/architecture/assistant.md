@@ -940,6 +940,7 @@ Server to browser:
 | `strategy_version_saved` | The strategy version ID, for the diff card. |
 | `backtest_finished` | The backtest ID, for the metric card. |
 | `run_state` | `running` or `settled`. |
+| `run_replay` | The socket opened during a run. The messages of the run until now follow. |
 | `error` | An error of the conversation. |
 | `login_step` | One login step: `auth_url`, `device_code`, `prompt`, or `progress`. |
 
@@ -992,6 +993,7 @@ Fields (#179). Each message is a JSON object with `type`.
 | `message_delta` | Server to browser | `text` |
 | `message_end` | Server to browser | `text`, `provider`, `model`, `credential_name`, `thinking_level` |
 | `run_state` | Server to browser | `state`: `running` or `settled` |
+| `run_replay` | Server to browser | `saved_message_count`, `text` |
 | `error` | Server to browser | `message` |
 | `heartbeat` | Server to browser | — (every 10 seconds) |
 
@@ -1003,7 +1005,28 @@ Fields (#179). Each message is a JSON object with `type`.
 - A `prompt` during a run and a message that is not valid each get an
   `error` message. A `prompt` during a run does not
   start a second run.
-- When the browser leaves during a run, `web` stops the run (`abort`).
+- A run belongs to its conversation, not to the socket that sent the
+  `prompt`. When the browser leaves during a run (a reload, a closed
+  connection, a Cloudflare challenge), the run goes on, `web` saves the last
+  model, and `web` generates the title. Only `abort` and a delete of the
+  conversation stop a run. A restart of `web` loses the messages of a run
+  that the browser did not get; the `assistant` service still writes the
+  run into the JSONL file.
+- Each socket of a conversation gets the messages of its runs. A `prompt`
+  during a run gets an `error` on each socket, and `abort` works on each
+  socket.
+- A socket that opens during a run gets `run_replay` first, then each
+  message of the run until now (from `run_state` `running`), then the next
+  messages. `saved_message_count` is the count of the saved messages (25.11)
+  before the run. `text` is the user message of the run. The conversation
+  log is then: the first `saved_message_count` saved messages, the user
+  message `text`, and the messages that follow. So the tool steps and the
+  cards of the run show again.
+- `web` adds the socket to the conversation before it accepts the socket.
+  The browser reads the saved messages after the socket opens, and it
+  applies the socket messages after the saved messages. So the saved
+  messages and the socket messages together have all messages, also when a
+  run ends at that time.
 - Decided (#182): the fields of the tool messages:
 
   | `type` | Direction | Fields |
@@ -1040,7 +1063,7 @@ Login fields (#183):
 - `ASSISTANT_SOCKET_MESSAGE_MODELS` (`atrade.assistant`) lists the messages
   of both directions. Message model names: `PromptMessage`,
   `AbortMessage`, `MessageDeltaMessage`, `MessageEndMessage`,
-  `RunStateMessage`, `ToolStepMessage`, `StrategyVersionSavedMessage`,
+  `RunStateMessage`, `RunReplayMessage`, `ToolStepMessage`, `StrategyVersionSavedMessage`,
   `BacktestFinishedMessage`, `ScreenSavedMessage`,
   `ScreenRunFinishedMessage`, `AssistantErrorMessage`, `HeartbeatMessage`,
   `LoginStartMessage`, `LoginAnswerMessage`, `LoginStepMessage`,
@@ -1224,12 +1247,14 @@ Decided (each workbench page has the column):
   `atrade.assistant-column.conversation`, so a reload opens it again.
   Without an open or a stored conversation, the column opens no
   conversation: the newest one can be the conversation of another browser
-  tab, and a socket that closes stops its run (25.10). After a delete, the
+  tab. After a delete, the
   column opens the newest conversation.
 - Each page reads the conversation list again when it opens. When the
   socket of the open conversation is closed, the page opens a new socket.
-- A socket close during a run ends the run in the log, because `web` stops
-  the run (25.10) and no `settled` message comes. "Stop" changes to the
+- A socket close during a run ends the run in the log, because no
+  `settled` message comes. The run goes on in `web` (25.10): the next
+  socket of the conversation (a reload, a page that opens) shows it again.
+  "Stop" changes to the
   disabled "Send" with its reason. A running tool step shows "Failed". A
   running backtest step shows "Interrupted", because the backtest can go on.
 - "Send" stays disabled ("connecting") until the socket is open and the

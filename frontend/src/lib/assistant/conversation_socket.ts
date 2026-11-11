@@ -1,6 +1,6 @@
 // The /ws/assistant socket of one conversation (docs/architecture/assistant.md 25.10). The browser sends `prompt` and
-// `abort`, and the server streams the run. The socket does not connect again after a close: `web` stops a run when
-// the browser leaves, so a new socket cannot continue it.
+// `abort`, and the server streams the run. The socket does not connect again after a close. The run goes on in `web`:
+// the next socket of the conversation gets `run_replay` and the messages of the run until now.
 import type { components } from '#lib/api';
 import { buildSocketUrl, readSocketMessage } from '#lib/foundation/live_socket';
 import type { ServerMessage } from './conversation_log';
@@ -13,6 +13,7 @@ const SERVER_MESSAGE_TYPES: (ServerMessage | AssistantErrorMessage)['type'][] = 
   'message_delta',
   'message_end',
   'run_state',
+  'run_replay',
   'tool_step',
   'strategy_version_saved',
   'backtest_finished',

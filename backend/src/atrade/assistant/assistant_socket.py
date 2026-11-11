@@ -4,8 +4,8 @@ The browser opens one socket for one conversation: `/ws/assistant?conversation_i
 messages to the assistant service and sends the server messages of assistant_service.py to the browser. The frontend
 depends only on these messages.
 
-After the first run with an answer, `web` generates the title once (25.8.3). A failure sends an `error` message and
-leaves the title. A rename before or during the generation wins. When the browser leaves, `web` stops the active run.
+A run belongs to its conversation (conversation_runs.py): it goes on when the browser leaves, and a socket that opens
+during a run gets `run_replay` and the messages of the run until now.
 
 The provider login runs on the same path (25.7.3). The Credentials dialog opens `/ws/assistant` without
 `conversation_id`, because a login needs no conversation. `login_start` starts one login, each pi step comes as
@@ -19,6 +19,7 @@ from typing import Annotated, Literal
 import anyio
 import psycopg
 from anyio.abc import TaskGroup
+from anyio.streams.memory import MemoryObjectReceiveStream
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field, StringConstraints, TypeAdapter, ValidationError
 
@@ -41,7 +42,7 @@ from atrade.assistant.assistant_service import (
     ThinkingLevel,
     ToolStepMessage,
 )
-from atrade.assistant.system_prompt import join_system_prompt
+from atrade.assistant.conversation_runs import ConversationRuns, RunReplayMessage, RunStateMessage
 from atrade.foundation.socket_push import HEARTBEAT_INTERVAL_SECONDS, HeartbeatMessage
 
 ASSISTANT_SOCKET_PATH = "/ws/assistant"
@@ -67,13 +68,6 @@ class AbortMessage(BaseModel):
     """Browser to server: stop the active run (the "Stop" button)."""
 
     type: Literal["abort"] = "abort"
-
-
-class RunStateMessage(BaseModel):
-    """The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run."""
-
-    type: Literal["run_state"] = "run_state"
-    state: Literal["running", "settled"]
 
 
 class LoginStartMessage(BaseModel):
@@ -105,6 +99,7 @@ ASSISTANT_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [
     MessageDeltaMessage,
     MessageEndMessage,
     RunStateMessage,
+    RunReplayMessage,
     ToolStepMessage,
     StrategyVersionSavedMessage,
     BacktestFinishedMessage,
@@ -122,7 +117,7 @@ ASSISTANT_SOCKET_MESSAGE_MODELS: list[type[BaseModel]] = [
 class ConversationSocket:
     """One browser socket of one conversation, or of the Credentials dialog (no conversation).
 
-    At most one run and one login are active.
+    At most one login is active. The runs are in `runs`.
     """
 
     def __init__(
@@ -132,13 +127,14 @@ class ConversationSocket:
         conversation_id: int | None,
         database_url: str,
         assistant_service: AssistantService,
+        runs: ConversationRuns,
     ) -> None:
         self.websocket = websocket
         self.socket_conversation_id = conversation_id
         self.database_url = database_url
         self.assistant_service = assistant_service
+        self.runs = runs
         self.send_lock = anyio.Lock()
-        self.is_running = False
         self.is_logging_in = False
 
     @property
@@ -159,6 +155,10 @@ class ConversationSocket:
         while True:
             await anyio.sleep(HEARTBEAT_INTERVAL_SECONDS)
             await self.send(HeartbeatMessage())
+
+    async def send_run_messages(self, messages: MemoryObjectReceiveStream[BaseModel]) -> None:
+        async for message in messages:
+            await self.send(message)
 
     async def receive(self, text: str, task_group: TaskGroup) -> None:
         try:
@@ -184,7 +184,7 @@ class ConversationSocket:
                 if not await self.assistant_service.answer_login(message.prompt_id, message.value):
                     await self.send_error("No login waits for this answer.")
             case PromptMessage():
-                if self.is_running:
+                if self.runs.is_running(self.conversation_id):
                     await self.send_error("The AI assistant runs. Stop the run first.")
                     return
                 selection = ModelSelection(
@@ -193,8 +193,7 @@ class ConversationSocket:
                     credential_id=message.credential_id,
                     thinking_level=message.thinking_level,
                 )
-                task_group.start_soon(self.run, self.conversation_id, message.text, message.images, selection)
-                self.is_running = True
+                self.runs.start(self.conversation_id, message.text, message.images, selection)
             case AbortMessage():
                 await self.assistant_service.abort(self.conversation_id)
 
@@ -207,70 +206,6 @@ class ConversationSocket:
         finally:
             self.is_logging_in = False
 
-    async def read_system_prompt(self, conversation_id: int) -> str:
-        """The prompt version of the conversation and the fixed part of its start (25.9)."""
-        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
-            parts = await conversation_store.select_system_prompt_parts(connection, conversation_id)
-        if parts is None:
-            message = f"The conversation {conversation_id} does not exist."
-            raise AssistantServiceError(message)
-        return join_system_prompt(parts.editable_part, parts.fixed_part)
-
-    async def run(self, conversation_id: int, text: str, images: list[PromptImage], selection: ModelSelection) -> None:
-        await self.send(RunStateMessage(state="running"))
-        has_answer = False
-        try:
-            system_prompt = await self.read_system_prompt(conversation_id)
-            async for event in self.assistant_service.run(conversation_id, text, selection, system_prompt, images):
-                if isinstance(event, MessageEndMessage):
-                    has_answer = True
-                    await self.save_last_model(event)
-                await self.send(event)
-        except AssistantServiceError as error:
-            await self.send_error(str(error))
-        # Only a run that ends here is settled. After a cancellation, is_running stays True, so stop_active_run stops it.
-        self.is_running = False
-        await self.send(RunStateMessage(state="settled"))
-        if has_answer:
-            await self.generate_title_once(selection)
-
-    async def save_last_model(self, event: MessageEndMessage) -> None:
-        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            await conversation_store.save_last_model(
-                connection,
-                self.conversation_id,
-                provider=event.provider,
-                model=event.model,
-                credential_name=event.credential_name,
-            )
-
-    async def generate_title_once(self, selection: ModelSelection) -> None:
-        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            if not await conversation_store.claim_title_generation(connection, self.conversation_id):
-                return
-        title: str | None = None
-        try:
-            title = await self.assistant_service.generate_title(self.conversation_id, selection)
-        except AssistantServiceError as error:
-            await self.send_error(f"The title was not generated. {error}")
-        finally:
-            # The browser can leave during the model call. The state must not stay `generating` (25.8.3).
-            with anyio.CancelScope(shield=True):
-                await self.end_title_generation(title)
-
-    async def end_title_generation(self, title: str | None) -> None:
-        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
-            await conversation_store.end_title_generation(connection, self.conversation_id, title)
-
-    async def stop_active_run(self) -> None:
-        if not self.is_running or self.socket_conversation_id is None:
-            return
-        with anyio.CancelScope(shield=True):
-            try:
-                await self.assistant_service.abort(self.socket_conversation_id)
-            except AssistantServiceError:
-                return
-
 
 async def conversation_exists(database_url: str, conversation_id: int | None) -> bool:
     """True for an existing conversation, and for a socket without a conversation (the Credentials dialog)."""
@@ -281,14 +216,20 @@ async def conversation_exists(database_url: str, conversation_id: int | None) ->
 
 
 async def serve_conversation(socket: ConversationSocket) -> None:
-    await socket.websocket.accept()
-    if not await conversation_exists(socket.database_url, socket.socket_conversation_id):
-        await socket.send_error(f"The conversation {socket.socket_conversation_id} does not exist.")
-        await socket.websocket.close(code=POLICY_VIOLATION_CODE)
-        return
+    # Before the accept: when the browser sees the open socket, the socket already gets the messages of the runs. So
+    # the saved messages that the browser reads after the open, and these messages, have all messages (25.10).
+    conversation_id = socket.socket_conversation_id
+    subscription = None if conversation_id is None else socket.runs.subscribe(conversation_id)
     try:
+        await socket.websocket.accept()
+        if not await conversation_exists(socket.database_url, conversation_id):
+            await socket.send_error(f"The conversation {conversation_id} does not exist.")
+            await socket.websocket.close(code=POLICY_VIOLATION_CODE)
+            return
         async with anyio.create_task_group() as task_group:
             task_group.start_soon(socket.send_heartbeats)
+            if subscription is not None:
+                task_group.start_soon(socket.send_run_messages, subscription.messages)
             try:
                 while True:
                     await socket.receive(await socket.websocket.receive_text(), task_group)
@@ -296,17 +237,23 @@ async def serve_conversation(socket: ConversationSocket) -> None:
                 pass
             task_group.cancel_scope.cancel()
     finally:
-        # Also when a send to the closed socket ends the task group first (25.10: web stops the run).
-        await socket.stop_active_run()
+        # The run goes on without this socket (25.10).
+        if subscription is not None:
+            socket.runs.unsubscribe(subscription)
 
 
 def create_assistant_socket_router(*, database_url: str, assistant_service: AssistantService) -> APIRouter:
     router = APIRouter()
+    runs = ConversationRuns(database_url=database_url, assistant_service=assistant_service)
 
     @router.websocket(ASSISTANT_SOCKET_PATH)
     async def stream_conversation(websocket: WebSocket, conversation_id: int | None = None) -> None:  # pyright: ignore[reportUnusedFunction] readability-exception: FastAPI registers the route through the decorator.
         socket = ConversationSocket(
-            websocket, conversation_id=conversation_id, database_url=database_url, assistant_service=assistant_service
+            websocket,
+            conversation_id=conversation_id,
+            database_url=database_url,
+            assistant_service=assistant_service,
+            runs=runs,
         )
         await serve_conversation(socket)
 

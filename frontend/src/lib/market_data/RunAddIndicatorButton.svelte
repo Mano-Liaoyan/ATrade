@@ -1,5 +1,5 @@
 <!-- "Add indicator" of a backtest or forward test bar chart (docs/architecture/indicator.md section 23.9.8): it adds to
-     the run panes of `chart` (not saved) and stars the favorite indicators of the saved chart indicator set. -->
+     the run panes of `chart` (saved in the chart indicator set) and stars the favorite indicators of the saved chart indicator set. -->
 <script lang="ts">
   import AddIndicatorButton from './AddIndicatorButton.svelte';
   import type { ChartIndicatorDefinition } from './chart_indicators';
@@ -23,6 +23,6 @@
     chart.indicatorSet.toggleFavorite(fetch, key);
   }}
   onAdd={(definition: ChartIndicatorDefinition) => {
-    chart.indicators.add(runKey, strategyIndicators, definition);
+    chart.indicators.add(fetch, runKey, strategyIndicators, definition);
   }}
 />

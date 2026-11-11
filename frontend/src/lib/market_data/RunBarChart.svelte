@@ -1,6 +1,6 @@
 <!-- The bar chart of a backtest or a forward test (docs/architecture/indicator.md section 23.9.8): the saved bars of
      one instrument and bar period in a fixed range, read with the source order of the run (a long range in windows,
-     `run_bars.ts`), and the run panes of `chart` (the strategy indicators and the changes of the user, not saved).
+     `run_bars.ts`), and the run panes of `chart` (the saved chart indicator set and the strategy indicators).
      `records` (the trades or the fills of the table) give the trade marks (section 23.9.9). The table row under the
      pointer or the focus and the selected row (`chart`) ring their marks; the selected row centers its mark. With
      `isUniverseMember`, `instrument` is one member of a multi-instrument run: only its records get marks. -->
@@ -39,7 +39,7 @@
   const centerTrade = $derived(findRowTrade(chartTrades.tradeIndexByRow, selectedRow));
 
   function changePanes(nextPanes: ChartPane[]): void {
-    chart.indicators.changePanes(runKey, nextPanes);
+    chart.indicators.changePanes(fetch, runKey, nextPanes);
   }
 
   // The bars and the series keep the request that they belong to, so a new run shows no data of the run before.

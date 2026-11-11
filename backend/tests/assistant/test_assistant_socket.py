@@ -451,7 +451,7 @@ async def wait_until(condition: Callable[[], Awaitable[bool]]) -> None:
 
 
 @pytest.mark.anyio
-async def test_leaving_during_a_run_stops_the_run(
+async def test_a_run_goes_on_after_the_browser_leaves_and_a_new_socket_gets_its_messages(
     database_url: str, clock: FixedClock, frontend_build_dir: Path, assistant_service: FakeAssistantService
 ) -> None:
     assistant_service.run_scripts = [[MessageDeltaMessage(text="Work"), HOLD, FIRST_ANSWER]]
@@ -463,22 +463,50 @@ async def test_leaving_during_a_run_stops_the_run(
     ) as client:
         conversation_id = await create_conversation(client, await create_strategy(client, "SMA"))
         async with aconnect_ws(f"/ws/assistant?conversation_id={conversation_id}", client) as socket:
-            await socket.send_text(json.dumps({"type": "prompt", "text": "Write a strategy.", **FIRST_MODEL}))
-            with anyio.fail_after(MESSAGE_WAIT_SECONDS):
-                await assistant_service.run_started.wait()
+            first = AssistantConnection(client, socket, conversation_id)
+            await first.prompt("Write a strategy.", FIRST_MODEL)
+            assert [await first.receive(), await first.receive()] == [
+                {"type": "run_state", "state": "running"},
+                {"type": "message_delta", "text": "Work"},
+            ]
 
-        async def is_aborted() -> bool:
-            return assistant_service.aborts == [conversation_id]
+        async with aconnect_ws(f"/ws/assistant?conversation_id={conversation_id}", client) as socket:
+            second = AssistantConnection(client, socket, conversation_id)
+            replay = [await second.receive(), await second.receive(), await second.receive()]
+            await second.prompt("Again.", FIRST_MODEL)
+            refused = await second.receive()
+            assistant_service.release()
+            messages = await second.receive_until_settled()
 
-        await wait_until(is_aborted)
+    assert replay == [
+        {"type": "run_replay", "saved_message_count": 0, "text": "Write a strategy."},
+        {"type": "run_state", "state": "running"},
+        {"type": "message_delta", "text": "Work"},
+    ]
+    assert refused == {"type": "error", "message": "The AI assistant runs. Stop the run first."}
+    assert messages == [FIRST_ANSWER.model_dump(), {"type": "run_state", "state": "settled"}]
+    assert assistant_service.aborts == []
+    assert [text for _, text, _ in assistant_service.runs] == ["Write a strategy."]
 
 
 @pytest.mark.anyio
-async def test_leaving_during_the_title_generation_ends_it_as_not_generated(
+async def test_a_socket_that_opens_without_a_run_gets_no_replay(connection: AssistantConnection) -> None:
+    await connection.prompt("Hi.", FIRST_MODEL)
+    await connection.receive_until_settled()
+
+    async with aconnect_ws(f"/ws/assistant?conversation_id={connection.conversation_id}", connection.client) as socket:
+        second = AssistantConnection(connection.client, socket, connection.conversation_id)
+        await second.send({"type": "abort"})
+        await second.send({"type": "nothing"})
+
+        assert (await second.receive())["type"] == "error"
+
+
+@pytest.mark.anyio
+async def test_the_title_is_generated_after_the_browser_leaves(
     database_url: str, clock: FixedClock, frontend_build_dir: Path, assistant_service: FakeAssistantService
 ) -> None:
-    assistant_service.run_scripts = [[FIRST_ANSWER]]
-    assistant_service.hold_title = True
+    assistant_service.run_scripts = [[HOLD, FIRST_ANSWER]]
     async with open_assistant_client(
         database_url=database_url,
         clock=clock,
@@ -489,14 +517,14 @@ async def test_leaving_during_the_title_generation_ends_it_as_not_generated(
         async with aconnect_ws(f"/ws/assistant?conversation_id={conversation_id}", client) as socket:
             await socket.send_text(json.dumps({"type": "prompt", "text": "Hi.", **FIRST_MODEL}))
             with anyio.fail_after(MESSAGE_WAIT_SECONDS):
-                await assistant_service.title_started.wait()
+                await assistant_service.run_started.wait()
+        assistant_service.release()
 
-        async def is_not_generated() -> bool:
+        async def is_generated() -> bool:
             response = await client.get(f"/api/assistant/conversations/{conversation_id}")
-            return response.json()["title_state"] == "not_generated"
+            return response.json()["title"] == "SMA crossover"
 
-        await wait_until(is_not_generated)
-        assert assistant_service.aborts == []
+        await wait_until(is_generated)
 
 
 @pytest.mark.anyio

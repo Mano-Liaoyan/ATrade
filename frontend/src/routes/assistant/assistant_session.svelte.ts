@@ -2,8 +2,8 @@
 // conversation list, the open conversation and its /ws/assistant socket, the log, the model selection and the thinking
 // level, the message
 // draft, and the Keep and Discard choices of the diff cards and the condition cards. Each page mounts its own AssistantColumn, but the state
-// is one module object, so a page change keeps the open conversation and does not close its socket (a closed socket
-// stops the run, 25.10).
+// is one module object, so a page change keeps the open conversation and its socket. A run goes on in `web` after a
+// reload or a closed socket: the new socket gets the messages of the run again (25.10).
 import { SvelteMap } from 'svelte/reactivity';
 import type { components } from '#lib/api';
 import {
@@ -38,6 +38,7 @@ import {
   type MessageImage,
   type ModelSelection,
   type Provider,
+  type ServerMessage,
   type ThinkingLevel,
 } from '#lib/assistant';
 import { readStoredLayout, writeStoredLayout } from '#lib/foundation/workbench';
@@ -161,7 +162,7 @@ export class AssistantSession {
 
   /** Reads the list and keeps the conversation `selectId` (default: the open one, else the stored one) when it is in
    * the list. Else it opens the newest with `opensNewest`, or no conversation. A page that opens does not open the
-   * newest: that can be a conversation of another browser tab, and a socket that closes stops its run (25.10). */
+   * newest: that can be a conversation of another browser tab. */
   async readConversations(
     selectId: number | null = this.conversationId ?? readStoredConversationId(),
     opensNewest = false,
@@ -219,26 +220,45 @@ export class AssistantSession {
     this.#socketState = 'connecting';
     this.#isHistoryRead = false;
     this.#socketConversationId = id;
-    void readConversation(fetch, id).then((result) => {
-      if (this.#socketConversationId !== id) {
+    // Messages that come before the saved messages are read. The saved messages replace the log, so these wait.
+    const waiting: ServerMessage[] = [];
+    const receive = (message: ServerMessage): void => {
+      this.log = addServerMessage(this.log, message, readNowUtc());
+      if (message.type === 'run_state' && message.state === 'settled') {
+        this.#readTitleLater(id, MAX_TITLE_READS);
+      }
+    };
+    // The saved messages are read after the socket opens (or fails). web sends each message of a run from the open on,
+    // so the saved messages and the socket messages together have all messages, also when a run ends at this time.
+    let isHistoryRequested = false;
+    const readHistory = (): void => {
+      if (isHistoryRequested) {
         return;
       }
-      this.#isHistoryRead = true;
-      if (result.kind === 'failed') {
-        this.reportError(`Conversation not read: ${result.message}`);
-        return;
-      }
-      this.log = readConversationLog(result.value.messages, result.value.created_at_utc);
-      this.selection = findDefaultSelection(this.providers, this.credentials, readLastModel(result.value));
-    });
+      isHistoryRequested = true;
+      void readConversation(fetch, id).then((result) => {
+        if (this.#socket !== opened) {
+          return;
+        }
+        this.#isHistoryRead = true;
+        if (result.kind === 'failed') {
+          this.reportError(`Conversation not read: ${result.message}`);
+        } else {
+          this.log = readConversationLog(result.value.messages, result.value.created_at_utc);
+          this.selection = findDefaultSelection(this.providers, this.credentials, readLastModel(result.value));
+        }
+        waiting.splice(0).forEach(receive);
+      });
+    };
     const opened = openConversationSocket(id, window.location, {
       onMessage: (message) => {
         if (this.#socket !== opened) {
           return;
         }
-        this.log = addServerMessage(this.log, message, readNowUtc());
-        if (message.type === 'run_state' && message.state === 'settled') {
-          this.#readTitleLater(id, MAX_TITLE_READS);
+        if (this.#isHistoryRead) {
+          receive(message);
+        } else {
+          waiting.push(message);
         }
       },
       onError: (text) => {
@@ -252,6 +272,7 @@ export class AssistantSession {
           if (!connected) {
             this.log = endRun(this.log);
           }
+          readHistory();
         }
       },
     });

@@ -1,6 +1,6 @@
 // The saved chart indicator set of a page (docs/architecture/indicator.md section 23.9.7). The instrument page uses
-// the panes and the favorites. A backtest or forward test chart uses only the favorites: its own panes are not saved,
-// and a favorite change sends the saved panes back unchanged.
+// the panes and the favorites. A backtest or forward test chart uses them too: it adds its strategy indicators to the
+// panes and saves the panes without them (run_chart_indicators.svelte.ts).
 import { EMPTY_CHART_INDICATOR_SET, readChartIndicatorSet, saveChartIndicatorSet, toggleFavorite } from './chart_indicator_set';
 import type { ChartPane } from './chart_indicators';
 

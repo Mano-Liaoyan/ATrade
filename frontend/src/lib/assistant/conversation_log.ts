@@ -10,6 +10,7 @@ export type ServerMessage =
   | Schemas['MessageDeltaMessage']
   | Schemas['MessageEndMessage']
   | Schemas['RunStateMessage']
+  | Schemas['RunReplayMessage']
   | Schemas['ToolStepMessage']
   | Schemas['StrategyVersionSavedMessage']
   | Schemas['BacktestFinishedMessage']
@@ -170,7 +171,7 @@ function endStreaming(log: ConversationLog): ConversationLog {
   return streaming === null ? log : replaceLast(log, { ...streaming, streaming: false });
 }
 
-/** Ends the run. A closed socket sends no `settled` message, and `web` stops the run on the close (25.10). */
+/** Ends the run in the log. A closed socket sends no `settled` message: the log cannot follow the run (25.10). */
 export function endRun(log: ConversationLog): ConversationLog {
   const ended = endStreaming(log);
   return { ...ended, items: ended.items.map(endToolStep), isRunning: false };
@@ -215,6 +216,18 @@ function addScreenCounts(log: ConversationLog, message: Schemas['ScreenRunFinish
   return { ...log, items: log.items.with(index, { ...card, counts }) };
 }
 
+function changeRunState(log: ConversationLog, state: Schemas['RunStateMessage']['state']): ConversationLog {
+  return state === 'running' ? { ...log, isRunning: true } : endRun(log);
+}
+
+/**
+ * The socket opened during a run. The log has the saved messages: the messages of the run go out, because the messages
+ * that follow give them again, with the tool steps and the cards.
+ */
+function startReplay(log: ConversationLog, message: Schemas['RunReplayMessage'], sentAtUtc: string): ConversationLog {
+  return addUserMessage({ ...log, items: log.items.slice(0, message.saved_message_count) }, message.text, sentAtUtc);
+}
+
 export function addServerMessage(log: ConversationLog, message: ServerMessage, sentAtUtc: string): ConversationLog {
   switch (message.type) {
     case 'message_delta':
@@ -222,7 +235,9 @@ export function addServerMessage(log: ConversationLog, message: ServerMessage, s
     case 'message_end':
       return endMessage(log, message, sentAtUtc);
     case 'run_state':
-      return message.state === 'running' ? { ...log, isRunning: true } : endRun(log);
+      return changeRunState(log, message.state);
+    case 'run_replay':
+      return startReplay(log, message, sentAtUtc);
     case 'tool_step':
       return addToolStep(log, message, sentAtUtc);
     case 'strategy_version_saved':
