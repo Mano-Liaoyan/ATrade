@@ -405,8 +405,14 @@ _Avoid_: chat, thread, session
 
 **Credential**:
 One named subscription login or API key of a model provider that the AI
-assistant uses, for example "Anthropic API key · personal". In Chinese, write
-凭据.
+assistant uses, for example "Anthropic API key · personal". The Claude Code
+login (the Claude login of the `claude` binary in the assistant container) is
+also a credential. In Chinese, write 凭据.
+
+**Runner**:
+The program that runs the conversations of the AI assistant: pi, or Claude
+Code through the Claude Agent SDK. The first run of a conversation sets its
+runner. In Chinese, write 运行方式.
 _Avoid_: account, auth, token
 
 **Thinking level**:

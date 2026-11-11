@@ -5876,7 +5876,8 @@
           "type": {
             "enum": [
               "oauth",
-              "api_key"
+              "api_key",
+              "claude_code"
             ],
             "title": "Type",
             "type": "string"

@@ -272,7 +272,7 @@ With `COMPOSE_PROFILES=ibkr` in `.env`, this command also stops `ib-gateway`.
 | `ib-gateway` | IB Gateway and IBC, logged in to the paper account. Profile `ibkr`. The API port (`ib-gateway:4004`) is not published outside the Compose network. |
 | `web` | FastAPI app (`python -m atrade.app.web`) and the built frontend. Port `${ATRADE_WEB_BIND_ADDRESS}:${ATRADE_WEB_PORT}` (default `127.0.0.1:8000`). Memory limit, read-only root file system, writable `/tmp`. Health check on `/api/health`. |
 | `forward-test` | Forward-test worker (`python -m atrade.app.forward_test_worker`) and 1 child process per running forward test. Same image as `web`. Starts after the health check of `web` passes. No IBKR user name or password. |
-| `assistant` | The AI assistant: a Node.js process with the pi SDK (`assistant/`, image from `deploy/assistant.Dockerfile`). Memory limit `ATRADE_ASSISTANT_MEMORY_LIMIT` (default `1g`), read-only root file system, writable `/tmp`, volume `atrade-assistant-pi` on `/data`. No published port, no database URL, no IBKR setting. Networks `atrade-assistant-internal` (with `web` only) and `atrade-assistant-egress` (to the model providers and, for the web tools `web_search` and `fetch_content`, to the internet). Health check on `GET /health` (port 8002, inside the network only). |
+| `assistant` | The AI assistant: a Node.js process with the pi SDK and the Claude Agent SDK (`assistant/`, image from `deploy/assistant.Dockerfile`, with the official `claude` binary). Memory limit `ATRADE_ASSISTANT_MEMORY_LIMIT` (default `1g`), read-only root file system, writable `/tmp`, volume `atrade-assistant-pi` on `/data`. No published port, no database URL, no IBKR setting. Networks `atrade-assistant-internal` (with `web` only) and `atrade-assistant-egress` (to the model providers and, for the web tools `web_search` and `fetch_content`, to the internet). Health check on `GET /health` (port 8002, inside the network only). |
 
 At start, `web` runs the Alembic migrations. When `ATRADE_TRADING_MODE` is
 `live`, `./start run` stops with the reason and does not call Compose. `web`
@@ -298,6 +298,24 @@ chmod 600 atrade-assistant-pi.tar.gz
 The backup holds the credentials. Keep it like `.env`: not in git, not in a
 shared folder, and readable only by you. When the volume is lost, log in and
 enter the API keys again in the "Credentials" dialog.
+
+### Use a Claude subscription in the AI assistant
+
+Anthropic permits a Claude subscription only in Claude Code. So the AI
+assistant uses a Claude subscription through the provider "Claude Code": the
+official `claude` binary in the `assistant` container
+(`docs/architecture/assistant.md` 25.7.5). The web page has no Claude login.
+Log in one time, in the repository on the server, and follow the steps of
+Claude Code:
+
+```sh
+docker compose -f deploy/compose.yaml exec assistant claude auth login
+```
+
+Claude Code keeps the login in the volume `atrade-assistant-pi`
+(`/data/.claude`), so the backup above also holds it. Each `claude` process
+uses about 200 to 250 MB, so set `ATRADE_ASSISTANT_MEMORY_LIMIT=2g` in
+`.env`. To log out, run `claude auth logout` in the same way.
 
 ### Import the Databento history
 

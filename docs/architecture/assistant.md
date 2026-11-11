@@ -89,9 +89,9 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
 | Item | Value |
 |---|---|
 | Root file system | Read-only. |
-| Memory limit | `mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT}`, default `1g`. |
+| Memory limit | `mem_limit: ${ATRADE_ASSISTANT_MEMORY_LIMIT}`, default `1g`. Each `claude` process of Claude Code (25.7.5) uses about 200 to 250 MB. With Claude Code, set `2g`. |
 | Environment | No `DATABASE_URL`, no IBKR setting, no other secret of `.env`. |
-| Volume | `atrade-assistant-pi`: the credential file (25.7) and the pi conversation files (JSONL, 25.8). |
+| Volume | `atrade-assistant-pi`: the credential file (25.7), the pi conversation files (JSONL, 25.8), and the Claude login and sessions of Claude Code (`/data/.claude`, 25.7.5). |
 | Networks | `atrade-assistant-internal` and `atrade-assistant-egress` (25.3). |
 | Published ports | None. |
 
@@ -575,6 +575,12 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
   `meta`. `openrouter` and `radius` have OAuth, but not a subscription.
 - The user takes the risk of each provider's terms of service. ATrade does
   not take away a provider because of its terms.
+- Decided (2026-11-11): the provider `claude-code` (25.7.5) is the access
+  method for a Claude subscription. pi's own `anthropic` subscription login
+  stays, but the page shows its risk (25.7.4): it sends the Claude
+  subscription token to the Anthropic API outside Claude Code, and
+  Anthropic permits a Claude subscription only in Claude Code and its own
+  apps.
 - Google: API key only. pi 1.4.0 has no Google Gemini or Antigravity login.
 - The user selects, for each conversation: the provider, the model, a
   subscription or an API key, which credential, and the thinking level.
@@ -683,6 +689,87 @@ Source: [AI strategy assistant design](https://github.com/Mano-Liaoyan/ATrade/is
   prompt (a password field for `secret`) with "Save API key", "Send code",
   or "Send answer". #185 puts the "Credentials" icon button in the side
   column and has the Playwright test of the flow.
+- Decided (2026-11-11, 25.7.5): the Claude Code login is the first row.
+  Provider "Claude Code", kind "Claude Code login", and the account email
+  as the name. It has no row menu: the user logs in and out on the server.
+  When it is not ready, the status icon is an error, and a warning
+  notification above the table gives the reason and the login command.
+- Decided (2026-11-11): pi's `anthropic` subscription is a warning status
+  icon with "Ready. Anthropic does not permit this login: ..." in its
+  tooltip. When the user selects "Subscription" and "Anthropic" to log in, a
+  warning notification shows the risk, and the button is "Log in anyway".
+
+### 25.7.5 Claude Code
+
+Source: user decisions of 2026-11-11, [ADR 0010](../adr/0010-claude-subscription-through-claude-code.md).
+
+- The provider `claude-code` ("Claude Code") runs a conversation in the
+  official, unmodified `claude` binary through the Claude Agent SDK
+  (`@anthropic-ai/claude-agent-sdk`, `query()`). The binary comes from the
+  platform package of the SDK. `deploy/assistant.Dockerfile` links it to
+  `/usr/local/bin/claude`.
+- Login: the user runs this command one time, in the repository on the
+  server, and follows the steps of Claude Code:
+  `docker compose -f deploy/compose.yaml exec assistant claude auth login`.
+  Claude Code keeps the login in `/data/.claude` (`HOME` is `/data`).
+  ATrade never reads, stores, or sends that login. The web page has no
+  Claude login, because Anthropic does not permit a Claude login in another
+  app.
+- The provider has one credential, `claude-code`, that is not in the
+  credential file. `GET /credentials` and `GET /providers` put it first.
+  `type` is `claude_code`. The name is the account email. The state is
+  `ready` with a login, else `failed` with the reason and the login
+  command. A delete answers `404`.
+- Status: `assistant` starts `claude` without a message and reads
+  `initializationResult()`: the account and the models. No model request.
+  One result serves the calls of 10 s. Without a login, Claude Code gives
+  `tokenSource` `none`. Without a login, the provider has no models.
+- Models: the `models` of the initialization (`value` is the ID,
+  `displayName` the name). The thinking levels are `off` and the
+  `supportedEffortLevels` of the model. `off` turns the thinking off. Each
+  other level is `thinking: {type: "adaptive"}` with `effort` of the same
+  name. `assistant` lowers a level that the model does not have to the next
+  lower level. Each Claude model reads images.
+- Isolation of each run:
+  - Tools: the ATrade tools of 25.4 (an MCP server `atrade` in the
+    `assistant` process, with the TypeBox schemas and the TypeBox argument
+    check of pi) and the built-in tools `WebSearch` and `WebFetch` in place
+    of the pi web tools. `tools: ["WebSearch", "WebFetch"]`,
+    `allowedTools` those 2 and `mcp__atrade__*`, and `permissionMode`
+    `dontAsk`, so Claude Code refuses each other tool.
+  - `settingSources: []` (no settings file, no CLAUDE.md, no hook, no
+    plugin) and `strictMcpConfig` (no other MCP server).
+  - The system prompt of 25.9 replaces the system prompt of Claude Code.
+  - The working directory is the empty directory `/data/claude-code`.
+  - The environment has no `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
+    `ANTHROPIC_BASE_URL`, or cloud provider switch, so the run always uses
+    the Claude login. Also `DISABLE_AUTOUPDATER=1`,
+    `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, and
+    `CLAUDE_AGENT_SDK_CLIENT_APP=atrade`.
+- Run events: the same events as a pi run (25.10). `text_delta` comes from
+  the stream events (`includePartialMessages`). `message_end` has the
+  provider `claude-code` and the selected model ID, so the browser selects
+  the model again. `WebSearch` and `WebFetch` show as the tool steps
+  `web_search` and `fetch_content`. An API error or a lost login is one
+  `error` event. A lost login gives the login command.
+- Conversation: the first run sets the runner of the conversation, pi or
+  Claude Code. A conversation cannot change it: the model context of each
+  runner is in its own session. `assistant` refuses a run in the other
+  runner. The side column lists only the providers of the runner of the
+  conversation (from `last_provider`).
+- Storage: Claude Code keeps the model context in its own session in
+  `/data/.claude/projects/`. The JSONL file of the conversation (25.8.1)
+  has the custom entry `atrade_claude_session` (`session_id`), the custom
+  entry `atrade_credential` of each run, and the user and AI assistant
+  message texts as pi messages, for the message list. The first run starts
+  the session with a new `sessionId`. Each next run gives `resume`.
+- Title (25.8.3): one Claude Code call with no tools, no session, and
+  `maxTurns: 1`.
+- Delete (25.8.4): `assistant` also deletes the Claude Code session
+  (`deleteSession`).
+- Usage: each run uses the limits of the Claude subscription. Anthropic's
+  advertised limits assume ordinary, individual use: ATrade is for one
+  user.
 
 ## 25.8 Conversations
 
@@ -758,6 +845,8 @@ Implemented (#179, #184):
   `thinking_level`, so the saved messages show the level too. A message of
   a run before this change has `thinking_level` null.
 - So the answers of 2 models in one conversation are easy to compare.
+- Decided (2026-11-11, 25.7.5): a conversation cannot change between pi and
+  Claude Code. It can change between the models of its runner.
 
 ### 25.8.3 Title
 

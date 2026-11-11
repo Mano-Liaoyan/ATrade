@@ -2,22 +2,32 @@
 // Each run opens the JSONL file of the conversation with the selected model and credential, so the user can change
 // the provider, the model, or the credential between 2 messages. One conversation has at most one active run.
 // The run events are pi events with only the fields that web needs. web changes them into the /ws/assistant messages.
+// A conversation runs in pi or in Claude Code (claude_code.ts, 25.7.5). The first run sets the runner. A conversation
+// cannot change it, because the model context of each runner is in its own session.
+import { randomUUID } from 'node:crypto';
 import { rmSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import type { AgentSession, AgentSessionEvent, ExtensionFactory, ToolDefinition } from '@earendil-works/pi-coding-agent';
 import { createAssistantSession } from './assistant_session.ts';
 import type { UserMessageBudget } from './backtest_tools.ts';
+import { CLAUDE_CODE_PROVIDER, type ClaudeCode } from './claude_code.ts';
 import {
+  CLAUDE_SESSION_ENTRY_TYPE,
   CREDENTIAL_ENTRY_TYPE,
   conversationDir,
   conversationFile,
   openConversationSession,
   readConversationMessages,
+  readConversationRunner,
   readMessageText,
+  toTextAssistantMessage,
+  toTextUserMessage,
+  type ClaudeSessionEntry,
   type ConversationMessage,
+  type ConversationRunner,
   type RunEntry,
 } from './conversation_files.ts';
-import { generateTitle } from './conversation_title.ts';
+import { completeWithPi, generateTitle } from './conversation_title.ts';
 import type { ModelSelection, OpenModel, ThinkingLevel } from './model_selection.ts';
 import { toToolRunEvents, type ToolRunEvent } from './tool_events.ts';
 
@@ -63,6 +73,8 @@ export interface ConversationsOptions {
   createTools: CreateTools;
   /** The web tools of each run (web_access.ts). Default: no web tool. */
   webAccess?: ExtensionFactory;
+  /** The Claude Code runner (25.7.5). Default: no Claude Code provider. */
+  claudeCode?: ClaudeCode;
 }
 
 interface EndedAssistantMessage {
@@ -122,7 +134,8 @@ export class Conversations {
   private readonly activeRuns = new Map<string, Promise<void>>();
   /** The active runs that got an abort before their session existed. */
   private readonly abortedRuns = new Set<string>();
-  private readonly sessions = new Map<string, AgentSession>();
+  /** The pi session or the Claude Code run of each active run, for the abort. */
+  private readonly sessions = new Map<string, Pick<AgentSession, 'abort'>>();
 
   constructor(options: ConversationsOptions) {
     this.options = options;
@@ -152,6 +165,11 @@ export class Conversations {
   }
 
   private async runSession(conversationId: string, request: RunRequest, emit: (event: RunEvent) => void) {
+    const claudeSessionId = this.checkRunner(conversationId, request.selection);
+    if (request.selection.provider === CLAUDE_CODE_PROVIDER) {
+      await this.runClaudeCode(conversationId, request, claudeSessionId, emit);
+      return;
+    }
     const opened = await this.options.openModel(request.selection);
     const images = request.images ?? [];
     if (images.length > 0 && !opened.model.input.includes('image')) {
@@ -193,6 +211,78 @@ export class Conversations {
     }
   }
 
+  /** Refuses a run in the other runner of the conversation. Returns the Claude Code session ID of the conversation. */
+  private checkRunner(conversationId: string, selection: ModelSelection): string | null {
+    const runner: ConversationRunner = selection.provider === CLAUDE_CODE_PROVIDER ? 'claude-code' : 'pi';
+    const stored = readConversationRunner(this.options.piDir, conversationId);
+    if (stored.runner !== null && stored.runner !== runner) {
+      throw new Error(
+        stored.runner === 'claude-code'
+          ? 'This conversation runs in Claude Code. Select a Claude Code model, or start a new conversation.'
+          : 'This conversation does not run in Claude Code. Start a new conversation for Claude Code.',
+      );
+    }
+    return stored.claudeSessionId;
+  }
+
+  private async runClaudeCode(
+    conversationId: string,
+    request: RunRequest,
+    storedSessionId: string | null,
+    emit: (event: RunEvent) => void,
+  ): Promise<void> {
+    const claudeCode = this.options.claudeCode;
+    if (claudeCode === undefined) {
+      throw new Error('The assistant service has no Claude Code provider.');
+    }
+    const credential = await claudeCode.credentialSummary();
+    if (credential.state !== 'ready') {
+      throw new Error(credential.state_message ?? 'Claude Code is not ready.');
+    }
+    const thinkingLevel = await claudeCode.effectiveThinkingLevel(request.selection.model, request.thinkingLevel);
+    await mkdir(conversationDir(this.options.piDir), { recursive: true });
+    if (this.abortedRuns.has(conversationId)) {
+      return;
+    }
+    const conversationSession = openConversationSession(this.options.piDir, conversationId);
+    const sessionId = storedSessionId ?? randomUUID();
+    if (storedSessionId === null) {
+      const entry: ClaudeSessionEntry = { session_id: sessionId };
+      conversationSession.appendCustomEntry(CLAUDE_SESSION_ENTRY_TYPE, entry);
+    }
+    const runEntry: RunEntry = { credential_name: credential.name, thinking_level: thinkingLevel };
+    conversationSession.appendCustomEntry(CREDENTIAL_ENTRY_TYPE, runEntry);
+    conversationSession.appendMessage(toTextUserMessage(request.text));
+    const abortController = new AbortController();
+    this.sessions.set(conversationId, {
+      abort: () => {
+        abortController.abort();
+        return Promise.resolve();
+      },
+    });
+    const budget: UserMessageBudget = { startedBacktests: 0 };
+    await claudeCode.run(
+      {
+        text: request.text,
+        images: request.images ?? [],
+        model: request.selection.model,
+        thinkingLevel,
+        systemPrompt: request.systemPrompt,
+        tools: this.options.createTools({ conversationId, budget }),
+        sessionId,
+        resume: storedSessionId !== null,
+        abortController,
+      },
+      { credentialName: credential.name, thinkingLevel, model: request.selection.model },
+      (event) => {
+        if (event.type === 'message_end') {
+          conversationSession.appendMessage(toTextAssistantMessage(event.text, event.provider, event.model));
+        }
+        emit(event);
+      },
+    );
+  }
+
   async abort(conversationId: string): Promise<void> {
     if (!this.activeRuns.has(conversationId)) {
       return;
@@ -211,7 +301,13 @@ export class Conversations {
 
   async generateTitle(conversationId: string, selection: ModelSelection): Promise<string> {
     const messages = this.readMessages(conversationId);
-    return generateTitle(messages, await this.options.openModel(selection));
+    if (selection.provider === CLAUDE_CODE_PROVIDER) {
+      if (this.options.claudeCode === undefined) {
+        throw new Error('The assistant service has no Claude Code provider.');
+      }
+      return generateTitle(messages, this.options.claudeCode.complete(selection.model));
+    }
+    return generateTitle(messages, completeWithPi(await this.options.openModel(selection)));
   }
 
   /** Stops the active run and deletes the JSONL file. */
@@ -219,6 +315,10 @@ export class Conversations {
     await this.abort(conversationId);
     // The run can still write the file until it ends.
     await this.activeRuns.get(conversationId);
+    const { claudeSessionId } = readConversationRunner(this.options.piDir, conversationId);
+    if (claudeSessionId !== null) {
+      await this.options.claudeCode?.deleteSession(claudeSessionId);
+    }
     rmSync(conversationFile(this.options.piDir, conversationId), { force: true });
   }
 }

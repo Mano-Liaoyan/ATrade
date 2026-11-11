@@ -1759,7 +1759,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "oauth" | "api_key";
+            type: "oauth" | "api_key" | "claude_code";
             /** Key Last4 */
             key_last4: string | null;
             /**

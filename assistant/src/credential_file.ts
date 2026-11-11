@@ -48,7 +48,8 @@ export interface CredentialSummary {
   id: string;
   name: string;
   provider: string;
-  type: Credential['type'];
+  /** "claude_code": the Claude login of Claude Code (claude_code.ts). It is not in this file. */
+  type: Credential['type'] | 'claude_code';
   /** The last 4 characters of an API key. Null for an OAuth credential. */
   key_last4: string | null;
   state: CredentialState;

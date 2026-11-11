@@ -101,7 +101,10 @@ export function findDefaultSelection(
       credentialId: lastCredential.id,
     };
   }
-  const first = credentials.find((item) => providers.some((provider) => provider.id === item.provider));
+  // The Claude Code credential is always in the list, but its provider has models only after its login.
+  const first = credentials.find((item) =>
+    providers.some((provider) => provider.id === item.provider && provider.models.length > 0),
+  );
   return first === undefined ? NO_SELECTION : changeProvider(providers, credentials, first.provider);
 }
 
@@ -111,15 +114,27 @@ export interface SelectionItems {
   credentials: SelectItem<string>[];
 }
 
-/** Only a provider with a credential can answer, so the provider Select lists only these. */
+/** The provider of the Claude Code runner (25.7.5). */
+export const CLAUDE_CODE_PROVIDER = 'claude-code';
+
+/** A conversation with a message stays in its runner: Claude Code or pi (25.7.5). Null: the conversation has no
+ * message yet, so each provider can answer. */
+function isSameRunner(provider: string, lastProvider: string | null): boolean {
+  return lastProvider === null || (provider === CLAUDE_CODE_PROVIDER) === (lastProvider === CLAUDE_CODE_PROVIDER);
+}
+
+/** Only a provider with a credential and a model can answer, so the provider Select lists only these. A conversation
+ * with a message lists only the providers of its runner. */
 export function listSelectItems(
   providers: readonly Provider[],
   credentials: readonly Credential[],
   provider: string,
+  lastProvider: string | null = null,
 ): SelectionItems {
   return {
     providers: providers
       .filter((item) => credentials.some((credential) => credential.provider === item.id))
+      .filter((item) => item.models.length > 0 && isSameRunner(item.id, lastProvider))
       .map((item) => ({ value: item.id, label: item.name })),
     models: (providers.find((item) => item.id === provider)?.models ?? []).map((model) => ({ value: model.id, label: model.name })),
     credentials: credentials

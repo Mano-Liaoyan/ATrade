@@ -67,6 +67,39 @@ describe('the model selection of the assistant side column', () => {
     expect(items.credentials).toEqual([{ value: 'c3', label: 'Claude login' }]);
   });
 
+  it('starts with a provider that has models, not with a Claude Code login that is not ready', () => {
+    const claudeCode: Provider = { id: 'claude-code', name: 'Claude Code', login_methods: [], models: [] };
+    const login: Credential = { ...credential('claude-code', 'Claude Code login', 'claude-code'), type: 'claude_code', state: 'failed' };
+
+    expect(
+      findDefaultSelection([claudeCode, ...PROVIDERS], [login, ...CREDENTIALS], { provider: null, model: null, credentialName: null }),
+    ).toEqual({ provider: 'openai', model: 'gpt-a', credentialId: 'c1' });
+    expect(listSelectItems([claudeCode, ...PROVIDERS], [login, ...CREDENTIALS], 'openai').providers).toEqual([
+      { value: 'openai', label: 'OpenAI' },
+      { value: 'anthropic', label: 'Anthropic' },
+    ]);
+  });
+
+  it('a conversation with a message lists only the providers of its runner: Claude Code or pi', () => {
+    const claudeCode: Provider = {
+      id: 'claude-code',
+      name: 'Claude Code',
+      login_methods: [],
+      models: [{ id: 'opus', name: 'Opus', thinking_levels: ['off'], reads_images: true }],
+    };
+    const providers = [claudeCode, ...PROVIDERS];
+    const credentials = [{ ...credential('claude-code', 'me@example.test', 'claude-code'), type: 'claude_code' as const }, ...CREDENTIALS];
+
+    expect(listSelectItems(providers, credentials, 'claude-code', 'claude-code').providers).toEqual([
+      { value: 'claude-code', label: 'Claude Code' },
+    ]);
+    expect(listSelectItems(providers, credentials, 'openai', 'anthropic').providers).toEqual([
+      { value: 'openai', label: 'OpenAI' },
+      { value: 'anthropic', label: 'Anthropic' },
+    ]);
+    expect(listSelectItems(providers, credentials, 'openai', null).providers).toHaveLength(3);
+  });
+
   it('selects the first model and credential of a new provider', () => {
     expect(changeProvider(PROVIDERS, CREDENTIALS, 'anthropic')).toEqual({
       provider: 'anthropic',
