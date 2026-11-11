@@ -41,10 +41,14 @@ export class RunChartIndicators {
     return this.#placed.panes;
   }
 
-  /** Shows the panes on the run `key` at once and saves them, without the strategy indicators, in the set. */
+  /** Shows the panes on the run `key` at once and saves them, without the strategy indicators, in the set. A change
+   * before the saved set is read stays on the run only. */
   changePanes(fetchFunction: typeof fetch, key: string, panes: ChartPane[]): void {
     this.#changed = { key, panes };
-    this.#indicatorSet.changePanes(fetchFunction, removeStrategyIndicators(panes));
+    // Before the saved set is read, the panes do not have it: a save would put these panes over the saved set.
+    if (this.#indicatorSet.isLoaded) {
+      this.#indicatorSet.changePanes(fetchFunction, removeStrategyIndicators(panes));
+    }
   }
 
   add(fetchFunction: typeof fetch, key: string, strategyIndicators: readonly StrategyIndicator[], definition: ChartIndicatorDefinition): void {

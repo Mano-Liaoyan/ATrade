@@ -1012,6 +1012,8 @@ Fields (#179). Each message is a JSON object with `type`.
   conversation stop a run. A restart of `web` loses the messages of a run
   that the browser did not get; the `assistant` service still writes the
   run into the JSONL file.
+- An error of `web` during a run (for example the database) sends
+  `error`, stops the run in the `assistant` service, and sends `settled`.
 - Each socket of a conversation gets the messages of its runs. A `prompt`
   during a run gets an `error` on each socket, and `abort` works on each
   socket.

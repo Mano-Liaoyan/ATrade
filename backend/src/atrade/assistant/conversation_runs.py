@@ -152,6 +152,11 @@ class ConversationRuns:
                     self.publish(conversation_id, event)
             except AssistantServiceError as error:
                 self.publish(conversation_id, AssistantErrorMessage(message=str(error)))
+            except Exception:
+                # web cannot follow the run after an error of its own (the database), so the run stops.
+                self.publish(conversation_id, AssistantErrorMessage(message="The run stopped: web failed."))
+                await self.stop(conversation_id)
+                raise
         finally:
             del self.active[conversation_id]
             # Without the message count, a waiting socket gets no replay: it gets `settled` and the next runs.
@@ -159,6 +164,13 @@ class ConversationRuns:
             self.publish(conversation_id, RunStateMessage(state="settled"))
         if has_answer:
             await self.generate_title_once(conversation_id, selection)
+
+    async def stop(self, conversation_id: int) -> None:
+        with anyio.CancelScope(shield=True):
+            try:
+                await self.assistant_service.abort(conversation_id)
+            except AssistantServiceError:
+                return
 
     async def read_system_prompt(self, conversation_id: int) -> str:
         """The prompt version of the conversation and the fixed part of its start (25.9)."""

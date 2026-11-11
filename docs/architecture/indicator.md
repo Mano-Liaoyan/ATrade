@@ -729,7 +729,9 @@ section 6.2).
   indicators in the chart indicator set (section 23.9.7), so each bar chart
   shows the indicators that the user added. An own pane with only strategy
   indicators is not saved. A change of a strategy indicator (settings, hide,
-  remove) stays only while the run stays open.
+  remove) stays only while the run stays open. A change
+  before the chart indicator set is read also stays on the run only, so it
+  cannot replace the saved set.
 - Decided (#331):
   - `GET /api/backtests/{backtest_id}` has `strategy_indicators` in
     `BacktestDetailResponse` (so the comparison route has it too). The

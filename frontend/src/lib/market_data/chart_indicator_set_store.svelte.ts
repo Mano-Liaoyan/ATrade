@@ -17,6 +17,11 @@ export class ChartIndicatorSetStore {
   // the last saved set, and a change before the read answer keeps the saved part that did not change.
   #saving: Promise<void> = Promise.resolve();
 
+  /** True after the saved set was read. */
+  get isLoaded(): boolean {
+    return this.#isLoaded;
+  }
+
   /** Reads the saved set. A part (panes or favorites) that changed before the answer keeps the change. */
   load(fetchFunction: typeof fetch): Promise<boolean> {
     if (this.#isLoaded) {

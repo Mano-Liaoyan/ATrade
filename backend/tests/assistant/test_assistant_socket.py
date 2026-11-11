@@ -490,6 +490,27 @@ async def test_a_run_goes_on_after_the_browser_leaves_and_a_new_socket_gets_its_
 
 
 @pytest.mark.anyio
+async def test_an_error_of_web_during_a_run_stops_the_run_and_sends_an_error(
+    connection: AssistantConnection, assistant_service: FakeAssistantService, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def fail(*_arguments: object, **_named: object) -> None:
+        message = "The database is not reachable."
+        raise RuntimeError(message)
+
+    monkeypatch.setattr("atrade.assistant.conversation_runs.conversation_store.save_last_model", fail)
+    assistant_service.run_scripts = [[FIRST_ANSWER]]
+
+    await connection.prompt("Hi.", FIRST_MODEL)
+
+    assert await connection.receive_until_settled() == [
+        {"type": "run_state", "state": "running"},
+        {"type": "error", "message": "The run stopped: web failed."},
+        {"type": "run_state", "state": "settled"},
+    ]
+    assert assistant_service.aborts == [connection.conversation_id]
+
+
+@pytest.mark.anyio
 async def test_a_socket_that_opens_without_a_run_gets_no_replay(connection: AssistantConnection) -> None:
     await connection.prompt("Hi.", FIRST_MODEL)
     await connection.receive_until_settled()

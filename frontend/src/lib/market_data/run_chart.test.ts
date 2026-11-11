@@ -67,4 +67,20 @@ describe('RunChart.indicators', () => {
     expect(chart.indicators.readPanes('2', [])).toEqual([{ indicators: [SMA] }]);
     await expect.poll(() => savedSets).toEqual([{ panes: [{ indicators: [SMA] }], favorites: ['rsi'] }]);
   });
+
+  it('does not save a change before the saved set is read: the saved set stays', async () => {
+    let putCount = 0;
+    const fetchFunction: typeof fetch = (_input, init) => {
+      putCount += init?.method === 'PUT' ? 1 : 0;
+      return Promise.resolve(new Response(JSON.stringify({ panes: [{ indicators: [SMA] }], favorites: [] })));
+    };
+    const chart = new RunChart();
+
+    chart.indicators.changePanes(fetchFunction, '1', [{ indicators: [STRATEGY_SMA] }]);
+    await chart.indicatorSet.load(fetchFunction);
+
+    expect(chart.indicators.readPanes('1', [])).toEqual([{ indicators: [STRATEGY_SMA] }]);
+    expect(chart.indicators.readPanes('2', [])).toEqual([{ indicators: [SMA] }]);
+    expect(putCount).toBe(0);
+  });
 });
