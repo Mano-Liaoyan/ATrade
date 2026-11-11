@@ -1,6 +1,6 @@
 // The /ws/assistant socket of one conversation (docs/architecture/assistant.md 25.10). The browser sends `prompt` and
-// `abort`, and the server streams the run. The socket does not connect again after a close. The run goes on in `web`:
-// the next socket of the conversation gets `run_replay` and the messages of the run until now.
+// `abort`, and the server streams the run. After a close, the page opens a new socket (assistant_session.svelte.ts).
+// The run goes on in `web`: the next socket of the conversation gets `run_replay` and the messages of the run until now.
 import type { components } from '#lib/api';
 import { buildSocketUrl, readSocketMessage } from '#lib/foundation/live_socket';
 import type { ServerMessage } from './conversation_log';
@@ -8,6 +8,10 @@ import type { ServerMessage } from './conversation_log';
 type PromptMessage = components['schemas']['PromptMessage'];
 type AbortMessage = components['schemas']['AbortMessage'];
 type AssistantErrorMessage = components['schemas']['AssistantErrorMessage'];
+
+// The server sends a heartbeat every 10 seconds. Two missing heartbeats and a margin mean a dead connection, for example
+// after the computer sleeps. The browser can wait a long time before it reports such a close.
+const HEARTBEAT_TIMEOUT_MILLISECONDS = 25_000;
 
 const SERVER_MESSAGE_TYPES: (ServerMessage | AssistantErrorMessage)['type'][] = [
   'message_delta',
@@ -40,21 +44,35 @@ export function openConversationSocket(
 ): ConversationSocket {
   const socket = new WebSocket(buildSocketUrl(`/ws/assistant?conversation_id=${String(conversationId)}`, location));
   let isClosed = false;
+  let heartbeatTimer: ReturnType<typeof setTimeout> | undefined;
+  const reportClose = (): void => {
+    if (!isClosed) {
+      isClosed = true;
+      clearTimeout(heartbeatTimer);
+      events.onConnectionChange(false);
+    }
+  };
+  const restartHeartbeatTimer = (): void => {
+    clearTimeout(heartbeatTimer);
+    heartbeatTimer = setTimeout(() => {
+      reportClose();
+      socket.close();
+    }, HEARTBEAT_TIMEOUT_MILLISECONDS);
+  };
+  restartHeartbeatTimer();
   // After close(), the page has a new socket: the events of this one do not change the page.
   socket.addEventListener('open', () => {
     if (!isClosed) {
+      restartHeartbeatTimer();
       events.onConnectionChange(true);
     }
   });
-  socket.addEventListener('close', () => {
-    if (!isClosed) {
-      events.onConnectionChange(false);
-    }
-  });
+  socket.addEventListener('close', reportClose);
   socket.addEventListener('message', (event: MessageEvent<unknown>) => {
     if (isClosed || typeof event.data !== 'string') {
       return;
     }
+    restartHeartbeatTimer();
     const message = readSocketMessage<ServerMessage | AssistantErrorMessage>(JSON.parse(event.data), SERVER_MESSAGE_TYPES);
     if (message === null) {
       return;
@@ -71,6 +89,7 @@ export function openConversationSocket(
     },
     close: () => {
       isClosed = true;
+      clearTimeout(heartbeatTimer);
       socket.close();
     },
   };

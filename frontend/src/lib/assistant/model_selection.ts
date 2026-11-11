@@ -148,7 +148,7 @@ export function findModelReadsImages(providers: readonly Provider[], selection: 
   return provider?.models.find((item) => item.id === selection.model)?.reads_images ?? false;
 }
 
-/** The socket of the open conversation. It does not connect again after a close (conversation_socket.ts). */
+/** The socket of the open conversation. After a close, the page connects again (assistant_session.svelte.ts). */
 export type ConnectionState = 'connecting' | 'open' | 'closed';
 
 export interface SendState {
@@ -180,7 +180,7 @@ export function describeSendButton(state: SendState): SendButton {
       : state.connection === 'connecting'
         ? 'Connecting to the AI assistant.'
         : state.connection === 'closed'
-          ? 'The connection to the AI assistant closed. Reload the page to send.'
+          ? 'The connection to the AI assistant closed. Connecting again.'
           : state.imageCount > 0 && !state.modelReadsImages
             ? 'The selected model does not read images. Remove the images or select another model.'
             : state.imageCount > 0 && !state.hasText

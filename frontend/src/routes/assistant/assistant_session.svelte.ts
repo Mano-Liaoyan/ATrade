@@ -63,6 +63,11 @@ const TITLE_READ_DELAY_MILLISECONDS = 1000;
 const MAX_TITLE_READS = 125;
 // The browser keeps the open conversation, so a reload opens it again.
 const OPEN_CONVERSATION_STORAGE_KEY = 'atrade.assistant-column.conversation';
+// After a close, the page opens a new socket of the open conversation. The delay doubles up to the maximum, like the
+// live sockets (live_socket.ts).
+const FIRST_RECONNECT_DELAY_MILLISECONDS = 1_000;
+const MAXIMUM_RECONNECT_DELAY_MILLISECONDS = 10_000;
+const RECONNECT_DELAY_FACTOR = 2;
 
 // The browser keeps the last chosen thinking level for all conversations.
 const THINKING_LEVEL_STORAGE_KEY = 'atrade.assistant-column.thinking-level';
@@ -137,6 +142,8 @@ export class AssistantSession {
   #socket: ConversationSocket | null = null;
   #socketConversationId: number | null = null;
   #titleTimer: ReturnType<typeof setTimeout> | undefined;
+  #reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+  #reconnectDelayMilliseconds = FIRST_RECONNECT_DELAY_MILLISECONDS;
   #listReadCount = 0;
   #errorReceiver: ((text: string) => void) | null = null;
   // A diff card on another page asked the strategy page to open this diff.
@@ -217,6 +224,13 @@ export class AssistantSession {
     if (id === null) {
       return;
     }
+    this.#reconnectDelayMilliseconds = FIRST_RECONNECT_DELAY_MILLISECONDS;
+    this.#connect(id, false);
+  }
+
+  /** Opens the socket of conversation `id`. A reconnect keeps the Keep and Discard choices and the model selection, and
+   * reads the saved messages only after the socket opens, so a server that is down does not add an error each time. */
+  #connect(id: number, isReconnect: boolean): void {
     this.#socketState = 'connecting';
     this.#isHistoryRead = false;
     this.#socketConversationId = id;
@@ -245,7 +259,9 @@ export class AssistantSession {
           this.reportError(`Conversation not read: ${result.message}`);
         } else {
           this.log = readConversationLog(result.value.messages, result.value.created_at_utc);
-          this.selection = findDefaultSelection(this.providers, this.credentials, readLastModel(result.value));
+          if (!isReconnect) {
+            this.selection = findDefaultSelection(this.providers, this.credentials, readLastModel(result.value));
+          }
         }
         waiting.splice(0).forEach(receive);
       });
@@ -269,10 +285,15 @@ export class AssistantSession {
       onConnectionChange: (connected) => {
         if (this.#socket === opened) {
           this.#socketState = connected ? 'open' : 'closed';
-          if (!connected) {
+          if (connected) {
+            this.#reconnectDelayMilliseconds = FIRST_RECONNECT_DELAY_MILLISECONDS;
+          } else {
             this.log = endRun(this.log);
+            this.#reconnectLater(id);
           }
-          readHistory();
+          if (connected || !isReconnect) {
+            readHistory();
+          }
         }
       },
     });
@@ -291,8 +312,19 @@ export class AssistantSession {
     }, TITLE_READ_DELAY_MILLISECONDS);
   }
 
+  #reconnectLater(id: number): void {
+    clearTimeout(this.#reconnectTimer);
+    this.#reconnectTimer = setTimeout(() => {
+      if (this.#socketConversationId === id && this.#socketState === 'closed') {
+        this.#connect(id, true);
+      }
+    }, this.#reconnectDelayMilliseconds);
+    this.#reconnectDelayMilliseconds = Math.min(this.#reconnectDelayMilliseconds * RECONNECT_DELAY_FACTOR, MAXIMUM_RECONNECT_DELAY_MILLISECONDS);
+  }
+
   #closeSocket(): void {
     clearTimeout(this.#titleTimer);
+    clearTimeout(this.#reconnectTimer);
     const socket = this.#socket;
     this.#socket = null;
     this.#socketConversationId = null;

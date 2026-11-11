@@ -1,4 +1,5 @@
-// The AI assistant session: the title read after a run, and send() with a run or without a credential.
+// The AI assistant session: the title read after a run, send() with a run or without a credential, and the new socket
+// after a close.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test';
 import { AssistantSession } from './assistant_session.svelte';
 
@@ -6,6 +7,9 @@ const CONVERSATION_ID = 7;
 const OTHER_CONVERSATION_ID = 8;
 const READ_DELAY_MILLISECONDS = 1000;
 const READ_LIMIT = 125;
+const RECONNECT_DELAY_MILLISECONDS = 1000;
+const HEARTBEAT_TIMEOUT_MILLISECONDS = 25_000;
+const HEARTBEAT_INTERVAL_MILLISECONDS = 10_000;
 
 class FakeWebSocket extends EventTarget {
   static opened: FakeWebSocket | null = null;
@@ -112,7 +116,11 @@ describe('the title read after a run', () => {
     titleState = 'generating';
     fakeSocket().receive({ type: 'run_state', state: 'settled' });
 
-    await vi.advanceTimersByTimeAsync(2 * READ_LIMIT * READ_DELAY_MILLISECONDS);
+    // The server sends a heartbeat every 10 seconds, so the socket stays open.
+    for (let elapsed = 0; elapsed < 2 * READ_LIMIT * READ_DELAY_MILLISECONDS; elapsed += HEARTBEAT_INTERVAL_MILLISECONDS) {
+      fakeSocket().receive({ type: 'heartbeat' });
+      await vi.advanceTimersByTimeAsync(HEARTBEAT_INTERVAL_MILLISECONDS);
+    }
 
     expect(listReadCount).toBe(READ_LIMIT);
   });
@@ -199,5 +207,57 @@ describe('send', () => {
     expect(session.text).toBe('Hello');
     expect(session.log.items).toHaveLength(0);
     expect(fakeSocket().sent).toHaveLength(0);
+  });
+});
+
+describe('a closed socket', () => {
+  it('connects again after a close, with a longer delay each time', async () => {
+    const session = await openSession();
+    const closedSocket = fakeSocket();
+
+    closedSocket.close();
+    expect(session.connection).toBe('closed');
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAY_MILLISECONDS - 1);
+    expect(fakeSocket()).toBe(closedSocket);
+    await vi.advanceTimersByTimeAsync(1);
+    const secondSocket = fakeSocket();
+    expect(secondSocket).not.toBe(closedSocket);
+    expect(session.connection).toBe('connecting');
+
+    secondSocket.close();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAY_MILLISECONDS);
+    expect(fakeSocket()).toBe(secondSocket);
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAY_MILLISECONDS);
+    fakeSocket().dispatchEvent(new Event('open'));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(session.connection).toBe('open');
+    expect(session.conversationId).toBe(CONVERSATION_ID);
+  });
+
+  it('keeps the model selection and the Keep and Discard choices', async () => {
+    const session = await openSession();
+    const selection = { provider: 'fake', model: 'fake-model', credentialId: 'key-1' };
+    session.selection = selection;
+    session.diffChoices.set(1, 'kept');
+
+    fakeSocket().close();
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAY_MILLISECONDS);
+    fakeSocket().dispatchEvent(new Event('open'));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(session.selection).toEqual(selection);
+    expect(session.diffChoices.get(1)).toBe('kept');
+  });
+
+  it('closes after the heartbeats stop and connects again', async () => {
+    const session = await openSession();
+    const silentSocket = fakeSocket();
+
+    await vi.advanceTimersByTimeAsync(HEARTBEAT_TIMEOUT_MILLISECONDS);
+
+    expect(session.connection).toBe('closed');
+    await vi.advanceTimersByTimeAsync(RECONNECT_DELAY_MILLISECONDS);
+    expect(fakeSocket()).not.toBe(silentSocket);
   });
 });
