@@ -1,7 +1,8 @@
 <!-- Backtest page: a workbench (foundation/workbench, spec #99) with the backtest list and the open backtest on one
      page, like QuantConnect. URL: /backtests/<id>; /backtests opens the newest backtest.
      Left: the "Backtests" side column (BacktestList) with the "New backtest" and "Backtest limits" buttons. Center:
-     the panel of the open backtest (header line: number, strategy version, instrument, bar period, status, and the
+     the panel of the open backtest (header line: number, strategy version, instrument, bar period, status, the
+     "Rerun backtest" button (the latest version of the strategy that is not discarded on the same data), and the
      "Start forward test" button; then the key metric row and the equity and drawdown curves on one time axis) over the
      Trades / Orders / Logs / Metrics / Bar sources panel. The API has no orders, so Orders is an empty state. Logs
      shows the strategy error. Metrics shows the metric table (docs/architecture/backtest.md section 10.9.6). Bar
@@ -19,6 +20,7 @@
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
   import ConnectionSignal16 from '@carbon/icons/es/connection-signal/16.js';
+  import Renew16 from '@carbon/icons/es/renew/16.js';
   import Settings16 from '@carbon/icons/es/settings/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -44,6 +46,7 @@
     listChartInstruments,
     readBacktest,
     readBacktestInstrument,
+    rerunBacktest,
     UniverseInstrumentTable,
     type Backtest,
     type BacktestDetail,
@@ -63,7 +66,8 @@
     SplitCheckWarning,
     SurvivorshipBiasWarning,
   } from '#lib/market_data';
-  import { formatVersionLabel } from '#lib/strategy';
+  import { formatVersionLabel, readStrategy, type StrategyVersionSummary } from '#lib/strategy';
+  import { findDefaultVersionNumber } from '../../strategies/strategy_workbench';
   import { createInstrumentHref } from '../../instrument_href';
   import { START_BACKTEST_FORM_ID } from '../../palette_commands';
   import { RunWorkbench } from '../../run_workbench.svelte';
@@ -106,6 +110,10 @@
   let isLimitsDialogOpen = $state(false);
   let forwardTestMessage = $state('');
   let isStartingForwardTest = $state(false);
+  // The version of a rerun: the latest version of the strategy of the open backtest that is not discarded.
+  let rerunVersion = $state<StrategyVersionSummary | null>(null);
+  let rerunMessage = $state('');
+  let isRerunning = $state(false);
 
   const shownBacktest = $derived(workbench.detail !== null && workbench.detail.id === backtestId ? workbench.detail : null);
   // A forward test runs on live bars: the bar period of the backtest must be a live bar period.
@@ -150,7 +158,40 @@
   $effect(() => {
     backtestId satisfies number | null;
     forwardTestMessage = '';
+    rerunMessage = '';
   });
+
+  // Each open backtest reads its strategy again: a new version can be saved after the last read.
+  const shownStrategyId = $derived(shownBacktest?.strategy_id ?? null);
+  $effect(() => {
+    backtestId satisfies number | null;
+    const strategyId = shownStrategyId;
+    rerunVersion = null;
+    if (strategyId === null) {
+      return;
+    }
+    void readStrategy(fetch, strategyId).then((result) => {
+      if (result.kind === 'ok' && shownStrategyId === strategyId) {
+        const versionNumber = findDefaultVersionNumber(result.value.versions);
+        rerunVersion = result.value.versions.find((version) => version.version_number === versionNumber) ?? null;
+      }
+    });
+  });
+
+  async function rerunShownBacktest(detail: BacktestDetail, version: StrategyVersionSummary): Promise<void> {
+    if (isRerunning) {
+      return;
+    }
+    isRerunning = true;
+    rerunMessage = '';
+    const result = await rerunBacktest(fetch, detail.id, version.id);
+    isRerunning = false;
+    if (result.kind === 'failed') {
+      rerunMessage = result.message;
+      return;
+    }
+    openStartedBacktest(result.value);
+  }
 
   // A deleted open backtest: /backtests opens the newest backtest that is left.
   function removeDeletedBacktests(deletedIds: number[]): void {
@@ -277,6 +318,17 @@
                     {/if}
                     <RunAddIndicatorButton chart={runChart} runKey={chartKey} strategyIndicators={detail.strategy_indicators} />
                   {/if}
+                  {#if detail.sweep_id === null && rerunVersion !== null}
+                    {@const version = rerunVersion}
+                    <IconButton
+                      label={isRerunning ? 'Starting backtest…' : `Rerun backtest with v${String(version.version_number)}`}
+                      icon={Renew16}
+                      tone="success"
+                      disabled={isRerunning}
+                      busy={isRerunning}
+                      onclick={() => void rerunShownBacktest(detail, version)}
+                    />
+                  {/if}
                   <IconButton
                     label={describeForwardTestButton(detail, instrument)}
                     icon={ConnectionSignal16}
@@ -298,6 +350,17 @@
                   lowContrast
                   onClose={() => {
                     forwardTestMessage = '';
+                  }}
+                />
+              {/if}
+              {#if rerunMessage !== ''}
+                <InlineNotification
+                  kind="error"
+                  title="Backtest not rerun"
+                  subtitle={rerunMessage}
+                  lowContrast
+                  onClose={() => {
+                    rerunMessage = '';
                   }}
                 />
               {/if}

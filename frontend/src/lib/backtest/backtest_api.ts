@@ -62,6 +62,21 @@ export function startBacktest(fetchFunction: typeof fetch, request: BacktestRequ
   return requestJson(fetchFunction, FAILED_ACTION, BACKTESTS_PATH, jsonRequest('POST', request));
 }
 
+/** A new backtest of the strategy version on the data of the backtest: the same instruments, universe members, bar
+ * period, range, paper capital, out-of-sample share, and source order. The version must be of the same strategy. */
+export function rerunBacktest(
+  fetchFunction: typeof fetch,
+  backtestId: number,
+  strategyVersionId: number,
+): Promise<RequestResult<Backtest>> {
+  return requestJson(
+    fetchFunction,
+    FAILED_ACTION,
+    `${BACKTESTS_PATH}/${String(backtestId)}/rerun`,
+    jsonRequest('POST', { strategy_version_id: strategyVersionId }),
+  );
+}
+
 export function listBacktests(fetchFunction: typeof fetch): Promise<RequestResult<Backtest[]>> {
   return requestJson(fetchFunction, FAILED_ACTION, BACKTESTS_PATH);
 }

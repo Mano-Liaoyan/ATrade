@@ -5,6 +5,7 @@ import {
   deleteBacktest,
   listChartInstruments,
   readBacktestLimits,
+  rerunBacktest,
   startBacktest,
   type BacktestDetail,
   type BacktestRequest,
@@ -21,6 +22,24 @@ const REQUEST: BacktestRequest = {
   end_utc: '2026-01-01T00:00:00Z',
   paper_capital_usd: '10000',
 };
+
+describe('rerunBacktest', () => {
+  it('posts the strategy version to the rerun route of the backtest', async () => {
+    let sentPath = '';
+    let sentBody = '';
+    const recordingFetch: typeof fetch = (path, init) => {
+      sentPath = typeof path === 'string' ? path : '';
+      sentBody = typeof init?.body === 'string' ? init.body : '';
+      return Promise.resolve(new Response(JSON.stringify({ id: 9, status: 'queued' }), { status: 201 }));
+    };
+
+    const result = await rerunBacktest(recordingFetch, 4, 8);
+
+    expect(sentPath).toBe('/api/backtests/4/rerun');
+    expect(JSON.parse(sentBody)).toEqual({ strategy_version_id: 8 });
+    expect(result).toEqual({ kind: 'ok', value: { id: 9, status: 'queued' } });
+  });
+});
 
 describe('startBacktest', () => {
   it('sends the request as JSON and returns the queued backtest', async () => {

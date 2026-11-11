@@ -97,7 +97,7 @@ test('names the shortcut of each toolbar button, and Ctrl S saves from the edito
   const modifier = await readShortcutModifier(page);
 
   await expect(page.getByRole('button', { name: 'Save version', exact: true })).toHaveAttribute('aria-keyshortcuts', `${modifier}+S`);
-  await expect(page.getByRole('button', { name: 'Run backtest' })).toHaveAttribute('aria-keyshortcuts', `${modifier}+B`);
+  await expect(page.getByRole('button', { name: 'Run backtest', exact: true })).toHaveAttribute('aria-keyshortcuts', `${modifier}+B`);
   await expect(page.getByRole('button', { name: 'Start forward test' })).toHaveAttribute(
     'aria-keyshortcuts',
     `${modifier}+Shift+F`,
@@ -152,7 +152,7 @@ test('runs a backtest from the toolbar and opens its result in a new tab', async
   await results.getByRole('tab', { name: 'Logs' }).click();
   await expect(backtestTab).toHaveText(/^\s*Backtest #\d+\s+[+-]?[\d,]+\.\d{2} %$/, { timeout: BACKTEST_TIMEOUT_MILLISECONDS });
   await expect(backtestTab).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('button', { name: 'Run backtest' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Run backtest', exact: true })).toBeVisible();
   await expect(results.getByRole('term')).toHaveText(KEY_METRIC_NAMES);
   await expect(results.getByRole('img', { name: 'Equity and drawdown' }).locator('canvas').first()).toBeVisible();
   await expect(results.getByRole('link', { name: 'Charting by TradingView' })).toBeVisible();

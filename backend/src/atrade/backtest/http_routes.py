@@ -116,6 +116,12 @@ class StartBacktestRequest(BaseModel):
     source_order: list[BarSource] | None = None
 
 
+class RerunBacktestRequest(BaseModel):
+    """A new backtest of this strategy version on the data of a backtest (docs/architecture/backtest.md 10.5)."""
+
+    strategy_version_id: int
+
+
 class BacktestLimitsBody(BaseModel):
     """The request and the response of the backtest limits routes."""
 
@@ -511,6 +517,45 @@ class BacktestRoutes:
     ) -> BacktestResponse:
         """Port 8001 gives the conversation of the request."""
         backtest_request, periods = await self.make_backtest_request(request)
+        return await self.queue_backtest(backtest_request, periods, conversation_id)
+
+    async def rerun_backtest(self, backtest_id: int, request: RerunBacktestRequest) -> BacktestResponse:
+        """A new backtest of another version of the same strategy with the request of the backtest: the same
+        instruments, members of each universe period, screen copy, bar period, range, paper capital, out-of-sample
+        share, and source order (docs/architecture/backtest.md section 10.5)."""
+        async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
+            row = await backtest_store.select_backtest(connection, backtest_id)
+            if row is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backtest not found.")
+            periods = (
+                []
+                if row.currency is None
+                else await backtest_store.select_universe_periods(
+                    connection, backtest_id=backtest_id, currency=row.currency
+                )
+            )
+        if row.sweep_id is not None:
+            refuse(f"Backtest #{backtest_id} is a run of sweep #{row.sweep_id}. Start a sweep.")
+        versions = await read_strategy_versions(
+            database_url=self.database_url,
+            strategy_version_ids=sorted({row.strategy_version_id, request.strategy_version_id}),
+        )
+        new_version = versions.get(request.strategy_version_id)
+        if new_version is None:
+            refuse(f"Strategy version {request.strategy_version_id} does not exist.")
+        old_version = versions.get(row.strategy_version_id)
+        if old_version is None or old_version.strategy_id != new_version.strategy_id:
+            refuse(
+                f"Strategy version {request.strategy_version_id} is not a version of the strategy of backtest "
+                f"#{backtest_id}."
+            )
+        backtest_request = replace(backtest_store.read_request(row), strategy_version_id=request.strategy_version_id)
+        return await self.queue_backtest(backtest_request, periods, None)
+
+    async def queue_backtest(
+        self, backtest_request: BacktestRequest, periods: list[UniversePeriod], conversation_id: int | None
+    ) -> BacktestResponse:
+        """The checks of the start, the queued row, and its response. Raises a 422 HTTPException for a refusal."""
         started = await start_backtest(
             database_url=self.database_url,
             exchange_rate_reader=self.exchange_rate_reader,
@@ -687,6 +732,13 @@ def create_backtest_router(*, database_url: str, clock: Clock, exchange_rate_rea
         methods=["POST"],
         status_code=status.HTTP_201_CREATED,
         responses=REFUSED,
+    )
+    router.add_api_route(
+        "/backtests/{backtest_id}/rerun",
+        routes.rerun_backtest,
+        methods=["POST"],
+        status_code=status.HTTP_201_CREATED,
+        responses={**REFUSED, **NOT_FOUND},
     )
     router.add_api_route("/backtest-limits", routes.read_limits, methods=["GET"])
     router.add_api_route("/us-universe/range", routes.read_us_universe_range, methods=["GET"])
