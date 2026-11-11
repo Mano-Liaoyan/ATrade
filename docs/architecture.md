@@ -97,7 +97,7 @@ and its revision comments.
 | Code completion | basedpyright language server in the backend, `@codemirror/lsp-client` in the frontend. | NautilusTrader 2.0 ships `.pyi` stubs, so basedpyright can resolve `Strategy`. |
 | Real-time communication | WebSocket. | One technology for live data and for the language server. |
 | IBKR connection | TWS API through IB Gateway. Image `ghcr.io/gnzsnz/ib-gateway:stable`, pinned by digest. | IB Gateway is the official IBKR program. The Client Portal Web API has a lower rate limit. |
-| AI agent runtime | pi SDK `@earendil-works/pi-coding-agent` (MIT), exact version pinned. Built-in tools off, only custom tools (section 25). | The SDK does each provider login from the web page. RPC mode has no login command ([#133](https://github.com/Mano-Liaoyan/ATrade/issues/133), [#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). |
+| AI agent runtime | pi SDK `@earendil-works/pi-coding-agent` (MIT), exact version pinned. Built-in tools off, only custom tools (section 25). The web tools are the pi extension `pi-web-access` (MIT), exact version pinned (assistant section 25.4.5). | The SDK does each provider login from the web page. RPC mode has no login command ([#133](https://github.com/Mano-Liaoyan/ATrade/issues/133), [#140](https://github.com/Mano-Liaoyan/ATrade/issues/140)). |
 | History bars | `databento` Python client for the one-time history import and the quarterly EQUS.SUMMARY download (section 8). | Point-in-time US data with instruments that stopped trading ([#141](https://github.com/Mano-Liaoyan/ATrade/issues/141)). |
 | Deployment | User's own server, one Docker Compose project, Cloudflare proxy and Cloudflare Access, Nginx Proxy Manager, GitHub Actions deployment through Tailscale and SSH. | See section 14. |
 | Effect-TS | Not used. | Its HTTP and SQL modules are unstable, it has no Svelte binding, and its style conflicts with the readability rules ([Effect-TS evaluation](https://github.com/Mano-Liaoyan/ATrade/issues/47)). |
@@ -1401,7 +1401,9 @@ browser -> Cloudflare (proxy, Access) -> Nginx Proxy Manager (other host) -> Tai
 - The AI assistant (phase 2, section 25) adds 2 networks.
   `atrade-assistant-internal` has `internal: true` and the fixed subnet
   `172.31.250.0/24`, and only `web` and `assistant` are in it.
-  `atrade-assistant-egress` has only `assistant`. `assistant` is not on the
+  `atrade-assistant-egress` has only `assistant`: its connection to the
+  model providers and, for the web tools, to the internet (assistant section
+  25.4.5). `assistant` is not on the
   default network, so it cannot connect to `postgres` or `ib-gateway`. `web`
   is on the default network and on `atrade-assistant-internal`. `web` also
   listens on port 8001 in `atrade-assistant-internal`. Compose does not

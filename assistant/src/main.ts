@@ -7,6 +7,7 @@ import { Conversations } from './conversations.ts';
 import { CredentialFile, createModelRuntime } from './credential_file.ts';
 import { Logins } from './logins.ts';
 import { openStoredModel } from './providers.ts';
+import { loadWebAccess } from './web_access.ts';
 import { WEB_PORT_URL, WebPortClient } from './web_port_client.ts';
 
 // The port of assistant in the network atrade-assistant-internal. Compose does not publish it.
@@ -31,6 +32,7 @@ const conversations = new Conversations({
       budget,
       wait: SERVICE_BACKTEST_WAIT,
     }),
+  webAccess: await loadWebAccess(PI_DIR),
 });
 await startAssistantServer({ host: '0.0.0.0', port: ASSISTANT_PORT }, conversations, {
   file,

@@ -2,19 +2,22 @@
 // - No built-in pi tool (noTools "builtin"). Only the custom tools of the caller.
 // - The tool guard refuses each tool that is not in the tool list (the second guard).
 // - pi reads no AGENTS.md, no skill, no prompt template, no theme, no extension file, and no settings file.
-//   The tool guard is the only extension. It is code of this process, not a file that pi loads.
+//   The extensions are the tool guard and, when the caller gives it, the web tools (web_access.ts). Both are code
+//   that this process imports, not files that pi loads.
 import {
   createAgentSession,
   DefaultResourceLoader,
   SessionManager,
   SettingsManager,
   type AgentSession,
+  type ExtensionFactory,
   type ModelRuntime,
   type ToolDefinition,
 } from '@earendil-works/pi-coding-agent';
 import { ASSISTANT_TOOL_NAMES } from './assistant_tools.ts';
 import type { ThinkingLevel } from './model_selection.ts';
 import { createToolGuard } from './tool_guard.ts';
+import { REFUSED_WEB_ARGUMENTS, WEB_ACCESS_TOOL_NAMES } from './web_access.ts';
 
 export interface AssistantSessionOptions {
   modelRuntime: ModelRuntime;
@@ -26,6 +29,8 @@ export interface AssistantSessionOptions {
   customTools: ToolDefinition[];
   /** The system prompt of the conversation: the editable part and the fixed part (assistant.md 25.9). web makes it. */
   systemPrompt: string;
+  /** The web tools (25.4.5). Default: the session has no web tool. */
+  webAccess?: ExtensionFactory;
   /** The session of one conversation (its JSONL file). Default: a session in memory. */
   conversationSession?: SessionManager;
 }
@@ -34,7 +39,10 @@ async function createResourceLoader(
   piDir: string,
   settings: SettingsManager,
   systemPrompt: string,
+  webAccess: ExtensionFactory | undefined,
 ): Promise<DefaultResourceLoader> {
+  const toolNames = webAccess === undefined ? ASSISTANT_TOOL_NAMES : [...ASSISTANT_TOOL_NAMES, ...WEB_ACCESS_TOOL_NAMES];
+  const toolGuard = { name: 'atrade-tool-guard', factory: createToolGuard(toolNames, REFUSED_WEB_ARGUMENTS) };
   const resourceLoader = new DefaultResourceLoader({
     cwd: piDir,
     agentDir: piDir,
@@ -45,7 +53,7 @@ async function createResourceLoader(
     noThemes: true,
     noContextFiles: true,
     systemPrompt,
-    extensionFactories: [{ name: 'atrade-tool-guard', factory: createToolGuard(ASSISTANT_TOOL_NAMES) }],
+    extensionFactories: webAccess === undefined ? [toolGuard] : [toolGuard, { name: 'pi-web-access', factory: webAccess }],
   });
   await resourceLoader.reload();
   return resourceLoader;
@@ -62,7 +70,7 @@ export async function createAssistantSession(options: AssistantSessionOptions): 
     thinkingLevel: options.thinkingLevel,
     noTools: 'builtin',
     customTools: options.customTools,
-    resourceLoader: await createResourceLoader(options.piDir, settings, options.systemPrompt),
+    resourceLoader: await createResourceLoader(options.piDir, settings, options.systemPrompt, options.webAccess),
     sessionManager: options.conversationSession ?? SessionManager.inMemory(options.piDir),
     settingsManager: settings,
   });

@@ -4,7 +4,7 @@
 // The run events are pi events with only the fields that web needs. web changes them into the /ws/assistant messages.
 import { rmSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
-import type { AgentSession, AgentSessionEvent, ToolDefinition } from '@earendil-works/pi-coding-agent';
+import type { AgentSession, AgentSessionEvent, ExtensionFactory, ToolDefinition } from '@earendil-works/pi-coding-agent';
 import { createAssistantSession } from './assistant_session.ts';
 import type { UserMessageBudget } from './backtest_tools.ts';
 import {
@@ -61,6 +61,8 @@ export interface ConversationsOptions {
   piDir: string;
   openModel: OpenModel;
   createTools: CreateTools;
+  /** The web tools of each run (web_access.ts). Default: no web tool. */
+  webAccess?: ExtensionFactory;
 }
 
 interface EndedAssistantMessage {
@@ -168,6 +170,7 @@ export class Conversations {
       piDir: this.options.piDir,
       customTools: this.options.createTools({ conversationId, budget }),
       systemPrompt: request.systemPrompt,
+      webAccess: this.options.webAccess,
       conversationSession,
     });
     if (this.abortedRuns.has(conversationId)) {
