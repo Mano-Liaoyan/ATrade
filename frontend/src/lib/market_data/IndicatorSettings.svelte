@@ -15,7 +15,7 @@
     createSettingsDraft,
     describeApplyBlock,
     formatLineLabel,
-    formatParameterLabel,
+    labelParameter,
     hasSettingsProblems,
     resetSettingsDraft,
   } from './indicator_settings';
@@ -81,7 +81,7 @@
       <div class="settings-fields">
         {#each definition.parameters as parameter (parameter.name)}
           <NumberInput
-            label={formatParameterLabel(parameter.name)}
+            label={labelParameter(parameter)}
             size="sm"
             value={draft.parameters[parameter.name] ?? ''}
             min={parameter.minimum}

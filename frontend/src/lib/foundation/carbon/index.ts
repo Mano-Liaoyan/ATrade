@@ -13,6 +13,7 @@ export { default as Tooltip, type TooltipAlignment } from './Tooltip.svelte';
 export { default as TooltipProvider } from './TooltipProvider.svelte';
 export { default as Button } from './Button.svelte';
 export { default as TextInput } from './TextInput.svelte';
+export { default as TextArea } from './TextArea.svelte';
 export { default as NumberInput } from './NumberInput.svelte';
 export { default as Select, type SelectItem } from './Select.svelte';
 export { default as ContentSwitcher, type ContentSwitcherItem } from './ContentSwitcher.svelte';

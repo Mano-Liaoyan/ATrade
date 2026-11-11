@@ -20,6 +20,7 @@ from atrade.indicator.formula_indicator import (
     check_expression,
     count_formula_bars,
 )
+from atrade.indicator.formula_parameter_body import FormulaParameterBody
 from atrade.indicator.formula_reference import (
     CUSTOM_KEY_PREFIX,
     check_chart_placement,
@@ -62,6 +63,7 @@ __all__ = [
     "DistanceTo52WeekHigh",
     "DonchianChannel",
     "FormulaIndicator",
+    "FormulaParameterBody",
     "IndicatorDefinition",
     "IndicatorParameter",
     "IndicatorProblem",

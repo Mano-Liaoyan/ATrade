@@ -3,6 +3,7 @@
 // catalog response with their parameters and lines, and the comparisons.
 
 import type { components } from '#lib/api';
+import { findChartDefinition, isSameFormula, withDefaults } from '#lib/foundation/indicator_reference';
 
 type Schemas = components['schemas'];
 export type StrategyRules = Schemas['StrategyRules'];
@@ -98,11 +99,16 @@ export function listOperandChoices(
   return [...prices, ...indicators, ...numbers];
 }
 
-/** The parameters and lines of a built-in indicator. A custom indicator has none. A parameter that the catalog leaves
- * out of the name (bars_per_year of realized volatility) keeps its default: the builder does not show it. */
-export function findIndicatorChoice(key: string, catalog: readonly CatalogIndicator[]): IndicatorChoice | undefined {
-  const indicator = catalog.find((choice) => choice.key === key);
-  if (indicator === undefined || indicator.formula) {
+/** The parameters and lines of an indicator. An operand of a custom indicator gives its `formula`: the formula has the
+ * parameters, also after a change or a delete. A parameter that the catalog leaves out of the name (bars_per_year of
+ * realized volatility) keeps its default: the builder does not show it. */
+export function findIndicatorChoice(
+  key: string,
+  catalog: readonly CatalogIndicator[],
+  formula?: IndicatorOperand['formula'],
+): IndicatorChoice | undefined {
+  const indicator = findChartDefinition(catalog, { indicator: key, formula: formula ?? catalog.find((choice) => choice.key === key)?.formula });
+  if (indicator === undefined) {
     return undefined;
   }
   return {
@@ -140,12 +146,9 @@ export function createOperand(choice: OperandChoice, catalog: readonly CatalogIn
     return { type: 'price', price: name as PriceName };
   }
   const formula = catalog.find((item) => item.key === name)?.formula;
-  if (formula) {
-    return { type: 'indicator', indicator: name, parameters: {}, formula };
-  }
   const indicator = findIndicatorChoice(name, catalog);
   const parameters = Object.fromEntries((indicator?.parameters ?? []).map((parameter) => [parameter.name, parameter.default]));
-  const operand: IndicatorOperand = { type: 'indicator', indicator: name, parameters };
+  const operand: IndicatorOperand = { type: 'indicator', indicator: name, parameters, ...(formula ? { formula } : {}) };
   const firstLine = indicator?.lines[0];
   return firstLine === undefined ? operand : { ...operand, output: firstLine[0] };
 }
@@ -160,9 +163,13 @@ export function readCurrentOperand(operand: RightOperand, catalog: readonly Cata
   if (operand.type !== 'indicator' || !formula || !current) {
     return null;
   }
-  const isSame =
-    formula.name === current.name && formula.expression === current.expression && formula.chart_placement === current.chart_placement;
-  return isSame ? null : { ...operand, formula: current };
+  if (isSameFormula(formula, current)) {
+    return null;
+  }
+  // The current formula can have other parameters: a value stays only for a parameter that the formula still has.
+  const definition = findChartDefinition(catalog, { indicator: operand.indicator, formula: current });
+  const parameters = definition === undefined ? {} : withDefaults(definition, operand.parameters ?? {});
+  return { ...operand, parameters, formula: current };
 }
 
 export function createCondition(): RuleCondition {

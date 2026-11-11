@@ -1,6 +1,7 @@
 // The changed, unsaved screen of the screen page (docs/architecture/screen.md section 24.13). The page runs the draft
 // at once after each change; the saved screen changes only on "Save screen" or "Save as new screen".
 import type { components } from '#lib/api';
+import { findChartDefinition, isSameFormula, withDefaults } from '#lib/foundation/indicator_reference';
 import type { IndicatorNames, ScreenDefinition } from './condition_bar';
 
 export type ScreenMarket = 'US' | 'HK';
@@ -134,9 +135,13 @@ export function readCurrentReference(catalog: ScreenIndicator[], value: unknown,
   if (!formula || !current || (kind === 'close_versus_line' && current.chart_placement !== 'price')) {
     return null;
   }
-  const isSame =
-    formula.name === current.name && formula.expression === current.expression && formula.chart_placement === current.chart_placement;
-  return isSame ? null : { ...held, formula: current };
+  if (isSameFormula(formula, current)) {
+    return null;
+  }
+  // The current formula can have other parameters: a value stays only for a parameter that the formula still has.
+  const definition = findChartDefinition(catalog, { indicator: String(held['indicator']), formula: current });
+  const parameters = definition === undefined ? {} : withDefaults(definition, (held['parameters'] ?? {}) as Record<string, number>);
+  return { ...held, parameters, formula: current };
 }
 
 function formatParameter(value: unknown): string {
@@ -146,11 +151,8 @@ function formatParameter(value: unknown): string {
 /** The UI name of an indicator reference, as the backend makes it (indicator.md section 23.3), for example RSI(14). */
 export function nameIndicator(catalog: ScreenIndicator[], value: unknown): string {
   const indicatorReference = (value ?? {}) as Item;
-  const formula = indicatorReference['formula'] as { name: string } | undefined;
-  if (formula !== undefined) {
-    return formula.name;
-  }
-  const indicator = catalog.find((candidate) => candidate.key === indicatorReference['indicator']);
+  // A reference to a custom indicator has its name and its parameters in its formula, also after a delete.
+  const indicator = findChartDefinition(catalog, indicatorReference as { indicator: string; formula?: ScreenIndicator['formula'] });
   if (indicator === undefined) {
     return formatParameter(indicatorReference['indicator']);
   }
@@ -158,7 +160,7 @@ export function nameIndicator(catalog: ScreenIndicator[], value: unknown): strin
   const shown = indicator.parameters
     .filter((parameter) => parameter.is_in_name)
     .map((parameter) => formatParameter(parameters[parameter.name] ?? parameter.default));
-  return `${indicator.name}(${shown.join(', ')})`;
+  return shown.length === 0 ? indicator.name : `${indicator.name}(${shown.join(', ')})`;
 }
 
 /** The names of the indicators of a definition that has no screen result yet. */

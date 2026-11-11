@@ -4620,6 +4620,46 @@
         ],
         "title": "ChangeScreenRequest"
       },
+      "ChartFormulaParameter": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type"
+          },
+          "default": {
+            "$ref": "#/components/schemas/ParameterNumber"
+          },
+          "minimum": {
+            "$ref": "#/components/schemas/ParameterNumber"
+          },
+          "maximum": {
+            "$ref": "#/components/schemas/ParameterNumber"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "value_type",
+          "default",
+          "minimum",
+          "maximum",
+          "description"
+        ],
+        "title": "ChartFormulaParameter"
+      },
       "ChartIndicator": {
         "properties": {
           "indicator": {
@@ -4658,6 +4698,13 @@
           "chart_placement": {
             "type": "string",
             "title": "Chart Placement"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ChartFormulaParameter"
+            },
+            "type": "array",
+            "title": "Parameters"
           }
         },
         "type": "object",
@@ -5783,6 +5830,13 @@
           "value_description": {
             "type": "string",
             "title": "Value Description"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/FormulaParameterBody"
+            },
+            "type": "array",
+            "title": "Parameters"
           }
         },
         "type": "object",
@@ -5814,12 +5868,24 @@
               }
             ],
             "title": "Look Back Bars"
+          },
+          "default_look_back_bars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Look Back Bars"
           }
         },
         "type": "object",
         "required": [
           "problems",
-          "look_back_bars"
+          "look_back_bars",
+          "default_look_back_bars"
         ],
         "title": "CustomIndicatorCheckResponse"
       },
@@ -5840,6 +5906,13 @@
           "value_description": {
             "type": "string",
             "title": "Value Description"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/FormulaParameterBody"
+            },
+            "type": "array",
+            "title": "Parameters"
           },
           "custom_indicator_id": {
             "type": "integer",
@@ -6048,6 +6121,71 @@
           "shares"
         ],
         "title": "FixedShares"
+      },
+      "FormulaParameterBody": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value_type": {
+            "type": "string",
+            "title": "Value Type"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Default"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "value_type",
+          "default",
+          "minimum",
+          "maximum"
+        ],
+        "title": "FormulaParameterBody",
+        "description": "An expression uses `name` as a number. Each reference holds its own value (ADR 0009)."
       },
       "ForwardTestCapitalResponse": {
         "properties": {
@@ -6985,6 +7123,13 @@
           "chart_placement": {
             "type": "string",
             "title": "Chart Placement"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/FormulaParameterBody"
+            },
+            "type": "array",
+            "title": "Parameters"
           }
         },
         "additionalProperties": false,
@@ -7010,6 +7155,13 @@
           "chart_placement": {
             "type": "string",
             "title": "Chart Placement"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/FormulaParameterBody"
+            },
+            "type": "array",
+            "title": "Parameters"
           }
         },
         "type": "object",
@@ -7120,6 +7272,28 @@
           "is_in_name": {
             "type": "boolean",
             "title": "Is In Name"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
           }
         },
         "type": "object",

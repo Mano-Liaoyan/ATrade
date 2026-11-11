@@ -24,11 +24,21 @@ LIST_MESSAGE = f"{CHART_INDICATORS_NAME} must be a list literal of dict literals
 type ParameterNumber = int | float
 
 
+class ChartFormulaParameter(TypedDict):
+    name: str
+    label: str
+    value_type: str
+    default: ParameterNumber
+    minimum: ParameterNumber
+    maximum: ParameterNumber
+    description: str
+
+
 class ChartIndicatorFormula(TypedDict):
     name: str
     expression: str
     chart_placement: str
-    parameters: NotRequired[list[dict[str, object]]]
+    parameters: NotRequired[list[ChartFormulaParameter]]
 
 
 class ChartIndicator(TypedDict):

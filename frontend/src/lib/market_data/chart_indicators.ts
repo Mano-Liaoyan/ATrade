@@ -1,14 +1,12 @@
 // Pure functions of the indicators on a bar chart (docs/architecture/indicator.md sections 23.9.2 to 23.9.5): the
 // legend name, the placement of a new indicator in the panes, its colors, the legend bar, and the "/" shortcut.
 // The JSON form of `ChartPane` is the chart indicator set of section 23.9.7.
-import type { components } from '#lib/api';
+import { findChartDefinition, withDefaults, type ChartIndicatorDefinition, type IndicatorFormula } from '#lib/foundation/indicator_reference';
 import { CHART_PALETTE_SIZE, formatIndicatorValue, readPaletteColor } from './chart_indicator_styles';
 import type { IndicatorSeriesResult } from './indicator_series';
 
-/** One indicator of `GET /api/market-data/indicators`. */
-export type ChartIndicatorDefinition = components['schemas']['IndicatorResponse'];
-/** A reference to a custom indicator holds it, so the reference works after a change or a delete (section 23.10). */
-export type IndicatorFormula = components['schemas']['IndicatorFormulaBody'];
+export { findChartDefinition, withDefaults };
+export type { ChartIndicatorDefinition, IndicatorFormula };
 export type ChartLineStyle = 'solid' | 'dashed' | 'dotted';
 
 /** One line of an indicator. `color` is a palette index from 1 to 14. `width` is 1 to 4 pixels. */
@@ -75,36 +73,6 @@ export interface PaneBox {
 export const MAX_OWN_PANES = 3;
 const NEW_LINE_STYLE: ChartLineStyle = 'solid';
 const NEW_LINE_WIDTH = 2;
-
-/**
- * The definition of a reference: the definition of its `formula` when it has one, else the catalog item. A deleted
- * custom indicator is not in the catalog, and a changed one has another expression there.
- */
-export function findChartDefinition(
-  catalog: readonly ChartIndicatorDefinition[],
-  reference: { indicator: string; formula?: IndicatorFormula | null },
-): ChartIndicatorDefinition | undefined {
-  const { indicator, formula } = reference;
-  const catalogItem = catalog.find((item) => item.key === indicator);
-  if (formula === undefined || formula === null) {
-    return catalogItem;
-  }
-  return {
-    key: indicator,
-    name: formula.name,
-    short_name: formula.name,
-    chart_placement: formula.chart_placement === 'price' ? 'price' : 'own',
-    parameters: [],
-    outputs: ['value'],
-    value_description: catalogItem?.value_description ?? '',
-    formula,
-  };
-}
-
-/** The parameters of the indicator with the catalog defaults for the missing ones, in the catalog order. */
-export function withDefaults(definition: ChartIndicatorDefinition, parameters: Record<string, number>): Record<string, number> {
-  return Object.fromEntries(definition.parameters.map((parameter) => [parameter.name, parameters[parameter.name] ?? parameter.default]));
-}
 
 /** "SMA 50", "BB 20 2", "MACD 12 26 9": the short name and the parameters that are in the name. */
 export function formatLegendName(definition: ChartIndicatorDefinition, parameters: Record<string, number>): string {
@@ -295,7 +263,7 @@ export function isAddIndicatorShortcut(keys: ShortcutKeys): boolean {
 
 type IndicatorSeries = IndicatorSeriesResult['series'][number];
 
-// 2 references to one custom indicator can have 2 expressions (section 23.10).
+// 2 references to one custom indicator can have 2 expressions (section 23.10). The parameter values are in the key.
 function formatParametersKey(indicator: string, parameters: Record<string, number>, formula: IndicatorFormula | null | undefined): string {
   const entries = Object.entries(parameters).sort(([first], [second]) => first.localeCompare(second));
   return JSON.stringify([indicator, entries, formula?.expression ?? null]);

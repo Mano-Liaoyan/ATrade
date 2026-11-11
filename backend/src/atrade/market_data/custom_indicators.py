@@ -17,6 +17,7 @@ from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.foundation.table_changes import ChangeSocket
 from atrade.indicator import (
     CUSTOM_KEY_PREFIX,
+    FormulaParameterBody,
     IndicatorProblem,
     check_chart_placement,
     check_expression_with_parameters,
@@ -25,7 +26,6 @@ from atrade.indicator import (
     has_unstorable_character,
 )
 from atrade.market_data.indicator_series import (
-    FormulaParameterBody,
     IndicatorCheckFailedResponse,
     IndicatorFormulaBody,
     IndicatorProblemResponse,

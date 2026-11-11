@@ -13,13 +13,14 @@ from typing import Any, Literal, cast
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import JSONResponse
-from pydantic import AwareDatetime, BaseModel, Field, JsonValue, StrictFloat, StrictInt
+from pydantic import AwareDatetime, BaseModel, Field, JsonValue
 
 from atrade.foundation.bar import Bar, BarPeriod, TimeRange
 from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.indicator import (
     INDICATOR_CATALOG,
+    FormulaParameterBody,
     IndicatorProblem,
     check_indicator_reference,
     create_indicator,
@@ -48,20 +49,6 @@ class IndicatorParameterResponse(BaseModel):
     # A parameter of a custom indicator only: the name that the UI shows, and the meaning.
     label: str | None = Field(default=None, exclude_if=lambda value: value is None)
     description: str | None = Field(default=None, exclude_if=lambda value: value is None)
-
-
-class FormulaParameterBody(BaseModel):
-    """One parameter of a custom indicator (indicator.md section 23.10.1). An expression uses `name` as a number."""
-
-    name: str
-    # The name that the UI shows.
-    label: str
-    # `int` or `float`. The route checks the value, so a wrong value is a problem with its location.
-    value_type: str
-    default: StrictInt | StrictFloat
-    minimum: StrictInt | StrictFloat
-    maximum: StrictInt | StrictFloat
-    description: str = ""
 
 
 class IndicatorFormulaBody(BaseModel):

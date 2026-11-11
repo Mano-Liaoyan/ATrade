@@ -80,7 +80,7 @@ export function hasSettingsProblems(problems: SettingsProblems): boolean {
 /** Why "Apply" is disabled: the first field with a problem, in the order of the fields. Null when it is not. */
 export function describeApplyBlock(definition: ChartIndicatorDefinition, problems: SettingsProblems): string | null {
   const parameter = definition.parameters.find((item) => problems[item.name] !== undefined);
-  return parameter === undefined ? null : `Fix ${formatParameterLabel(parameter.name)} to apply.`;
+  return parameter === undefined ? null : `Fix ${labelParameter(parameter)} to apply.`;
 }
 
 /** "Reset to defaults": the catalog defaults of the parameters, solid lines of width 2. The colors do not change. */
@@ -121,6 +121,11 @@ export function replaceChartIndicator(
 }
 
 /** "bars_per_year" is "Bars per year", as the parameter labels of the screen editor. */
+/** The label of a parameter field: the label of a parameter of a custom indicator, else the name as words. */
+export function labelParameter(parameter: ChartIndicatorDefinition['parameters'][number]): string {
+  return parameter.label ?? formatParameterLabel(parameter.name);
+}
+
 export function formatParameterLabel(name: string): string {
   const words = name.replaceAll('_', ' ');
   return words.charAt(0).toUpperCase() + words.slice(1);
