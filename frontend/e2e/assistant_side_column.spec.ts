@@ -225,6 +225,20 @@ test('Send becomes Stop while the AI assistant runs, and Stop ends the run', asy
   await expect(column.getByRole('button', { name: 'Send' })).toBeVisible();
 });
 
+test('a reload during a run shows the run again: the message is not lost, and Stop stops the run', async ({ page }, currentTest) => {
+  await openStrategyWithConversation(page, createUniqueName(currentTest, 'Reload in run'));
+  const column = assistantColumn(page);
+  await sendMessage(page, 'Please wait.');
+  await expect(conversationLog(page).getByText('Working on it')).toBeVisible();
+
+  await page.reload();
+
+  await expect(conversationLog(page).getByText('Working on it')).toBeVisible();
+  await expect(conversationLog(page).getByText('Please wait.', { exact: true })).toHaveCount(1);
+  await column.getByRole('button', { name: 'Stop' }).click();
+  await expect(column.getByRole('button', { name: 'Send' })).toBeVisible();
+});
+
 test('a socket close during a run ends the run: the disabled Send says to reload', async ({ page }, currentTest) => {
   let closeSocket: () => Promise<void> = () => Promise.resolve();
   await page.routeWebSocket(/\/ws\/assistant\?conversation_id=/, (socket) => {

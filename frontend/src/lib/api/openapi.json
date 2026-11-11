@@ -11723,6 +11723,31 @@
         "title": "PromptMessage",
         "type": "object"
       },
+      "RunReplayMessage": {
+        "description": "The socket opened during a run. The messages of the run until now come after this message.\n\nThe conversation log is then: the first `saved_message_count` saved messages (the messages before the run), the\nuser message `text` of the run, and the messages that follow.",
+        "properties": {
+          "type": {
+            "const": "run_replay",
+            "default": "run_replay",
+            "title": "Type",
+            "type": "string"
+          },
+          "saved_message_count": {
+            "title": "Saved Message Count",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "saved_message_count",
+          "text"
+        ],
+        "title": "RunReplayMessage",
+        "type": "object"
+      },
       "RunStateMessage": {
         "description": "The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.",
         "properties": {

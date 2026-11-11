@@ -6,6 +6,7 @@ import {
   EMPTY_LOG,
   endRun,
   readConversationLog,
+  type SavedMessage,
   type ConversationLog,
 } from './conversation_log';
 
@@ -64,6 +65,27 @@ describe('the conversation log', () => {
       streaming: false,
     });
     expect(log.isRunning).toBe(false);
+  });
+
+  it('replays a run for a socket that opened during it: the saved messages of the run go out', () => {
+    const saved = (role: 'user' | 'assistant', text: string): SavedMessage => ({
+      role,
+      text,
+      provider: null,
+      model: null,
+      credential_name: null,
+      thinking_level: null,
+    });
+    // The saved messages have 2 messages of before the run, the prompt of the run, and its first answer.
+    let log = readConversationLog([saved('user', 'Hi.'), saved('assistant', 'Hello.'), saved('user', 'Go on.'), saved('assistant', 'Step 1.')], NOW);
+
+    log = addServerMessage(log, { type: 'run_replay', saved_message_count: 2, text: 'Go on.' }, NOW);
+    log = addServerMessage(log, { type: 'run_state', state: 'running' }, NOW);
+    log = addServerMessage(log, { type: 'message_delta', text: 'Step 1.' }, NOW);
+
+    expect(log.items.map((item) => (item.kind === 'message' ? item.text : item.kind))).toEqual(['Hi.', 'Hello.', 'Go on.', 'Step 1.']);
+    expect(new Set(log.items.map((item) => item.id)).size).toBe(4);
+    expect(log.isRunning).toBe(true);
   });
 
   it('ends a run without a settled message: the streaming message ends, and the kept text stays', () => {

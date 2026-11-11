@@ -6,15 +6,16 @@ import { addChartIndicator, findChartDefinition, withDefaults, type ChartIndicat
 export type StrategyIndicator = components['schemas']['ChartIndicator'];
 
 /**
- * The panes of the strategy indicators: each indicator is added as a new indicator (section 23.9.3: placement and the
- * next free colors), with its parameters and the catalog defaults of the others. An indicator that is not in the
- * catalog and has no formula is left out.
+ * `savedPanes` (the panes of the chart indicator set) and the strategy indicators: each strategy indicator is added as
+ * a new indicator (section 23.9.3: placement and the next free colors), with its parameters and the catalog defaults
+ * of the others. An indicator that is not in the catalog and has no formula is left out.
  */
 export function placeStrategyIndicators(
   strategyIndicators: readonly StrategyIndicator[],
   catalog: readonly ChartIndicatorDefinition[],
+  savedPanes: readonly ChartPane[] = [{ indicators: [] }],
 ): ChartPane[] {
-  let panes: ChartPane[] = [{ indicators: [] }];
+  let panes: ChartPane[] = [...savedPanes];
   for (const item of strategyIndicators) {
     const definition = findChartDefinition(catalog, item);
     if (definition === undefined) {
@@ -24,7 +25,7 @@ export function placeStrategyIndicators(
     const oldIndicators = new Set(panes.flatMap((pane) => pane.indicators));
     // addChartIndicator gives the new indicator the catalog defaults; it is the only indicator that is not old.
     panes = addChartIndicator(panes, definition).map((pane) => ({
-      indicators: pane.indicators.map((indicator) => (oldIndicators.has(indicator) ? indicator : { ...indicator, parameters })),
+      indicators: pane.indicators.map((indicator) => (oldIndicators.has(indicator) ? indicator : { ...indicator, parameters, isFromStrategy: true as const })),
     }));
   }
   return panes;

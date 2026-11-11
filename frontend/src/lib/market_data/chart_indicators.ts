@@ -25,6 +25,8 @@ export interface ChartIndicator {
   lines: ChartIndicatorLine[];
   /** A custom indicator only. */
   formula?: IndicatorFormula | null;
+  /** A strategy indicator of a backtest or forward test chart (section 23.9.8). It is never in the saved set. */
+  isFromStrategy?: true;
 }
 
 /** The first pane is the price pane. The others are own panes, in the order on the chart. */
@@ -146,6 +148,14 @@ export function removeChartIndicator(panes: readonly ChartPane[], paneIndex: num
       return [pane];
     }
     const indicators = pane.indicators.filter((_, itemIndex) => itemIndex !== indicatorIndex);
+    return index > 0 && indicators.length === 0 ? [] : [{ indicators }];
+  });
+}
+
+/** The panes without the strategy indicators: the part of a backtest or forward test chart that the set saves. */
+export function removeStrategyIndicators(panes: readonly ChartPane[]): ChartPane[] {
+  return panes.flatMap((pane, index) => {
+    const indicators = pane.indicators.filter((indicator) => indicator.isFromStrategy !== true);
     return index > 0 && indicators.length === 0 ? [] : [{ indicators }];
   });
 }

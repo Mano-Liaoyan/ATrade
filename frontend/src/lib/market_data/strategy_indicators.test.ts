@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vite-plus/test';
-import type { ChartIndicatorDefinition } from './chart_indicators';
+import { removeStrategyIndicators, type ChartIndicatorDefinition } from './chart_indicators';
 import { placeStrategyIndicators } from './strategy_indicators';
 
 function period(defaultValue: number): ChartIndicatorDefinition['parameters'][number] {
@@ -41,11 +41,12 @@ describe('placeStrategyIndicators', () => {
     expect(panes).toEqual([
       {
         indicators: [
-          { indicator: 'sma', parameters: { period: 30 }, hidden: false, lines: [{ output: 'value', color: 1, style: 'solid', width: 2 }] },
+          { indicator: 'sma', parameters: { period: 30 }, hidden: false, isFromStrategy: true, lines: [{ output: 'value', color: 1, style: 'solid', width: 2 }] },
           {
             indicator: 'bollinger_bands',
             parameters: { period: 20, k: 2.5 },
             hidden: false,
+            isFromStrategy: true,
             lines: [
               { output: 'upper', color: 3, style: 'solid', width: 2 },
               { output: 'middle', color: 4, style: 'solid', width: 2 },
@@ -55,7 +56,7 @@ describe('placeStrategyIndicators', () => {
         ],
       },
       {
-        indicators: [{ indicator: 'rsi', parameters: { period: 14 }, hidden: false, lines: [{ output: 'value', color: 2, style: 'solid', width: 2 }] }],
+        indicators: [{ indicator: 'rsi', parameters: { period: 14 }, hidden: false, isFromStrategy: true, lines: [{ output: 'value', color: 2, style: 'solid', width: 2 }] }],
       },
     ]);
   });
@@ -63,5 +64,26 @@ describe('placeStrategyIndicators', () => {
   it('leaves out an indicator that is not in the catalog and gives only the price pane without indicators', () => {
     expect(placeStrategyIndicators([{ indicator: 'missing', parameters: {} }], CATALOG)).toEqual([{ indicators: [] }]);
     expect(placeStrategyIndicators([], CATALOG)).toEqual([{ indicators: [] }]);
+  });
+
+  it('adds the strategy indicators to the saved panes, and removeStrategyIndicators gives the saved panes again', () => {
+    const saved = { indicator: 'sma', parameters: { period: 50 }, hidden: false, lines: [{ output: 'value', color: 1, style: 'solid' as const, width: 2 }] };
+    const savedPanes = [{ indicators: [saved] }];
+
+    const panes = placeStrategyIndicators(
+      [
+        { indicator: 'sma', parameters: { period: 30 } },
+        { indicator: 'rsi', parameters: {} },
+      ],
+      CATALOG,
+      savedPanes,
+    );
+
+    expect(panes[0]?.indicators).toEqual([
+      saved,
+      { indicator: 'sma', parameters: { period: 30 }, hidden: false, isFromStrategy: true, lines: [{ output: 'value', color: 2, style: 'solid', width: 2 }] },
+    ]);
+    expect(panes).toHaveLength(2);
+    expect(removeStrategyIndicators(panes)).toEqual(savedPanes);
   });
 });

@@ -49,8 +49,9 @@ function legendRow(page: Page, name: RegExp | string): ReturnType<Page['getByRol
   return page.getByRole('list', { name: 'Legend' }).getByRole('listitem').filter({ hasText: name });
 }
 
-/** "Bars" shows the bar chart with the strategy indicators, the address keeps it, and an added EMA is not saved. A
- * favorite (MACD) is saved: the instrument page shows it first. */
+/** "Bars" shows the bar chart with the strategy indicators, the address keeps it, and an added EMA is saved in the
+ * chart indicator set without the strategy indicators: the instrument page shows the EMA and no SMA. A favorite (MACD)
+ * is saved too: the instrument page shows it first. */
 async function expectBarsWithStrategyIndicators(page: Page): Promise<void> {
   const switcher = page.getByRole('tablist', { name: 'Chart' });
   await expect(switcher.getByRole('tab', { name: 'Equity' })).toHaveAttribute('aria-selected', 'true');
@@ -89,11 +90,18 @@ async function expectBarsWithStrategyIndicators(page: Page): Promise<void> {
   await expect(page).not.toHaveURL(/chart=bars/);
   await expect(page.getByRole('list', { name: 'Legend' })).toHaveCount(0);
 
-  // The chart of a backtest or forward test does not save its indicators: the instrument page has no EMA from here.
+  // The added EMA stays after a page change, and the changed strategy indicator starts again (SMA 20).
+  await switcher.getByRole('tab', { name: 'Bars' }).click();
+  await expect(page).toHaveURL(/[?&]chart=bars(&|$)/);
+  await page.reload();
+  await expect(legendRow(page, /^EMA \d+/)).toBeVisible();
+  await expect(legendRow(page, STRATEGY_INDICATOR_NAME)).toBeVisible();
+
+  // The set has the EMA and not the strategy indicator: the instrument page shows the EMA and no SMA.
   await page.goto(INSTRUMENT_PAGE_PATH);
   await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
-  await expect(page.getByRole('list', { name: 'Legend' }).first()).toBeVisible();
-  await expect(legendRow(page, /^EMA \d+/)).toHaveCount(0);
+  await expect(legendRow(page, /^EMA \d+/)).toBeVisible();
+  await expect(legendRow(page, /^SMA \d+/)).toHaveCount(0);
   await page.getByRole('button', { name: 'Add indicator' }).click();
   await expect(dialog.getByRole('option').first()).toHaveText('MACD');
 }

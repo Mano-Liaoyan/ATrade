@@ -1,5 +1,5 @@
 // The state of the bar chart of a backtest or forward test page (docs/architecture/indicator.md sections 23.9.8 and
-// 23.9.9): the run indicators (not saved), the favorite indicators of the saved chart indicator set, and the link with
+// 23.9.9): the run indicators (the saved chart indicator set and the strategy indicators), the favorites of the set, and the link with
 // the Trades or Fills table: the row under the pointer or the focus, the selected row of the open run, and the universe
 // member that the bar chart of a multi-instrument run shows. The page
 // owns one RunChart and gives it to RunAddIndicatorButton, RunBarChart, and the table.
@@ -20,9 +20,9 @@ export function findRingTrades(tradeIndexByRow: readonly (number | null)[], poin
 type MemberId = Pick<Instrument, 'symbol' | 'exchange'>;
 
 export class RunChart {
-  readonly indicators = new RunChartIndicators();
-  /** Only the favorite indicators of the set: the run panes are not saved. */
+  /** The saved panes and the favorites. The instrument page uses the same set. */
   readonly indicatorSet = new ChartIndicatorSetStore();
+  readonly indicators = new RunChartIndicators(this.indicatorSet);
   /** The table row under the pointer or the focus. */
   pointedRow: number | null = $state(null);
   #selected: { key: string; row: number } | null = $state(null);

@@ -3,6 +3,12 @@
 // 2025-11-03 (close 100 + |(n + 10) mod 20 − 10| for bar n), the finished backtest of "E2E trade marks" with 5 trades
 // at the bar ends (1 USD commission each), and the stopped forward test of "E2E chart indicators" with 2 fills.
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { useLocalChartIndicatorSet } from './local_chart_indicator_set';
+
+// A run chart saves its added indicators in the chart indicator set. Each test has its own set.
+test.beforeEach(async ({ context }) => {
+  await useLocalChartIndicatorSet(context);
+});
 
 // The marks read the place of each mark from the series primitive (the "Trade marks" list of TradeMarkLayer).
 function markItems(page: Page): Locator {

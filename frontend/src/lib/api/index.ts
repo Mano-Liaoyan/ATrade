@@ -3805,6 +3805,25 @@ export interface components {
             thinking_level: components["schemas"]["ThinkingLevel"];
         };
         /**
+         * RunReplayMessage
+         * @description The socket opened during a run. The messages of the run until now come after this message.
+         *
+         *     The conversation log is then: the first `saved_message_count` saved messages (the messages before the run), the
+         *     user message `text` of the run, and the messages that follow.
+         */
+        RunReplayMessage: {
+            /**
+             * Type
+             * @default run_replay
+             * @constant
+             */
+            type: "run_replay";
+            /** Saved Message Count */
+            saved_message_count: number;
+            /** Text */
+            text: string;
+        };
+        /**
          * RunStateMessage
          * @description The state of the run of the conversation: `running` from the prompt, `settled` after the end of the run.
          */

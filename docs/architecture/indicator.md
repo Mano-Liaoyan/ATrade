@@ -334,13 +334,14 @@ user).
   same parameters, and the same bars.
 - A bar without a value is whitespace data of `lightweight-charts` (a point
   with only `time`). The legend shows "No value" for it.
-- One chart indicator set is in PostgreSQL. All market data charts use it
-  (today: the bar chart of the instrument page). A change saves at once.
-- The backtest and forward test charts show the indicators in
-  `CHART_INDICATORS` of the strategy version code (section 23.9.8), not the
-  chart indicator set.
-  The user can add, change, and remove indicators there. These changes are
-  not saved.
+- One chart indicator set is in PostgreSQL. All bar charts use it: the
+  instrument page, the backtest charts, and the forward test charts. A
+  change saves at once.
+- The backtest and forward test charts show the chart indicator set and the
+  indicators in `CHART_INDICATORS` of the strategy version code (the
+  strategy indicators, section 23.9.8). The user can add, change, and remove
+  indicators there. A change saves the set without the strategy indicators.
+  A change of a strategy indicator is not saved.
 - No indicator templates and no set for each instrument in the first
   version.
 - No limit on the indicator count. A chart has the price pane and at most 3
@@ -722,9 +723,15 @@ section 6.2).
   - A version without `CHART_INDICATORS` has an empty list. Its chart starts
     without indicators.
 - The chart puts the strategy indicators as section 23.9.3 says, with the
-  colors of a new indicator. "Add indicator", the legend buttons, and the
-  settings work as on the instrument page. No change is saved, except the
-  favorites.
+  colors of a new indicator, after the indicators of the chart indicator
+  set. "Add indicator", the legend buttons, and the settings work as on the
+  instrument page. Each change saves the panes without the strategy
+  indicators in the chart indicator set (section 23.9.7), so each bar chart
+  shows the indicators that the user added. An own pane with only strategy
+  indicators is not saved. A change of a strategy indicator (settings, hide,
+  remove) stays only while the run stays open. A change
+  before the chart indicator set is read also stays on the run only, so it
+  cannot replace the saved set.
 - Decided (#331):
   - `GET /api/backtests/{backtest_id}` has `strategy_indicators` in
     `BacktestDetailResponse` (so the comparison route has it too). The

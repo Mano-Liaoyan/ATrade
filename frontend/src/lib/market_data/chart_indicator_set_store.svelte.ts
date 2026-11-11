@@ -1,6 +1,6 @@
 // The saved chart indicator set of a page (docs/architecture/indicator.md section 23.9.7). The instrument page uses
-// the panes and the favorites. A backtest or forward test chart uses only the favorites: its own panes are not saved,
-// and a favorite change sends the saved panes back unchanged.
+// the panes and the favorites. A backtest or forward test chart uses them too: it adds its strategy indicators to the
+// panes and saves the panes without them (run_chart_indicators.svelte.ts).
 import { EMPTY_CHART_INDICATOR_SET, readChartIndicatorSet, saveChartIndicatorSet, toggleFavorite } from './chart_indicator_set';
 import type { ChartPane } from './chart_indicators';
 
@@ -16,6 +16,11 @@ export class ChartIndicatorSetStore {
   // Each PUT starts after the read and after the PUT before it, and sends the set at that time. So the last change is
   // the last saved set, and a change before the read answer keeps the saved part that did not change.
   #saving: Promise<void> = Promise.resolve();
+
+  /** True after the saved set was read. */
+  get isLoaded(): boolean {
+    return this.#isLoaded;
+  }
 
   /** Reads the saved set. A part (panes or favorites) that changed before the answer keeps the change. */
   load(fetchFunction: typeof fetch): Promise<boolean> {
