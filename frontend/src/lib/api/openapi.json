@@ -2416,6 +2416,96 @@
         }
       }
     },
+    "/api/forward-tests/{forward_test_id}": {
+      "delete": {
+        "summary": "Delete Forward Test",
+        "description": "Section 12.13. 409 while the forward test has not ended.",
+        "operationId": "delete_forward_test_api_forward_tests__forward_test_id__delete",
+        "parameters": [
+          {
+            "name": "forward_test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Forward Test Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Read Forward Test Detail",
+        "operationId": "read_forward_test_detail_api_forward_tests__forward_test_id__get",
+        "parameters": [
+          {
+            "name": "forward_test_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Forward Test Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForwardTestDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/forward-tests/{forward_test_id}/same-period-backtests": {
       "post": {
         "summary": "Start Same Period Backtest",
@@ -2439,45 +2529,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SamePeriodBacktestResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/forward-tests/{forward_test_id}": {
-      "get": {
-        "summary": "Read Forward Test Detail",
-        "operationId": "read_forward_test_detail_api_forward_tests__forward_test_id__get",
-        "parameters": [
-          {
-            "name": "forward_test_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "title": "Forward Test Id"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ForwardTestDetailResponse"
                 }
               }
             }

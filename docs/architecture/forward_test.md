@@ -612,8 +612,8 @@ this document. The implementation can change them.
 
 ## 12.12 Table
 
-`forward_test`: `id`, `strategy_version_id` (not null, foreign key without
-`ON DELETE`), `symbol`, `exchange`, `currency`, `bar_period`,
+`forward_test`: `id`, `strategy_version_id` (not null, foreign key with
+`ON DELETE CASCADE`: a strategy delete also deletes its forward tests), `symbol`, `exchange`, `currency`, `bar_period`,
 `desired_state` (`running`, `stopped`), `status`, `client_id` (`UNIQUE`,
 null when free), `start_balance_usd`, `error_message`, `created_at_utc`,
 `stopped_at_utc`, `end_time_utc` (null when there is no end time),
@@ -624,11 +624,22 @@ null when free), `start_balance_usd`, `error_message`, `created_at_utc`,
 `forward_test_same_period_backtest`: `forward_test_id`, `backtest_id`
 (foreign keys, primary key on both). One row for each "Backtest the same
 period". Migration `3e7a1c5d9b79_forward_test_create_same_period_backtest.py`.
-`forward_test_id` has `ON DELETE CASCADE`. `backtest_id` has `ON DELETE
-RESTRICT` (migration
-`e2b3fdd9c1ee_forward_test_same_period_backtest_restrict.py`), so
+`forward_test_id` has `ON DELETE CASCADE`. `backtest_id` has no `ON DELETE`
+action and is `DEFERRABLE INITIALLY IMMEDIATE` (migrations
+`e2b3fdd9c1ee_forward_test_same_period_backtest_restrict.py` and
+`7e4b1d9a2c58_forward_test_delete.py`), so
 `DELETE /api/backtests/{backtest_id}` refuses the same-period backtest of a
-forward test with `409` (backtest section 10.5).
+forward test with `409` (backtest section 10.5). The strategy delete defers
+the check to its commit, so it deletes the forward test and the backtest
+together (strategy section 9.1).
+
+Delete: the trigger `forward_test_no_delete_while_active` refuses the
+delete of a forward test that has not ended. A forward test has ended when the
+status is `stopped`, or `failed` without a client ID (the rows that the worker
+skips, section 12.14). The rows of the forward test tables go with it
+(`ON DELETE CASCADE`, also from `forward_test_interruption` since migration
+`7e4b1d9a2c58`). The owner ledger rows stay: they are the paper account
+history, and `owner_ledger_entry.forward_test_id` has no foreign key.
 
 `forward_test_interruption` (#77): `id`, `forward_test_id`, `reason`
 (`crash`, `gateway`, `worker_restart`), `started_at_utc`, `ended_at_utc`
@@ -697,6 +708,7 @@ Phase 3 table changes (#146). The column names are choices of this document.
 | `GET /api/forward-tests` | `200` with the list of `ForwardTestResponse`, newest first: the row of section 12.12 plus `strategy_id`, `strategy_name`, `version_number`, and `interruptions` (`reason`, `started_at_utc`, `ended_at_utc`, oldest first). |
 | `GET /api/forward-tests/{id}` | `200` with `ForwardTestDetailResponse`, for the forward test page: `forward_test` (`ForwardTestResponse`), `metrics` (null without a start balance; the fields of section 12.10, #170), `equity_curve`, `fills` (`symbol`, `exchange`, `time_utc`, `side`, `quantity_shares`, `price_usd`, `commission_usd`, oldest first), and `same_period_backtests` (the backtest summary of the comparison route, newest first). `404` for an unknown ID. |
 | `POST /api/forward-tests/{id}/stop` | `202`. Writes `desired_state = stopped`. `404` for an unknown ID. |
+| `DELETE /api/forward-tests/{id}` | A true delete of the forward test and its records (section 12.12). `204` when deleted. `404` for an unknown ID. `409` with "Forward test #<id> has not ended. Stop it first." Only port 8000 has this route. |
 | `POST /api/forward-tests/{id}/same-period-backtests` | `201` with `{"backtest_id"}`: a queued backtest of the same period (section 12.10). `404` for an unknown ID. `422` without a start balance (`"The forward test has no start balance yet. The backtest uses it as the paper capital."`), for a currency that is not USD, or for an empty period. |
 | `GET /api/forward-tests/{id}/comparison/{backtest_id}` | `200` with `ForwardTestComparisonResponse`: `forward_test`, `backtest` (`id`, `status`, `error_message`, `start_utc`, `end_utc`, `paper_capital_usd`, `metrics` or null), `forward_test_metrics` (null without a start balance; the fields of section 12.10, with the win rate in the backtest period, #170), `forward_test_equity_curve`, `backtest_equity_curve`, `fills` (`bar_end_utc`, `side`, quantity and price of each side or null, `price_difference_usd` or null), and `interruptions` (`start_utc`, `end_utc`). `404` for an unknown forward test or backtest. `422` when the backtest has another strategy version, instrument, or bar period. |
 | `/ws/forward-tests` | The change socket of architecture.md section 13 "Live updates": `{"type": "changed"}` after each change of `forward_test`, `forward_test_interruption`, `forward_test_equity_point`, `forward_test_same_period_backtest`, or `owner_ledger_entry`, and `{"type": "heartbeat"}` after 10 seconds without a change. The fills of a forward test are in `owner_ledger_entry`, so a fill of "By hand" also sends the message. The page then reads `GET /api/forward-tests`, which reads the full list with a fixed number of database connections (not connections for each row). The browser sends nothing. |
@@ -909,7 +921,9 @@ than the worker clock.
   crash count when it is not 0 and the status is not `stopped`, the red
   "Stop forward test" button while `canStop()`, and the "Backtest the same
   period" button (disabled without a start balance; the page starts the
-  backtest and opens the comparison page). Below: `KeyMetricRow` and
+  backtest and opens the comparison page), and "Delete forward test"
+  (only while `canDelete()`; a danger dialog asks first, and then the
+  page opens the newest forward test that is left). Below: `KeyMetricRow` and
   `EquityDrawdownChart` of `backtest` (the same metrics and chart as the
   backtest page; the start balance is the start capital, the fills are the
   trades). The chart lists the interruptions under it and marks grey only the

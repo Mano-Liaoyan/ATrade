@@ -321,6 +321,18 @@ async def write_desired_state(
     return cursor.rowcount == 1
 
 
+async def delete_forward_test(connection: psycopg.AsyncConnection, forward_test_id: int) -> str | None:
+    """Deletes a forward test that has ended, with its records (ON DELETE CASCADE). The owner ledger rows stay.
+    Returns the reason of a refusal, or None after the delete. The caller has checked that the row exists."""
+    try:
+        async with connection.transaction():
+            await connection.execute("DELETE FROM forward_test WHERE id = %(id)s", {"id": forward_test_id})
+    except psycopg.errors.ObjectInUse as error:
+        # readability-exception: the trigger forward_test_no_delete_while_active refuses a forward test that runs.
+        return error.diag.message_primary
+    return None
+
+
 async def select_rows_to_compare(connection: psycopg.AsyncConnection) -> list[ForwardTestRow]:
     """The rows that the worker can still act on: a row is done when it is stopped, or failed without a client ID."""
     async with connection.cursor(row_factory=class_row(ForwardTestRow)) as cursor:

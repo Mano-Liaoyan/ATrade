@@ -1061,7 +1061,7 @@ Sources: [Technology stack decision](https://github.com/Mano-Liaoyan/ATrade/issu
     danger dialog as the other delete controls. Backtests: "Compare with
     #<open backtest>" for a backtest of the same strategy, "Delete backtest".
     Strategies: "Delete strategy". Screens: "Delete screen". Forward tests:
-    "Stop forward test" while it can stop.
+    "Stop forward test" while it can stop, "Delete forward test" after its end.
   - Table column names stay on one line. The instrument page has a narrow
     order panel, so its `PositionTable` and `OpenOrderList` have `compact`:
     no Currency and Market price columns, and no Type and Filled columns. The

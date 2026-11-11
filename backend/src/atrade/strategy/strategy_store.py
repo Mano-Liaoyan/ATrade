@@ -260,19 +260,21 @@ async def discard_version(
 
 
 async def delete_strategy(connection: psycopg.AsyncConnection, strategy_id: int) -> DeleteResult:
-    """Deletes the strategy and its versions, unless a backtest or forward test uses one of the versions.
+    """Deletes the strategy, its versions, and the backtests, parameter sweeps, and forward tests of the versions.
 
-    The tables of backtests and forward tests reference strategy_version with a foreign key. PostgreSQL
-    refuses the delete when a reference exists. This way the strategy capability does not read the tables
-    of other capabilities (docs/architecture.md section 6.3).
+    The foreign keys of the other capabilities to strategy_version have ON DELETE CASCADE, and their triggers refuse
+    the delete of a backtest or forward test that has not ended. This way the strategy capability does not read or
+    write the tables of other capabilities (docs/architecture.md section 6.3). The deferred constraints are checked at
+    the commit, after the whole cascade: a forward test and its same-period backtest are deleted in any order.
     """
     try:
         async with connection.transaction():
+            await connection.execute("SET CONSTRAINTS ALL DEFERRED")
             cursor = await connection.execute(
                 "DELETE FROM strategy WHERE id = %(strategy_id)s", {"strategy_id": strategy_id}
             )
-    except psycopg.errors.ForeignKeyViolation:
-        # readability-exception: PostgreSQL reports a foreign key reference only as an error.
+    except psycopg.errors.ObjectInUse:
+        # readability-exception: PostgreSQL reports the refusal of a trigger only as an error.
         return DeleteResult.IN_USE
     if cursor.rowcount == 0:
         return DeleteResult.NOT_FOUND

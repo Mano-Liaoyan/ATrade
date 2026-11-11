@@ -121,17 +121,10 @@ def set_run_status(database_url: str, backtest_id: int, status: str) -> None:
 
 
 @pytest.mark.anyio
-async def test_delete_removes_the_sweep_and_its_runs_so_the_strategy_can_be_deleted(
-    web_client: httpx.AsyncClient, database_url: str
-) -> None:
+async def test_delete_removes_the_sweep_and_its_runs(web_client: httpx.AsyncClient, database_url: str) -> None:
     save_test_bars(database_url)
     sweep = (await start_sweep(web_client, [QUANTITY_GRID])).json()
     await web_client.post(f"/api/sweeps/{sweep['id']}/cancel")
-    refused = await web_client.delete(f"/api/strategies/{sweep['strategy_id']}")
-    assert refused.status_code == 409
-    assert refused.json() == {
-        "detail": "A backtest, parameter sweep, or forward test uses a version of this strategy. It cannot be deleted."
-    }
 
     response = await web_client.delete(f"/api/sweeps/{sweep['id']}")
 
@@ -139,7 +132,23 @@ async def test_delete_removes_the_sweep_and_its_runs_so_the_strategy_can_be_dele
     assert (await web_client.get(f"/api/sweeps/{sweep['id']}")).status_code == 404
     for run in sweep["runs"]:
         assert (await web_client.get(f"/api/backtests/{run['backtest_id']}")).status_code == 404
-    assert (await web_client.delete(f"/api/strategies/{sweep['strategy_id']}")).status_code == 204
+
+
+@pytest.mark.anyio
+async def test_a_strategy_delete_deletes_its_sweeps_and_their_runs(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    sweep = (await start_sweep(web_client, [QUANTITY_GRID])).json()
+    assert (await web_client.delete(f"/api/strategies/{sweep['strategy_id']}")).status_code == 409
+    await web_client.post(f"/api/sweeps/{sweep['id']}/cancel")
+
+    response = await web_client.delete(f"/api/strategies/{sweep['strategy_id']}")
+
+    assert response.status_code == 204
+    assert (await web_client.get(f"/api/sweeps/{sweep['id']}")).status_code == 404
+    for run in sweep["runs"]:
+        assert (await web_client.get(f"/api/backtests/{run['backtest_id']}")).status_code == 404
 
 
 @pytest.mark.anyio

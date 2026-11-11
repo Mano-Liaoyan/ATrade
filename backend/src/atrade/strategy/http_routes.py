@@ -325,7 +325,10 @@ class StrategyRoutes:
         if result == strategy_store.DeleteResult.IN_USE:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="A backtest, parameter sweep, or forward test uses a version of this strategy. It cannot be deleted.",
+                detail=(
+                    "A backtest, parameter sweep, or forward test of this strategy has not ended."
+                    " Wait for its end, or stop the forward test."
+                ),
             )
 
 

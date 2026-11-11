@@ -147,26 +147,6 @@ async def test_deletes_a_strategy_that_no_test_uses(web_client: httpx.AsyncClien
     assert (await web_client.get("/api/strategies")).json() == []
 
 
-@pytest.mark.anyio
-async def test_refuses_to_delete_a_strategy_that_a_test_uses(web_client: httpx.AsyncClient, database_url: str) -> None:
-    strategy = (await web_client.post("/api/strategies", json={"name": "Moving average"})).json()
-    version_id = strategy["versions"][0]["id"]
-    # The backtest and forward test tables come in later tickets. This table has the same foreign key.
-    with psycopg.connect(database_url, autocommit=True) as connection:
-        connection.execute(
-            "CREATE TABLE test_strategy_user (strategy_version_id bigint NOT NULL REFERENCES strategy_version (id))"
-        )
-        connection.execute("INSERT INTO test_strategy_user VALUES (%(version_id)s)", {"version_id": version_id})
-    try:
-        response = await web_client.delete(f"/api/strategies/{strategy['id']}")
-    finally:
-        with psycopg.connect(database_url, autocommit=True) as connection:
-            connection.execute("DROP TABLE test_strategy_user")
-
-    assert response.status_code == 409
-    assert (await web_client.get(f"/api/strategies/{strategy['id']}")).status_code == 200
-
-
 def find_config_init(code: str) -> ast.FunctionDef:
     module = ast.parse(code)
     for class_node in module.body:

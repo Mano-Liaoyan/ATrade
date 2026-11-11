@@ -13,7 +13,9 @@ export {
 export {
   canBacktestSamePeriod,
   readStartCapital,
+  canDelete,
   canStop,
+  deleteForwardTest,
   describeForwardTestStatus,
   describeForwardTestUniverse,
   findUniverseBarPeriods,
@@ -32,6 +34,7 @@ export {
   startSamePeriodBacktest,
   stopForwardTest,
   type FillComparison,
+  type DeleteForwardTestResult,
   type ForwardTest,
   type ForwardTestComparison,
   type ForwardTestDetail,

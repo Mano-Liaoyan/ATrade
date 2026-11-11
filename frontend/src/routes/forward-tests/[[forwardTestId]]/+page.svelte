@@ -2,7 +2,7 @@
      /forward-tests/<id>; /forward-tests opens the newest forward test.
      Left: the "Forward tests" side column (ForwardTestList, live from /ws/forward-tests) with the "New forward test"
      button. Center: the panel of the open forward test (header line: number, strategy version, instrument, bar
-     period, status, the allocated capital, "Split check needed: AAPL" while an instrument needs a split check, the red "Stop forward test" button while it can stop, and "Backtest the same period"; then the
+     period, status, the allocated capital, "Split check needed: AAPL" while an instrument needs a split check, the red "Stop forward test" button while it can stop, "Backtest the same period", and "Delete forward test" after the end (a danger dialog asks first); then the
      key metric row and the equity and drawdown curves with the interruptions in grey) over the
      Fills / Comparison / Logs panel. Comparison links to the comparison with each backtest of the same period. Logs
      shows the current error and the events (start, interruptions, stop). The open forward test reads again every
@@ -16,6 +16,7 @@
   import Add16 from '@carbon/icons/es/add/16.js';
   import Compare16 from '@carbon/icons/es/compare/16.js';
   import StopFilledAlt16 from '@carbon/icons/es/stop--filled--alt/16.js';
+  import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
   import { page } from '$app/state';
@@ -34,6 +35,7 @@
   } from '#lib/backtest';
   import {
     DataTable,
+    Dialog,
     IconButton,
     InlineNotification,
     StatusIndicator,
@@ -48,7 +50,9 @@
   import {
     FORWARD_TESTS_SOCKET_PATH,
     canBacktestSamePeriod,
+    canDelete,
     canStop,
+    deleteForwardTest,
     describeForwardTestStatus,
     describeForwardTestUniverse,
     readForwardTestInstrument,
@@ -118,6 +122,10 @@
   let actionFailure = $state<{ title: string; message: string } | null>(null);
   let stoppingId = $state<number | null>(null);
   let isStartingBacktest = $state(false);
+  // The forward test of the delete dialog: the open forward test, or the row of the list context menu.
+  let deleteTarget = $state<ForwardTest | null>(null);
+  let isDeleteDialogOpen = $state(false);
+  let isDeleting = $state(false);
 
   const shownDetail = $derived(
     workbench.detail !== null && workbench.detail.forward_test.id === forwardTestId ? workbench.detail : null,
@@ -210,6 +218,28 @@
     );
   }
 
+  function requestDelete(forwardTest: ForwardTest): void {
+    deleteTarget = forwardTest;
+    isDeleteDialogOpen = true;
+  }
+
+  // After the delete of the open forward test, /forward-tests opens the newest forward test that is left.
+  async function removeForwardTest(forwardTest: ForwardTest): Promise<void> {
+    isDeleting = true;
+    actionFailure = null;
+    const result = await deleteForwardTest(fetch, forwardTest.id);
+    isDeleting = false;
+    isDeleteDialogOpen = false;
+    if (result.kind === 'failed') {
+      actionFailure = { title: 'Forward test not deleted', message: result.message };
+      return;
+    }
+    workbench.removeItem(forwardTest.id);
+    if (forwardTest.id === forwardTestId) {
+      await goto(resolve('/forward-tests/[[forwardTestId]]', { forwardTestId: undefined }), { replace: true });
+    }
+  }
+
   function describeStopButton(forwardTest: ForwardTest): string {
     return stoppingId === forwardTest.id ? 'Stopping forward test…' : 'Stop forward test';
   }
@@ -248,6 +278,7 @@
       forwardTests={workbench.items}
       openForwardTestId={forwardTestId}
       onStop={(forwardTest: ForwardTest) => void stop(forwardTest)}
+      onDeleteRequest={requestDelete}
     />
   </SideColumn>
 
@@ -320,6 +351,17 @@
                     disabled={!canBacktestSamePeriod(forwardTest) || isStartingBacktest}
                     onclick={() => void backtestSamePeriod(forwardTest)}
                   />
+                  {#if canDelete(forwardTest)}
+                    <IconButton
+                      label="Delete forward test"
+                      icon={TrashCan16}
+                      align="bottom-end"
+                      disabled={isDeleting}
+                      onclick={() => {
+                        requestDelete(forwardTest);
+                      }}
+                    />
+                  {/if}
                 </span>
               {/snippet}
               {#if actionFailure !== null}
@@ -457,6 +499,25 @@
 
   <AssistantColumn />
 </Workbench>
+
+{#if deleteTarget !== null}
+  {@const target = deleteTarget}
+  <Dialog
+    open={isDeleteDialogOpen}
+    onOpenChange={(open: boolean) => {
+      isDeleteDialogOpen = open;
+    }}
+    title={`Delete forward test #${String(target.id)}?`}
+    primaryText="Delete forward test"
+    primaryKind="danger"
+    busy={isDeleting}
+    onPrimary={() => {
+      void removeForwardTest(target);
+    }}
+  >
+    <p>Its records are deleted. The paper account history stays.</p>
+  </Dialog>
+{/if}
 
 <StartForwardTestDialog
   open={workbench.isStartDialogOpen}

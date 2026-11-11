@@ -10,6 +10,7 @@ import {
   EDITOR_SHORTCUT_KEYS,
   closeBacktestTab,
   describeNoBacktestText,
+  describeStrategyDelete,
   listClosedBacktestTabs,
   openBacktestTab,
   reopenAllBacktestTabs,
@@ -388,5 +389,30 @@ describe('findDefaultVersionNumber', () => {
   it('opens the latest version when all versions are discarded', () => {
     expect(findDefaultVersionNumber([{ version_number: 4, discarded: true }])).toBe(4);
     expect(findDefaultVersionNumber([])).toBeUndefined();
+  });
+});
+
+describe('describeStrategyDelete', () => {
+  const of = (...strategyIds: number[]): { strategy_id: number }[] => strategyIds.map((id) => ({ strategy_id: id }));
+
+  it('names the backtests, parameter sweeps, and forward tests of the strategy that the delete also deletes', () => {
+    expect(describeStrategyDelete(1, { backtests: of(1, 1, 2), sweeps: of(1), forwardTests: of(1, 2) })).toBe(
+      'All versions of the strategy are deleted, with 2 backtests, 1 parameter sweep and 1 forward test.',
+    );
+    expect(describeStrategyDelete(1, { backtests: of(2), sweeps: of(), forwardTests: of(1, 1) })).toBe(
+      'All versions of the strategy are deleted, with 2 forward tests.',
+    );
+  });
+
+  it('names only the versions when no test uses the strategy', () => {
+    expect(describeStrategyDelete(1, { backtests: of(2), sweeps: of(2), forwardTests: of() })).toBe(
+      'All versions of the strategy are deleted.',
+    );
+  });
+
+  it('names all test kinds without counts when the sweep list was not read', () => {
+    expect(describeStrategyDelete(1, { backtests: of(1), sweeps: null, forwardTests: of() })).toBe(
+      'All versions of the strategy are deleted, with all their backtests, parameter sweeps, and forward tests.',
+    );
   });
 });

@@ -89,12 +89,7 @@ async def test_refuses_to_delete_a_sweep_run(web_client: httpx.AsyncClient, data
     }
 
 
-@pytest.mark.anyio
-async def test_refuses_to_delete_the_same_period_backtest_of_a_forward_test(
-    web_client: httpx.AsyncClient, database_url: str
-) -> None:
-    started = await start_backtest(web_client, database_url)
-    set_status(database_url, started["backtest_id"], "finished")
+def insert_stopped_forward_test_with_same_period_backtest(database_url: str, started: dict[str, int]) -> int:
     with psycopg.connect(database_url, autocommit=True) as connection:
         forward_test = connection.execute(
             """
@@ -113,6 +108,23 @@ async def test_refuses_to_delete_the_same_period_backtest_of_a_forward_test(
             """,
             {"forward_test_id": forward_test[0], "backtest_id": started["backtest_id"]},
         )
+        connection.execute(
+            """
+            INSERT INTO forward_test_interruption (forward_test_id, reason, started_at_utc, ended_at_utc)
+            VALUES (%(forward_test_id)s, 'crash', now(), now())
+            """,
+            {"forward_test_id": forward_test[0]},
+        )
+        return forward_test[0]
+
+
+@pytest.mark.anyio
+async def test_refuses_to_delete_the_same_period_backtest_of_a_forward_test(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    started = await start_backtest(web_client, database_url)
+    set_status(database_url, started["backtest_id"], "finished")
+    insert_stopped_forward_test_with_same_period_backtest(database_url, started)
 
     response = await web_client.delete(f"/api/backtests/{started['backtest_id']}")
 
@@ -120,3 +132,43 @@ async def test_refuses_to_delete_the_same_period_backtest_of_a_forward_test(
     assert response.json() == {
         "detail": f"Backtest #{started['backtest_id']} is the same-period backtest of a forward test."
     }
+
+
+@pytest.mark.anyio
+async def test_a_strategy_delete_deletes_its_backtests_and_forward_tests(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    started = await start_backtest(web_client, database_url)
+    set_status(database_url, started["backtest_id"], "finished")
+    forward_test_id = insert_stopped_forward_test_with_same_period_backtest(database_url, started)
+    strategy_id = (await web_client.get(f"/api/backtests/{started['backtest_id']}")).json()["strategy_id"]
+
+    response = await web_client.delete(f"/api/strategies/{strategy_id}")
+
+    assert response.status_code == 204
+    assert (await web_client.get(f"/api/backtests/{started['backtest_id']}")).status_code == 404
+    assert (await web_client.get(f"/api/forward-tests/{forward_test_id}")).status_code == 404
+    with psycopg.connect(database_url) as connection:
+        interruption = connection.execute("SELECT count(*) FROM forward_test_interruption").fetchone()
+    assert interruption == (0,)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("status", ["queued", "running"])
+async def test_refuses_a_strategy_delete_while_a_backtest_has_not_ended(
+    web_client: httpx.AsyncClient, database_url: str, status: str
+) -> None:
+    started = await start_backtest(web_client, database_url)
+    set_status(database_url, started["backtest_id"], status)
+    strategy_id = (await web_client.get(f"/api/backtests/{started['backtest_id']}")).json()["strategy_id"]
+
+    response = await web_client.delete(f"/api/strategies/{strategy_id}")
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "detail": (
+            "A backtest, parameter sweep, or forward test of this strategy has not ended."
+            " Wait for its end, or stop the forward test."
+        )
+    }
+    assert (await web_client.get(f"/api/backtests/{started['backtest_id']}")).status_code == 200
