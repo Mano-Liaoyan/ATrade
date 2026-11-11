@@ -24,6 +24,7 @@ from atrade.indicator import (
     make_nautilus_bar,
 )
 from atrade.indicator.formula_indicator import FormulaProblem
+from atrade.indicator.indicator_catalog import IndicatorParameter
 from tests.indicator.test_atrade_indicators import make_long_test_bars
 from tests.indicator.test_wrapped_indicators import (
     IndicatorCase,
@@ -222,7 +223,7 @@ def test_the_look_back_bars_are_enough_for_a_value(expression: str) -> None:
         ("close[0]", "Subscript is not allowed"),
         ("f'{close}'", "JoinedStr is not allowed"),
         ("(x := 1)", "NamedExpr is not allowed"),
-        ("close; close", "syntax error"),
+        ("close; close", "must give a name to a value"),
         ("close ** 99999999", "exponent must be a number from -10 to 10"),
         ("2 ** 2 ** 2 ** 2", "exponent must be a number from -10 to 10"),
         ("close ** close", "exponent must be a number from -10 to 10"),
@@ -247,7 +248,7 @@ def test_the_look_back_bars_are_enough_for_a_value(expression: str) -> None:
         ("custom_1()", "Unknown function 'custom_1'"),
         ("(" * 240 + "close" + ")" * 240, "too many nested"),
         ("-" * 400 + "close", "too deep"),
-        ("1" * 501, "at most 500 characters"),
+        ("1" * 1001, "at most 1000 characters"),
         ("+".join(["close"] * 30), "too deep"),
     ],
 )
@@ -332,6 +333,8 @@ def test_no_catalog_key_is_a_formula_function_or_a_bar_field() -> None:
         "lag",
         "abs",
         "log",
+        "quantile",
+        "median",
     }
 
 
@@ -428,6 +431,203 @@ def test_the_screen_path_and_the_strategy_path_give_the_same_values(tmp_path: Pa
 
 def test_a_formula_problem_keeps_its_column_and_message_through_pickle() -> None:
     # A process pool sends the exception of a screen period back with pickle (screen.md section 24.9).
-    problem = pickle.loads(pickle.dumps(FormulaProblem(3, "The expression is not correct.")))
+    problem = pickle.loads(pickle.dumps(FormulaProblem(3, "The expression is not correct.", 2)))
 
-    assert (problem.column, problem.message) == (3, "The expression is not correct.")
+    assert (problem.column, problem.message, problem.line) == (3, "The expression is not correct.", 2)
+
+
+def calculate_with(expression: str, parameters: dict[str, int | float], closes: list[float]) -> float | None:
+    indicator = FormulaIndicator(expression, parameters)
+    for index, close in enumerate(closes):
+        indicator.handle_bar(make_nautilus_bar(make_bar(close, index=index)))
+    return indicator.value
+
+
+CLOSES = [100.0 + (index * 37 % 11) for index in range(400)]
+WIDTH = "lag(std(close, 20) / mean(close, 20), 1)"
+RELATIVE_WIDTH = f"({WIDTH} - mean({WIDTH}, 60)) / ({WIDTH} + mean({WIDTH}, 60))"
+
+
+@pytest.mark.parametrize(
+    ("expression", "parameters", "fixed"),
+    [
+        ("mean(close, days)", {"days": 20}, "mean(close, 20)"),
+        ("lag(close, days) * factor", {"days": 3, "factor": 1.5}, "lag(close, 3) * 1.5"),
+        ("sma(period=days) + rsi(days)", {"days": 14}, "sma(period=14) + rsi(14)"),
+        (
+            'bollinger_bands(days, k, output="upper")',
+            {"days": 10, "k": 2.5},
+            'bollinger_bands(10, 2.5, output="upper")',
+        ),
+        ("quantile(close, days, part)", {"days": 9, "part": 0.25}, "quantile(close, 9, 0.25)"),
+        (RELATIVE_WIDTH.replace("60", "lookback_days"), {"lookback_days": 20}, RELATIVE_WIDTH.replace("60", "20")),
+    ],
+)
+def test_a_parameter_gives_the_value_of_the_same_number(
+    expression: str, parameters: dict[str, int | float], fixed: str
+) -> None:
+    value = calculate_with(expression, parameters, CLOSES)
+
+    assert value is not None
+    assert value == calculate(fixed, CLOSES)
+    assert count_formula_bars(expression, tuple(parameters.items())) == count_formula_bars(fixed)
+
+
+def test_reset_keeps_the_parameter_values() -> None:
+    indicator = FormulaIndicator("mean(close, days)", {"days": 2})
+    indicator.reset()
+    for index, close in enumerate([1.0, 2.0, 4.0]):
+        indicator.handle_bar(make_nautilus_bar(make_bar(close, index=index)))
+
+    assert indicator.value == 3.0
+
+
+@pytest.mark.parametrize(
+    ("closes", "quantile", "expected"),
+    [
+        ([9, 1, 5, 3, 7], 0.5, 5.0),
+        ([9, 1, 5, 3, 7], 0, 1.0),
+        ([9, 1, 5, 3, 7], 1, 9.0),
+        ([9, 1, 5, 3, 7], 0.25, 3.0),
+        ([9, 1, 5, 3, 7], 0.9, 8.2),
+        ([4, 4, 4, 4, 4], 0.3, 4.0),
+    ],
+)
+def test_quantile_interpolates_between_the_2_nearest_values(
+    closes: list[float], quantile: float, expected: float
+) -> None:
+    assert calculate(f"quantile(close, 5, {quantile})", closes) == pytest.approx(expected)
+
+
+def test_quantile_follows_the_window() -> None:
+    closes = [float(index * 37 % 101) for index in range(300)]
+    indicator = FormulaIndicator("quantile(close, 7, 0.35)")
+    for index, close in enumerate(closes):
+        indicator.handle_bar(make_nautilus_bar(make_bar(close, index=index)))
+        if index >= 6:
+            window = sorted(closes[index - 6 : index + 1])
+            position = 0.35 * 6
+            below, above = window[int(position)], window[int(position) + 1]
+            assert indicator.value == pytest.approx(below + (above - below) * (position - int(position)))
+
+
+@pytest.mark.parametrize("window", [1, 4, 5])
+def test_median_is_the_quantile_of_one_half(window: int) -> None:
+    closes = [9.0, 1.0, 5.0, 3.0, 7.0, 2.0]
+
+    median = calculate(f"median(close, {window})", closes)
+
+    assert median == calculate(f"quantile(close, {window}, 0.5)", closes)
+    assert median == statistics.median(closes[-window:])
+
+
+def test_variables_give_the_value_of_the_expression_without_them() -> None:
+    with_variables = f"""
+        width = {WIDTH}
+        usual = mean(width, 60)
+        (width - usual) / (width + usual)
+    """.replace("        ", "")
+
+    assert check_expression(with_variables) == []
+    assert calculate(with_variables, CLOSES) == calculate(RELATIVE_WIDTH, CLOSES)
+    assert calculate("a = close * 2; b = a + 1; b - a", [3.0]) == 1.0
+
+
+def test_a_variable_counts_its_windows_1_time() -> None:
+    # 11 uses of 1 window of 1000 bars. Without the variable, the 11 windows are over the limit.
+    uses = " + ".join(["long"] * 11)
+
+    assert check_expression(f"long = mean(close, 1000)\n{uses}") == []
+    assert check_expression(uses.replace("long", "mean(close, 1000)")) != []
+    assert count_formula_bars("a = lag(close, 5); mean(a, 20)") == 25
+
+
+@pytest.mark.parametrize(
+    ("expression", "message"),
+    [
+        ("a = close", "last line must be the value"),
+        ("a = close; close", "does not use the variable 'a'"),
+        ("a = a + 1; a", "Unknown name 'a'"),
+        ("a = close; a = open; a", "The name 'a' is in use"),
+        ("close = open; close", "The name 'close' is in use"),
+        ("a = b = close; a + b", "1 name to 1 value"),
+        ("a, b = close, open; a", "1 name to 1 value"),
+        ("a += close; a", "must give a name to a value"),
+        ("import os; close", "must give a name to a value"),
+        ("a = close\nb", "Line 2, column 1: Unknown name 'b'"),
+        ("quantile(close, 5)", "quantile needs 3 arguments"),
+        ("quantile(close, 5, 1.5)", "quantile must be a number from 0 to 1"),
+        ("quantile(close, 5, close)", "quantile must be a number from 0 to 1"),
+        ("median(close, 5, 0.5)", "median needs 2 arguments"),
+        ("median(close, 0)", "from 1 to 1000"),
+    ],
+)
+def test_refuses_the_variables_and_the_quantile(expression: str, message: str) -> None:
+    problems = check_expression(expression)
+
+    assert len(problems) == 1
+    assert message in problems[0].message, problems[0].message
+
+
+def make_parameter(
+    name: str, minimum: float, default: float, maximum: float, value_type: type[int | float] = int
+) -> IndicatorParameter:
+    return IndicatorParameter(name, value_type, default, minimum, maximum)
+
+
+@pytest.mark.parametrize(
+    ("expression", "parameter", "message"),
+    [
+        ("mean(close, days)", None, "Column 13: Unknown name 'days'"),
+        ("close", make_parameter("days", 5, 60, 250), "does not use the parameter 'days'"),
+        (
+            "mean(close, days)",
+            make_parameter("days", 5.0, 60.0, 250.0, float),
+            "the parameter 'days' is not an integer",
+        ),
+        ("mean(close, days)", make_parameter("days", 0, 60, 250), "from 1 to 1000, but the parameter 'days' is from 0"),
+        (
+            "mean(close, days)",
+            make_parameter("days", 5, 60, 1001),
+            "from 1 to 1000, but the parameter 'days' is from 5",
+        ),
+        ("std(close, days)", make_parameter("days", 1, 60, 250), "from 2 to 1000"),
+        ("rsi(days)", make_parameter("days", 1, 14, 2000), "period must be from 1 to 1000"),
+        ("rsi(days)", make_parameter("days", 1.0, 14.0, 20.0, float), "period must be an integer"),
+        ("quantile(close, 5, days)", make_parameter("days", 0, 1, 2), "quantile must be from 0 to 1"),
+        ("close ** days", make_parameter("days", 1, 2, 3), "exponent must be a number"),
+        ("days = close; days", make_parameter("days", 1, 2, 3), "The name 'days' is in use"),
+        ('macd(days, 26, output="value")', make_parameter("days", 5, 12, 30), "must be less than"),
+        # 10 windows at the maximum are over the calculation limit. The default is under it.
+        (" + ".join(["mean(close, days)"] * 11), make_parameter("days", 5, 60, 1000), "Window bars x bars read"),
+    ],
+)
+def test_refuses_the_use_of_a_parameter(expression: str, parameter: IndicatorParameter | None, message: str) -> None:
+    problems = check_expression(expression, () if parameter is None else (parameter,))
+
+    assert len(problems) == 1
+    assert message in problems[0].message, problems[0].message
+
+
+def test_accepts_a_parameter_in_each_place_of_a_number() -> None:
+    parameters = (
+        make_parameter("days", 5, 60, 250),
+        make_parameter("factor", 0.1, 2.0, 10.0, float),
+        make_parameter("part", 0.0, 0.5, 1.0, float),
+    )
+    expression = 'quantile(lag(close, days), days, part) * factor + bollinger_bands(days, factor, output="upper")'
+
+    assert check_expression(expression, parameters) == []
+
+
+@pytest.mark.parametrize("value", [True, "20", None, float("nan"), float("inf"), 10**400])
+def test_the_class_refuses_a_parameter_value_that_is_not_a_number(value: object) -> None:
+    with pytest.raises(ValueError, match="The parameter 'days' must be a number"):
+        FormulaIndicator("mean(close, days)", {"days": value})  # pyright: ignore[reportArgumentType]
+
+
+def test_the_class_refuses_a_parameter_value_that_the_expression_cannot_use() -> None:
+    with pytest.raises(ValueError, match="from 1 to 1000"):
+        FormulaIndicator("mean(close, days)", {"days": 0})
+    with pytest.raises(ValueError, match="does not use the parameter 'other'"):
+        FormulaIndicator("mean(close, days)", {"days": 5, "other": 1})

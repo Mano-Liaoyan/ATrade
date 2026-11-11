@@ -13,6 +13,7 @@ import {
   readCurrentOperand,
   readOperandChoice,
   type CatalogIndicator,
+  type IndicatorOperand,
   type RuleCondition,
 } from './strategy_rules';
 
@@ -207,10 +208,25 @@ describe('findIndicatorChoice', () => {
     expect(findIndicatorChoice('bollinger_bands', CATALOG)?.lines[0]).toEqual(['upper', 'Upper']);
   });
 
-  it('gives no choice for a custom indicator', () => {
-    const formula = { name: 'Ratio', expression: 'close / sma(5)', chart_placement: 'own' };
+  const days = { name: 'days', label: 'Days', value_type: 'int', default: 5, minimum: 2, maximum: 50, description: '' };
+  const formula = { name: 'Ratio', expression: 'close / mean(close, days)', chart_placement: 'own', parameters: [days] };
+  const choice = { name: 'days', isInteger: true, default: 5, minimum: 2, maximum: 50 };
 
-    expect(findIndicatorChoice('custom_1', [makeIndicator('custom_1', { formula })])).toBeUndefined();
+  it('gives the parameters of the formula of a custom indicator, also after a delete', () => {
+    expect(findIndicatorChoice('custom_1', [makeIndicator('custom_1', { formula })])?.parameters).toEqual([choice]);
+    expect(findIndicatorChoice('custom_1', [], formula)?.parameters).toEqual([choice]);
+    expect(findIndicatorChoice('custom_1', [], { ...formula, parameters: [] })?.parameters).toEqual([]);
+    expect(findIndicatorChoice('custom_1', [])).toBeUndefined();
+  });
+
+  it('a custom operand has the defaults of its parameters, and the current formula keeps the values of the names that stay', () => {
+    const catalog = [makeIndicator('custom_1', { formula })];
+    const operand = createOperand('indicator:custom_1', catalog);
+    expect(operand).toEqual({ type: 'indicator', indicator: 'custom_1', parameters: { days: 5 }, formula });
+
+    const old: IndicatorOperand = { type: 'indicator', indicator: 'custom_1', parameters: { days: 9, other: 3 }, formula: { ...formula, parameters: [{ ...days, maximum: 20 }] } };
+    expect(readCurrentOperand(old, catalog)).toEqual({ ...old, parameters: { days: 9 }, formula });
+    expect(readCurrentOperand({ ...old, formula }, catalog)).toBeNull();
   });
 });
 

@@ -17,10 +17,12 @@
     noteText?: string | null;
     // Extra classes of the input element.
     class?: string;
+    // Keeps the label for assistive technology only, for a field below a field with the same visible label.
+    hideLabel?: boolean;
   }
 
   const uid = $props.id();
-  let { label, type = 'text', value = $bindable(''), invalidText = null, noteText = null, id, class: className, ...restProps }: Props = $props();
+  let { label, type = 'text', value = $bindable(''), invalidText = null, noteText = null, id, class: className, hideLabel = false, ...restProps }: Props = $props();
 
   const invalid = $derived(invalidText !== null);
   const inputId = $derived(id ?? `text-input-${uid}`);
@@ -30,7 +32,7 @@
 
 <div class="cds--form-item cds--text-input-wrapper">
   <div class="cds--text-input__label-wrapper">
-    <label for={inputId} class="cds--label">{label}</label>
+    <label for={inputId} class={['cds--label', hideLabel && 'cds--visually-hidden']}>{label}</label>
   </div>
   <div class="cds--text-input__field-outer-wrapper">
     <div class="cds--text-input__field-wrapper" data-invalid={invalid ? '' : undefined}>

@@ -44,8 +44,17 @@ Decision: [#372](https://github.com/Mano-Liaoyan/ATrade/issues/372).
   To use the new expression, the user clicks "Use current expression" at the
   reference. So one screen can hold 2 expressions with 1 name. The screen check
   refuses this, because a result names its columns by the indicator name.
-- A custom indicator has no parameters and one output, `value`. Its catalog key
+- A custom indicator has one output, `value`. Its catalog key
   is `custom_<id>`. No built-in key can start with `custom_`, and the database
   does not give a deleted id again.
 - An expression can call built-in indicators only, not other custom indicators.
   So a reference needs only 1 expression, and an expression cannot call itself.
+- Changed by [#428](https://github.com/Mano-Liaoyan/ATrade/issues/428): a
+  custom indicator can have parameters. The reference holds a copy of the
+  parameter list in `formula`, and its own values in `parameters`, as a
+  reference to a built-in indicator. So a change of a value needs no change of
+  the custom indicator and no database read. The class is
+  `FormulaIndicator(expression, parameters)` with the values. An expression
+  can also give names to values (variables), so the user does not write one
+  part more than 1 time. This does the work of a call to another custom
+  indicator without a second expression in the reference.

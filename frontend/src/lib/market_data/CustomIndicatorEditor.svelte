@@ -6,20 +6,34 @@
   import Checkmark16 from '@carbon/icons/es/checkmark/16.js';
   import Edit16 from '@carbon/icons/es/edit/16.js';
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
-  import { Button, DataTable, Dialog, IconButton, InlineNotification, Select, StatusIndicator, TextInput, type TableColumn } from '#lib/foundation/carbon';
+  import {
+    Button,
+    DataTable,
+    Dialog,
+    IconButton,
+    InlineNotification,
+    Select,
+    StatusIndicator,
+    TextArea,
+    TextInput,
+    type TableColumn,
+  } from '#lib/foundation/carbon';
   import { EmptyText } from '#lib/foundation/empty_text';
   import type { RequestResult } from '#lib/foundation/http_request';
   import { readOnChange } from '#lib/foundation/live_socket';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
     CUSTOM_INDICATORS_SOCKET_PATH,
+    createParameterDraft,
     deleteCustomIndicator,
     keepCustomIndicator,
     listCustomIndicators,
+    readParameterDrafts,
     saveCustomIndicator,
     type CustomIndicator,
     type CustomIndicatorFields,
     type CustomIndicatorProblems,
+    type ParameterDraft,
   } from './custom_indicators';
 
   const COLUMNS: TableColumn[] = [
@@ -33,7 +47,17 @@
     { value: 'own', label: 'Own pane' },
     { value: 'price', label: 'Price pane' },
   ];
-  const EXPRESSION_NOTE = 'open high low close volume, + - * / **, mean max min sum std lag abs log, catalog keys: close / sma(50) - 1';
+  const TYPE_ITEMS = [
+    { value: 'int', label: 'Integer' },
+    { value: 'float', label: 'Decimal' },
+  ];
+  const NUMBER_FIELDS = [
+    ['default', 'Default'],
+    ['minimum', 'Minimum'],
+    ['maximum', 'Maximum'],
+  ] as const;
+  const EXPRESSION_NOTE =
+    'open high low close volume, + - * / **, mean max min sum std lag quantile median abs log, catalog keys, parameter names, name = value on its own line: close / sma(50) - 1';
   const NEW_FIELDS: CustomIndicatorFields = { name: '', expression: '', chart_placement: 'own', value_description: '' };
 
   let indicators = $state<CustomIndicator[] | null>(null);
@@ -42,6 +66,7 @@
   // The row that the dialog changes. Null: the dialog creates a new one.
   let editedId = $state<number | null>(null);
   let fields = $state<CustomIndicatorFields>({ ...NEW_FIELDS });
+  let parameters = $state<ParameterDraft[]>([]);
   let problems = $state<CustomIndicatorProblems>({});
   let saveMessage = $state<string | null>(null);
   let isSaving = $state(false);
@@ -76,6 +101,7 @@
     editedId = indicator?.custom_indicator_id ?? null;
     const { name, expression, chart_placement, value_description } = indicator ?? NEW_FIELDS;
     fields = { name, expression, chart_placement, value_description };
+    parameters = (indicator?.parameters ?? []).map(createParameterDraft);
     problems = {};
     saveMessage = null;
     isDialogOpen = true;
@@ -83,8 +109,13 @@
 
   async function save(event: SubmitEvent): Promise<void> {
     event.preventDefault();
+    const read = readParameterDrafts($state.snapshot(parameters));
+    if (Object.keys(read.problems).length > 0) {
+      problems = read.problems;
+      return;
+    }
     isSaving = true;
-    const result = await saveCustomIndicator(fetch, editedId, $state.snapshot(fields));
+    const result = await saveCustomIndicator(fetch, editedId, { ...$state.snapshot(fields), parameters: read.parameters });
     isSaving = false;
     if (result.kind === 'refused') {
       problems = result.problems;
@@ -197,7 +228,7 @@
     isDialogOpen = open;
   }}
   title={editedId === null ? 'New custom indicator' : 'Change custom indicator'}
-  size="md"
+  size="lg"
   primaryText={isSaving ? 'Saving…' : 'Save custom indicator'}
   busy={isSaving}
   onPrimary={() => form?.requestSubmit()}
@@ -211,7 +242,7 @@
     }}
   >
     <TextInput label="Name" bind:value={fields.name} invalidText={problems['name'] ?? null} autocomplete="off" />
-    <TextInput
+    <TextArea
       label="Expression"
       class="expression"
       bind:value={fields.expression}
@@ -220,6 +251,65 @@
       autocomplete="off"
       spellcheck="false"
     />
+    <fieldset class="parameters">
+      <legend class="cds--label">Parameters</legend>
+      {#each parameters as parameter, index (index)}
+        {@const location = `parameters.${String(index)}`}
+        {@const row = `Parameter ${String(index + 1)}`}
+        {@const hideLabel = index > 0}
+        <div class="parameter-row" role="group" aria-label={row}>
+          <TextInput
+            label="Name"
+            class="expression"
+            {hideLabel}
+            bind:value={parameter.name}
+            invalidText={problems[`${location}.name`] ?? null}
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <TextInput label="Label" {hideLabel} bind:value={parameter.label} invalidText={problems[`${location}.label`] ?? null} autocomplete="off" />
+          <Select
+            label="Type"
+            {hideLabel}
+            items={TYPE_ITEMS}
+            value={parameter.value_type}
+            onValueChange={(value: string) => {
+              parameter.value_type = value;
+            }}
+          />
+          {#each NUMBER_FIELDS as [field, label] (field)}
+            <TextInput
+              {label}
+              class="number"
+              {hideLabel}
+              inputmode="decimal"
+              bind:value={parameter[field]}
+              invalidText={problems[`${location}.${field}`] ?? null}
+              autocomplete="off"
+            />
+          {/each}
+          <IconButton
+            label={`Remove ${row.toLowerCase()}`}
+            icon={TrashCan16}
+            align="left"
+            onclick={() => {
+              parameters = parameters.filter((_, other) => other !== index);
+              problems = {};
+            }}
+          />
+        </div>
+      {/each}
+      {#if problems['parameters'] !== undefined}
+        <div class="cds--form-requirement parameters-problem">{problems['parameters']}</div>
+      {/if}
+      <Button
+        kind="ghost"
+        size="sm"
+        onclick={() => {
+          parameters = [...parameters, createParameterDraft()];
+        }}>Add parameter</Button
+      >
+    </fieldset>
     <Select
       label="Chart pane"
       items={PLACEMENT_ITEMS}
@@ -291,5 +381,38 @@
   .fields :global(.expression) {
     font-family: var(--cds-code-02-font-family);
     overflow-wrap: anywhere;
+  }
+
+  .parameters {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--cds-spacing-03);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .parameter-row {
+    display: grid;
+    grid-template-columns: 3fr 3fr 8.5rem 5.5rem 5.5rem 5.5rem auto;
+    align-items: start;
+    gap: var(--cds-spacing-03);
+    inline-size: 100%;
+  }
+
+  /* The Remove button is on the line of the fields. Only the first row has visible labels above them. */
+  .parameter-row:first-of-type > :global(:last-child) {
+    margin-block-start: var(--cds-spacing-06);
+  }
+
+  .fields :global(.number) {
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+
+  .parameters-problem {
+    display: block;
+    max-block-size: none;
   }
 </style>

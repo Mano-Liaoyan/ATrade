@@ -70,18 +70,33 @@ _Avoid_: ATR
 
 **Custom indicator**:
 An indicator that the user adds as a formula expression, for example
-`close / sma(50) - 1`. It has a name, an expression, a chart placement, and a
-value description. Screens, strategies, and bar charts use it as a built-in
-indicator of the catalog. Each stored reference holds a copy of its expression.
+`close / sma(50) - 1`. It has a name, an expression, parameters, a chart
+placement, and a value description. Screens, strategies, and bar charts use it
+as a built-in indicator of the catalog. Each stored reference holds a copy of
+its expression and its own parameter values.
 The AI assistant can also add one. It stays not kept until the user clicks
 Keep. In Chinese, write 自定义指标.
 _Avoid_: user indicator, script indicator, formula indicator
 
 **Formula expression**:
 The text that calculates a custom indicator. It uses numbers, `+ - * / **`, bar
-fields, the functions `mean max min sum std lag abs log`, and built-in
-indicators. It is not Python code. In Chinese, write 公式表达式.
+fields, the functions `mean max min sum std lag quantile median abs log`,
+built-in indicators, formula variables, and formula parameters. It is not
+Python code. In Chinese, write 公式表达式.
 _Avoid_: script, code
+
+**Formula parameter**:
+A number of a formula expression that has a name, a default, a minimum, and a
+maximum, for example `lookback_days`. The user sets its value at each chart
+indicator, screen condition, and strategy, as the parameter of a built-in
+indicator. In Chinese, write 公式参数.
+_Avoid_: argument, setting, input
+
+**Formula variable**:
+A name that a line of a formula expression gives to a value, for example
+`width = high - low`. The lines after it use the name. In Chinese, write
+公式变量.
+_Avoid_: middle value, alias
 
 **No value**:
 The state of an indicator at a time when the instrument does not have

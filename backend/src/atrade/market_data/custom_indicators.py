@@ -8,7 +8,8 @@ from typing import Annotated, Any
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from psycopg.types.json import Jsonb
+from pydantic import BaseModel, Field
 
 from atrade.foundation.assistant_conversation import ConversationCheck, create_conversation_dependency
 from atrade.foundation.clock import Clock
@@ -16,9 +17,10 @@ from atrade.foundation.error_response import ERROR_RESPONSE
 from atrade.foundation.table_changes import ChangeSocket
 from atrade.indicator import (
     CUSTOM_KEY_PREFIX,
+    FormulaParameterBody,
     IndicatorProblem,
     check_chart_placement,
-    check_expression,
+    check_expression_with_parameters,
     check_name,
     count_formula_bars,
     has_unstorable_character,
@@ -29,6 +31,7 @@ from atrade.market_data.indicator_series import (
     IndicatorProblemResponse,
     IndicatorResponse,
     list_built_in_indicators,
+    make_parameter_responses,
 )
 
 # The Settings page reads the list again after a change, also after a change of the AI assistant.
@@ -36,7 +39,8 @@ CUSTOM_INDICATOR_CHANGE_SOCKET = ChangeSocket(path="/ws/custom-indicators", tabl
 
 MAX_VALUE_DESCRIPTION_LENGTH = 1000
 SELECT_FIELDS = (
-    "custom_indicator_id, name, expression, chart_placement, value_description, kept, assistant_conversation_id"
+    "custom_indicator_id, name, expression, chart_placement, value_description, kept, assistant_conversation_id, "
+    "parameters"
 )
 NOT_FOUND: dict[int | str, dict[str, Any]] = {status.HTTP_404_NOT_FOUND: ERROR_RESPONSE}
 NAME_IN_USE: dict[int | str, dict[str, Any]] = {status.HTTP_409_CONFLICT: ERROR_RESPONSE}
@@ -53,6 +57,11 @@ class CustomIndicatorBody(BaseModel):
     chart_placement: str
     # The meaning, the range, and the unit of the value, as in the catalog.
     value_description: str
+    # The parameters that the expression uses as numbers (section 23.10.1). Each reference holds its own values.
+    parameters: list[FormulaParameterBody] = Field(default_factory=list[FormulaParameterBody])
+
+    def read_parameters(self) -> list[dict[str, Any]]:
+        return [parameter.model_dump() for parameter in self.parameters]
 
 
 class CustomIndicatorResponse(CustomIndicatorBody):
@@ -70,23 +79,38 @@ class CustomIndicatorResponse(CustomIndicatorBody):
             name=self.name,
             short_name=self.name,
             chart_placement="price" if self.chart_placement == "price" else "own",
-            parameters=[],
+            parameters=make_parameter_responses(self.parameters),
             outputs=["value"],
             value_description=self.value_description,
             formula=IndicatorFormulaBody(
-                name=self.name, expression=self.expression, chart_placement=self.chart_placement
+                name=self.name,
+                expression=self.expression,
+                chart_placement=self.chart_placement,
+                parameters=self.parameters,
             ),
         )
 
 
 class CustomIndicatorCheckResponse(BaseModel):
     problems: list[IndicatorProblemResponse]
-    # The bars that the expression needs for a value. None when the expression has a problem.
+    # The bars that the expression needs for a value when each parameter has its maximum. None when the expression or
+    # a parameter has a problem.
     look_back_bars: int | None
+    # The same when each parameter has its default.
+    default_look_back_bars: int | None
 
 
-def make_response(row: tuple[int, str, str, str, str, bool, int | None]) -> CustomIndicatorResponse:
-    custom_indicator_id, name, expression, chart_placement, value_description, kept, assistant_conversation_id = row
+def make_response(row: tuple[int, str, str, str, str, bool, int | None, list[Any]]) -> CustomIndicatorResponse:
+    (
+        custom_indicator_id,
+        name,
+        expression,
+        chart_placement,
+        value_description,
+        kept,
+        assistant_conversation_id,
+        parameters,
+    ) = row
     return CustomIndicatorResponse(
         custom_indicator_id=custom_indicator_id,
         key=f"{CUSTOM_KEY_PREFIX}{custom_indicator_id}",
@@ -96,13 +120,14 @@ def make_response(row: tuple[int, str, str, str, str, bool, int | None]) -> Cust
         value_description=value_description,
         kept=kept,
         assistant_conversation_id=assistant_conversation_id,
+        parameters=parameters,
     )
 
 
 def check_fields(body: CustomIndicatorBody) -> list[IndicatorProblem]:
     problems = [
         *check_name(body.name, ("name",)),
-        *check_expression(body.expression),
+        *check_expression_with_parameters(body.expression, body.read_parameters()),
         *check_chart_placement(body.chart_placement, ("chart_placement",)),
     ]
     if not 1 <= len(body.value_description.strip()) <= MAX_VALUE_DESCRIPTION_LENGTH:
@@ -221,9 +246,17 @@ class CustomIndicatorRoutes:
     ) -> CustomIndicatorCheckResponse:
         async with await psycopg.AsyncConnection.connect(self.database_url) as connection:
             problems = await check_custom_indicator(connection, body, custom_indicator_id)
-        has_expression_problem = any(problem.location == ["expression"] for problem in problems)
-        look_back_bars = None if has_expression_problem else count_formula_bars(body.expression)
-        return CustomIndicatorCheckResponse(problems=problems, look_back_bars=look_back_bars)
+        if any(problem.location[0] in {"expression", "parameters"} for problem in problems):
+            return CustomIndicatorCheckResponse(problems=problems, look_back_bars=None, default_look_back_bars=None)
+        return CustomIndicatorCheckResponse(
+            problems=problems,
+            look_back_bars=count_formula_bars(
+                body.expression, tuple((parameter.name, parameter.maximum) for parameter in body.parameters)
+            ),
+            default_look_back_bars=count_formula_bars(
+                body.expression, tuple((parameter.name, parameter.default) for parameter in body.parameters)
+            ),
+        )
 
     async def create(self, body: CustomIndicatorBody) -> CustomIndicatorResponse | JSONResponse:
         return await self.create_of(body, None)
@@ -242,9 +275,9 @@ class CustomIndicatorRoutes:
                     await cursor.execute(
                         f"""
                         INSERT INTO custom_indicator
-                            (name, expression, chart_placement, value_description, kept, assistant_conversation_id,
-                             created_at_utc, changed_at_utc)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                            (name, expression, chart_placement, value_description, parameters, kept,
+                             assistant_conversation_id, created_at_utc, changed_at_utc)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING {SELECT_FIELDS}
                         """,
                         (*self.read_values(body), conversation_id is None, conversation_id, now_utc, now_utc),
@@ -281,7 +314,8 @@ class CustomIndicatorRoutes:
                     await cursor.execute(
                         f"""
                         UPDATE custom_indicator
-                        SET name = %s, expression = %s, chart_placement = %s, value_description = %s, changed_at_utc = %s
+                        SET name = %s, expression = %s, chart_placement = %s, value_description = %s,
+                            parameters = %s, changed_at_utc = %s
                         WHERE custom_indicator_id = %s
                         RETURNING {SELECT_FIELDS}
                         """,
@@ -324,8 +358,14 @@ class CustomIndicatorRoutes:
             raise raise_not_found(custom_indicator_id)
 
     @staticmethod
-    def read_values(body: CustomIndicatorBody) -> tuple[str, str, str, str]:
-        return (body.name.strip(), body.expression.strip(), body.chart_placement, body.value_description.strip())
+    def read_values(body: CustomIndicatorBody) -> tuple[str, str, str, str, Jsonb]:
+        return (
+            body.name.strip(),
+            body.expression.strip(),
+            body.chart_placement,
+            body.value_description.strip(),
+            Jsonb(body.read_parameters()),
+        )
 
 
 def add_read_routes(router: APIRouter, routes: CustomIndicatorRoutes) -> None:

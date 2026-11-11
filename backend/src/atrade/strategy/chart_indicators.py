@@ -24,10 +24,21 @@ LIST_MESSAGE = f"{CHART_INDICATORS_NAME} must be a list literal of dict literals
 type ParameterNumber = int | float
 
 
+class ChartFormulaParameter(TypedDict):
+    name: str
+    label: str
+    value_type: str
+    default: ParameterNumber
+    minimum: ParameterNumber
+    maximum: ParameterNumber
+    description: str
+
+
 class ChartIndicatorFormula(TypedDict):
     name: str
     expression: str
     chart_placement: str
+    parameters: NotRequired[list[ChartFormulaParameter]]
 
 
 class ChartIndicator(TypedDict):
@@ -170,12 +181,15 @@ def read_item(number: int, element: ast.expr) -> ChartItem | CodeProblem:
 
 
 def read_formula(value: ast.expr) -> dict[str, object] | None:
-    """The `formula` of a custom indicator: a dict literal of string literals. None makes a problem of the check."""
-    keys = read_string_keys(value)
-    if not isinstance(value, ast.Dict) or keys is None:
+    """The `formula` of a custom indicator: a dict literal of literals. None makes a problem of the check."""
+    if read_string_keys(value) is None:
         return None
-    texts = [item.value if isinstance(item, ast.Constant) else None for item in value.values]
-    return dict(zip(keys, texts, strict=True))
+    try:
+        return cast("dict[str, object]", ast.literal_eval(value))
+    except ValueError, TypeError:
+        # readability-exception: ast.literal_eval reports a value that is not a literal, or a dict key that cannot be
+        # a key, only as an exception.
+        return None
 
 
 def read_string_keys(element: ast.expr) -> list[str] | None:

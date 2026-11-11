@@ -25,7 +25,7 @@
 
   const catalog = readIndicatorCatalog();
   const choices = $derived(listOperandChoices(side, catalog(), operand));
-  const indicator = $derived(operand.type === 'indicator' ? findIndicatorChoice(operand.indicator, catalog()) : undefined);
+  const indicator = $derived(operand.type === 'indicator' ? findIndicatorChoice(operand.indicator, catalog(), operand.formula) : undefined);
   const currentOperand = $derived(readCurrentOperand(operand, catalog()));
 </script>
 

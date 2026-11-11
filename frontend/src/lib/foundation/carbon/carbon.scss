@@ -55,6 +55,8 @@
 @use '@carbon/styles/scss/components/structured-list';
 // The parameter fields of the chart indicator settings (#329).
 @use '@carbon/styles/scss/components/number-input';
+// The expression field of a custom indicator (#428).
+@use '@carbon/styles/scss/components/text-area';
 
 // Themes: g10 is the light theme and g100 is the dark theme.
 // The system theme applies when <html> has no data-theme attribute. data-theme="light" or "dark" overrides it.

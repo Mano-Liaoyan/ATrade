@@ -7,11 +7,12 @@ use the same code (ADR 0001).
 """
 
 import ast
+import bisect
 import math
 import operator
 from collections import deque
-from collections.abc import Callable
-from dataclasses import dataclass
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Protocol, cast
 
@@ -22,11 +23,13 @@ from atrade.indicator.indicator_catalog import (
     MAXIMUM_PERIOD,
     CatalogIndicator,
     IndicatorDefinition,
+    IndicatorParameter,
     ParameterValue,
+    ParameterValues,
 )
 from atrade.indicator.indicator_problems import IndicatorProblem, check_output, check_parameters
 
-MAX_EXPRESSION_LENGTH = 500
+MAX_EXPRESSION_LENGTH = 1000
 MAX_DEPTH = 20
 MAX_EXPONENT = 10
 # The largest look-back of a catalog indicator is 8 x (1000 + 1000): MACD. A formula must not read more.
@@ -37,7 +40,11 @@ MAX_CALCULATION_BARS = 10_000_000
 MIN_STD_WINDOW = 2
 BAR_FIELDS = ("open", "high", "low", "close", "volume")
 OUTPUT_KEYWORD = "output"
-FORMULA_ARGUMENT_COUNT = 2
+MEDIAN_QUANTILE = 0.5
+WINDOW_ARGUMENT_COUNT = 2
+QUANTILE_ARGUMENT_COUNT = 3
+# A larger parameter value has no use, and a float keeps each integer to this size.
+MAX_PARAMETER_SIZE = 1e15
 # Each finite float is an integer multiple of 2^-1074, so a window sum in this unit has no rounding error.
 EXACT_UNIT_BITS = 1074
 EXACT_ONE = 1 << EXACT_UNIT_BITS
@@ -189,6 +196,28 @@ class WindowExtreme:
         return self.kept[0]
 
 
+class WindowQuantile:
+    """The quantile `quantile` of the window, with linear interpolation between the 2 nearest values (the NumPy
+    default). `ordered` holds the values of the window, the smallest first."""
+
+    def __init__(self, quantile: float) -> None:
+        self.quantile = quantile
+        self.ordered: list[float] = []
+
+    def add(self, value: float) -> None:
+        bisect.insort(self.ordered, value)
+
+    def remove(self, value: float) -> None:
+        del self.ordered[bisect.bisect_left(self.ordered, value)]
+
+    def read(self, count: int) -> float:
+        position = self.quantile * (count - 1)
+        lower = int(position)
+        below = self.ordered[lower]
+        above = self.ordered[min(lower + 1, count - 1)]
+        return below + (above - below) * (position - lower)
+
+
 class RollingNode:
     """A function of the last `window` values of its child. A value is "no value" while one value of the window is."""
 
@@ -256,6 +285,44 @@ class CatalogNode:
         return calculate(lambda: cast("float | None", getattr(self.indicator, self.output)))
 
 
+class VariableNode:
+    """A variable: a value with a name, for example `width = std(close, 20) / mean(close, 20)`. The program calculates it
+    1 time for each bar, and each use reads that value. So a use adds no window."""
+
+    def __init__(self, child: FormulaNode) -> None:
+        self.child = child
+        self.value: float | None = None
+        self.window_bars = 0
+
+    @property
+    def look_back(self) -> int:
+        return self.child.look_back
+
+    def update(self, bar: NautilusBar) -> float | None:
+        return self.value
+
+
+@dataclass
+class ProgramNode:
+    """The variables in the order of the text, then the value of the indicator."""
+
+    variables: tuple[VariableNode, ...]
+    result: FormulaNode
+
+    @property
+    def look_back(self) -> int:
+        return self.result.look_back
+
+    @property
+    def window_bars(self) -> int:
+        return sum(variable.child.window_bars for variable in self.variables) + self.result.window_bars
+
+    def update(self, bar: NautilusBar) -> float | None:
+        for variable in self.variables:
+            variable.value = variable.child.update(bar)
+        return self.result.update(bar)
+
+
 def add(left: float, right: float) -> float:
     return left + right
 
@@ -307,7 +374,10 @@ ROLLING_FUNCTIONS: dict[str, Callable[[], WindowMeasure]] = {
     "sum": WindowSum,
     "std": WindowDeviation,
 }
+QUANTILE_FUNCTIONS = ("quantile", "median")
+WINDOW_FUNCTIONS = (*ROLLING_FUNCTIONS, "lag", *QUANTILE_FUNCTIONS)
 SCALAR_FUNCTIONS: dict[str, Callable[..., float]] = {"abs": find_absolute, "log": find_log}
+QUANTILE_LIMIT = IndicatorParameter("quantile", float, MEDIAN_QUANTILE, 0, 1)
 OPERATOR_SYMBOLS: dict[type[ast.AST], str] = {
     ast.Mod: "%",
     ast.FloorDiv: "//",
@@ -323,24 +393,47 @@ OPERATOR_SYMBOLS: dict[type[ast.AST], str] = {
 
 
 class FormulaProblem(Exception):
-    """The first problem of an expression. `column` starts at 1."""
+    """The first problem of an expression. `column` and `line` start at 1."""
 
-    def __init__(self, column: int, message: str) -> None:
+    def __init__(self, column: int, message: str, line: int = 1) -> None:
         super().__init__(message)
         self.column = column
         self.message = message
+        self.line = line
 
-    def __reduce__(self) -> tuple[type[FormulaProblem], tuple[int, str]]:
+    def __reduce__(self) -> tuple[type[FormulaProblem], tuple[int, str, int]]:
         """A process pool sends an exception back with pickle. The default repeats only the `Exception` arguments."""
-        return FormulaProblem, (self.column, self.message)
+        return FormulaProblem, (self.column, self.message, self.line)
+
+    def describe(self) -> str:
+        place = f"Column {self.column}" if self.line == 1 else f"Line {self.line}, column {self.column}"
+        return f"{place}: {self.message}"
 
 
 def refuse(node: ast.AST, message: str) -> FormulaProblem:
-    return FormulaProblem(getattr(node, "col_offset", 0) + 1, message)
+    return FormulaProblem(getattr(node, "col_offset", 0) + 1, message, getattr(node, "lineno", 1))
 
 
-def read_tree(expression: str) -> ast.expr:
-    """The `ast` tree of the text. `ast.parse` reads the text and runs nothing."""
+@dataclass
+class Scope:
+    """The names of an expression that are not bar fields: the parameters with their values, and the variables."""
+
+    parameters: dict[str, IndicatorParameter]
+    values: dict[str, ParameterValue]
+    variables: dict[str, VariableNode] = field(default_factory=dict[str, VariableNode])
+    used: set[str] = field(default_factory=set[str])
+
+    def read_names(self) -> str:
+        return ", ".join([*BAR_FIELDS, *self.parameters, *self.variables])
+
+
+def fix_parameters(values: ParameterValues) -> tuple[IndicatorParameter, ...]:
+    """Parameters that have only the given value, for an expression that runs with these values."""
+    return tuple(IndicatorParameter(name, type(value), value, value, value) for name, value in values.items())
+
+
+def read_statements(expression: str) -> list[ast.stmt]:
+    """The `ast` statements of the text. `ast.parse` reads the text and runs nothing."""
     if not expression.strip():
         raise FormulaProblem(1, "The expression must not be empty.")
     if len(expression) > MAX_EXPRESSION_LENGTH:
@@ -349,20 +442,42 @@ def read_tree(expression: str) -> ast.expr:
         )
     text = expression.strip()
     try:
-        return ast.parse(text, mode="eval").body
+        statements = ast.parse(text).body
     except SyntaxError as error:
         # readability-exception: ast.parse reports a syntax error only as an exception. Offset 0: the text ended early.
         column = error.offset or len(text) + 1
-        raise FormulaProblem(column, f"The expression has a syntax error: {error.msg}.") from error
+        message = f"The expression has a syntax error: {error.msg}."
+        raise FormulaProblem(column, message, error.lineno or 1) from error
     except (ValueError, RecursionError, MemoryError) as error:
         # readability-exception: ast.parse reports a null byte or a very deep text only as these exceptions.
         raise FormulaProblem(1, "The expression is too deep or has a character that is not allowed.") from error
+    if not statements:
+        raise FormulaProblem(1, "The expression must not be empty.")
+    return statements
 
 
-def parse_expression(expression: str) -> FormulaNode:
-    """The tree of nodes of a correct expression. Raises `FormulaProblem` for the first problem."""
-    tree = read_tree(expression)
-    root = parse_node(tree, 1)
+def parse_expression(
+    expression: str, parameters: Sequence[IndicatorParameter] = (), values: ParameterValues | None = None
+) -> FormulaNode:
+    """The tree of nodes of a correct expression. Raises `FormulaProblem` for the first problem.
+
+    `values` has the value of each parameter. A parameter without a value has its default.
+    """
+    *assignments, last = read_statements(expression)
+    scope = Scope(
+        {parameter.name: parameter for parameter in parameters},
+        {parameter.name: (values or {}).get(parameter.name, parameter.default) for parameter in parameters},
+    )
+    for statement in assignments:
+        parse_assignment(statement, scope)
+    if not isinstance(last, ast.Expr):
+        raise refuse(last, "The last line must be the value of the indicator, for example `close / sma(50) - 1`.")
+    result = parse_node(last.value, 1, scope)
+    for name in (*scope.variables, *scope.parameters):
+        if name not in scope.used:
+            kind = "variable" if name in scope.variables else "parameter"
+            raise FormulaProblem(1, f"The expression does not use the {kind} {name!r}.")
+    root = ProgramNode(tuple(scope.variables.values()), result) if scope.variables else result
     if root.look_back > MAX_LOOK_BACK_BARS:
         message = f"An expression reads at most {MAX_LOOK_BACK_BARS} bars, not {root.look_back}."
         raise FormulaProblem(1, message)
@@ -377,20 +492,35 @@ def parse_expression(expression: str) -> FormulaNode:
     return root
 
 
-def parse_node(node: ast.expr, depth: int) -> FormulaNode:
+def parse_assignment(statement: ast.stmt, scope: Scope) -> None:
+    """`name = expression`: a variable that the lines after it can use."""
+    if not isinstance(statement, ast.Assign):
+        message = "Each line before the last line must give a name to a value, for example `width = high - low`."
+        raise refuse(statement, message)
+    target = statement.targets[0]
+    if len(statement.targets) > 1 or not isinstance(target, ast.Name):
+        raise refuse(target, "A line gives 1 name to 1 value, for example `width = high - low`.")
+    if target.id in BAR_FIELDS or target.id in scope.parameters or target.id in scope.variables:
+        raise refuse(target, f"The name {target.id!r} is in use. Use another name.")
+    # The name is known only after its line, so a variable cannot use itself.
+    variable = VariableNode(parse_node(statement.value, 1, scope))
+    scope.variables[target.id] = variable
+
+
+def parse_node(node: ast.expr, depth: int, scope: Scope) -> FormulaNode:
     if depth > MAX_DEPTH:
         raise refuse(node, f"The expression is too deep: at most {MAX_DEPTH} levels.")
     match node:
         case ast.Constant():
             return NumberNode(read_number(node))
         case ast.Name():
-            return read_bar_field(node)
+            return read_name(node, scope)
         case ast.BinOp():
-            return parse_binary(node, depth)
+            return parse_binary(node, depth, scope)
         case ast.UnaryOp():
-            return parse_unary(node, depth)
+            return parse_unary(node, depth, scope)
         case ast.Call():
-            return parse_call(node, depth)
+            return parse_call(node, depth, scope)
         case ast.Attribute():
             raise refuse(node, "Attribute access is not allowed.")
         case _:
@@ -413,24 +543,52 @@ def read_number(node: ast.Constant) -> float:
     return number
 
 
-def read_bar_field(node: ast.Name) -> FormulaNode:
-    if node.id not in BAR_FIELDS:
-        raise refuse(node, f"Unknown name {node.id!r}. Known names: {', '.join(BAR_FIELDS)}.")
-    return BarFieldNode(node.id)
+def read_name(node: ast.Name, scope: Scope) -> FormulaNode:
+    if node.id in BAR_FIELDS:
+        return BarFieldNode(node.id)
+    scope.used.add(node.id)
+    if node.id in scope.variables:
+        return scope.variables[node.id]
+    if node.id in scope.parameters:
+        return NumberNode(float(scope.values[node.id]))
+    raise refuse(node, f"Unknown name {node.id!r}. Known names: {scope.read_names()}.")
 
 
-def parse_binary(node: ast.BinOp, depth: int) -> FormulaNode:
+def read_parameter_value(node: ast.expr, scope: Scope, limit: IndicatorParameter) -> ParameterValue | None:
+    """The value of the parameter that `node` names, or None when `node` is not a parameter.
+
+    The range of the parameter must be in the range of `limit`, so each value that the user can set is correct.
+    """
+    if not isinstance(node, ast.Name) or node.id in BAR_FIELDS or node.id in scope.variables:
+        return None
+    if node.id not in scope.parameters:
+        raise refuse(node, f"Unknown name {node.id!r}. Known names: {scope.read_names()}.")
+    parameter = scope.parameters[node.id]
+    scope.used.add(node.id)
+    if limit.value_type is int and parameter.value_type is not int:
+        message = f"The {limit.name} must be an integer, but the parameter {parameter.name!r} is not an integer."
+        raise refuse(node, message)
+    if not limit.minimum <= parameter.minimum <= parameter.maximum <= limit.maximum:
+        message = (
+            f"The {limit.name} must be from {limit.minimum} to {limit.maximum}, but the parameter {parameter.name!r} "
+            f"is from {parameter.minimum} to {parameter.maximum}."
+        )
+        raise refuse(node, message)
+    return scope.values[node.id]
+
+
+def parse_binary(node: ast.BinOp, depth: int, scope: Scope) -> FormulaNode:
     if isinstance(node.op, ast.Pow):
         exponent = read_exponent(node.right)
 
         def raise_to_exponent(base: float) -> float:
             return math.pow(base, exponent)
 
-        return ScalarNode(raise_to_exponent, (parse_node(node.left, depth + 1),))
+        return ScalarNode(raise_to_exponent, (parse_node(node.left, depth + 1, scope),))
     known = BINARY_OPERATORS.get(type(node.op))
     if known is None:
         raise refuse(node, f"The operator {OPERATOR_SYMBOLS.get(type(node.op), '?')} is not allowed.")
-    return ScalarNode(known, (parse_node(node.left, depth + 1), parse_node(node.right, depth + 1)))
+    return ScalarNode(known, (parse_node(node.left, depth + 1, scope), parse_node(node.right, depth + 1, scope)))
 
 
 def read_exponent(node: ast.expr) -> float:
@@ -444,47 +602,59 @@ def read_exponent(node: ast.expr) -> float:
     raise refuse(node, f"The exponent must be a number from -{MAX_EXPONENT} to {MAX_EXPONENT}.")
 
 
-def parse_unary(node: ast.UnaryOp, depth: int) -> FormulaNode:
-    operand = parse_node_after_operator(node, depth)
+def parse_unary(node: ast.UnaryOp, depth: int, scope: Scope) -> FormulaNode:
+    operand = parse_node_after_operator(node, depth, scope)
     if isinstance(node.op, ast.UAdd):
         return operand
     return ScalarNode(negate, (operand,))
 
 
-def parse_node_after_operator(node: ast.UnaryOp, depth: int) -> FormulaNode:
+def parse_node_after_operator(node: ast.UnaryOp, depth: int, scope: Scope) -> FormulaNode:
     if not isinstance(node.op, ast.USub | ast.UAdd):
         raise refuse(node, f"The operator {OPERATOR_SYMBOLS.get(type(node.op), '?')} is not allowed.")
-    return parse_node(node.operand, depth + 1)
+    return parse_node(node.operand, depth + 1, scope)
 
 
-def parse_call(node: ast.Call, depth: int) -> FormulaNode:
+def parse_call(node: ast.Call, depth: int, scope: Scope) -> FormulaNode:
     if isinstance(node.func, ast.Attribute):
         raise refuse(node.func, "Attribute access is not allowed.")
     name = node.func.id if isinstance(node.func, ast.Name) else None
     if name is None:
         raise refuse(node, "Only a function name can be called.")
-    if name in ROLLING_FUNCTIONS or name == "lag":
-        return parse_window_call(node, name, depth)
+    if name in WINDOW_FUNCTIONS:
+        return parse_window_call(node, name, depth, scope)
     if name in SCALAR_FUNCTIONS:
-        return parse_scalar_call(node, name, depth)
+        return parse_scalar_call(node, name, depth, scope)
     definition = INDICATOR_CATALOG.get(name)
     if definition is None:
-        known = ", ".join([*ROLLING_FUNCTIONS, "lag", *SCALAR_FUNCTIONS, *INDICATOR_CATALOG])
+        known = ", ".join([*WINDOW_FUNCTIONS, *SCALAR_FUNCTIONS, *INDICATOR_CATALOG])
         raise refuse(node, f"Unknown function {name!r}. Known functions: {known}.")
-    return parse_catalog_call(node, definition)
+    return parse_catalog_call(node, definition, scope)
 
 
-def parse_window_call(node: ast.Call, name: str, depth: int) -> FormulaNode:
+def parse_window_call(node: ast.Call, name: str, depth: int, scope: Scope) -> FormulaNode:
     if node.keywords:
         raise refuse(node, f"{name} takes no keyword arguments.")
-    if len(node.args) != FORMULA_ARGUMENT_COUNT:
+    if name == "quantile":
+        if len(node.args) != QUANTILE_ARGUMENT_COUNT:
+            raise refuse(node, "quantile needs 3 arguments: a value, a number of bars, and a quantile from 0 to 1.")
+    elif len(node.args) != WINDOW_ARGUMENT_COUNT:
         raise refuse(node, f"{name} needs 2 arguments: a value and a number of bars.")
-    child = parse_node(node.args[0], depth + 1)
-    size = read_window(node.args[1], MIN_STD_WINDOW if name == "std" else 1)
-    return LagNode(child, size) if name == "lag" else RollingNode(ROLLING_FUNCTIONS[name](), child, size)
+    child = parse_node(node.args[0], depth + 1, scope)
+    size = read_window(node.args[1], MIN_STD_WINDOW if name == "std" else 1, scope)
+    if name == "lag":
+        return LagNode(child, size)
+    if name in QUANTILE_FUNCTIONS:
+        quantile = MEDIAN_QUANTILE if name == "median" else read_quantile(node.args[2], scope)
+        return RollingNode(WindowQuantile(quantile), child, size)
+    return RollingNode(ROLLING_FUNCTIONS[name](), child, size)
 
 
-def read_window(node: ast.expr, minimum: int) -> int:
+def read_window(node: ast.expr, minimum: int, scope: Scope) -> int:
+    limit = IndicatorParameter("number of bars", int, minimum, minimum, MAXIMUM_PERIOD)
+    value = read_parameter_value(node, scope, limit)
+    if value is not None:
+        return int(value)
     if not (isinstance(node, ast.Constant) and type(node.value) is int):
         raise refuse(node, "The number of bars must be an integer.")
     if not minimum <= node.value <= MAXIMUM_PERIOD:
@@ -492,13 +662,22 @@ def read_window(node: ast.expr, minimum: int) -> int:
     return node.value
 
 
-def parse_scalar_call(node: ast.Call, name: str, depth: int) -> FormulaNode:
+def read_quantile(node: ast.expr, scope: Scope) -> float:
+    value = read_parameter_value(node, scope, QUANTILE_LIMIT)
+    if value is not None:
+        return float(value)
+    if isinstance(node, ast.Constant) and type(node.value) in {int, float} and 0 <= cast("float", node.value) <= 1:
+        return float(cast("float", node.value))
+    raise refuse(node, "The quantile must be a number from 0 to 1, for example 0.5 for the median.")
+
+
+def parse_scalar_call(node: ast.Call, name: str, depth: int, scope: Scope) -> FormulaNode:
     if node.keywords or len(node.args) != 1:
         raise refuse(node, f"{name} needs 1 argument.")
-    return ScalarNode(SCALAR_FUNCTIONS[name], (parse_node(node.args[0], depth + 1),))
+    return ScalarNode(SCALAR_FUNCTIONS[name], (parse_node(node.args[0], depth + 1, scope),))
 
 
-def parse_catalog_call(node: ast.Call, definition: IndicatorDefinition) -> FormulaNode:
+def parse_catalog_call(node: ast.Call, definition: IndicatorDefinition, scope: Scope) -> FormulaNode:
     if len(node.args) > len(definition.parameters):
         raise refuse(node, f"{definition.key} takes at most {len(definition.parameters)} argument(s).")
     names = [parameter.name for parameter in definition.parameters]
@@ -513,7 +692,8 @@ def parse_catalog_call(node: ast.Call, definition: IndicatorDefinition) -> Formu
             raise refuse(keyword.value, f"The parameter {keyword.arg!r} is given more than 1 time.")
         else:
             written[keyword.arg] = keyword.value
-    parameters = {name: read_parameter(name, value) for name, value in written.items()}
+    limits = {parameter.name: parameter for parameter in definition.parameters}
+    parameters = {name: read_parameter(name, value, scope, limits.get(name)) for name, value in written.items()}
     problems: list[IndicatorProblem] = [*check_parameters(definition, parameters), *check_output(definition, output)]
     if problems:
         raise refuse(node, problems[0].message)
@@ -530,26 +710,36 @@ def read_output_name(node: ast.expr) -> str:
     raise refuse(node, 'The output must be a text, for example "signal".')
 
 
-def read_parameter(name: str, node: ast.expr) -> ParameterValue:
+def read_parameter(name: str, node: ast.expr, scope: Scope, limit: IndicatorParameter | None) -> ParameterValue:
+    """`limit` is None for a name that the indicator does not have. `check_parameters` gives that problem."""
+    value = None if limit is None else read_parameter_value(node, scope, limit)
+    if value is not None:
+        return value
     if isinstance(node, ast.Constant) and type(node.value) in {int, float}:
         return cast("ParameterValue", node.value)
     raise refuse(node, f"The {name} must be a number.")
 
 
-def check_expression(expression: str) -> list[IndicatorProblem]:
-    """Returns the problem of an expression. An empty list means the expression is correct."""
+def check_expression(expression: str, parameters: Sequence[IndicatorParameter] = ()) -> list[IndicatorProblem]:
+    """Returns the problem of an expression. An empty list means the expression is correct.
+
+    The check uses the maximum of each parameter, then the default. The bars of an expression do not decrease when a
+    parameter increases, so an expression that passes stays in the limits for each value that the user can set.
+    """
     try:
-        parse_expression(expression)
+        parse_expression(expression, parameters, {parameter.name: parameter.maximum for parameter in parameters})
+        parse_expression(expression, parameters)
     except FormulaProblem as problem:
-        return [IndicatorProblem(("expression",), f"Column {problem.column}: {problem.message}")]
+        return [IndicatorProblem(("expression",), problem.describe())]
     return []
 
 
 # A screen run reads the name of each indicator for each instrument and condition, on the event loop.
 @lru_cache(maxsize=1024)
-def count_formula_bars(expression: str) -> int:
-    """The bars that a correct expression needs for its value. The parser calculates it (section 23.10.3)."""
-    return parse_expression(expression).look_back
+def count_formula_bars(expression: str, values: tuple[tuple[str, ParameterValue], ...] = ()) -> int:
+    """The bars that a correct expression needs for its value with these parameter values. The parser calculates it
+    (section 23.10.3)."""
+    return parse_expression(expression, fix_parameters(dict(values))).look_back
 
 
 class FormulaIndicator:
@@ -557,13 +747,22 @@ class FormulaIndicator:
     expression, so a run needs no database read. The value is None ("no value") when the expression has no number.
     """
 
-    def __init__(self, expression: str) -> None:
-        problems = check_expression(expression)
-        if problems:
-            raise ValueError(problems[0].message)
+    def __init__(self, expression: str, parameters: ParameterValues | None = None) -> None:
+        """`parameters` has the value of each parameter name of the expression, for example `{"lookback_days": 20}`."""
         self.expression = expression
+        self.parameters = dict(parameters or {})
+        for name, value in self.parameters.items():
+            if type(value) not in {int, float} or not abs(value) <= MAX_PARAMETER_SIZE:
+                message = f"The parameter {name!r} must be a number from -1e15 to 1e15, not {value!r}."
+                raise ValueError(message)
         self.value: float | None = None
-        self._root = parse_expression(expression)
+        self._root = self._parse()
+
+    def _parse(self) -> FormulaNode:
+        try:
+            return parse_expression(self.expression, fix_parameters(self.parameters))
+        except FormulaProblem as problem:
+            raise ValueError(problem.describe()) from problem
 
     @property
     def initialized(self) -> bool:
@@ -574,4 +773,4 @@ class FormulaIndicator:
 
     def reset(self) -> None:
         self.value = None
-        self._root = parse_expression(self.expression)
+        self._root = self._parse()

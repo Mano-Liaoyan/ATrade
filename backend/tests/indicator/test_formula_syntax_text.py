@@ -15,8 +15,8 @@ from atrade.indicator.formula_indicator import (
     MAX_EXPRESSION_LENGTH,
     MAX_LOOK_BACK_BARS,
     MIN_STD_WINDOW,
-    ROLLING_FUNCTIONS,
     SCALAR_FUNCTIONS,
+    WINDOW_FUNCTIONS,
 )
 from atrade.indicator.indicator_catalog import MAXIMUM_PERIOD
 
@@ -35,7 +35,7 @@ def test_the_text_names_each_bar_field_and_each_function_of_the_parser() -> None
 
     for name in BAR_FIELDS:
         assert re.search(rf"\b{name}\b", text), name
-    for name in [*ROLLING_FUNCTIONS, *SCALAR_FUNCTIONS]:
+    for name in [*WINDOW_FUNCTIONS, *SCALAR_FUNCTIONS]:
         assert f"{name}(" in text, name
 
 

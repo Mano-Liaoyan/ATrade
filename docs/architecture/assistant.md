@@ -399,7 +399,7 @@ The code is `assistant/src/custom_indicator_tools.ts`.
 |---|---|---|
 | `list_custom_indicators` | Lists the custom indicators. | The body of `GET /api/custom-indicators`, with `kept` and `assistant_conversation_id`. |
 | `read_custom_indicator` | Reads one custom indicator. | The row. |
-| `check_custom_indicator` | Checks a formula and saves nothing. The optional `custom_indicator_id` names the row to change. | `{"problems": [{"location", "message"}], "look_back_bars"}`. A message of the expression gives the column. |
+| `check_custom_indicator` | Checks a formula and saves nothing. The optional `custom_indicator_id` names the row to change. | `{"problems": [{"location", "message"}], "look_back_bars", "default_look_back_bars"}` (indicator.md section 23.10.4). A message of the expression gives the column. |
 | `create_custom_indicator` | Saves a new custom indicator (indicator.md section 23.10.6). | The row. On `422`, the problem list. |
 | `update_custom_indicator` | Changes a custom indicator that the same conversation created and that the user has not kept. | The row. `403` for each other custom indicator. On `422`, the problem list. |
 
@@ -409,7 +409,11 @@ The code is `assistant/src/custom_indicator_tools.ts`.
 - `FORMULA_SYNTAX` in the tool file is the only text of the expression syntax
   for the model. It is the description of the `expression` parameter of the
   check, create, and update tools. It has the calculation limit of rolling
-  windows. `tests/indicator/test_formula_syntax_text.py` compares it with
+  windows, the variables, and the use of parameters. The 3 tools also take
+  the optional `parameters` list of indicator.md section 23.10.1. Its
+  description tells the model to make a parameter of each number that the
+  user could want to change, and to change the `parameters` of a reference,
+  not the custom indicator, for other values. `tests/indicator/test_formula_syntax_text.py` compares it with
   the parser: each bar field, each function, each limit, and each example. A
   change of the parser must change this text and indicator.md section 23.10.1.
 

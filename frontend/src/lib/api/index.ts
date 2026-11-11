@@ -1391,6 +1391,20 @@ export interface components {
             name: string;
             definition: components["schemas"]["JsonValue"];
         };
+        /** ChartFormulaParameter */
+        ChartFormulaParameter: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Value Type */
+            value_type: string;
+            default: components["schemas"]["ParameterNumber"];
+            minimum: components["schemas"]["ParameterNumber"];
+            maximum: components["schemas"]["ParameterNumber"];
+            /** Description */
+            description: string;
+        };
         /**
          * ChartIndicator
          * @description A whole indicator of the chart with its parameter values, as `{"indicator", "parameters"}` JSON. A custom
@@ -1413,6 +1427,8 @@ export interface components {
             expression: string;
             /** Chart Placement */
             chart_placement: string;
+            /** Parameters */
+            parameters?: components["schemas"]["ChartFormulaParameter"][];
         };
         /**
          * ChartIndicatorSet
@@ -1741,6 +1757,8 @@ export interface components {
             chart_placement: string;
             /** Value Description */
             value_description: string;
+            /** Parameters */
+            parameters?: components["schemas"]["FormulaParameterBody"][];
         };
         /** CustomIndicatorCheckResponse */
         CustomIndicatorCheckResponse: {
@@ -1748,6 +1766,8 @@ export interface components {
             problems: components["schemas"]["IndicatorProblemResponse"][];
             /** Look Back Bars */
             look_back_bars: number | null;
+            /** Default Look Back Bars */
+            default_look_back_bars: number | null;
         };
         /** CustomIndicatorResponse */
         CustomIndicatorResponse: {
@@ -1759,6 +1779,8 @@ export interface components {
             chart_placement: string;
             /** Value Description */
             value_description: string;
+            /** Parameters */
+            parameters?: components["schemas"]["FormulaParameterBody"][];
             /** Custom Indicator Id */
             custom_indicator_id: number;
             /** Key */
@@ -1828,6 +1850,29 @@ export interface components {
             type: "fixed_shares";
             /** Shares */
             shares: number;
+        };
+        /**
+         * FormulaParameterBody
+         * @description An expression uses `name` as a number. Each reference holds its own value (ADR 0009).
+         */
+        FormulaParameterBody: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Value Type */
+            value_type: string;
+            /** Default */
+            default: number;
+            /** Minimum */
+            minimum: number;
+            /** Maximum */
+            maximum: number;
+            /**
+             * Description
+             * @default
+             */
+            description: string;
         };
         /**
          * ForwardTestCapitalResponse
@@ -2122,6 +2167,8 @@ export interface components {
             expression: string;
             /** Chart Placement */
             chart_placement: string;
+            /** Parameters */
+            parameters?: components["schemas"]["FormulaParameterBody"][];
         };
         /**
          * IndicatorFormulaBody
@@ -2135,6 +2182,8 @@ export interface components {
             expression: string;
             /** Chart Placement */
             chart_placement: string;
+            /** Parameters */
+            parameters?: components["schemas"]["FormulaParameterBody"][];
         };
         /**
          * IndicatorOperand
@@ -2173,6 +2222,10 @@ export interface components {
             maximum: number;
             /** Is In Name */
             is_in_name: boolean;
+            /** Label */
+            label?: string | null;
+            /** Description */
+            description?: string | null;
         };
         /** IndicatorProblemResponse */
         IndicatorProblemResponse: {

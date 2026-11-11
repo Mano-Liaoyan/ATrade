@@ -916,14 +916,67 @@ and an allow-list. Nothing runs the text: there is no `eval` and no `exec`.
 | Numbers | Finite `int` and `float` literals. |
 | Operators | `+ - * /`, unary `-` and `+`, and `**`. The exponent of `**` must be a number from -10 to 10. |
 | Bar fields | `open`, `high`, `low`, `close`, `volume`. |
-| Rolling functions | `mean(x, n)`, `max(x, n)`, `min(x, n)`, `sum(x, n)`, `std(x, n)` (sample standard deviation, `n` at least 2), `lag(x, n)`. `n` is an integer literal from 1 to 1000. |
+| Rolling functions | `mean(x, n)`, `max(x, n)`, `min(x, n)`, `sum(x, n)`, `std(x, n)` (sample standard deviation, `n` at least 2), `lag(x, n)`. `n` is an integer literal from 1 to 1000, or a parameter. |
+| Quantile functions | `quantile(x, n, q)`: the quantile `q` (a number from 0 to 1, or a parameter) of the last `n` values, with linear interpolation between the 2 nearest values, as the NumPy default. `median(x, n)` is `quantile(x, n, 0.5)`. |
 | Other functions | `abs(x)`, `log(x)` (natural logarithm). |
-| Built-in indicators | The catalog key as a function: `rsi(14)`, `sma(period=50)`, `macd(output="signal")`. Arguments are in the order of the catalog or by name. The value of each is a number literal. The check of section 23.6 checks them. A multi-line indicator needs `output`. |
+| Built-in indicators | The catalog key as a function: `rsi(14)`, `sma(period=50)`, `macd(output="signal")`. Arguments are in the order of the catalog or by name. The value of each is a number literal or a parameter. The check of section 23.6 checks them. A multi-line indicator needs `output`. |
+| Variables | A line `name = value` before the last line. The lines after it use `name`. A new line or `;` separates the lines. The last line is the value of the indicator. |
+| Parameters | The name of a parameter of the custom indicator. It is a number. |
 
 All other syntax is a problem of the check, for example an attribute, a name
 that is not in the table, a comparison, a list, or a text outside `output`.
-An expression has at most 500 characters and 20 levels, and reads at most 20000
-bars. `check_expression(expression)` returns the problem with its column.
+An expression has at most 1000 characters and 20 levels, and reads at most
+20000 bars. `check_expression(expression, parameters)` returns the problem
+with its column, and with its line when the line is not the first line.
+
+Variables (#428):
+
+```text
+width = std(close, 20) / mean(close, 20)
+width / median(width, 60) - 1
+```
+
+- A variable has a name that is not a bar field, a parameter, or a variable
+  before it. It cannot use itself, and a second line cannot give the name
+  again.
+- The expression calculates a variable 1 time for each bar. Each use reads
+  that value. So the windows of a variable count 1 time in the calculation
+  limit below, also when the expression uses the variable more than 1 time.
+- A variable that the expression does not use is a problem.
+
+Parameters (#428). A custom indicator has a list of 0 to 10 parameters:
+
+```json
+{"name": "lookback_days", "label": "Look-back days", "value_type": "int",
+ "default": 60, "minimum": 5, "maximum": 250, "description": ""}
+```
+
+- `name` is the name in the expression: a lower-case letter, then lower-case
+  letters, digits, and `_`, at most 40 characters. It is not a bar field, a
+  function of the table, or a catalog key. `label` (1 to 60 characters) is
+  the name that the UI shows. `value_type` is `int` or `float`. The numbers
+  are from -1e15 to 1e15, and an `int` parameter has integer numbers. The
+  default is from the minimum to the maximum. `description` is optional (at
+  most 200 characters).
+- A parameter can be a normal number, the `n` of a rolling function or of
+  `lag`, the `q` of `quantile`, or an argument of a built-in indicator. It
+  cannot be the exponent of `**`.
+- In a place with a range, the range of the parameter must be in the range of
+  the place. An `n` must be an `int` parameter from 1 (`std`: 2) to 1000. So
+  each value that the user can set is correct.
+- The check calculates the limits (20000 bars read, and the calculation limit
+  below) with the maximum of each parameter. The bars of an expression do not
+  decrease when a parameter increases. Then the check parses the expression
+  with the defaults, so the default values are correct together, for example
+  for `macd(fast, slow)`. The maximum values must also be correct together:
+  the maximum of `fast` must be less than the maximum of `slow`.
+- A look-back for parameter values that the expression cannot use (a
+  parameter sweep can give them) is the look-back of the defaults. The run
+  then reports the problem, as for a built-in indicator.
+- A name that is not a bar field, a variable, or a parameter is a problem with
+  its column. A parameter that the expression does not use is a problem.
+- Each reference holds its own parameter values in `parameters` (section
+  23.10.2). A change of a value does not change the custom indicator.
 
 The window bars x the bars read of an expression must be at most 10000000. The
 window bars are the sum of each `n` of a rolling function and of `lag`, and the
@@ -932,8 +985,8 @@ average has a look-back factor and keeps one number, so it counts 0. The bars
 read are the look-back of section 23.10.3. So `std(close, 1000) / ema(1000)`
 passes, and 11 windows of 1000 bars are refused.
 
-An expression cannot call a custom indicator. A custom indicator has no
-parameters and has one output, `value`.
+An expression cannot call a custom indicator. A custom indicator has one
+output, `value`.
 
 ### 23.10.2 Stored references
 
@@ -952,6 +1005,36 @@ A stored reference holds a copy of the expression (ADR 0009):
 }
 ```
 
+A custom indicator with parameters has the list in `formula.parameters`, and
+the reference has the values, as a reference to a built-in indicator:
+
+```json
+{
+  "indicator": "custom_12",
+  "parameters": {"lookback_days": 20},
+  "output": "value",
+  "formula": {
+    "name": "Mean close",
+    "expression": "mean(close, lookback_days)",
+    "chart_placement": "price",
+    "parameters": [{"name": "lookback_days", "label": "Look-back days", "value_type": "int",
+                    "default": 60, "minimum": 5, "maximum": 250, "description": ""}]
+  }
+}
+```
+
+- A parameter without a value has its default. `check_indicator_reference`
+  checks the values with the ranges of `formula.parameters`, and then parses
+  the expression with the values. A problem of values that are not correct
+  together has the location `parameters`.
+- A formula without parameters does not hold `parameters`, so its JSON is the
+  same as before #428.
+- The UI name has the values, as a built-in indicator: `Mean close(20)`
+  (section 23.3). A chart legend shows `Mean close 20`. The name of a custom
+  indicator has no parentheses, so the values are not part of the name.
+- One chart, screen, or strategy can hold 2 references to one custom indicator
+  with different values.
+
 - A reference gets `formula` from the catalog when the user selects the
   indicator. The catalog gives it for each custom indicator.
 - `check_indicator_reference` checks `formula`. Its locations start with
@@ -964,9 +1047,16 @@ A stored reference holds a copy of the expression (ADR 0009):
   click on the selected item changes nothing. A `close_versus_line` condition
   does not show the button when the catalog chart placement is not `price`. On
   a chart, the user removes the indicator and adds it again.
-- Strategy code has `FormulaIndicator(<expression>)`. `CHART_INDICATORS` has
-  `formula` as a dict literal of string literals.
+- Strategy code has `FormulaIndicator(<expression>)`, or
+  `FormulaIndicator(<expression>, parameters={"lookback_days": 20})` for an
+  expression with parameters. The class takes the values only, not the ranges.
+  `CHART_INDICATORS` has `formula` as a dict literal of literals.
   A backtest child and a forward test child read no custom indicator row.
+  The code of a rule builder version has one configuration field for each
+  parameter, as for a built-in indicator, so a parameter sweep can change it.
+  The version code holds the values, so a backtest can be repeated.
+- "Use current expression" also copies the parameter list. A value stays for
+  a parameter name that the current formula still has.
 - A screen with 1 name and 2 references is refused (`check_screen`), because
   a result names its columns by the indicator name. The problem tells the user
   to click "Use current expression" in each place or to select another
@@ -975,10 +1065,12 @@ A stored reference holds a copy of the expression (ADR 0009):
 
 ### 23.10.3 Values
 
-`FormulaIndicator(expression)` has the parts of section 23.3. Each node of the
-expression gets each bar. `initialized` is `True` while `value` is a number.
+`FormulaIndicator(expression, parameters)` has the parts of section 23.3. Each
+node of the expression gets each bar. `initialized` is `True` while `value` is
+a number.
 
-- Look-back: the parser calculates it. A bar field or a number is 1 bar. A rolling
+- Look-back: the parser calculates it with the parameter values of the
+  reference. A bar field or a number is 1 bar. A rolling
   function adds `n - 1` to the bars of `x`. `lag` adds `n`. A built-in indicator
   has the count of section 23.4. An operator takes the largest count. A screen
   reads this count, and a rule builder version uses it for the warm-up.
@@ -989,7 +1081,7 @@ expression gets each bar. `initialized` is `True` while `value` is a number.
 - Rolling calculation: each bar adds one value and removes one value. `mean`,
   `sum`, and `std` keep integer totals, so they keep no rounding error of a value
   that left the window. `max` and `min` keep the values that can become the
-  extreme.
+  extreme. `quantile` and `median` keep the values of the window in order.
 - Thread: a screen run and the series route calculate in a thread
   (`asyncio.to_thread`), so the event loop serves other requests. A screen run
   keeps the order of the instruments.
@@ -998,13 +1090,14 @@ expression gets each bar. `initialized` is `True` while `value` is a number.
 
 Table `custom_indicator`: `custom_indicator_id`, `name` (unique, without case),
 `expression`, `chart_placement` (`price` or `own`), `value_description`,
-`kept`, `assistant_conversation_id`, `created_at_utc`, `changed_at_utc`.
+`parameters` (jsonb, the list of section 23.10.1), `kept`,
+`assistant_conversation_id`, `created_at_utc`, `changed_at_utc`.
 
 | Route | Behavior |
 |---|---|
-| `GET /api/custom-indicators` | `200` with the list by name: `[{"custom_indicator_id", "key", "name", "expression", "chart_placement", "value_description", "kept", "assistant_conversation_id"}]`. |
-| `POST /api/custom-indicators` | Body `{"name", "expression", "chart_placement", "value_description"}`. `201` with the row. `422` with `{"problems": [{"location", "message"}]}`. `409` with `{"detail"}` when another save takes the name after the name check. |
-| `POST /api/custom-indicators/check` | The same body. `200` with `{"problems": [...], "look_back_bars"}`. `look_back_bars` is null when the expression has a problem. It saves nothing. The optional parameter `custom_indicator_id` names the row that the body changes, so the row does not conflict with its own name. |
+| `GET /api/custom-indicators` | `200` with the list by name: `[{"custom_indicator_id", "key", "name", "expression", "chart_placement", "value_description", "parameters", "kept", "assistant_conversation_id"}]`. |
+| `POST /api/custom-indicators` | Body `{"name", "expression", "chart_placement", "value_description", "parameters"}`. `parameters` is optional: without it, the custom indicator has no parameters. `201` with the row. `422` with `{"problems": [{"location", "message"}]}`. `409` with `{"detail"}` when another save takes the name after the name check. |
+| `POST /api/custom-indicators/check` | The same body. `200` with `{"problems": [...], "look_back_bars", "default_look_back_bars"}`. `look_back_bars` is the bars for a value when each parameter has its maximum. `default_look_back_bars` is the same with the defaults. They are null when the expression or a parameter has a problem. It saves nothing. The optional parameter `custom_indicator_id` names the row that the body changes, so the row does not conflict with its own name. |
 | `GET /api/custom-indicators/{id}` | `200` with the row. `404` for an unknown id. |
 | `PUT /api/custom-indicators/{id}` | The body of `POST`. `200` with the row. `404`, `409` (as `POST`), or `422`. |
 | `POST /api/custom-indicators/{id}/keep` | `200` with the row, and `kept` true. `404` for an unknown id. |
@@ -1012,15 +1105,19 @@ Table `custom_indicator`: `custom_indicator_id`, `name` (unique, without case),
 
 The problems are: a name with less than 1 or more than 60 characters, a name
 with parentheses, a name that another custom indicator has, a problem of the
-expression, an unknown chart placement, a value description with less than 1 or
-more than 1000 characters, and a NUL or a lone surrogate character in a name or
-a value description.
+expression, a problem of a parameter (location `["parameters", "<index>",
+"<field>"]`), an unknown chart placement, a value description with less than 1
+or more than 1000 characters, and a NUL or a lone surrogate character in a name
+or a value description. The expression is checked only when the parameter list
+is correct.
 
 `GET /api/market-data/indicators` and `GET /api/screen-indicators` give the
 built-in indicators, then the custom indicators by name. A custom indicator has
-`formula`, no parameters, the outputs `["value"]`, its `name` as `short_name`,
+`formula`, its parameters in the form of a built-in indicator (`name`,
+`value_type`, `default`, `minimum`, `maximum`, `is_in_name` true) with `label`
+and `description`, the outputs `["value"]`, its `name` as `short_name`,
 and the text of the user as `value_description`. A built-in indicator has no
-`formula`.
+`formula`, and its parameters have no `label` and no `description`.
 
 The routes are methods of `CustomIndicatorRoutes` in
 `market_data/custom_indicators.py`. `/ws/custom-indicators` pushes each change
@@ -1031,7 +1128,15 @@ of the table (docs/architecture.md section 13, "Live updates").
 - The section "Custom indicators" of the Settings page has a table with the
   name and the expression. "New custom indicator" and the row buttons open a
   dialog. A problem of the backend shows at its field. A delete asks for a
-  confirmation.
+  confirmation. The expression is a text area. Below it, "Parameters" has one
+  line of fields for each parameter (Name, Label, Type, Default, Minimum,
+  Maximum, and a Remove button) and the button "Add parameter".
+- The settings of a chart indicator, a screen condition, and a rule builder
+  operand show one number field for each parameter of a custom indicator, with
+  its `label`, as for a built-in indicator. A change of a value on a chart
+  calculates the series again at once. The fields come from the `formula` of
+  the reference, so they also show after a change or a delete of the custom
+  indicator.
 - "Add indicator", the Indicator select of a screen condition, and the operand
   select of the rule builder show the custom indicators after the built-in
   indicators. A custom indicator with the chart placement `price` is also a

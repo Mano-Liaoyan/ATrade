@@ -97,3 +97,26 @@ def make_full_rules() -> Json:
         },
         position_size={"type": "percent_of_equity", "percent": 50},
     )
+
+
+DAYS_PARAMETER: Json = {
+    "name": "days",
+    "label": "Days",
+    "value_type": "int",
+    "default": 5,
+    "minimum": 2,
+    "maximum": 50,
+    "description": "",
+}
+
+
+def parameter_indicator(days: int | None = None) -> Json:
+    """A custom indicator with the parameter `days`."""
+    formula = {
+        "name": "Ratio",
+        "expression": "close / mean(close, days)",
+        "chart_placement": "own",
+        "parameters": [DAYS_PARAMETER],
+    }
+    parameters = {} if days is None else {"days": days}
+    return {"type": "indicator", "indicator": "custom_3", "parameters": parameters, "formula": formula}

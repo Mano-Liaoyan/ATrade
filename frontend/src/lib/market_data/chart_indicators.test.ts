@@ -271,6 +271,15 @@ describe('custom indicators', () => {
     expect(createChartIndicator(SMA, [])).not.toHaveProperty('formula');
   });
 
+  it('the parameters of a formula are the parameters of its definition, and the legend shows their values', () => {
+    const days = { name: 'days', label: 'Days', value_type: 'int', default: 60, minimum: 5, maximum: 250, description: '' };
+    const definition = findChartDefinition([], { indicator: 'custom_1', formula: { ...FORMULA, parameters: [days] } });
+
+    expect(definition?.parameters).toEqual([{ name: 'days', value_type: 'int', default: 60, minimum: 5, maximum: 250, is_in_name: true, label: 'Days', description: '' }]);
+    expect(definition && createChartIndicator(definition, []).parameters).toEqual({ days: 60 });
+    expect(definition && formatLegendName(definition, { days: 20 })).toBe('Ratio 20');
+  });
+
   it('the formula of a deleted custom indicator gives its definition', () => {
     expect(findChartDefinition([SMA], { indicator: 'custom_1', formula: FORMULA })).toMatchObject({ name: 'Ratio', outputs: ['value'], parameters: [] });
     expect(findChartDefinition([SMA], { indicator: 'custom_1' })).toBeUndefined();

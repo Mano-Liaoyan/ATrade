@@ -4,6 +4,7 @@ import {
   groupProblems,
   isDraftChanged,
   nameDefinitionIndicators,
+  nameIndicator,
   newCondition,
   readCurrentReference,
   readTarget,
@@ -212,6 +213,18 @@ describe('custom indicators', () => {
 
   it('a new reference holds the formula', () => {
     expect(referenceOf([custom], 'custom_1', 'compare')).toEqual({ indicator: 'custom_1', parameters: {}, output: 'value', formula });
+  });
+
+  it('a reference with parameters has their defaults, their values in its name, and keeps the values of the names that stay', () => {
+    const days = { name: 'days', label: 'Days', value_type: 'int', default: 5, minimum: 2, maximum: 50, description: '' };
+    const withDays = { ...formula, expression: 'close / mean(close, days)', parameters: [days] };
+    const catalog: ScreenIndicator[] = [{ ...custom, parameters: [{ ...days, value_type: 'int', is_in_name: true }], formula: withDays }];
+    const held = { indicator: 'custom_1', parameters: { days: 9, other: 3 }, output: 'value', formula };
+
+    expect(referenceOf(catalog, 'custom_1', 'compare')).toMatchObject({ parameters: { days: 5 }, formula: withDays });
+    expect(readCurrentReference(catalog, held, 'compare')).toEqual({ ...held, parameters: { days: 9 }, formula: withDays });
+    expect(nameIndicator([], { ...held, formula: withDays })).toBe('Ratio(9)');
+    expect(nameIndicator([], { indicator: 'custom_1', formula: withDays })).toBe('Ratio(5)');
   });
 
   it('a reference gets its name from its formula, also after a delete', () => {

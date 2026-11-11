@@ -5,6 +5,7 @@
 <script lang="ts">
   import { Button, Checkbox, Select, TextInput } from '#lib/foundation/carbon';
   import { ScrollRegion } from '#lib/foundation/scroll_region';
+  import { findChartDefinition } from '#lib/foundation/indicator_reference';
   import {
     LINE_OUTPUTS,
     MARKET_EXCHANGES,
@@ -67,7 +68,10 @@
     kind === 'start' ? 'Start instruments' : kind === 'order' ? 'Order' : (FILTER_TITLES[kind] ?? CONDITION_TITLES[kind] ?? kind),
   );
   const reference = $derived((item['indicator'] ?? {}) as Item);
-  const indicator = $derived(catalog.find((candidate) => candidate.key === reference['indicator']));
+  // A reference to a custom indicator has its parameters in its formula, also after a change or a delete.
+  const indicator = $derived(
+    findChartDefinition(catalog, reference as { indicator: string; formula?: ScreenIndicator['formula'] }),
+  );
   const catalogItems = $derived(
     (kind === 'close_versus_line'
       ? catalog.filter((candidate) => candidate.key in LINE_OUTPUTS || candidate.formula?.chart_placement === 'price')
@@ -173,7 +177,7 @@
     <div class="field-row">
       {#each indicator.parameters.filter((parameter) => parameter.is_in_name) as parameter (parameter.name)}
         <TextInput
-          label={parameterLabel(parameter.name)}
+          label={parameter.label ?? parameterLabel(parameter.name)}
           class="number-input"
           inputmode={parameter.value_type === 'int' ? 'numeric' : 'decimal'}
           value={text(((reference['parameters'] ?? {}) as Item)[parameter.name] ?? parameter.default)}

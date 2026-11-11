@@ -7,7 +7,7 @@ range. So a chart value is equal to the screen value at the same daily bar.
 """
 
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from typing import Any, Literal, cast
 
@@ -20,6 +20,7 @@ from atrade.foundation.clock import Clock
 from atrade.foundation.instrument import Instrument
 from atrade.indicator import (
     INDICATOR_CATALOG,
+    FormulaParameterBody,
     IndicatorProblem,
     check_indicator_reference,
     create_indicator,
@@ -45,6 +46,9 @@ class IndicatorParameterResponse(BaseModel):
     maximum: int | float
     # False for a parameter that the UI name does not show (bars_per_year).
     is_in_name: bool
+    # A parameter of a custom indicator only: the name that the UI shows, and the meaning.
+    label: str | None = Field(default=None, exclude_if=lambda value: value is None)
+    description: str | None = Field(default=None, exclude_if=lambda value: value is None)
 
 
 class IndicatorFormulaBody(BaseModel):
@@ -54,6 +58,10 @@ class IndicatorFormulaBody(BaseModel):
     name: str
     expression: str
     chart_placement: str
+    # A formula without parameters does not hold the field, so its JSON stays the same as before #428.
+    parameters: list[FormulaParameterBody] = Field(
+        default_factory=list[FormulaParameterBody], exclude_if=lambda value: not value
+    )
 
 
 class IndicatorResponse(BaseModel):
@@ -71,6 +79,23 @@ class IndicatorResponse(BaseModel):
     value_description: str
     # A custom indicator only. A new reference to this indicator copies it.
     formula: IndicatorFormulaBody | None = Field(default=None, exclude_if=lambda value: value is None)
+
+
+def make_parameter_responses(parameters: Sequence[FormulaParameterBody]) -> list[IndicatorParameterResponse]:
+    """The parameters of a custom indicator in the form of the catalog."""
+    return [
+        IndicatorParameterResponse(
+            name=parameter.name,
+            value_type="int" if parameter.value_type == "int" else "float",
+            default=parameter.default,
+            minimum=parameter.minimum,
+            maximum=parameter.maximum,
+            is_in_name=True,
+            label=parameter.label,
+            description=parameter.description,
+        )
+        for parameter in parameters
+    ]
 
 
 def list_built_in_indicators() -> list[IndicatorResponse]:

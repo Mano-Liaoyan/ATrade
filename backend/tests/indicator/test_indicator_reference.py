@@ -5,6 +5,7 @@ import pytest
 from atrade.indicator import (
     MACD,
     RSI,
+    FormulaIndicator,
     IndicatorProblem,
     check_indicator_reference,
     create_indicator,
@@ -161,3 +162,157 @@ def test_refuses_a_wrong_reference_to_a_custom_indicator(
     reference: dict[str, object], location: tuple[str, ...]
 ) -> None:
     assert location in [problem.location for problem in check_indicator_reference(reference)]
+
+
+LOOKBACK = {
+    "name": "lookback_days",
+    "label": "Look-back days",
+    "value_type": "int",
+    "default": 60,
+    "minimum": 5,
+    "maximum": 250,
+    "description": "",
+}
+PARAMETER_FORMULA = {
+    "name": "Mean close",
+    "expression": "mean(close, lookback_days)",
+    "chart_placement": "price",
+    "parameters": [LOOKBACK],
+}
+
+
+def make_parameter_reference(values: object = None, **formula: object) -> dict[str, object]:
+    reference: dict[str, object] = {"indicator": "custom_3", "formula": {**PARAMETER_FORMULA, **formula}}
+    return reference if values is None else {**reference, "parameters": values}
+
+
+def test_a_custom_indicator_has_the_parameters_of_its_formula() -> None:
+    reference = make_parameter_reference({"lookback_days": 20})
+    definition = find_indicator_definition(reference)
+
+    assert check_indicator_reference(reference) == []
+    assert [(parameter.name, parameter.default, parameter.label) for parameter in definition.parameters] == [
+        ("lookback_days", 60, "Look-back days")
+    ]
+    assert definition.display_name({"lookback_days": 20}) == "Mean close(20)"
+    assert definition.screen_look_back_bars({"lookback_days": 20}) == 20
+    assert definition.screen_look_back_bars({}) == 60
+    for held, values in ((make_parameter_reference(), {"lookback_days": 60}), (reference, {"lookback_days": 20})):
+        indicator = create_indicator(held)
+        assert isinstance(indicator, FormulaIndicator)
+        assert indicator.parameters == values
+
+
+@pytest.mark.parametrize(
+    ("reference", "location", "message"),
+    [
+        (make_parameter_reference({"lookback_days": 4}), ("parameters", "lookback_days"), "from 5 to 250"),
+        (make_parameter_reference({"lookback_days": 20.5}), ("parameters", "lookback_days"), "must be an integer"),
+        (make_parameter_reference({"days": 20}), ("parameters", "days"), "Unknown parameter 'days'"),
+        (make_parameter_reference(parameters=3), ("formula", "parameters"), "must be a list"),
+        (make_parameter_reference(parameters=[3]), ("formula", "parameters", "0"), "must be an object"),
+        (make_parameter_reference(parameters=[LOOKBACK] * 2), ("formula", "parameters", "1", "name"), "2 times"),
+        (make_parameter_reference(parameters=[LOOKBACK] * 11), ("formula", "parameters"), "at most 10 parameters"),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "extra": 1}]),
+            ("formula", "parameters", "0", "extra"),
+            "Unknown field 'extra'",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "name": "Days"}]),
+            ("formula", "parameters", "0", "name"),
+            "lower-case letter",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "name": "close"}]),
+            ("formula", "parameters", "0", "name"),
+            "is a bar field or a function",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "name": "median"}]),
+            ("formula", "parameters", "0", "name"),
+            "is a bar field or a function",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "label": ""}]),
+            ("formula", "parameters", "0", "label"),
+            "1 to 60 characters",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "description": "x" * 201}]),
+            ("formula", "parameters", "0", "description"),
+            "0 to 200 characters",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "value_type": "text"}]),
+            ("formula", "parameters", "0", "value_type"),
+            "`int` or `float`",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "default": 60.5}]),
+            ("formula", "parameters", "0", "default"),
+            "must be an integer",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "maximum": True}]),
+            ("formula", "parameters", "0", "maximum"),
+            "must be an integer",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "value_type": "float", "maximum": 1e16}]),
+            ("formula", "parameters", "0", "maximum"),
+            "from -1e15 to 1e15",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "default": 4}]),
+            ("formula", "parameters", "0", "default"),
+            "from the minimum (5) to the maximum (250)",
+        ),
+        (
+            make_parameter_reference(parameters=[{**LOOKBACK, "maximum": 1001}]),
+            ("formula", "expression"),
+            "the parameter 'lookback_days' is from 5 to 1001",
+        ),
+        (make_parameter_reference(expression="close"), ("formula", "expression"), "does not use the parameter"),
+        (make_parameter_reference(parameters=[]), ("formula", "expression"), "Unknown name 'lookback_days'"),
+    ],
+)
+def test_a_wrong_parameter_of_a_custom_indicator_is_a_problem(
+    reference: dict[str, object], location: tuple[str, ...], message: str
+) -> None:
+    problems = check_indicator_reference(reference, has_output=False)
+
+    assert [problem.location for problem in problems] == [location]
+    assert message in problems[0].message
+
+
+def test_parameter_values_that_the_expression_cannot_use_together_are_a_problem() -> None:
+    fast = {**LOOKBACK, "name": "fast", "default": 12, "maximum": 20}
+    slow = {**LOOKBACK, "name": "slow", "default": 26, "minimum": 10}
+    reference = make_parameter_reference(expression='macd(fast, slow, output="value")', parameters=[fast, slow])
+
+    assert check_indicator_reference(reference, has_output=False) == []
+    problems = check_indicator_reference({**reference, "parameters": {"fast": 20, "slow": 15}}, has_output=False)
+    assert [problem.location for problem in problems] == [("parameters",)]
+    assert "must be less than" in problems[0].message
+
+
+@pytest.mark.parametrize(
+    ("field", "value"), [("value_type", [1]), ("value_type", {}), ("name", {}), ("name", [1]), ("label", [1])]
+)
+def test_a_parameter_field_that_is_a_list_or_an_object_is_a_problem(field: str, value: object) -> None:
+    reference = make_parameter_reference(parameters=[{**LOOKBACK, field: value}, {**LOOKBACK, field: value}])
+
+    problems = check_indicator_reference(reference, has_output=False)
+
+    assert {problem.location for problem in problems} == {
+        ("formula", "parameters", "0", field),
+        ("formula", "parameters", "1", field),
+    }
+
+
+def test_the_look_back_of_a_value_that_the_expression_cannot_use_is_the_look_back_of_the_defaults() -> None:
+    definition = find_indicator_definition(make_parameter_reference())
+
+    assert definition.screen_look_back_bars({"lookback_days": 5000}) == 60
+    assert definition.screen_look_back_bars({"lookback_days": 20.5}) == 60

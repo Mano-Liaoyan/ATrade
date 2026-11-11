@@ -4,9 +4,47 @@ import { BACKEND_NOT_REACHABLE, jsonRequest, readErrorMessage, readJsonBody, req
 
 export type CustomIndicator = components['schemas']['CustomIndicatorResponse'];
 export type CustomIndicatorFields = components['schemas']['CustomIndicatorBody'];
+export type CustomIndicatorParameter = components['schemas']['FormulaParameterBody'];
 type IndicatorProblem = components['schemas']['IndicatorProblemResponse'];
 
-/** The message of each field with a problem, by the field name. A problem without a field has the key "". */
+/** One parameter in the dialog. The numbers are the texts of the fields, so a wrong text stays. */
+export interface ParameterDraft {
+  name: string;
+  label: string;
+  value_type: string;
+  default: string;
+  minimum: string;
+  maximum: string;
+  description: string;
+}
+
+const NUMBER_FIELDS = ['default', 'minimum', 'maximum'] as const;
+
+const NEW_PARAMETER: ParameterDraft = { name: '', label: '', value_type: 'int', default: '', minimum: '', maximum: '', description: '' };
+
+export function createParameterDraft(parameter?: CustomIndicatorParameter): ParameterDraft {
+  if (parameter === undefined) {
+    return { ...NEW_PARAMETER };
+  }
+  return { ...NEW_PARAMETER, ...parameter, default: String(parameter.default), minimum: String(parameter.minimum), maximum: String(parameter.maximum) };
+}
+
+/** The parameters of the request, or the problem of each number field that has no number. */
+export function readParameterDrafts(drafts: readonly ParameterDraft[]): { parameters: CustomIndicatorParameter[]; problems: CustomIndicatorProblems } {
+  const problems: CustomIndicatorProblems = {};
+  const parameters = drafts.map((draft, index) => {
+    for (const field of NUMBER_FIELDS) {
+      if (draft[field].trim() === '' || !Number.isFinite(Number(draft[field]))) {
+        problems[`parameters.${String(index)}.${field}`] = 'Enter a number.';
+      }
+    }
+    return { ...draft, default: Number(draft.default), minimum: Number(draft.minimum), maximum: Number(draft.maximum) };
+  });
+  return { parameters, problems };
+}
+
+/** The message of each field with a problem, by the location with `.` between its parts, for example `name` or
+ * `parameters.0.default`. A problem without a field has the key "". */
 export type CustomIndicatorProblems = Record<string, string>;
 export type SaveResult = { kind: 'ok' } | { kind: 'refused'; problems: CustomIndicatorProblems } | { kind: 'failed'; message: string };
 
@@ -22,7 +60,7 @@ export function listCustomIndicators(fetchFunction: typeof fetch): Promise<Reque
 export function groupProblems(problems: readonly IndicatorProblem[]): CustomIndicatorProblems {
   const grouped: CustomIndicatorProblems = {};
   for (const problem of problems) {
-    grouped[String(problem.location[0] ?? '')] ??= problem.message;
+    grouped[problem.location.join('.')] ??= problem.message;
   }
   return grouped;
 }

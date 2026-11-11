@@ -24,6 +24,7 @@ interface Row {
   expression: string;
   chart_placement: string;
   value_description: string;
+  parameters?: unknown[];
   kept: boolean;
   assistant_conversation_id: number | null;
 }
@@ -232,4 +233,71 @@ test('Add indicator adds a custom indicator of the catalog, and the backend calc
 
   const row = page.getByRole('list', { name: 'Legend' }).getByRole('listitem').filter({ hasText: 'Close ratio' });
   await expect(row.locator('.legend-value')).toHaveText(/^\d+\.\d{2}$/);
+});
+
+const DAYS = { name: 'days', label: 'Days', value_type: 'int', default: 20, minimum: 5, maximum: 250, description: '' };
+
+test('the Settings page saves the parameters of a custom indicator, and a number field without a number has a problem', async ({ page, context }) => {
+  await useLocalCustomIndicators(context);
+  await page.goto('/settings');
+
+  await page.getByRole('button', { name: 'New custom indicator' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New custom indicator' });
+  await dialog.getByLabel('Name', { exact: true }).first().fill('Close ratio');
+  await dialog.getByLabel('Expression').fill('width = close / mean(close, days)\nwidth - 1');
+  await dialog.getByLabel('Value description').fill('The close over its mean.');
+  await dialog.getByRole('button', { name: 'Add parameter' }).click();
+  const parameter = dialog.getByRole('group', { name: 'Parameter 1' });
+  await parameter.getByLabel('Name').fill('days');
+  await parameter.getByLabel('Label').fill('Days');
+  await parameter.getByLabel('Default').fill('20');
+  await parameter.getByLabel('Minimum').fill('5');
+  await dialog.getByRole('button', { name: 'Save custom indicator' }).click();
+  await expect(parameter.getByText('Enter a number.')).toBeVisible();
+
+  await parameter.getByLabel('Maximum').fill('250');
+  const saved = page.waitForRequest((sent) => sent.method() === 'POST' && sent.url().endsWith('/api/custom-indicators'));
+  await dialog.getByRole('button', { name: 'Save custom indicator' }).click();
+  expect(((await saved).postDataJSON() as { parameters: unknown[] }).parameters).toEqual([DAYS]);
+  await expect(dialog).toBeHidden();
+
+  await page.getByRole('button', { name: 'Change Close ratio' }).click();
+  const changeDialog = page.getByRole('dialog', { name: 'Change custom indicator' });
+  await expect(changeDialog.getByLabel('Expression')).toHaveValue('width = close / mean(close, days)\nwidth - 1');
+  await expect(changeDialog.getByRole('group', { name: 'Parameter 1' }).getByLabel('Maximum')).toHaveValue('250');
+  await changeDialog.getByRole('button', { name: 'Remove parameter 1' }).click();
+  await expect(changeDialog.getByRole('group', { name: 'Parameter 1' })).toHaveCount(0);
+});
+
+test('a chart shows 1 custom indicator 2 times with 2 parameter values, and the settings change a value', async ({ page, context }) => {
+  await useLocalChartIndicatorSet(context);
+  const formula = { ...FORMULA, expression: 'close / mean(close, days)', parameters: [DAYS] };
+  const { description, ...catalogParameter } = DAYS;
+  await context.route('**/api/market-data/indicators', async (route) => {
+    const response = await route.fetch();
+    const catalog = (await response.json()) as unknown[];
+    await route.fulfill({ json: [...catalog, { ...CUSTOM_ITEM, parameters: [{ ...catalogParameter, description, is_in_name: true }], formula }] });
+  });
+  await page.goto(CHART_PATH);
+  await expect(page.getByRole('status', { name: 'Bar count' })).toHaveText('1096 bars');
+
+  const legend = page.getByRole('list', { name: 'Legend' });
+  for (const count of [1, 2]) {
+    await page.getByRole('button', { name: 'Add indicator' }).click();
+    await page.getByRole('dialog', { name: 'Add indicator' }).getByRole('option', { name: 'Close ratio' }).click();
+    await expect(legend.getByRole('listitem').filter({ hasText: 'Close ratio 20' })).toHaveCount(count);
+  }
+
+  const first = legend.getByRole('listitem').filter({ hasText: 'Close ratio 20' }).first();
+  await first.locator('.legend-name').hover();
+  await first.getByRole('button', { name: 'Settings for Close ratio 20' }).click();
+  const settings = page.getByRole('dialog', { name: 'Close ratio' });
+  await settings.getByRole('spinbutton', { name: 'Days' }).fill('60');
+  await settings.getByRole('button', { name: 'Apply' }).click();
+
+  for (const name of ['Close ratio 60', 'Close ratio 20']) {
+    const row = legend.getByRole('listitem').filter({ hasText: name });
+    await expect(row).toHaveCount(1);
+    await expect(row.locator('.legend-value')).toHaveText(/^\d+\.\d{2}$/);
+  }
 });
