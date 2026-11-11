@@ -5,6 +5,7 @@ import pytest
 from atrade.indicator import (
     MACD,
     RSI,
+    FormulaIndicator,
     IndicatorProblem,
     check_indicator_reference,
     create_indicator,
@@ -196,8 +197,10 @@ def test_a_custom_indicator_has_the_parameters_of_its_formula() -> None:
     assert definition.display_name({"lookback_days": 20}) == "Mean close(20)"
     assert definition.screen_look_back_bars({"lookback_days": 20}) == 20
     assert definition.screen_look_back_bars({}) == 60
-    assert create_indicator(make_parameter_reference()).parameters == {"lookback_days": 60}  # pyright: ignore[reportAttributeAccessIssue]
-    assert create_indicator(reference).parameters == {"lookback_days": 20}  # pyright: ignore[reportAttributeAccessIssue]
+    for held, values in ((make_parameter_reference(), {"lookback_days": 60}), (reference, {"lookback_days": 20})):
+        indicator = create_indicator(held)
+        assert isinstance(indicator, FormulaIndicator)
+        assert indicator.parameters == values
 
 
 @pytest.mark.parametrize(
