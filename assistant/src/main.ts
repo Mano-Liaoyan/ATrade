@@ -3,6 +3,7 @@ import path from 'node:path';
 import { startAssistantServer } from './assistant_server.ts';
 import { createAssistantTools } from './assistant_tools.ts';
 import { SERVICE_BACKTEST_WAIT } from './backtest_tools.ts';
+import { ClaudeCode } from './claude_code.ts';
 import { Conversations } from './conversations.ts';
 import { CredentialFile, createModelRuntime } from './credential_file.ts';
 import { Logins } from './logins.ts';
@@ -20,7 +21,12 @@ const CREDENTIAL_FILE = path.join(PI_DIR, 'credentials.json');
 // The device ID of this installation for "Sign in with ChatGPT" (25.7.3). Mode 0600.
 const DEVICE_ID_FILE = path.join(PI_DIR, 'device-id');
 
+// The empty working directory of the Claude Code runs (25.7.5). Claude Code keeps its login and its sessions in
+// HOME/.claude, also in the volume.
+const CLAUDE_CODE_DIR = path.join(PI_DIR, 'claude-code');
+
 const file = new CredentialFile(CREDENTIAL_FILE);
+const claudeCode = new ClaudeCode({ workDir: CLAUDE_CODE_DIR });
 const logins = new Logins({ file, createRuntime: createModelRuntime, deviceIdFile: DEVICE_ID_FILE });
 // The tools call port 8001 of web with the conversation ID of the run.
 const conversations = new Conversations({
@@ -33,10 +39,12 @@ const conversations = new Conversations({
       wait: SERVICE_BACKTEST_WAIT,
     }),
   webAccess: await loadWebAccess(PI_DIR),
+  claudeCode,
 });
 await startAssistantServer({ host: '0.0.0.0', port: ASSISTANT_PORT }, conversations, {
   file,
   logins,
   createRuntime: createModelRuntime,
+  claudeCode,
 });
 console.log(`assistant listens on port ${String(ASSISTANT_PORT)}`);

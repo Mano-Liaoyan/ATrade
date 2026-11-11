@@ -40,8 +40,26 @@ export function formatKey(credential: Credential): string {
 }
 
 export function describeCredentialKind(type: Credential['type']): string {
-  return type === 'oauth' ? 'Subscription' : 'API key';
+  switch (type) {
+    case 'oauth':
+      return 'Subscription';
+    case 'api_key':
+      return 'API key';
+    case 'claude_code':
+      return 'Claude Code login';
+  }
 }
+
+/** pi's own Anthropic subscription login: pi sends the Claude subscription token to the Anthropic API itself.
+ * Anthropic permits a Claude subscription only in Claude Code and its own apps (docs/architecture/assistant.md 25.7.5). */
+export function isAnthropicSubscription(provider: string, method: Credential['type']): boolean {
+  return provider === 'anthropic' && method === 'oauth';
+}
+
+export const ANTHROPIC_SUBSCRIPTION_RISK_TITLE = 'Anthropic does not permit this login';
+export const ANTHROPIC_SUBSCRIPTION_RISK =
+  'pi sends the Claude subscription token to the Anthropic API outside Claude Code. Anthropic can limit or close the ' +
+  'account. Use the Claude Code login for a Claude subscription.';
 
 /** The status icon before the credential name. `label` is its accessible name and tooltip, with the reason of a failure. */
 export interface CredentialStateView {
@@ -49,10 +67,16 @@ export interface CredentialStateView {
   label: string;
 }
 
-/** "failed": the last OAuth refresh failed. The user deletes the credential and logs in again. */
+/** "failed": the last OAuth refresh failed. The user deletes the credential and logs in again. A Claude Code login
+ * that is not ready gives its reason and the login command. A ready Anthropic subscription of pi shows its risk. */
 export function describeCredentialState(credential: Credential): CredentialStateView {
+  if (credential.type === 'claude_code' && credential.state === 'failed') {
+    return { kind: 'error', label: credential.state_message ?? 'Claude Code is not ready.' };
+  }
   if (credential.state === 'ready') {
-    return { kind: 'success', label: 'Ready' };
+    return isAnthropicSubscription(credential.provider, credential.type)
+      ? { kind: 'warning', label: `Ready. ${ANTHROPIC_SUBSCRIPTION_RISK_TITLE}: ${ANTHROPIC_SUBSCRIPTION_RISK}` }
+      : { kind: 'success', label: 'Ready' };
   }
   return { kind: 'error', label: `Log in again: ${credential.state_message ?? 'The OAuth refresh failed.'}` };
 }

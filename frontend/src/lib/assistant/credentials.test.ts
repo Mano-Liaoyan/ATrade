@@ -5,6 +5,7 @@ import {
   describeCredentialKind,
   describeCredentialState,
   formatKey,
+  isAnthropicSubscription,
   isLoginWaiting,
   listLoginProviders,
   NO_LOGIN,
@@ -44,9 +45,33 @@ describe('the credential columns', () => {
     expect(formatKey({ ...API_KEY, type: 'oauth', key_last4: null })).toBe('');
   });
 
-  test('the kind is a subscription or an API key', () => {
+  test('the kind is a subscription, an API key, or the Claude Code login', () => {
     expect(describeCredentialKind('oauth')).toBe('Subscription');
     expect(describeCredentialKind('api_key')).toBe('API key');
+    expect(describeCredentialKind('claude_code')).toBe('Claude Code login');
+  });
+
+  test("pi's Anthropic subscription shows its risk, and the Claude Code login that is not ready gives the command", () => {
+    const subscription: Credential = { ...API_KEY, type: 'oauth', key_last4: null };
+    const claudeCode: Credential = {
+      ...API_KEY,
+      provider: 'claude-code',
+      type: 'claude_code',
+      key_last4: null,
+      state: 'failed',
+      state_message: 'Run this command on the server: claude auth login',
+    };
+
+    expect(isAnthropicSubscription('anthropic', 'oauth')).toBe(true);
+    expect(isAnthropicSubscription('anthropic', 'api_key')).toBe(false);
+    expect(describeCredentialState(subscription)).toMatchObject({
+      kind: 'warning',
+      label: expect.stringContaining('Anthropic does not permit this login') as string,
+    });
+    expect(describeCredentialState(claudeCode)).toEqual({
+      kind: 'error',
+      label: 'Run this command on the server: claude auth login',
+    });
   });
 
   test('a ready credential is a success, and a failed refresh is an error with its reason', () => {

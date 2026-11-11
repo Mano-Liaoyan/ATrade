@@ -75,7 +75,8 @@ class CredentialResponse(BaseModel):
     id: str
     name: str
     provider: str
-    type: Literal["oauth", "api_key"]
+    # "claude_code": the Claude login of Claude Code in the assistant container (25.7.5). It has no secret in ATrade.
+    type: Literal["oauth", "api_key", "claude_code"]
     # The last 4 characters of an API key. None for a subscription login.
     key_last4: str | None
     # "failed": the last OAuth refresh failed. The user deletes the credential and logs in again.

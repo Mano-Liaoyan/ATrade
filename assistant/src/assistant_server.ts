@@ -8,13 +8,14 @@
 //   POST   /conversations/{id}/title        {provider, model, credential_id} → {title}, or 502 {detail}.
 //   GET    /conversations/{id}/messages     → {messages}.
 //   DELETE /conversations/{id}              Stops the active run and deletes the JSONL file → 204.
-//   GET    /providers                       → {providers} (25.7.1).
-//   GET    /credentials                     → {credentials}, without secrets (25.7.4).
+//   GET    /providers                       → {providers} (25.7.1). Claude Code first, when it is there (25.7.5).
+//   GET    /credentials                     → {credentials}, without secrets (25.7.4). The Claude login first.
 //   DELETE /credentials/{id}                → 204, or 404.
 //   POST   /logins                          {provider, method, name} → the login events as JSON lines (25.7.3).
 //                                           The login stops when web closes the request.
 //   POST   /login-answers                   {prompt_id, value} → 204, or 404 when no login waits for the prompt.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { ClaudeCode } from './claude_code.ts';
 import type { Conversations, PromptImage } from './conversations.ts';
 import type { CreateModelRuntime, CredentialFile } from './credential_file.ts';
 import type { LoginMethod, Logins } from './logins.ts';
@@ -37,6 +38,8 @@ export interface CredentialServices {
   file: CredentialFile;
   logins: Logins;
   createRuntime: CreateModelRuntime;
+  /** The Claude Code provider and its Claude login (25.7.5). Default: none. */
+  claudeCode?: ClaudeCode;
 }
 
 export interface ListenAddress {
@@ -164,11 +167,14 @@ type PlainRouteAction = (request: IncomingMessage, response: ServerResponse) => 
 function createCredentialRoutes(services: CredentialServices): Record<string, PlainRouteAction> {
   return {
     'GET /providers': async (_request, response) => {
-      sendJson(response, HTTP_OK, { providers: await listProviders(services.file, services.createRuntime) });
+      const providers = await listProviders(services.file, services.createRuntime);
+      const claudeCode = await services.claudeCode?.providerSummary();
+      sendJson(response, HTTP_OK, { providers: claudeCode === undefined ? providers : [claudeCode, ...providers] });
     },
-    'GET /credentials': (_request, response) => {
-      sendJson(response, HTTP_OK, { credentials: services.file.list() });
-      return Promise.resolve();
+    'GET /credentials': async (_request, response) => {
+      const claudeCode = await services.claudeCode?.credentialSummary();
+      const credentials = services.file.list();
+      sendJson(response, HTTP_OK, { credentials: claudeCode === undefined ? credentials : [claudeCode, ...credentials] });
     },
     'POST /logins': async (request, response) => {
       const body = await readJson(request);

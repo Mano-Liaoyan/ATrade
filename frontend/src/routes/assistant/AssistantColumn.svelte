@@ -66,7 +66,9 @@
 
   const conversation = $derived(session.conversation);
   const log = $derived(session.log);
-  const items = $derived(listSelectItems(session.providers, session.credentials, session.selection.provider));
+  const items = $derived(
+    listSelectItems(session.providers, session.credentials, session.selection.provider, conversation?.last_provider ?? null),
+  );
   const sendButton = $derived(
     describeSendButton({
       hasConversation: conversation !== null,

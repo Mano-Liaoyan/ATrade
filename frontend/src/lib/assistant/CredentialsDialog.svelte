@@ -3,7 +3,9 @@
      API key shows only its last 4 characters). Below it, a subscription login or an
      API key is added: the dialog starts a login on /ws/assistant and shows each step that pi asks for (the
      authorization link, the device code, a field to paste a code, or a password field for a new API key).
-     Closing the dialog closes the socket, and the login stops. #185 puts the icon button in the side column. -->
+     Closing the dialog closes the socket, and the login stops. #185 puts the icon button in the side column.
+     The Claude Code login (25.7.5) is the first row. It is not added or deleted here: the user logs in on the server.
+     pi's own Anthropic subscription login shows its risk. -->
 <script lang="ts">
   import {
     Button,
@@ -22,11 +24,14 @@
   import { ScrollRegion } from '#lib/foundation/scroll_region';
   import {
     addLoginMessage,
+    ANTHROPIC_SUBSCRIPTION_RISK,
+    ANTHROPIC_SUBSCRIPTION_RISK_TITLE,
     answerPrompt,
     deleteCredential,
     describeCredentialKind,
     describeCredentialState,
     formatKey,
+    isAnthropicSubscription,
     isLoginWaiting,
     listCredentials,
     listLoginProviders,
@@ -71,6 +76,11 @@
 
   const providerItems = $derived(listLoginProviders(providers, method));
   const providerNames = $derived(new Map(providers.map((provider) => [provider.id, provider.name])));
+  const claudeCodeProblem = $derived(
+    credentials.find((credential) => credential.type === 'claude_code' && credential.state === 'failed')?.state_message ??
+      null,
+  );
+  const isRiskyLogin = $derived(isAnthropicSubscription(providerId, method));
 
   async function load(): Promise<void> {
     const [credentialResult, providerResult] = await Promise.all([listCredentials(fetch), listProviders(fetch)]);
@@ -193,6 +203,9 @@
     {#if loadError !== null}
       <InlineNotification kind="error" title={loadError} />
     {/if}
+    {#if claudeCodeProblem !== null}
+      <InlineNotification kind="warning" title="Claude Code is not ready" subtitle={claudeCodeProblem} />
+    {/if}
     <ScrollRegion label="Credentials" maxHeight="16rem">
       <DataTable columns={COLUMNS} size="md">
         {#snippet rows()}
@@ -206,11 +219,13 @@
                 {#if credential.key_last4 !== null}<span class="credentials__key">{formatKey(credential)}</span>{/if}
               </td>
               <td class="cds--table-column-menu">
-                <OverflowMenu
-                  label={`Actions for ${credential.name}`}
-                  size="md"
-                  items={[{ label: 'Delete credential', danger: true, onSelect: () => void removeCredential(credential) }]}
-                />
+                {#if credential.type !== 'claude_code'}
+                  <OverflowMenu
+                    label={`Actions for ${credential.name}`}
+                    size="md"
+                    items={[{ label: 'Delete credential', danger: true, onSelect: () => void removeCredential(credential) }]}
+                  />
+                {/if}
               </td>
             </tr>
           {/each}
@@ -271,6 +286,9 @@
       {#if login.error !== null}
         <InlineNotification kind="error" title={login.error} />
       {/if}
+      {#if isRiskyLogin}
+        <InlineNotification kind="warning" title={ANTHROPIC_SUBSCRIPTION_RISK_TITLE} subtitle={ANTHROPIC_SUBSCRIPTION_RISK} />
+      {/if}
       <form class="credentials__form" onsubmit={startLogin}>
         <Select label="Provider" items={providerItems} value={providerId} onValueChange={setProviderId} />
         <TextInput label="Name" autocomplete="off" bind:value={name} />
@@ -279,7 +297,7 @@
           disabled={providerId === '' || name.trim() === ''}
           title={providerId === '' || name.trim() === '' ? 'Select a provider and enter a name first.' : undefined}
         >
-          {method === 'oauth' ? 'Log in' : 'Add API key'}
+          {method === 'oauth' ? (isRiskyLogin ? 'Log in anyway' : 'Log in') : 'Add API key'}
         </Button>
       </form>
     {/if}

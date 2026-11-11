@@ -27,7 +27,7 @@ function readDetails(result: unknown): ToolDetails {
 }
 
 function toolStep(
-  event: { toolCallId: string; toolName: string },
+  event: ToolCall,
   status: ToolStepEvent['status'],
   details: ToolDetails,
 ): ToolStepEvent {
@@ -41,30 +41,48 @@ function toolStep(
   };
 }
 
+/** The tool call of a tool event: its ID and its tool name. */
+export interface ToolCall {
+  toolCallId: string;
+  toolName: string;
+}
+
+export function startToolEvents(call: ToolCall): ToolRunEvent[] {
+  return [toolStep(call, 'running', {})];
+}
+
+export function updateToolEvents(call: ToolCall, partialResult: unknown): ToolRunEvent[] {
+  return [toolStep(call, 'running', readDetails(partialResult))];
+}
+
+/** The tool step at the end, and one event for each result card in the details of the result. */
+export function endToolEvents(call: ToolCall, result: unknown, isError: boolean): ToolRunEvent[] {
+  const details = readDetails(result);
+  const events: ToolRunEvent[] = [toolStep(call, isError ? 'failed' : 'succeeded', details)];
+  if (details.savedVersion !== undefined) {
+    events.push({ type: 'strategy_version_saved', ...details.savedVersion });
+  }
+  if (details.finishedBacktestId !== undefined) {
+    events.push({ type: 'backtest_finished', backtest_id: details.finishedBacktestId });
+  }
+  if (details.savedScreen !== undefined) {
+    events.push({ type: 'screen_saved', ...details.savedScreen });
+  }
+  if (details.screenRun !== undefined) {
+    events.push({ type: 'screen_run_finished', ...details.screenRun });
+  }
+  return events;
+}
+
 /** The run events of one pi event. Empty for a pi event that is not a tool event. */
 export function toToolRunEvents(event: AgentSessionEvent): ToolRunEvent[] {
   switch (event.type) {
     case 'tool_execution_start':
-      return [toolStep(event, 'running', {})];
+      return startToolEvents(event);
     case 'tool_execution_update':
-      return [toolStep(event, 'running', readDetails(event.partialResult))];
-    case 'tool_execution_end': {
-      const details = readDetails(event.result);
-      const events: ToolRunEvent[] = [toolStep(event, event.isError ? 'failed' : 'succeeded', details)];
-      if (details.savedVersion !== undefined) {
-        events.push({ type: 'strategy_version_saved', ...details.savedVersion });
-      }
-      if (details.finishedBacktestId !== undefined) {
-        events.push({ type: 'backtest_finished', backtest_id: details.finishedBacktestId });
-      }
-      if (details.savedScreen !== undefined) {
-        events.push({ type: 'screen_saved', ...details.savedScreen });
-      }
-      if (details.screenRun !== undefined) {
-        events.push({ type: 'screen_run_finished', ...details.screenRun });
-      }
-      return events;
-    }
+      return updateToolEvents(event, event.partialResult);
+    case 'tool_execution_end':
+      return endToolEvents(event, event.result, event.isError);
     default:
       return [];
   }

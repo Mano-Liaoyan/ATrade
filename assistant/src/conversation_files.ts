@@ -2,11 +2,18 @@
 // pi writes all messages, tool arguments, and tool results into it. PostgreSQL does not hold the messages.
 // Each run adds a custom entry with the credential name and the thinking level of the run, so each AI assistant
 // message can show its model, its thinking level, and its credential name (25.8.2).
+// A Claude Code conversation (25.7.5) keeps its model context in the session of Claude Code. Its JSONL file keeps the
+// Claude Code session ID (a custom entry) and the message texts (pi messages with text only), for the message list.
+// pi writes the file only when it has a user message or an AI assistant message.
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { SessionManager } from '@earendil-works/pi-coding-agent';
 
 export const CREDENTIAL_ENTRY_TYPE = 'atrade_credential';
+export const CLAUDE_SESSION_ENTRY_TYPE = 'atrade_claude_session';
+
+/** The runner of a conversation. The first run sets it. A conversation cannot change it (25.7.5). */
+export type ConversationRunner = 'pi' | 'claude-code';
 
 export interface ConversationMessage {
   role: 'user' | 'assistant';
@@ -24,11 +31,47 @@ export interface RunEntry {
   thinking_level?: string;
 }
 
+/** The data of the Claude Code session entry: the session ID that the next runs resume. */
+export interface ClaudeSessionEntry {
+  session_id: string;
+}
+
 interface LooseMessage {
   role: string;
   content: unknown;
   provider?: string;
   model?: string;
+}
+
+type StoredMessage = Parameters<SessionManager['appendMessage']>[0];
+
+const NO_USAGE = {
+  input: 0,
+  output: 0,
+  cacheRead: 0,
+  cacheWrite: 0,
+  totalTokens: 0,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+};
+
+/** A pi user message with text only, for the message list of a Claude Code conversation. */
+export function toTextUserMessage(text: string): StoredMessage {
+  return { role: 'user', content: [{ type: 'text', text }], timestamp: Date.now() };
+}
+
+/** A pi AI assistant message with text only, for the message list of a Claude Code conversation. pi never sends it to
+ * a model: a Claude Code conversation does not run in pi. */
+export function toTextAssistantMessage(text: string, provider: string, model: string): StoredMessage {
+  return {
+    role: 'assistant',
+    content: [{ type: 'text', text }],
+    api: 'anthropic-messages',
+    provider,
+    model,
+    usage: NO_USAGE,
+    stopReason: 'stop',
+    timestamp: Date.now(),
+  };
 }
 
 export function conversationDir(piDir: string): string {
@@ -78,22 +121,56 @@ function toConversationMessage(message: LooseMessage, run: RunEntry | null): Con
   return null;
 }
 
-/** The user messages and the AI assistant messages with text, in order. [] when the conversation has no file. */
-export function readConversationMessages(piDir: string, conversationId: string): ConversationMessage[] {
-  if (!existsSync(conversationFile(piDir, conversationId))) {
-    return [];
+interface ConversationRecord {
+  messages: ConversationMessage[];
+  runner: ConversationRunner | null;
+  claudeSessionId: string | null;
+}
+
+/** Adds a custom entry to the record. Returns the run entry of a pi run, else null. */
+function readCustomEntry(record: ConversationRecord, customType: string, content: unknown): RunEntry | null {
+  switch (customType) {
+    case CREDENTIAL_ENTRY_TYPE:
+      return content as RunEntry;
+    case CLAUDE_SESSION_ENTRY_TYPE:
+      record.runner = 'claude-code';
+      record.claudeSessionId = (content as ClaudeSessionEntry).session_id;
+      return null;
+    default:
+      return null;
   }
-  const messages: ConversationMessage[] = [];
+}
+
+function readConversationRecord(piDir: string, conversationId: string): ConversationRecord {
+  const record: ConversationRecord = { messages: [], runner: null, claudeSessionId: null };
+  if (!existsSync(conversationFile(piDir, conversationId))) {
+    return record;
+  }
   let run: RunEntry | null = null;
   for (const entry of openConversationSession(piDir, conversationId).getBranch()) {
-    if (entry.type === 'custom' && entry.customType === CREDENTIAL_ENTRY_TYPE) {
-      run = entry.data as RunEntry;
+    if (entry.type === 'custom') {
+      run = readCustomEntry(record, entry.customType, entry.data) ?? run;
     } else if (entry.type === 'message') {
+      record.runner ??= 'pi';
       const message = toConversationMessage(entry.message as LooseMessage, run);
       if (message !== null) {
-        messages.push(message);
+        record.messages.push(message);
       }
     }
   }
-  return messages;
+  return record;
+}
+
+/** The user messages and the AI assistant messages with text, in order. [] when the conversation has no file. */
+export function readConversationMessages(piDir: string, conversationId: string): ConversationMessage[] {
+  return readConversationRecord(piDir, conversationId).messages;
+}
+
+/** The runner of the conversation and its Claude Code session ID. Null runner: the conversation has no run yet. */
+export function readConversationRunner(
+  piDir: string,
+  conversationId: string,
+): { runner: ConversationRunner | null; claudeSessionId: string | null } {
+  const { runner, claudeSessionId } = readConversationRecord(piDir, conversationId);
+  return { runner, claudeSessionId };
 }
