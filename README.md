@@ -309,7 +309,7 @@ Log in one time, in the repository on the server, and follow the steps of
 Claude Code:
 
 ```sh
-docker compose -f deploy/compose.yaml exec assistant claude auth login
+docker compose --file deploy/compose.yaml --env-file .env exec assistant claude auth login
 ```
 
 Claude Code keeps the login in the volume `atrade-assistant-pi`

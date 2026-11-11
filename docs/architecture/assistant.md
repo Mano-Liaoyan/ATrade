@@ -710,7 +710,9 @@ Source: user decisions of 2026-11-11, [ADR 0010](../adr/0010-claude-subscription
   `/usr/local/bin/claude`.
 - Login: the user runs this command one time, in the repository on the
   server, and follows the steps of Claude Code:
-  `docker compose -f deploy/compose.yaml exec assistant claude auth login`.
+  `docker compose --file deploy/compose.yaml --env-file .env exec assistant claude auth login`.
+  Compose reads `.env` only from the directory of the compose file
+  (`deploy/`), so the command gives `--env-file .env`, as `./start` does.
   Claude Code keeps the login in `/data/.claude` (`HOME` is `/data`).
   ATrade never reads, stores, or sends that login. The web page has no
   Claude login, because Anthropic does not permit a Claude login in another
