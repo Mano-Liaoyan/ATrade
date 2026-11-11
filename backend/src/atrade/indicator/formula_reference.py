@@ -14,6 +14,7 @@ from atrade.indicator.formula_indicator import (
     SCALAR_FUNCTIONS,
     WINDOW_FUNCTIONS,
     FormulaIndicator,
+    FormulaProblem,
     check_expression,
     count_formula_bars,
     fix_parameters,
@@ -35,7 +36,7 @@ CUSTOM_KEY_PREFIX = "custom_"
 CUSTOM_KEY_FORM = re.compile(rf"{CUSTOM_KEY_PREFIX}[0-9]+")
 FORMULA_FIELDS = ("name", "expression", "chart_placement", "parameters")
 PARAMETER_FIELDS = ("name", "label", "value_type", "default", "minimum", "maximum", "description")
-VALUE_TYPES: Mapping[object, type[int | float]] = {"int": int, "float": float}
+VALUE_TYPES: Mapping[str, type[int | float]] = {"int": int, "float": float}
 PARAMETER_NAME_FORM = re.compile("[a-z][a-z0-9_]*")
 MAX_PARAMETER_COUNT = 10
 MAX_PARAMETER_NAME_LENGTH = 40
@@ -93,14 +94,17 @@ def check_formula_parameters(parameters: object) -> list[IndicatorProblem]:
         message = f"A custom indicator has at most {MAX_PARAMETER_COUNT} parameters, not {len(items)}."
         return [IndicatorProblem(("parameters",), message)]
     problems: list[IndicatorProblem] = []
-    names: set[object] = set()
+    names: set[str] = set()
     for index, item in enumerate(items):
         location = ("parameters", str(index))
         item_problems = check_formula_parameter(item, location)
         name = cast("Mapping[object, object]", item).get("name") if isinstance(item, Mapping) else None
-        if not item_problems and name in names:
-            item_problems = [IndicatorProblem((*location, "name"), f"The parameter {name!r} is in the list 2 times.")]
-        names.add(name)
+        # A name from a request can be a list or an object. Only a text is a correct name.
+        if isinstance(name, str):
+            if not item_problems and name in names:
+                message = f"The parameter {name!r} is in the list 2 times."
+                item_problems = [IndicatorProblem((*location, "name"), message)]
+            names.add(name)
         problems.extend(item_problems)
     return problems
 
@@ -156,7 +160,8 @@ def check_parameter_text(
 
 
 def check_parameter_range(fields: Mapping[object, object], location: Location) -> list[IndicatorProblem]:
-    value_type = VALUE_TYPES.get(fields.get("value_type"))
+    written_type = fields.get("value_type")
+    value_type = VALUE_TYPES.get(written_type) if isinstance(written_type, str) else None
     if value_type is None:
         return [IndicatorProblem((*location, "value_type"), "The value type must be `int` or `float`.")]
     problems: list[IndicatorProblem] = []
@@ -181,7 +186,7 @@ def read_formula_parameters(parameters: object) -> tuple[IndicatorParameter, ...
     return tuple(
         IndicatorParameter(
             cast("str", item["name"]),
-            VALUE_TYPES[item["value_type"]],
+            VALUE_TYPES[cast("str", item["value_type"])],
             cast("ParameterValue", item["default"]),
             cast("ParameterValue", item["minimum"]),
             cast("ParameterValue", item["maximum"]),
@@ -227,15 +232,24 @@ def make_formula_definition(key: str, formula: Mapping[str, object]) -> Indicato
     def create(**values: ParameterValue) -> CatalogIndicator:
         return FormulaIndicator(expression, values)
 
+    parameters = read_formula_parameters(formula.get("parameters", []))
+
     def count_look_back_bars(values: ParameterValues) -> int:
-        return count_formula_bars(expression, tuple(values.items()))
+        try:
+            return count_formula_bars(expression, tuple(values.items()))
+        except FormulaProblem:
+            # readability-exception: a parameter sweep can give a value that the expression cannot use. The count of a
+            # built-in indicator has no check, and the run reports the problem. So this count uses the defaults.
+            return count_formula_bars(
+                expression, tuple((parameter.name, parameter.default) for parameter in parameters)
+            )
 
     return IndicatorDefinition(
         key,
         name,
         name,
         cast("ChartPlacement", formula["chart_placement"]),
-        read_formula_parameters(formula.get("parameters", [])),
+        parameters,
         VALUE,
         create,
         ScreenLookBack(()),

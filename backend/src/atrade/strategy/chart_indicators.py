@@ -186,8 +186,9 @@ def read_formula(value: ast.expr) -> dict[str, object] | None:
         return None
     try:
         return cast("dict[str, object]", ast.literal_eval(value))
-    except ValueError:
-        # readability-exception: ast.literal_eval reports a value that is not a literal only as an exception.
+    except ValueError, TypeError:
+        # readability-exception: ast.literal_eval reports a value that is not a literal, or a dict key that cannot be
+        # a key, only as an exception.
         return None
 
 

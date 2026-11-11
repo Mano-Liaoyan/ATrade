@@ -10,6 +10,7 @@ from atrade.strategy.rules_code import find_warm_up_bar_count, make_rules_code
 from atrade.strategy.strategy_rules import StrategyRules
 from tests.strategy.rules_examples import (
     COMPARISONS,
+    DAYS_PARAMETER,
     PRICES,
     Json,
     condition,
@@ -239,3 +240,21 @@ async def test_the_code_gives_the_parameters_of_a_custom_indicator_as_configurat
     assert await check_strategy_code(code) == []
     assert find_warm_up_bar_count(rules) == 20
     assert find_warm_up_bar_count(rules, {"custom_3_1_days": 30, "custom_3_2_days": 40}) == 40
+
+
+def test_a_float_parameter_with_a_whole_number_is_a_float_configuration_field() -> None:
+    factor = {**DAYS_PARAMETER, "name": "factor", "value_type": "float", "default": 2, "minimum": 1, "maximum": 5}
+    operand = parameter_indicator()
+    operand["formula"] = {**operand["formula"], "expression": "close * factor", "parameters": [factor]}
+    bands = {"type": "indicator", "indicator": "bollinger_bands", "parameters": {"k": 2}, "output": "upper"}
+
+    code = make_rules_code(check(custom_rules(operand, bands)))
+
+    assert "custom_3_1_factor: float = 2.0" in code
+    assert "bollinger_bands_2_k: float = 2.0" in code
+
+
+def test_a_sweep_value_that_the_expression_cannot_use_gives_the_warm_up_of_the_defaults() -> None:
+    rules = check(custom_rules(parameter_indicator(20)))
+
+    assert find_warm_up_bar_count(rules, {"custom_3_1_days": 5000}) == 5

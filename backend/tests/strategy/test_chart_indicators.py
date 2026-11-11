@@ -346,3 +346,14 @@ def test_the_code_of_a_custom_indicator_lists_its_parameters_for_the_chart() -> 
     assert list_chart_indicators(code, {"custom_3_1_days": 30}) == [
         {"indicator": "custom_3", "parameters": {"days": 30}, "formula": formula}
     ]
+
+
+@pytest.mark.anyio
+async def test_a_formula_that_is_not_a_literal_in_chart_indicators_is_a_problem() -> None:
+    code = STRATEGY_TEMPLATE + (
+        'CHART_INDICATORS = [{"indicator": "custom_1", "parameters": {}, "formula": {"name": "X", '
+        '"expression": "close", "chart_placement": "own", "parameters": [{[1]: 2}]}}]\n'
+    )
+
+    assert any("needs a formula object" in problem.message for problem in await check_strategy_code(code))
+    assert list_chart_indicators(code, {}) == []

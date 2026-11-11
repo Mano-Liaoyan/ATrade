@@ -968,7 +968,11 @@ Parameters (#428). A custom indicator has a list of 0 to 10 parameters:
   below) with the maximum of each parameter. The bars of an expression do not
   decrease when a parameter increases. Then the check parses the expression
   with the defaults, so the default values are correct together, for example
-  for `macd(fast, slow)`.
+  for `macd(fast, slow)`. The maximum values must also be correct together:
+  the maximum of `fast` must be less than the maximum of `slow`.
+- A look-back for parameter values that the expression cannot use (a
+  parameter sweep can give them) is the look-back of the defaults. The run
+  then reports the problem, as for a built-in indicator.
 - A name that is not a bar field, a variable, or a parameter is a problem with
   its column. A parameter that the expression does not use is a problem.
 - Each reference holds its own parameter values in `parameters` (section

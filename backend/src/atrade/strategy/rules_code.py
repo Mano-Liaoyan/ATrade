@@ -58,7 +58,12 @@ class CodeParts:
 
     def find_indicator(self, operand: IndicatorOperand) -> IndicatorUse:
         definition = find_indicator_definition(operand.model_dump(exclude={"type"}, exclude_none=True))
-        parameters = definition.with_defaults(operand.parameters)
+        # A float parameter with the value 2 is a float configuration field, so a parameter sweep can use 2.5.
+        parameters = {
+            parameter.name: float(value) if parameter.value_type is float else value
+            for parameter in definition.parameters
+            for value in [operand.parameters.get(parameter.name, parameter.default)]
+        }
         for indicator in self.indicators:
             is_same_definition = (indicator.definition.key, indicator.definition.expression) == (
                 definition.key,

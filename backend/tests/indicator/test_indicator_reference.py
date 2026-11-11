@@ -295,3 +295,24 @@ def test_parameter_values_that_the_expression_cannot_use_together_are_a_problem(
     problems = check_indicator_reference({**reference, "parameters": {"fast": 20, "slow": 15}}, has_output=False)
     assert [problem.location for problem in problems] == [("parameters",)]
     assert "must be less than" in problems[0].message
+
+
+@pytest.mark.parametrize(
+    ("field", "value"), [("value_type", [1]), ("value_type", {}), ("name", {}), ("name", [1]), ("label", [1])]
+)
+def test_a_parameter_field_that_is_a_list_or_an_object_is_a_problem(field: str, value: object) -> None:
+    reference = make_parameter_reference(parameters=[{**LOOKBACK, field: value}, {**LOOKBACK, field: value}])
+
+    problems = check_indicator_reference(reference, has_output=False)
+
+    assert {problem.location for problem in problems} == {
+        ("formula", "parameters", "0", field),
+        ("formula", "parameters", "1", field),
+    }
+
+
+def test_the_look_back_of_a_value_that_the_expression_cannot_use_is_the_look_back_of_the_defaults() -> None:
+    definition = find_indicator_definition(make_parameter_reference())
+
+    assert definition.screen_look_back_bars({"lookback_days": 5000}) == 60
+    assert definition.screen_look_back_bars({"lookback_days": 20.5}) == 60
