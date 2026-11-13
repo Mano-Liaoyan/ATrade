@@ -465,7 +465,7 @@ test('the column is 28rem wide; Minimize gives a rail, Maximize takes the center
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 });
 
-test('the log has a visible scroll track and does not scroll while the user reads older messages', async ({
+test('the log has a visible scroll track, does not make the page scroll, and does not scroll while the user reads older messages', async ({
   page,
 }, currentTest) => {
   await openStrategyWithConversation(page, createUniqueName(currentTest, 'Scroll'), 600);
@@ -481,6 +481,13 @@ test('the log has a visible scroll track and does not scroll while the user read
   const track = page.getByRole('scrollbar', { name: 'Conversation messages scroll bar' });
   await expect(track).toBeVisible();
   await expect(track.locator('.scroll-thumb')).toBeVisible();
+  // Each message has a visually hidden author span (position: absolute). The log must contain it, or the spans of a
+  // long log make the page taller than the window, and the page scrolls.
+  const pageSizes = await page.evaluate(() => ({
+    scrollHeight: document.documentElement.scrollHeight,
+    clientHeight: document.documentElement.clientHeight,
+  }));
+  expect(pageSizes.scrollHeight).toBeLessThanOrEqual(pageSizes.clientHeight);
 
   await sendMessage(page, 'Please wait.');
   await expect(log.getByText('Working on it')).toBeVisible();

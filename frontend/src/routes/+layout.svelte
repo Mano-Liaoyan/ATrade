@@ -182,8 +182,10 @@
   }
 
   /* A workbench page (foundation/workbench) is exactly the window height below the header and does not scroll as a
-     page. Each region of the workbench scrolls in itself. */
+     page. Each region of the workbench scrolls in itself. position: relative makes overflow: hidden also clip absolute
+     content that has no other positioned ancestor. */
   .app-main:has(:global(.atrade-workbench)) {
+    position: relative;
     box-sizing: border-box;
     block-size: 100vh;
     padding: var(--cds-spacing-09) 0 0;
