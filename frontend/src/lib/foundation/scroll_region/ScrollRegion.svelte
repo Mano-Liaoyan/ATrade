@@ -159,7 +159,10 @@
     block-size: 100%;
   }
 
+  /* position: relative makes the viewport the containing block of absolute content (for example the Carbon visually
+     hidden spans). Without it, overflow does not clip that content, and the content makes the page scroll. */
   .scroll-viewport {
+    position: relative;
     flex: 1;
     min-width: 0;
     overflow-y: auto;
