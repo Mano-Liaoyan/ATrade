@@ -39,17 +39,21 @@ from nautilus_trader.model import Bar, BarType, DataType, OrderSide, Quantity
 from nautilus_trader.trading import Strategy
 
 WARM_UP_LENGTH = timedelta(days=60)
-AVERAGE_PERIOD = 20
-TRADE_QUANTITY_SHARES = 10
 
 
 class HoldMembersConfig(StrategyConfig):
     \"\"\"A multi-instrument configuration has no `instrument_id` and no `bar_type`.\"\"\"
 
+    def __init__(self, *, average_period: int = 20, trade_quantity_shares: int = 10, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.average_period = average_period
+        self.trade_quantity_shares = trade_quantity_shares
+
 
 class HoldMembersStrategy(Strategy):
     def __init__(self, config: HoldMembersConfig) -> None:
         super().__init__(config)
+        self.settings = config
         self.members: dict[str, BarType] = {}
         self.averages: dict[str, SimpleMovingAverage] = {}
         self.held: set[str] = set()
@@ -74,7 +78,7 @@ class HoldMembersStrategy(Strategy):
             if name in self.members:
                 continue
             self.members[name] = bar_type
-            self.averages[name] = SimpleMovingAverage(AVERAGE_PERIOD)
+            self.averages[name] = SimpleMovingAverage(self.settings.average_period)
             self.register_indicator_for_bars(bar_type, self.averages[name])
             self.request_bars(bar_type, start=self.clock.utc_now() - WARM_UP_LENGTH)
             self.subscribe_bars(bar_type)
@@ -89,7 +93,8 @@ class HoldMembersStrategy(Strategy):
             self.held.add(name)
 
     def send_market_order(self, bar_type: BarType, order_side: OrderSide) -> None:
-        order = self.order_factory.market(bar_type.instrument_id, order_side, Quantity.from_int(TRADE_QUANTITY_SHARES))
+        quantity = Quantity.from_int(self.settings.trade_quantity_shares)
+        order = self.order_factory.market(bar_type.instrument_id, order_side, quantity)
         self.submit_order(order)
 """
 
@@ -104,6 +109,11 @@ How to write a strategy:
 - The StrategyConfig subclass has a keyword-only __init__. NautilusTrader 2.0 requires it.
 - For a "single" universe, ATrade fills instrument_id and bar_type at run time. All other configuration fields must \
 have a default value.
+- Put each number or switch that the user can tune (a period, a threshold, a quantity, an on/off choice) in the \
+__init__ of the StrategyConfig subclass as a keyword argument with an int, float, or bool annotation and a constant \
+default, for example `fast_period: int = 7`. The strategy reads it from the configuration. A parameter sweep can \
+change only these arguments. A module constant or a value in the Strategy code cannot be in a sweep. After a save, \
+read_sweep_parameters shows the parameters of the version.
 - Warm up the indicators with request_bars in on_start. In a backtest, request_bars gets the saved bars before \
 the start.
 - An indicator of register_indicator_for_bars gets the bars of request_bars. To read these bars in the strategy \

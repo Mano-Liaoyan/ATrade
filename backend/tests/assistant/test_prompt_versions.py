@@ -16,6 +16,8 @@ import pytest
 from httpx_ws import aconnect_ws
 
 from atrade.assistant import MessageEndMessage
+from atrade.assistant.system_prompt import MULTI_INSTRUMENT_EXAMPLE
+from atrade.strategy import StrategyParameter, read_strategy_parameters
 from tests.assistant.assistant_app import create_conversation, create_strategy, open_assistant_client
 from tests.backtest.real_runner import save_test_bars
 from tests.fakes.assistant import FakeAssistantService
@@ -107,6 +109,23 @@ async def test_the_default_text_is_english_and_asks_for_the_metrics_and_the_out_
     assert "has no instrument_id and no bar_type" in default_text
     assert 'self.subscribe_data(DataType("UniverseUpdate"))' in default_text
     assert "data.data.bar_types" in default_text
+
+
+def test_the_multi_instrument_example_has_parameters_that_a_sweep_can_change() -> None:
+    """The AI assistant copies the example. Tunable values in the configuration make a sweep possible
+    (backtest.md 10.11.1)."""
+    assert read_strategy_parameters(MULTI_INSTRUMENT_EXAMPLE) == [
+        StrategyParameter(name="average_period", type="int", default=20),
+        StrategyParameter(name="trade_quantity_shares", type="int", default=10),
+    ]
+
+
+@pytest.mark.anyio
+async def test_the_default_text_asks_for_tunable_values_in_the_configuration(client: httpx.AsyncClient) -> None:
+    default_text: str = (await client.get("/api/assistant/prompt-versions")).json()["default_text"]
+
+    assert "A parameter sweep can change only these arguments." in default_text
+    assert "read_sweep_parameters" in default_text
 
 
 @pytest.mark.anyio

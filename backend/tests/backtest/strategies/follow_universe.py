@@ -15,17 +15,22 @@ from nautilus_trader.model import Bar, BarType, DataType, OrderSide, Quantity
 from nautilus_trader.trading import Strategy
 
 WARM_UP_LENGTH = timedelta(days=60)
-AVERAGE_PERIOD = 20
-TRADE_QUANTITY_SHARES = 10
 
 
 class FollowUniverseConfig(StrategyConfig):
-    """A multi-instrument configuration has no `instrument_id` and no `bar_type`."""
+    """A multi-instrument configuration has no `instrument_id` and no `bar_type`. Its tunable values are parameters
+    (docs/architecture/backtest.md 10.11.1), as in the multi-instrument example of the system prompt."""
+
+    def __init__(self, *, average_period: int = 20, trade_quantity_shares: int = 10, **kwargs: object) -> None:
+        super().__init__(**kwargs)  # pyright: ignore[reportArgumentType] readability-exception: the stub has many keyword types.
+        self.average_period = average_period
+        self.trade_quantity_shares = trade_quantity_shares
 
 
 class FollowUniverseStrategy(Strategy):
     def __init__(self, config: FollowUniverseConfig) -> None:
         super().__init__(config)
+        self.settings = config
         self.members: dict[str, BarType] = {}
         self.averages: dict[str, SimpleMovingAverage] = {}
         self.held: set[str] = set()
@@ -48,7 +53,7 @@ class FollowUniverseStrategy(Strategy):
             if name in self.members:
                 continue
             self.members[name] = bar_type
-            self.averages[name] = SimpleMovingAverage(AVERAGE_PERIOD)
+            self.averages[name] = SimpleMovingAverage(self.settings.average_period)
             self.register_indicator_for_bars(bar_type, self.averages[name])
             self.request_bars(bar_type, start=self.clock.utc_now() - WARM_UP_LENGTH)
             self.subscribe_bars(bar_type)
@@ -60,5 +65,6 @@ class FollowUniverseStrategy(Strategy):
             self.held.add(name)
 
     def send_market_order(self, bar_type: BarType, order_side: OrderSide) -> None:
-        order = self.order_factory.market(bar_type.instrument_id, order_side, Quantity.from_int(TRADE_QUANTITY_SHARES))
+        quantity = Quantity.from_int(self.settings.trade_quantity_shares)
+        order = self.order_factory.market(bar_type.instrument_id, order_side, quantity)
         self.submit_order(order)

@@ -1,6 +1,6 @@
 // Counts the runs of a parameter grid and tells why a sweep cannot start (backtest.md section 10.11.1).
 import { describe, expect, it } from 'vite-plus/test';
-import { buildSweepGrid, countSweepRuns, readSweepStartBlock } from './sweep_grid';
+import { buildSweepGrid, countSweepRuns, NO_SWEEP_PARAMETERS, readSweepStartBlock } from './sweep_grid';
 
 describe('buildSweepGrid', () => {
   it('has 1 entry for each checked parameter, and a bool parameter has only its name', () => {
@@ -67,5 +67,10 @@ describe('readSweepStartBlock', () => {
 
   it('blocks a grid without parameters', () => {
     expect(readSweepStartBlock([])).toBe('Select 1 to 3 parameters to sweep.');
+  });
+
+  it('says that a strategy version without parameters cannot be swept', () => {
+    expect(readSweepStartBlock([], 0)).toBe(NO_SWEEP_PARAMETERS);
+    expect(readSweepStartBlock([], 2)).toBe('Select 1 to 3 parameters to sweep.');
   });
 });

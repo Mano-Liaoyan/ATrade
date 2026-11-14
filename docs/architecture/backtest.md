@@ -1466,7 +1466,8 @@ chart is hard to read on flat Carbon surfaces.
   start, end, and step inputs. The dialog
   shows the run count while the user types. When the grid has more than 200
   runs or more than 3 parameters, "Start parameter sweep" is disabled, and
-  the dialog says why.
+  the dialog says why. When the strategy version has no parameters, the
+  dialog says so and tells how to add one (section 10.11.1).
 - Prototype: a heat map of 8 × 12 cells for `roc_period` (5 to 40) and
   `rebalance_days` (5 to 60), and the Runs table sorted by Total return,
   highest first.

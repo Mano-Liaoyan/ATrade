@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from atrade.assistant import conversation_exists
-from atrade.backtest import create_backtest_assistant_router
+from atrade.backtest import create_backtest_assistant_router, create_sweep_assistant_router
 from atrade.foundation.assistant_conversation import CONVERSATION_HEADER
 from atrade.foundation.clock import Clock
 from atrade.foundation.error_response import add_validation_error_handler
@@ -63,6 +63,11 @@ def create_assistant_port_app(*, settings: Settings, clock: Clock, gateway_conne
             clock=clock,
             exchange_rate_reader=exchange_rate_reader,
             conversation_exists=check_conversation,
+        )
+    )
+    app.include_router(
+        create_sweep_assistant_router(
+            database_url=settings.database_url, clock=clock, exchange_rate_reader=exchange_rate_reader
         )
     )
     app.include_router(
