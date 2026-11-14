@@ -9,9 +9,11 @@
      a sweep row opens its context menu ("Open in new tab"). The page reads the
      list again after each change that /ws/sweeps pushes, and the open sweep when its list row changes. The
      "Delete parameter sweep" button opens a danger dialog; the backend can refuse the delete, and the page shows the reason.
+     When runs failed or timed out, the "Requeue failed runs" button before it queues them again (section 10.11.2).
      Right: the "AI assistant" side column (routes/assistant/, docs/architecture/assistant.md 25.12). -->
 <script lang="ts">
   import Add16 from '@carbon/icons/es/add/16.js';
+  import Renew16 from '@carbon/icons/es/renew/16.js';
   import TrashCan16 from '@carbon/icons/es/trash-can/16.js';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
@@ -45,6 +47,7 @@
     readSweepChart,
     readSweepRows,
     readSweepStatus,
+    requeueFailedRuns,
     sortSweepRows,
     SWEEP_METRICS,
     SWEEP_STATUS_COLUMN,
@@ -92,11 +95,16 @@
   let runsRegion = $state<HTMLDivElement>();
   let runsTable = $state<HTMLTableElement>();
   let deleteMessage = $state('');
+  let isRequeueing = $state(false);
+  let requeueMessage = $state('');
 
   const shownSweep = $derived(workbench.detail !== null && workbench.detail.id === sweepId ? workbench.detail : null);
   const parameterNames = $derived(shownSweep === null ? [] : readParameterNames(shownSweep));
   const chart = $derived(shownSweep === null ? null : readSweepChart(shownSweep, metric, sliceValue));
   const metricLabel = $derived(SWEEP_METRICS.find((item) => item.value === metric)?.label ?? '');
+  const failedRunCount = $derived(
+    shownSweep === null ? 0 : (shownSweep.status_counts['failed'] ?? 0) + (shownSweep.status_counts['timed_out'] ?? 0),
+  );
   const sortedRows = $derived(
     shownSweep === null ? [] : sortSweepRows(readSweepRows(shownSweep), sortColumn, sortDirection),
   );
@@ -147,6 +155,14 @@
     deleteMessage = '';
     workbench.removeItem(id);
     await goto(resolve('/sweeps/[[sweepId]]', { sweepId: undefined }), { replace: true });
+  }
+
+  // /ws/sweeps pushes the new run statuses, so the page reads the sweep again by itself.
+  async function requeueOpenSweep(id: number): Promise<void> {
+    isRequeueing = true;
+    const result = await requeueFailedRuns(fetch, id);
+    isRequeueing = false;
+    requeueMessage = result.kind === 'failed' ? result.message : '';
   }
 
   function openStartedSweep(started: SweepDetail): void {
@@ -218,6 +234,17 @@
         }}
       />
     {/if}
+    {#if requeueMessage !== ''}
+      <InlineNotification
+        kind="error"
+        title="Failed runs not requeued"
+        subtitle={requeueMessage}
+        lowContrast
+        onClose={() => {
+          requeueMessage = '';
+        }}
+      />
+    {/if}
     {#if shownSweep === null || chart === null}
       <div class="atrade-run-empty">
         {#if workbench.isListRead && workbench.items.length === 0 && workbench.listMessage === '' && workbench.detailMessage === ''}
@@ -251,6 +278,17 @@
                     >
                   {/each}
                 </span>
+                {#if failedRunCount > 0}
+                  <IconButton
+                    label={isRequeueing
+                      ? 'Requeueing failed runs…'
+                      : `Requeue ${String(failedRunCount)} failed ${failedRunCount === 1 ? 'run' : 'runs'}`}
+                    icon={Renew16}
+                    disabled={isRequeueing}
+                    busy={isRequeueing}
+                    onclick={() => void requeueOpenSweep(detail.id)}
+                  />
+                {/if}
                 <IconButton
                   label="Delete parameter sweep"
                   icon={TrashCan16}

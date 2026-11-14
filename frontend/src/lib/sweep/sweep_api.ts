@@ -38,6 +38,12 @@ export async function deleteSweep(
   return result.kind === 'failed' ? result : { kind: 'deleted' };
 }
 
+/** Queues the failed and timed-out runs of the sweep again. The backend refuses a sweep without such a run (422 with
+ * the reason). */
+export function requeueFailedRuns(fetchFunction: typeof fetch, sweepId: number): Promise<RequestResult<SweepDetail>> {
+  return requestJson(fetchFunction, FAILED_ACTION, `${SWEEPS_PATH}/${String(sweepId)}/requeue-failed`, { method: 'POST' });
+}
+
 export function readSweepParameters(
   fetchFunction: typeof fetch,
   strategyVersionId: number,

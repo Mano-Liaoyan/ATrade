@@ -718,6 +718,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sweeps/{sweep_id}/requeue-failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Requeue Failed Runs
+         * @description Queues the failed and timed-out runs again, for example after the kernel stopped them when memory was low.
+         *     The runs that finished stay.
+         */
+        post: operations["requeue_failed_runs_api_sweeps__sweep_id__requeue_failed_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/forward-tests/capital": {
         parameters: {
             query?: never;
@@ -5868,6 +5889,46 @@ export interface operations {
         };
     };
     cancel_sweep_api_sweeps__sweep_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sweep_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SweepDetailResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description The request is refused (detail is a text), or a field is not valid (detail is a list). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    requeue_failed_runs_api_sweeps__sweep_id__requeue_failed_post: {
         parameters: {
             query?: never;
             header?: never;

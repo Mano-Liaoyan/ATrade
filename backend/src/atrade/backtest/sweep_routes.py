@@ -31,6 +31,7 @@ from atrade.backtest.parameter_sweep import (
     delete_sweep,
     insert_sweep,
     make_grid,
+    requeue_failed_runs,
     select_sweep,
     select_sweep_runs,
     select_sweeps,
@@ -203,6 +204,17 @@ class SweepRoutes:
             await cancel_queued_runs(connection, sweep_id=sweep_id, ended_at_utc=self.clock.read_now_utc())
         return await self.read_sweep(sweep_id)
 
+    async def requeue_failed_runs(self, sweep_id: int) -> SweepDetailResponse:
+        """Queues the failed and timed-out runs again, for example after the kernel stopped them when memory was low.
+        The runs that finished stay."""
+        async with await psycopg.AsyncConnection.connect(self.database_url, autocommit=True) as connection:
+            if await select_sweep(connection, sweep_id) is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=SWEEP_NOT_FOUND)
+            requeued_count = await requeue_failed_runs(connection, sweep_id=sweep_id)
+        if requeued_count == 0:
+            refuse(f"Parameter sweep #{sweep_id} has no failed or timed-out runs.")
+        return await self.read_sweep(sweep_id)
+
     async def delete_sweep(self, sweep_id: int) -> None:
         """A true delete of the sweep and its runs. 409 while a run is queued or running, and for a run that is the
         same-period backtest of a forward test."""
@@ -239,6 +251,9 @@ def create_sweep_router(*, database_url: str, clock: Clock, exchange_rate_reader
         "/sweeps", routes.start_sweep, methods=["POST"], status_code=status.HTTP_201_CREATED, responses=REFUSED
     )
     router.add_api_route("/sweeps/{sweep_id}/cancel", routes.cancel_sweep, methods=["POST"], responses=responses)
+    router.add_api_route(
+        "/sweeps/{sweep_id}/requeue-failed", routes.requeue_failed_runs, methods=["POST"], responses=responses
+    )
     router.add_api_route(
         "/sweeps/{sweep_id}",
         routes.delete_sweep,
