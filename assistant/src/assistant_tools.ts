@@ -1,6 +1,7 @@
 // The tools of the AI assistant (docs/architecture/assistant.md 25.4.1). pi may run only these tools.
 // Each tool calls only the routes of port 8001 of web (25.3.3). The screen tools of 25.4.3 are in screen_tools.ts, and
-// the custom indicator tools of 25.4.4 are in custom_indicator_tools.ts.
+// the custom indicator tools of 25.4.4 are in custom_indicator_tools.ts, and the sweep tools of 25.4.6 are in
+// sweep_tools.ts.
 import { defineTool, type ToolDefinition } from '@earendil-works/pi-coding-agent';
 import { Type } from 'typebox';
 import {
@@ -13,6 +14,7 @@ import {
 } from './backtest_tools.ts';
 import { createCustomIndicatorTools } from './custom_indicator_tools.ts';
 import { createScreenTools } from './screen_tools.ts';
+import { createSweepTools } from './sweep_tools.ts';
 import { answerResult, isSuccess, textResult } from './tool_results.ts';
 import type { WebPortClient } from './web_port_client.ts';
 
@@ -26,6 +28,9 @@ export const ASSISTANT_TOOL_NAMES: readonly string[] = [
   'list_backtests',
   'read_backtest',
   'compare_backtests',
+  'read_sweep_parameters',
+  'list_sweeps',
+  'read_sweep',
   'list_indicators',
   'list_screens',
   'read_screen',
@@ -215,11 +220,13 @@ function createBacktestTools(context: AssistantToolsContext): ToolDefinition[] {
   ];
 }
 
-/** The 9 tools of 25.4.1, the 7 screen tools of 25.4.3, and the 5 tools of 25.4.4 for one run of one conversation. */
+/** The 9 tools of 25.4.1, the 7 screen tools of 25.4.3, the 5 tools of 25.4.4, and the 3 sweep tools of 25.4.6 for one
+ * run of one conversation. */
 export function createAssistantTools(context: AssistantToolsContext): ToolDefinition[] {
   return [
     ...createStrategyTools(context),
     ...createBacktestTools(context),
+    ...createSweepTools(context.client),
     ...createScreenTools(context.client),
     ...createCustomIndicatorTools(context.client),
   ];

@@ -166,6 +166,9 @@ The screen paths come from #150. Decided (#205): they are the final paths
 | `GET /api/backtests` | `list_backtests` | 2 | None. |
 | `GET /api/backtests/{backtest_id}` | `read_backtest`, `run_backtest` (wait) | 2 | None. |
 | `GET /api/backtests/{first_id}/comparison/{second_id}` | `compare_backtests` | 2 | None. |
+| `GET /api/sweeps/parameters?strategy_version_id=<id>` | `read_sweep_parameters` | 3 | None. |
+| `GET /api/sweeps` | `list_sweeps` | 3 | None. |
+| `GET /api/sweeps/{sweep_id}` | `read_sweep` | 3 | None. |
 | `GET /api/screen-indicators` | `list_indicators` | 3 | None. |
 | `GET /api/screens` | `list_screens` | 3 | None. |
 | `GET /api/screens/{screen_id}` | `read_screen` | 3 | None. |
@@ -206,7 +209,9 @@ These routes are not on port 8001:
   `POST /api/custom-indicators/{custom_indicator_id}/keep`
 - the HK instrument list changes
 - the daily bar update
-- the parameter sweep routes
+- `POST /api/sweeps`, `POST /api/sweeps/{sweep_id}/cancel`, and
+  `DELETE /api/sweeps/{sweep_id}`: the AI assistant reads sweeps but does
+  not start, cancel, or delete one (25.4.6)
 - all `/ws/` routes
 
 ## 25.4 Tools
@@ -460,6 +465,29 @@ internet and read each public web page. The tools come from the pi extension
 - `tests/web_access.test.ts` shows the tool list, the refused addresses, the
   refused local files, and the refused arguments. No test connects to the
   internet.
+
+### 25.4.6 Parameter sweep tools
+
+Decided (user decision of 2026-11-14): the AI assistant reads parameter
+sweeps, but only the user starts one. A sweep has up to 200 runs in the
+backtest queue, and each run counts in the DSR trial count of the strategy
+(backtest section 10.9.5). Thus the user controls the cost and the trial
+count. The code is `assistant/src/sweep_tools.ts`.
+
+| Tool | Does | Result to the model |
+|---|---|---|
+| `read_sweep_parameters` | Reads the parameters that a sweep of a strategy version can change (backtest section 10.11.1). | The answer of `GET /api/sweeps/parameters`. An empty list means that the version cannot be swept. |
+| `list_sweeps` | Lists the sweeps. | The answer of `GET /api/sweeps`. |
+| `read_sweep` | Reads one sweep. | The sweep, and each run with `backtest_id`, `parameters`, `status`, and 8 metrics: `total_return_percent`, `cagr_percent`, `sharpe_ratio`, `sortino_ratio`, `max_drawdown_percent`, `profit_factor`, `win_rate_percent`, and `trade_count`. `read_backtest` gives all metrics of a run. |
+
+- The default editable part of the system prompt (25.9) tells the model to
+  put each value that the user can tune in the `__init__` of the
+  `StrategyConfig` subclass, with an `int`, `float`, or `bool` annotation
+  and a constant default. A module constant cannot be in a sweep. The
+  multi-instrument example of the system prompt has the parameters
+  `average_period` and `trade_quantity_shares`.
+- A conversation with a prompt version that the user saved before this
+  change keeps that text. The Prompt dialog can restore the default text.
 
 ## 25.5 Strategy versions saved by the AI assistant
 

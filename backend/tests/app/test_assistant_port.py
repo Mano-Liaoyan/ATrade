@@ -34,6 +34,9 @@ ALLOWED_ROUTES = {
     ("GET", "/api/backtests"),
     ("GET", "/api/backtests/{backtest_id}"),
     ("GET", "/api/backtests/{first_backtest_id}/comparison/{second_backtest_id}"),
+    ("GET", "/api/sweeps/parameters"),
+    ("GET", "/api/sweeps"),
+    ("GET", "/api/sweeps/{sweep_id}"),
     ("GET", "/api/screens"),
     ("GET", "/api/screens/{screen_id}"),
     ("POST", "/api/screens"),
@@ -127,6 +130,8 @@ async def test_the_port_8001_app_has_no_frontend_files_and_no_socket_routes(
         ("DELETE", "/api/market-data/hk-instrument-list/1"),
         ("POST", "/api/market-data/daily-bars/update"),
         ("POST", "/api/sweeps"),
+        ("POST", "/api/sweeps/1/cancel"),
+        ("DELETE", "/api/sweeps/1"),
     ],
 )
 async def test_the_port_8001_app_refuses_the_routes_that_are_not_in_the_allow_list(

@@ -1,5 +1,6 @@
-"""HTTP routes of parameter sweeps (docs/architecture/backtest.md section 10.11.3). Port 8000 only: the AI assistant
-port has no sweep routes (decision #150)."""
+"""HTTP routes of parameter sweeps (docs/architecture/backtest.md section 10.11.3). Port 8001 has only the 3 read
+routes (docs/architecture/assistant.md 25.3.3): the AI assistant reads a sweep but does not start, cancel, or delete
+one."""
 
 from collections import Counter
 from dataclasses import replace
@@ -213,16 +214,30 @@ class SweepRoutes:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=refusal)
 
 
+def create_sweep_assistant_router(
+    *, database_url: str, clock: Clock, exchange_rate_reader: ExchangeRateReader
+) -> APIRouter:
+    """The read routes of port 8001. The user starts each sweep, so the user controls its cost and its DSR trials."""
+    routes = SweepRoutes(database_url=database_url, clock=clock, exchange_rate_reader=exchange_rate_reader)
+    router = APIRouter(prefix="/api")
+    add_sweep_read_routes(router, routes)
+    return router
+
+
+def add_sweep_read_routes(router: APIRouter, routes: SweepRoutes) -> None:
+    router.add_api_route("/sweeps/parameters", routes.read_parameters, methods=["GET"], responses=NOT_FOUND)
+    router.add_api_route("/sweeps", routes.list_sweeps, methods=["GET"])
+    router.add_api_route("/sweeps/{sweep_id}", routes.read_sweep, methods=["GET"], responses=NOT_FOUND)
+
+
 def create_sweep_router(*, database_url: str, clock: Clock, exchange_rate_reader: ExchangeRateReader) -> APIRouter:
     routes = SweepRoutes(database_url=database_url, clock=clock, exchange_rate_reader=exchange_rate_reader)
     router = APIRouter(prefix="/api")
     responses: dict[int | str, dict[str, Any]] = {**REFUSED, **NOT_FOUND}
-    router.add_api_route("/sweeps/parameters", routes.read_parameters, methods=["GET"], responses=NOT_FOUND)
+    add_sweep_read_routes(router, routes)
     router.add_api_route(
         "/sweeps", routes.start_sweep, methods=["POST"], status_code=status.HTTP_201_CREATED, responses=REFUSED
     )
-    router.add_api_route("/sweeps", routes.list_sweeps, methods=["GET"])
-    router.add_api_route("/sweeps/{sweep_id}", routes.read_sweep, methods=["GET"], responses=NOT_FOUND)
     router.add_api_route("/sweeps/{sweep_id}/cancel", routes.cancel_sweep, methods=["POST"], responses=responses)
     router.add_api_route(
         "/sweeps/{sweep_id}",

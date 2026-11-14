@@ -26,8 +26,16 @@ export function countSweepRuns(grid: GridEntry[]): number {
   return grid.length === 0 ? 0 : grid.reduce((runs, entry) => runs * valueCount(entry), 1);
 }
 
-// The reason that "Start parameter sweep" is disabled, or undefined when the grid can start.
-export function readSweepStartBlock(grid: GridEntry[]): string | undefined {
+export const NO_SWEEP_PARAMETERS =
+  'This strategy version has no parameters. Give the __init__ of its StrategyConfig keyword arguments with an int, ' +
+  'float, or bool annotation and a default value.';
+
+// The reason that "Start parameter sweep" is disabled, or undefined when the grid can start. `parameterCount` is the
+// number of parameters of the strategy version, or undefined while the dialog reads them.
+export function readSweepStartBlock(grid: GridEntry[], parameterCount?: number): string | undefined {
+  if (parameterCount === 0) {
+    return NO_SWEEP_PARAMETERS;
+  }
   if (grid.length === 0) {
     return 'Select 1 to 3 parameters to sweep.';
   }

@@ -1,8 +1,9 @@
 <!-- The "New parameter sweep" dialog (docs/architecture/backtest.md section 10.11.4): the fields of the "New backtest"
      form (BacktestRequestFields) and 1 row for each parameter of the strategy version: the name, the default value,
      the check box that adds the parameter to the sweep, and the start, end, and step inputs. The run count changes
-     while the user types. "Start parameter sweep" is disabled with its reason when the grid has no parameter, more
-     than 3 parameters, a range without values, or more than 200 runs. A bool parameter uses both values. -->
+     while the user types. "Start parameter sweep" is disabled with its reason when the strategy version has no
+     parameters, or the grid has no parameter, more than 3 parameters, a range without values, or more than 200 runs.
+     A bool parameter uses both values. -->
 <script lang="ts">
   import type { BacktestRequest } from '#lib/backtest';
   import { Checkbox, Dialog, InlineNotification, type NotificationMessage } from '#lib/foundation/carbon';
@@ -40,22 +41,30 @@
   let fieldsBlockReason = $state<string | null>(null);
   let strategyVersionId = $state('');
   let parameterRows = $state<(SweepParameterInput & { defaultValue: string })[]>([]);
+  // False while the dialog reads the parameters of the strategy version.
+  let areParametersRead = $state(false);
   let form: HTMLFormElement | undefined = $state();
   let fieldsRequest = $state<BacktestRequest | null>(null);
   let missingChoice = $state('');
 
   const grid = $derived(buildSweepGrid(parameterRows));
   const runCount = $derived(countSweepRuns(grid));
-  const blockReason = $derived(fieldsBlockReason ?? readSweepStartBlock(grid) ?? null);
+  const blockReason = $derived(
+    fieldsBlockReason ?? readSweepStartBlock(grid, areParametersRead ? parameterRows.length : undefined) ?? null,
+  );
 
   // A new strategy version has its own parameters. A range starts at the default value with step 1.
   $effect(() => {
     const versionId = strategyVersionId;
     parameterRows = [];
+    areParametersRead = false;
     if (versionId === '') {
       return;
     }
     void readSweepParameters(fetch, Number(versionId)).then((result) => {
+      if (versionId !== strategyVersionId) {
+        return;
+      }
       if (result.kind === 'failed') {
         startError = { kind: 'error', title: 'Parameters not read', subtitle: result.message };
         return;
@@ -73,6 +82,7 @@
           step: isBool ? '' : '1',
         };
       });
+      areParametersRead = true;
     });
   });
 

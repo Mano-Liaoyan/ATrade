@@ -23,6 +23,9 @@ import {
   SCREEN_LIST,
   SOURCE_SCREEN,
   STRATEGY_TRACEBACK,
+  SWEEP,
+  SWEEP_LIST,
+  SWEEP_PARAMETERS,
   SCREEN_SUMMARY,
   screenRow,
   startFakeWebPort,
@@ -556,6 +559,48 @@ describe('run_backtest with a universe (25.4.2)', () => {
     expect(readToolResults().at(-1)).toBe(
       'This user message already started 5 backtests. No backtest started. Ask the user before you start more backtests.',
     );
+  });
+});
+
+describe('the sweep tools (25.4.6)', () => {
+  test('the sweep tools only read, and read_sweep keeps the parameters and the main metrics of each run', async () => {
+    const conversations = await openConversations([
+      call('read_sweep_parameters', { strategy_version_id: 102 }),
+      call('list_sweeps'),
+      call('read_sweep', { sweep_id: 4 }),
+      { text: 'Done.' },
+    ]);
+
+    await runOnce(conversations);
+
+    expect(web.requests.map((request) => `${request.method} ${request.path}`)).toEqual([
+      'GET /api/sweeps/parameters?strategy_version_id=102',
+      'GET /api/sweeps',
+      'GET /api/sweeps/4',
+    ]);
+    const [parameters, list, sweep] = readToolResults() as [unknown, unknown, { runs: unknown[]; note: string }];
+    expect(parameters).toEqual(SWEEP_PARAMETERS);
+    expect(list).toEqual(SWEEP_LIST);
+    expect(sweep.runs).toEqual([
+      {
+        backtest_id: 21,
+        parameters: { fast_period: 5 },
+        status: 'finished',
+        metrics: {
+          total_return_percent: '12.5',
+          cagr_percent: null,
+          sharpe_ratio: '1.4',
+          sortino_ratio: null,
+          max_drawdown_percent: null,
+          profit_factor: null,
+          win_rate_percent: null,
+          trade_count: null,
+        },
+      },
+      { backtest_id: 22, parameters: { fast_period: 6 }, status: 'failed', metrics: null },
+    ]);
+    expect(sweep).toMatchObject({ id: SWEEP.id, grid: SWEEP.grid });
+    expect(sweep.note).toContain('DSR');
   });
 });
 

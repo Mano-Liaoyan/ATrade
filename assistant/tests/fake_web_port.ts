@@ -117,6 +117,25 @@ export function screenResultBody(offset: number, limit: number) {
   };
 }
 export const TRADE_COUNT = 60;
+export const SWEEP_PARAMETERS = { parameters: [{ name: 'fast_period', type: 'int', default: 7 }] };
+export const SWEEP_LIST = [{ id: 4, strategy_version_id: 102, run_count: 2, status_counts: { finished: 1, failed: 1 } }];
+/** GET /api/sweeps/4 as port 8001 gives it: a finished run with all metrics and a failed run without metrics. */
+export const SWEEP = {
+  id: 4,
+  strategy_version_id: 102,
+  grid: [{ name: 'fast_period', start: 5, end: 6, step: 1 }],
+  run_count: 2,
+  status_counts: { finished: 1, failed: 1 },
+  runs: [
+    {
+      backtest_id: 21,
+      parameters: { fast_period: 5 },
+      status: 'finished',
+      metrics: { total_return_percent: '12.5', sharpe_ratio: '1.4', final_equity_usd: '11250', missing_reasons: {} },
+    },
+    { backtest_id: 22, parameters: { fast_period: 6 }, status: 'failed', metrics: null },
+  ],
+};
 
 export function versionBody(versionNumber: number) {
   const isRuleBuilder = versionNumber === 1;
@@ -207,6 +226,9 @@ class FakeRoutes {
       'POST /api/backtests': () => this.startBacktest(),
       'GET /api/backtests': () => ({ status: 200, body: this.port.backtestList }),
       'GET /api/backtests/11/comparison/12': () => ({ status: 200, body: COMPARISON }),
+      'GET /api/sweeps/parameters?strategy_version_id=102': () => ({ status: 200, body: SWEEP_PARAMETERS }),
+      'GET /api/sweeps': () => ({ status: 200, body: SWEEP_LIST }),
+      'GET /api/sweeps/4': () => ({ status: 200, body: SWEEP }),
       'GET /api/screen-indicators': () => ({ status: 200, body: this.port.indicatorCatalog }),
       'GET /api/screens': () => ({ status: 200, body: SCREEN_LIST }),
       'GET /api/screens/5': () => ({ status: 200, body: SCREEN }),
