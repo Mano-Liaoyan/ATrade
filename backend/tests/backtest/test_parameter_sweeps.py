@@ -239,9 +239,18 @@ async def test_a_run_gives_its_parameters_to_the_strategy_and_counts_as_a_trial(
     assert backtest["robustness"]["trial_count"] == 1
 
 
-def test_the_port_8001_app_has_no_sweep_routes(database_url: str, clock: FixedClock, frontend_build_dir: Path) -> None:
+def test_the_port_8001_app_has_only_the_sweep_read_routes(
+    database_url: str, clock: FixedClock, frontend_build_dir: Path
+) -> None:
+    """The AI assistant reads sweeps but does not start, cancel, or delete one (assistant.md 25.4.6)."""
     app = create_port_app(database_url, clock, frontend_build_dir)
 
-    paths: dict[str, object] = app.openapi()["paths"]
+    paths: dict[str, dict[str, object]] = app.openapi()["paths"]
+    sweep_paths = {path: operations for path, operations in paths.items() if path.startswith("/api/sweeps")}
+    sweep_routes = {(method.upper(), path) for path, operations in sweep_paths.items() for method in operations}
 
-    assert [path for path in paths if path.startswith("/api/sweeps")] == []
+    assert sweep_routes == {
+        ("GET", "/api/sweeps/parameters"),
+        ("GET", "/api/sweeps"),
+        ("GET", "/api/sweeps/{sweep_id}"),
+    }
