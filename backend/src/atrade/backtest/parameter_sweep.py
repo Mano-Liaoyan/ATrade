@@ -172,6 +172,20 @@ async def cancel_queued_runs(connection: psycopg.AsyncConnection, *, sweep_id: i
     )
 
 
+async def requeue_failed_runs(connection: psycopg.AsyncConnection, *, sweep_id: int) -> int:
+    """Sets the failed and timed-out runs of the sweep to queued again and returns their count. The runs keep their
+    IDs, so they wait before the backtests that were queued after the sweep. A failed run has no result rows: the
+    child writes them in the same transaction as the status "finished" (section 10.11.2)."""
+    cursor = await connection.execute(
+        """
+        UPDATE backtest SET status = 'queued', started_at_utc = NULL, ended_at_utc = NULL, error_message = NULL
+        WHERE sweep_id = %(id)s AND status IN ('failed', 'timed_out')
+        """,
+        {"id": sweep_id},
+    )
+    return cursor.rowcount
+
+
 async def delete_sweep(connection: psycopg.AsyncConnection, sweep_id: int) -> str | None:
     """Deletes the sweep and its runs with their result rows (ON DELETE CASCADE). Returns the reason of a refusal, or
     None after the delete. The row locks stop the start of a queued run after the check. Section 10.11.2."""
