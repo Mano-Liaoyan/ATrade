@@ -121,6 +121,72 @@ def set_run_status(database_url: str, backtest_id: int, status: str) -> None:
 
 
 @pytest.mark.anyio
+async def test_requeue_failed_queues_only_the_failed_and_timed_out_runs_again(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    sweep = (await start_sweep(web_client, [QUANTITY_GRID])).json()
+    failed_id, timed_out_id, finished_id = (run["backtest_id"] for run in sweep["runs"])
+    with psycopg.connect(database_url, autocommit=True) as connection:
+        connection.execute(
+            """
+            UPDATE backtest SET status = 'failed', started_at_utc = now(), ended_at_utc = now(),
+                error_message = 'The backtest process ended with exit code -9 and no result.'
+            WHERE id = %(id)s
+            """,
+            {"id": failed_id},
+        )
+    set_run_status(database_url, timed_out_id, "timed_out")
+    set_run_status(database_url, finished_id, "finished")
+
+    response = await web_client.post(f"/api/sweeps/{sweep['id']}/requeue-failed")
+
+    assert response.status_code == 200, response.text
+    assert response.json()["status_counts"] == {"queued": 2, "finished": 1}
+    requeued = (await web_client.get(f"/api/backtests/{failed_id}")).json()
+    assert requeued["status"] == "queued"
+    assert [requeued[key] for key in ("started_at_utc", "ended_at_utc", "error_message")] == [None, None, None]
+
+
+@pytest.mark.anyio
+async def test_a_requeued_run_runs_again_and_finishes(
+    web_client: httpx.AsyncClient, database_url: str, clock: FixedClock
+) -> None:
+    save_test_bars(database_url)
+    grid = [{"name": "trade_quantity_shares", "start": 3, "end": 3, "step": 1}]
+    sweep = (await start_sweep(web_client, grid)).json()
+    backtest_id = sweep["runs"][0]["backtest_id"]
+    set_run_status(database_url, backtest_id, "failed")
+    await web_client.post(f"/api/sweeps/{sweep['id']}/requeue-failed")
+
+    async with run_backtest_runner(web_client, database_url, clock, timeout_seconds=60):
+        backtest = await wait_for_final_status(web_client, backtest_id)
+
+    assert backtest["status"] == "finished", backtest["error_message"]
+    assert {trade["quantity_shares"] for trade in backtest["trades"]} == {"3"}
+
+
+@pytest.mark.anyio
+async def test_requeue_failed_refuses_a_sweep_without_failed_runs(
+    web_client: httpx.AsyncClient, database_url: str
+) -> None:
+    save_test_bars(database_url)
+    sweep = (await start_sweep(web_client, [QUANTITY_GRID])).json()
+    await web_client.post(f"/api/sweeps/{sweep['id']}/cancel")
+
+    response = await web_client.post(f"/api/sweeps/{sweep['id']}/requeue-failed")
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": f"Parameter sweep #{sweep['id']} has no failed or timed-out runs."}
+    assert (await web_client.get(f"/api/sweeps/{sweep['id']}")).json()["status_counts"] == {"cancelled": 3}
+
+
+@pytest.mark.anyio
+async def test_requeue_failed_of_a_missing_sweep_is_404(web_client: httpx.AsyncClient) -> None:
+    assert (await web_client.post("/api/sweeps/999/requeue-failed")).status_code == 404
+
+
+@pytest.mark.anyio
 async def test_delete_removes_the_sweep_and_its_runs(web_client: httpx.AsyncClient, database_url: str) -> None:
     save_test_bars(database_url)
     sweep = (await start_sweep(web_client, [QUANTITY_GRID])).json()

@@ -38,6 +38,7 @@ export {
   listSweeps,
   readSweep,
   readSweepParameters,
+  requeueFailedRuns,
   startSweep,
   type Sweep,
   type SweepDetail,

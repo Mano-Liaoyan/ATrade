@@ -2293,6 +2293,56 @@
         }
       }
     },
+    "/api/sweeps/{sweep_id}/requeue-failed": {
+      "post": {
+        "summary": "Requeue Failed Runs",
+        "description": "Queues the failed and timed-out runs again, for example after the kernel stopped them when memory was low.\nThe runs that finished stay.",
+        "operationId": "requeue_failed_runs_api_sweeps__sweep_id__requeue_failed_post",
+        "parameters": [
+          {
+            "name": "sweep_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Sweep Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SweepDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is refused (detail is a text), or a field is not valid (detail is a list).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          }
+        }
+      }
+    },
     "/api/forward-tests/capital": {
       "get": {
         "summary": "Read Capital",

@@ -1,6 +1,6 @@
 // Calls the sweep HTTP routes and returns each answer as a result that the sweep pages can show.
 import { describe, expect, it } from 'vite-plus/test';
-import { deleteSweep, readSweep, readSweepParameters } from './index';
+import { deleteSweep, readSweep, readSweepParameters, requeueFailedRuns } from './index';
 
 describe('readSweep', () => {
   it('reads the sweep at its route', async () => {
@@ -34,6 +34,26 @@ describe('deleteSweep', () => {
     const refusingFetch: typeof fetch = () => Promise.resolve(new Response(JSON.stringify({ detail }), { status: 409 }));
 
     expect(await deleteSweep(refusingFetch, 4)).toEqual({ kind: 'failed', message: detail });
+  });
+});
+
+describe('requeueFailedRuns', () => {
+  it('sends POST to the requeue route and returns the sweep', async () => {
+    let sent = '';
+    const recordingFetch: typeof fetch = (path, init) => {
+      sent = `${init?.method ?? 'GET'} ${path as string}`;
+      return Promise.resolve(new Response(JSON.stringify({ id: 4, runs: [] }), { status: 200 }));
+    };
+
+    expect(await requeueFailedRuns(recordingFetch, 4)).toEqual({ kind: 'ok', value: { id: 4, runs: [] } });
+    expect(sent).toBe('POST /api/sweeps/4/requeue-failed');
+  });
+
+  it('gives the reason when the backend refuses the requeue', async () => {
+    const detail = 'Parameter sweep #4 has no failed or timed-out runs.';
+    const refusingFetch: typeof fetch = () => Promise.resolve(new Response(JSON.stringify({ detail }), { status: 422 }));
+
+    expect(await requeueFailedRuns(refusingFetch, 4)).toEqual({ kind: 'failed', message: detail });
   });
 });
 

@@ -1389,6 +1389,15 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 - The user can cancel a sweep. The queued runs get the status `cancelled`.
   A running run continues to its end. A sweep has no status column: its
   status is the run count of each status (#203).
+- The user can queue the failed and timed-out runs of a sweep again, for
+  example after the kernel stopped them when memory was low. The runs keep
+  their IDs, parameters, and universe members. Their status changes to
+  `queued`, and the start time, the end time, and the error message are
+  removed. A failed run has no result rows: the child writes them in one
+  transaction with the status `finished`. The finished runs stay. The
+  requeued runs keep their place in the queue by ID, so they start before
+  the backtests that were queued after the sweep. The trial count of the
+  sweep does not change, because no run is added.
 - The user can delete a sweep when no run is queued or running. The delete
   removes the runs and their result rows. A strategy delete also deletes its
   sweeps.
@@ -1420,6 +1429,7 @@ Phase 3. Sources: [#131](https://github.com/Mano-Liaoyan/ATrade/issues/131),
 | `GET /api/sweeps` | `200` with all sweeps, the newest first. Each sweep has `id`, `strategy_version_id`, `strategy_id`, `strategy_name`, `version_number` (#204), `grid`, `created_at_utc`, `run_count`, and `status_counts` (the number of runs in each status that has runs). |
 | `GET /api/sweeps/{sweep_id}` | `200` with the sweep and `runs` (`[{"backtest_id", "parameters", "status", "metrics"}]`). `404` when the sweep does not exist. |
 | `POST /api/sweeps/{sweep_id}/cancel` | `200` with the sweep. The queued runs get `cancelled`. `404` when the sweep does not exist. |
+| `POST /api/sweeps/{sweep_id}/requeue-failed` | `200` with the sweep. The `failed` and `timed_out` runs get `queued` again (section 10.11.2). `404` when the sweep does not exist. `422` when the sweep has no failed or timed-out run: "Parameter sweep #<id> has no failed or timed-out runs." |
 | `DELETE /api/sweeps/{sweep_id}` | A true delete of the sweep, its runs, and their result rows. `204` when deleted. `404` when the sweep does not exist. `409` with the reason: "Parameter sweep #<id> has queued or running runs. Wait for their end." or "A run of parameter sweep #<id> is the same-period backtest of a forward test." |
 
 - `strategy` exports the function that reads the parameters with the AST.
@@ -1445,6 +1455,10 @@ chart is hard to read on flat Carbon surfaces.
   - A status line with the number of finished, failed, running, and queued
     runs: each count follows its status icon, and the status word is the
     tooltip of the icon.
+  - When the sweep has failed or timed-out runs, the "Requeue <n> failed
+    runs" icon button comes before the delete button. It sends
+    `POST /api/sweeps/{id}/requeue-failed`. An inline error notification
+    ("Failed runs not requeued") shows a refusal.
   - The "Delete parameter sweep" icon button opens a danger `Dialog` with only
     the title ("Delete parameter sweep #<id>?") and the buttons "Cancel" and
     "Delete parameter sweep". It sends `DELETE /api/sweeps/{id}`. An inline

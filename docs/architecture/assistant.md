@@ -209,9 +209,10 @@ These routes are not on port 8001:
   `POST /api/custom-indicators/{custom_indicator_id}/keep`
 - the HK instrument list changes
 - the daily bar update
-- `POST /api/sweeps`, `POST /api/sweeps/{sweep_id}/cancel`, and
+- `POST /api/sweeps`, `POST /api/sweeps/{sweep_id}/cancel`,
+  `POST /api/sweeps/{sweep_id}/requeue-failed`, and
   `DELETE /api/sweeps/{sweep_id}`: the AI assistant reads sweeps but does
-  not start, cancel, or delete one (25.4.6)
+  not start, cancel, requeue, or delete one (25.4.6)
 - all `/ws/` routes
 
 ## 25.4 Tools
